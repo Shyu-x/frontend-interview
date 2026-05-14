@@ -31,6 +31,14 @@
 - [ ] 增加手写题解题思路
 - [ ] 添加更多代码示例
 
+### Phase 3：Agent 系统 (进行中 🔄)
+
+- [x] 前端 SSE 流式对话 UI (React + Vite)
+- [x] 后端 NestJS + LangChain 服务
+- [x] TypeScript Agent 实现
+- [ ] 添加更多内置工具
+- [ ] 支持多模型 (OpenAI/Gemini)
+
 ### Phase 3：体验优化 (待规划 📋)
 
 - [ ] 添加 Mermaid 图表
