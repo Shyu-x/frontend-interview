@@ -113,6 +113,13 @@ nav:
     - performance/index.md
   - 手写代码:
     - coding/index.md
+  - AI Agent 篇:
+    - agent/index.md
+    - agent/tool-patterns.md
+    - agent/streaming-patterns.md
+    - agent/multi-model-integration.md
+    - agent/mcp-integration.md
+    - agent/claude-code-analysis.md
 
 extra:
   generator: false
