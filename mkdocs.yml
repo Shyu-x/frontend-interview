@@ -115,11 +115,23 @@ nav:
     - coding/index.md
   - AI Agent 篇:
     - agent/index.md
+    - agent/claude-code-analysis.md
+    - agent/claude-code-deep-analysis.md
+    - agent/opencode-analysis.md
+    - agent/agent-comparison.md
+    - agent/agent-frameworks.md
+    - agent/layered-architecture.md
+    - agent/state-machine-patterns.md
+    - agent/react-pattern.md
+    - agent/plan-execute-pattern.md
+    - agent/tool-orchestration.md
     - agent/tool-patterns.md
     - agent/streaming-patterns.md
     - agent/multi-model-integration.md
     - agent/mcp-integration.md
-    - agent/claude-code-analysis.md
+    - agent/rag-deep-dive.md
+    - agent/memory-system.md
+    - agent/langchain-deep-dive.md
 
 extra:
   generator: false
