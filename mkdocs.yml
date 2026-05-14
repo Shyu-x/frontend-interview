@@ -132,6 +132,14 @@ nav:
     - agent/rag-deep-dive.md
     - agent/memory-system.md
     - agent/langchain-deep-dive.md
+    - agent/langgraph-checkpointing.md
+    - agent/multi-agent-patterns.md
+    - agent/crewai-flows.md
+    - agent/autogen-groupchat.md
+    - agent/agent-evaluation.md
+    - agent/production-deployment.md
+    - agent/mcp-servers-ecosystem.md
+    - agent/research-findings.md
 
 extra:
   generator: false
