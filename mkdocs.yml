@@ -105,14 +105,14 @@ nav:
     - js/section-13-18.md
     - js/section-19-25.md
   - TypeScript 篇:
-    - typescript/index.md
+    - TypeScript 核心概念与面试题: typescript/index.md
   - 网络篇:
     - network/section-5-12.md
     - network/section-13-20.md
   - 性能优化:
-    - performance/index.md
+    - 前端性能优化全攻略: performance/index.md
   - 手写代码:
-    - coding/index.md
+    - 手写代码题库: coding/index.md
   - AI Agent 篇:
     - 概述与入门:
       - agent/index.md
