@@ -5,15 +5,47 @@
 
 #### 1.1 标准盒模型（W3C Box Model）
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-1.png)
-
+```mermaid
+flowchart TB
+    N0["margin"]
+    N1["border"]
+    N2["padding"]
+    N3["content"]
+    N4["width/height"]
+    N5["元素总宽度 = margin-left + border-left + padd"]
+    N6["+ width（content）"]
+    N7["+ padding-right + border-right + margin-"]
+    N8["元素总高度 = margin-top + border-top + paddin"]
+    N9["+ height（content）"]
+    N10["+ padding-bottom + border-bottom + margi"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+```
 
 #### 1.2 IE 盒模型（替代盒模型）
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-2.png)
-
+```mermaid
+flowchart TB
+    N0["width = content + padding + border（全部包含在"]
+    N1["height 同理"]
+    N2["margin"]
+    N3["border"]
+    N4["padding"]
+    N5["content"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+```
 
 #### 1.3 box-sizing 属性
 
@@ -60,9 +92,26 @@
 
 当两个垂直方向（上下）的 margin 相邻时，它们会合并为一个 margin，取较大值。
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-3.png)
-
+```mermaid
+flowchart TB
+    N0["父元素"]
+    N1["子元素"]
+    N2["margin-top: 20px"]
+    N3["margin-top 合并"]
+    N4["合并为 20px（而不是 20px + 20px）"]
+    N5["两个垂直相邻的 margin 会塌陷："]
+    N6[".margin1 { margin-bottom: 20px; }"]
+    N7[".margin2 { margin-top: 30px; }"]
+    N8["// 最终间距 = max(20, 30) = 30px（不是 50px）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+```
 
 **margin 塌陷的三种情况：**
 1. 相邻兄弟元素之间
@@ -218,9 +267,22 @@ flowchart TB
 - 按网格轨道（grid track）排列
 - 网格线（grid line）定义放置规则
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-6.png)
-
+```mermaid
+flowchart TB
+    N0["GFC（网格格式化上下文）"]
+    N1["grid-item"]
+    N2["grid-item"]
+    N3["行1"]
+    N4["grid-item"]
+    N5["grid-item"]
+    N6["行2"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+```
 
 ---
 
@@ -399,9 +461,32 @@ will-change: <上述任意属性>;
 
 #### 5.1 Flex 布局基本概念
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-9.png)
-
+```mermaid
+flowchart TB
+    N0["flex container"]
+    N1["flex-"]
+    N2["flex-"]
+    N3["flex-"]
+    N4["item 1"]
+    N5["item 2"]
+    N6["item 3"]
+    N7["主轴（main axis）：默认水平，flex-direction 控制"]
+    N8["交叉轴（cross axis）：默认垂直，与主轴垂直"]
+    N9["main start main end"]
+    N10["cross start"]
+    N11["cross end"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+```
 
 #### 5.2 flex 容器属性
 
@@ -1361,9 +1446,28 @@ transform: translateZ(0);
 
 #### 16.1 line-height 垂直居中原理
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-14.png)
-
+```mermaid
+flowchart TB
+    N0["文字在行盒中垂直居中的原理："]
+    N1["line-height（行高） 上下 padding+content 共同撑"]
+    N2["line box（行盒）"]
+    N3["行盒高度 = line-height"]
+    N4["content area(内容区)"]
+    N5["content area 高度 ≈ font-size"]
+    N6["文字 x-height"]
+    N7["════════════════"]
+    N8["══════════════════"]
+    N9["文字在 content area 中按 baseline 对齐"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+```
 
 ```css
 /* 单行文字垂直居中 */
@@ -4698,9 +4802,22 @@ Access-Control-Max-Age: 86400
 
 ### 6.20 nginx 正向代理 vs 反向代理 vs 负载均衡
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-38.png)
-
+```mermaid
+flowchart TB
+    N0["正向代理 vs 反向代理:"]
+    N1["正向代理: 代理站在客户端侧，代表客户端"]
+    N2["用户 > 正向代理 > 目标网站"]
+    N3["用途: 翻墙、企业内网过滤"]
+    N4["反向代理: 代理站在服务器侧，代表服务器"]
+    N5["用户 > 反向代理 > 应用服务器 A/B/C"]
+    N6["用途: 负载均衡、安全防护、SSL 终止"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+```
 
 ```nginx
 upstream backend {
@@ -7278,9 +7395,18 @@ Vue 批量更新（Batching）：同一事件循环内的多次状态变更会�
 
 #### diff策略（同层比较）
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-58.png)
-
+```mermaid
+flowchart TB
+    N0["旧 VNode 树"]
+    N1["div (same) diff children"]
+    N2["p (same) diff children"]
+    N3["span (moved) move"]
+    N4["h1 (removed)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+```
 
 Vue2 diff 核心：`updateChildren` 方法，4指针头尾比较
 
@@ -8496,9 +8622,18 @@ module.exports = {
 | 关系 | chunk 是 bundle 的中间态 | 一个或多个 chunk 组合成一个 bundle |
 | 类型 | entry chunk, async chunk, runtime chunk | JS/CSS/HTML bundle |
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-70.png)
-
+```mermaid
+flowchart TB
+    N0["编译产物："]
+    N1["dist/"]
+    N2["main.js main bundle（来自 entry chunk）"]
+    N3["vendors.js vendor chunk bundle（splitCh"]
+    N4["Home.abc123.js 异步 chunk bundle（dynamic"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+```
 
 ---
 
@@ -8835,9 +8970,78 @@ start({ prefetch: 'all', singular: true })
 
 ### 10.18 Module Federation 原理（webpack5）
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-72.png)
-
+```mermaid
+flowchart TB
+    N0["Module Federation = webpack5 内置的微前端/微模块方"]
+    N1["允许在运行时从远程构建加载模块（无需构建时依赖）"]
+    N2["架构："]
+    N3["Host (主应用)"]
+    N4["Remote (远程构建)"]
+    N5["import('"]
+    N6["exposes: {"]
+    N7["'remote/"]
+    N8["'./Button':"]
+    N9["Button'"]
+    N10["'./Button'"]
+    N11["')"]
+    N12["shared: ["]
+    N13["shared: ["]
+    N14["'vue'"]
+    N15["共享"]
+    N16["'vue'"]
+    N17["单例"]
+    N18["// Host 配置"]
+    N19["new ModuleFederationPlugin({"]
+    N20["name: 'host',"]
+    N21["remotes: {"]
+    N22["remote_app: 'remote_app@http://localhost"]
+    N23["},"]
+    N24["shared: ['vue']"]
+    N25["})"]
+    N26["// Remote 配置"]
+    N27["new ModuleFederationPlugin({"]
+    N28["name: 'remote_app',"]
+    N29["filename: 'remoteEntry.js',"]
+    N30["exposes: {"]
+    N31["'./Button': './src/Button.vue'"]
+    N32["},"]
+    N33["shared: ['vue']"]
+    N34["})"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+```
 
 **Module Federation vs qiankun**：
 - qiankun：运行在主应用框架内，需要注册子应用，框架无关但需要适配
@@ -8847,9 +9051,30 @@ start({ prefetch: 'all', singular: true })
 
 ### 10.19 ESLint 原理（AST遍历 + 规则检测）
 
-
-![mermaid diagram](assets/images/mermaid/css-hyper-frequencies-73.png)
-
+```mermaid
+flowchart TB
+    N0["ESLint 工作流程："]
+    N1["源代码"]
+    N2["1. Parser（解析）"]
+    N3["ESPree AST"]
+    N4["支持 TypeScript/JSX 等（@typescript-eslint"]
+    N5["2. Linter.lint()（执行）"]
+    N6["FlatConfig 或 .eslintrc.js 配置"]
+    N7["加载 plugin/rule"]
+    N8["遍历 AST，调用各规则检测"]
+    N9["3. 报告违规"]
+    N10["{ ruleId, message, line, column, severit"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+```
 
 ```javascript
 // 自定义 ESLint 规则
