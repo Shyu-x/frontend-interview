@@ -8,23 +8,28 @@
 
 `Proxy` 是 ES6 引入的元编程能力，用于拦截和自定义对象的基本操作（get、set、delete 等）。每个拦截行为称为一个 **trap**（陷阱），与 `Reflect` API 一一对应。
 
-```
-Proxy 工作原理
-
-┌──────────────────────────────────────────────────────────────────┐
-│  Proxy（代理对象）                                                 │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  new Proxy(target, handler)                                 │  │
-│  │                                                            │  │
-│  │  proxy.name          ──→  get trap  ──→  Reflect.get()     │  │
-│  │  proxy.age = 18      ──→  set trap  ──→  Reflect.set()    │  │
-│  │  delete proxy.name   ──→  deleteProperty trap             │  │
-│  │  'name' in proxy     ──→  has trap  ──→  Reflect.has()    │  │
-│  │  Object.keys(proxy)  ──→  ownKeys trap ──→ Reflect.ownKeys│  │
-│  │  proxy()             ──→  apply trap  ──→ Reflect.apply()│  │
-│  │  new proxy()         ──→  construct trap                  │  │
-│  └────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Proxy["Proxy（代理对象）"]
+        subgraph handler["new Proxy(target, handler)"]
+            A["proxy.name<br/>proxy.age = 18<br/>delete proxy.name<br/>'name' in proxy<br/>Object.keys(proxy)<br/>proxy()<br/>new proxy()"]
+        end
+    end
+    A -->|"get trap"| B["Reflect.get()"]
+    A -->|"set trap"| C["Reflect.set()"]
+    A -->|"deleteProperty trap"| D["deleteProperty"]
+    A -->|"has trap"| E["Reflect.has()"]
+    A -->|"ownKeys trap"| F["Reflect.ownKeys"]
+    A -->|"apply trap"| G["Reflect.apply()"]
+    A -->|"construct trap"| H["construct trap"]
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#fff3e0
+    style D fill:#fff3e0
+    style E fill:#fff3e0
+    style F fill:#fff3e0
+    style G fill:#fff3e0
+    style H fill:#fff3e0
 ```
 
 #### 完整 Proxy Handler 示例
@@ -395,24 +400,20 @@ revoke(); // 一旦调用，proxy 的所有操作都抛出 TypeError
 
 ### 20.1 核心区别与对比
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        ESM vs CJS 完整对比                           │
-├──────────────────┬────────────────────────┬────────────────────────┤
-│  特性             │  ESM（ES Module）        │  CJS（CommonJS）        │
-├──────────────────┼────────────────────────┼────────────────────────┤
-│  语法             │  import / export        │  require / module.exports│
-│  加载时机         │  编译时（静态分析）        │  运行时（动态解析）       │
-│  import 位置      │  必须在模块顶层          │  可以在条件语句中        │
-│  导出值           │  绑定（只读 live binding）│  值拷贝                 │
-│  循环引用         │  暂时性死区（TDZ）       │  缓存机制                │
-│  this            │  undefined              │  当前模块对象            │
-│  严格模式         │  自动开启                │  不自动开启              │
-│  浏览器           │  需要 type="module"     │  不支持                 │
-│  异步加载         │  支持（import()）        │  不支持                 │
-│  Tree Shaking    │  支持                   │  不支持（但 rollup 可）  │
-│  导出数量         │  可多导出                │  通常单个 module.exports │
-└──────────────────┴────────────────────────┴────────────────────────┘
+```mermaid
+table
+| 特性 | ESM（ES Module） | CJS（CommonJS） |
+| 语法 | import / export | require / module.exports |
+| 加载时机 | 编译时（静态分析） | 运行时（动态解析） |
+| import 位置 | 必须在模块顶层 | 可以在条件语句中 |
+| 导出值 | 绑定（只读 live binding） | 值拷贝 |
+| 循环引用 | 暂时性死区（TDZ） | 缓存机制 |
+| this | undefined | 当前模块对象 |
+| 严格模式 | 自动开启 | 不自动开启 |
+| 浏览器 | 需要 type="module" | 不支持 |
+| 异步加载 | 支持（import()） | 不支持 |
+| Tree Shaking | 支持 | 不支持（但 rollup 可） |
+| 导出数量 | 可多导出 | 通常单个 module.exports |
 ```
 
 ### 20.2 编译时 vs 运行时
@@ -506,30 +507,26 @@ Tree Shaking 是打包工具（Rollup、Webpack 4+）通过静态分析 ESM 依�
 ```
 Tree Shaking 原理
 
-源代码（ESM）
-┌──────────────────────────────────────────┐
-│  // utils.js                              │
-│  export function used() { return 1; }     │
-│  export function unused() { return 2; }   │
-│                                           │
-│  // main.js                               │
-│  import { used } from './utils.js';       │
-│  console.log(used());                     │
-└──────────────────────────────────────────┘
-
-静态分析依赖图（打包阶段，不执行代码）
-┌──────────────────────────────────────────┐
-│  打包工具检测到：                          │
-│  - used() 被 main.js 引用 ✓ 保留          │
-│  - unused() 没有任何引用者 ✗ 标记为 dead   │
-└──────────────────────────────────────────┘
-
-最终打包结果
-┌──────────────────────────────────────────┐
-│  // 只包含 used                             │
-│  export function used() { return 1; }     │
-└──────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph 源代码["源代码（ESM）"]
+        A1["// utils.js<br/>export function used() { return 1; }<br/>export function unused() { return 2; }"]
+        A2["// main.js<br/>import { used } from './utils.js';<br/>console.log(used());"]
+    end
+    subgraph 分析["静态分析依赖图（打包阶段）"]
+        B["打包工具检测到：<br/>used() 被引用 ✓ 保留<br/>unused() 无引用者 ✗ dead"]
+    end
+    subgraph 结果["最终打包结果"]
+        C["// 只包含 used<br/>export function used() { return 1; }"]
+    end
+    A1 --> B
+    A2 --> B
+    B --> C
+    style B fill:#fff3cd
+    style C fill:#d4edda
 ```
+
+### 20.5 Tree Shaking 条件
 
 #### Tree Shaking 条件
 

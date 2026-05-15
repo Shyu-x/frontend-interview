@@ -5,44 +5,46 @@
 
 #### 1.1 标准盒模型（W3C Box Model）
 
-```
-┌──────────────────────────────────────┐
-│              margin                  │
-│  ┌────────────────────────────────┐  │
-│  │           border               │  │
-│  │  ┌──────────────────────────┐  │  │
-│  │  │        padding           │  │  │
-│  │  │  ┌────────────────────┐  │  │  │
-│  │  │  │                    │  │  │  │
-│  │  │  │     content        │  │  │  │
-│  │  │  │   width/height     │  │  │  │
-│  │  │  │                    │  │  │  │
-│  │  │  └────────────────────┘  │  │  │
-│  │  └──────────────────────────┘  │  │  │
-│  └────────────────────────────────┘  │
-└──────────────────────────────────────┘
-
-元素总宽度 = margin-left + border-left + padding-left
-           + width（content）
-           + padding-right + border-right + margin-right
-
-元素总高度 = margin-top + border-top + padding-top
-           + height（content）
-           + padding-bottom + border-bottom + margin-bottom
+```mermaid
+flowchart TB
+    N0["margin"]
+    N1["border"]
+    N2["padding"]
+    N3["content"]
+    N4["width/height"]
+    N5["元素总宽度 = margin-left + border-left + padd"]
+    N6["+ width（content）"]
+    N7["+ padding-right + border-right + margin-"]
+    N8["元素总高度 = margin-top + border-top + paddin"]
+    N9["+ height（content）"]
+    N10["+ padding-bottom + border-bottom + margi"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 #### 1.2 IE 盒模型（替代盒模型）
 
-```
-width = content + padding + border（全部包含在内）
-height 同理
-
-┌──────────────────────────────────────┐
-│              margin                  │
-│  ┌────────────────────────────────┐  │
-│  │  border  │    padding    │content│  │
-│  └────────────────────────────────┘  │
-└──────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["width = content + padding + border（全部包含在"]
+    N1["height 同理"]
+    N2["margin"]
+    N3["border"]
+    N4["padding"]
+    N5["content"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
 ```
 
 #### 1.3 box-sizing 属性
@@ -90,20 +92,25 @@ height 同理
 
 当两个垂直方向（上下）的 margin 相邻时，它们会合并为一个 margin，取较大值。
 
-```
-┌─────────────┐
-│  父元素     │
-│ ┌─────────┐ │
-│ │ 子元素   │ │
-│ │ margin-top: 20px │     margin-top 合并
-│ └─────────┘ │
-└─────────────┘
-         ↓ 合并为 20px（而不是 20px + 20px）
-
-两个垂直相邻的 margin 会塌陷：
-.margin1 { margin-bottom: 20px; }
-.margin2 { margin-top: 30px; }
-// 最终间距 = max(20, 30) = 30px（不是 50px）
+```mermaid
+flowchart TB
+    N0["父元素"]
+    N1["子元素"]
+    N2["margin-top: 20px"]
+    N3["margin-top 合并"]
+    N4["合并为 20px（而不是 20px + 20px）"]
+    N5["两个垂直相邻的 margin 会塌陷："]
+    N6[".margin1 { margin-bottom: 20px; }"]
+    N7[".margin2 { margin-top: 30px; }"]
+    N8["// 最终间距 = max(20, 30) = 30px（不是 50px）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 **margin 塌陷的三种情况：**
@@ -121,20 +128,19 @@ height 同理
 - BFC 不被浮动元素覆盖
 - 计算 BFC 高度时，浮动子元素也参与计算（清除浮动）
 
-```
-┌──────────────────────────────────────────┐
-│         BFC 区域（独立渲染上下文）          │
-│                                          │
-│  ┌─────────┐  ← 同一个 BFC 内，垂直排列   │
-│  │ Box 1   │                            │
-│  └─────────┘                            │
-│       ↓ margin 折叠                      │
-│  ┌─────────┐                            │
-│  │ Box 2   │                            │
-│  └─────────┘                            │
-│                                          │
-│  ↑ BFC 外元素不受 BFC 内 margin 影响      │
-└──────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["BFC 区域（独立渲染上下文）"]
+    N1["同一个 BFC 内，垂直排列"]
+    N2["Box 1"]
+    N3["margin 折叠"]
+    N4["Box 2"]
+    N5["BFC 外元素不受 BFC 内 margin 影响"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
 ```
 
 #### 2.3 如何触发 BFC
@@ -223,20 +229,25 @@ display: flow-root;
 - `line-height` 决定行盒高度
 - `vertical-align` 调整垂直对齐
 
-```
-┌─────────────────────────────────────────┐
-│  行盒（Line Box）                        │
-│  ┌───────┐      ┌─────────────┐         │
-│  │ inline│      │inline-block │  ↑     │
-│  │ text  │      │   height:   │  │     │
-│  │       │      │   30px      │  │     │
-│  └───────┘      └─────────────┘  │     │
-│                      ↑           │     │
-│  ┌─────────┐   ┌───┴───┐        │     │
-│  │  img ↑  │   │ text  │  ↓      │     │
-│  │(默认baseline)│      │        │     │
-│  └─────────┘   └───────┘        ↓     │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["行盒（Line Box）"]
+    N1["inline"]
+    N2["inline-block"]
+    N3["text"]
+    N4["height:"]
+    N5["30px"]
+    N6["img"]
+    N7["text"]
+    N8["(默认baseline)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 #### 3.2 FFC（Flex Formatting Context）
@@ -256,19 +267,21 @@ display: flow-root;
 - 按网格轨道（grid track）排列
 - 网格线（grid line）定义放置规则
 
-```
-┌────────────────────────────────────────┐
-│          GFC（网格格式化上下文）          │
-│                                        │
-│  ┌──────────────┬──────────────┐      │
-│  │  grid-item   │   grid-item   │  ← 行1│
-│  │              │              │      │
-│  ├──────────────┼──────────────┤      │
-│  │  grid-item   │   grid-item   │  ← 行2│
-│  │              │              │      │
-│  └──────────────┴──────────────┘      │
-│                                        │
-└────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["GFC（网格格式化上下文）"]
+    N1["grid-item"]
+    N2["grid-item"]
+    N3["行1"]
+    N4["grid-item"]
+    N5["grid-item"]
+    N6["行2"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
 ```
 
 ---
@@ -314,22 +327,25 @@ display: flow-root;
 
 #### 4.3 固定定位（fixed）失效原因
 
-```
-┌──────────────────────────────────────────────────┐
-│  fixed 失效的常见原因：                            │
-│                                                  │
-│  1. 祖先元素设置了 transform（即使 transform: none）│
-│     → fixed 相对于 transform 祖先定位，而不是视口   │
-│                                                  │
-│  2. 祖先元素设置了 filter                         │
-│     → 同样会创建新的堆叠上下文                     │
-│                                                  │
-│  3. 移动端 WebView 中 fixed 行为异常              │
-│     → iOS Safari 使用惯性滚动时 fixed 会"飘"      │
-│                                                  │
-│  4. 使用了某些 CSS 属性导致创建了新的容器          │
-│     → perspective, will-change 等                │
-└──────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["fixed 失效的常见原因："]
+    N1["1. 祖先元素设置了 transform（即使 transform: none）"]
+    N2["fixed 相对于 transform 祖先定位，而不是视口"]
+    N3["2. 祖先元素设置了 filter"]
+    N4["同样会创建新的堆叠上下文"]
+    N5["3. 移动端 WebView 中 fixed 行为异常"]
+    N6["iOS Safari 使用惯性滚动时 fixed 会'飘'"]
+    N7["4. 使用了某些 CSS 属性导致创建了新的容器"]
+    N8["perspective, will-change 等"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 **解决方案：**
@@ -356,23 +372,25 @@ body {
 ```
 
 **sticky 原理：**
-```
-滚动容器
-┌────────────────────────────────────────┐
-│  初始位置                              │
-│  ┌──────────────────────┐             │
-│  │ sticky 元素          │  ← 正常文档流│
-│  └──────────────────────┘             │
-│                                        │
-│  滚动至 sticky 阈值                   │
-│  ══════════════════════════════ top:10px
-│  ┌──────────────────────┐  固定不动   │
-│  │ sticky 元素          │  ↑          │
-│  └──────────────────────┘             │
-│                                        │
-│  继续滚动，sticky 随内容离开容器       │
-│                                        │
-└────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["滚动容器"]
+    N1["初始位置"]
+    N2["sticky 元素"]
+    N3["正常文档流"]
+    N4["滚动至 sticky 阈值"]
+    N5["══════════════════════════════ top:10px"]
+    N6["固定不动"]
+    N7["sticky 元素"]
+    N8["继续滚动，sticky 随内容离开容器"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 **sticky 注意事项：**
@@ -443,23 +461,31 @@ will-change: <上述任意属性>;
 
 #### 5.1 Flex 布局基本概念
 
-```
-┌────────────────────────────────────────────────────┐
-│                  flex container                     │
-│                                                     │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐         │
-│   │ flex-   │  │ flex-   │  │ flex-   │         │
-│   │ item 1  │  │ item 2  │  │ item 3  │         │
-│   └──────────┘  └──────────┘  └──────────┘         │
-│                                                     │
-│  主轴（main axis）：默认水平，flex-direction 控制     │
-│  交叉轴（cross axis）：默认垂直，与主轴垂直            │
-│                                                     │
-│  main start ──────────────────────────── main end   │
-│  cross start                                        │
-│              ↓                                     │
-│            cross end                                │
-└────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["flex container"]
+    N1["flex-"]
+    N2["flex-"]
+    N3["flex-"]
+    N4["item 1"]
+    N5["item 2"]
+    N6["item 3"]
+    N7["主轴（main axis）：默认水平，flex-direction 控制"]
+    N8["交叉轴（cross axis）：默认垂直，与主轴垂直"]
+    N9["main start main end"]
+    N10["cross start"]
+    N11["cross end"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
 ```
 
 #### 5.2 flex 容器属性
@@ -908,23 +934,37 @@ p strong { font-size: 1.25em; /* 16*1.25=20px */ }
 ```
 
 **核心原理图（圣杯）：**
-```
-初始（浮动）：
-┌────────┬────────┬────────┐
-│ Main   │  Nav   │ Aside │  ← 全浮动，main 宽度100%，左右栏被挤到下一行
-└────────┴────────┴────────┘
-
-margin-left 负值拉回：
-第一行：Main（width:100%）
-第二行：[Nav][Aside]
-       ↑ margin-left:-100% 拉 Nav 到第一行最左
-       ↑ margin-left:-200px 拉 Aside 到第一行最右
-
-最终（加 padding + relative 偏移）：
-┌────────────────────────────────┐
-│ ████padding-left████padding-right████ │
-│ ███Nav████│████Main████│██Aside██ │
-└────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["初始（浮动）："]
+    N1["Main"]
+    N2["Nav"]
+    N3["Aside"]
+    N4["全浮动，main 宽度100%，左右栏被挤到下一行"]
+    N5["margin-left 负值拉回："]
+    N6["第一行：Main（width:100%）"]
+    N7["第二行：[Nav][Aside]"]
+    N8["margin-left:-100% 拉 Nav 到第一行最左"]
+    N9["margin-left:-200px 拉 Aside 到第一行最右"]
+    N10["最终（加 padding + relative 偏移）："]
+    N11["████padding-left████padding-right████"]
+    N12["███Nav████"]
+    N13["████Main████"]
+    N14["██Aside██"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
 ```
 
 **圣杯 vs 双飞翼 区别：**
@@ -938,23 +978,25 @@ margin-left 负值拉回：
 
 #### 9.1 浮动原理
 
-```
-浮动元素脱离文档流，但不完全脱离：
-1. 浮动元素从正常流中抽出，位置向左/右移动
-2. 后续块级元素忽略浮动（但行内元素感知浮动）
-3. 浮动元素在行框内排列（行内内容围绕浮动元素）
-
-正常文档流：
-┌─────┐ ┌─────┐ ┌─────┐
-│  A  │ │  B  │ │  C  │  ← 块级元素垂直排列
-└─────┘ └─────┘ └─────┘
-
-A 左浮动后：
-┌────────┐
-│   A    │  ┌──┐  ┌──┐
-└────────┘  │B │  │C │  ← B/C 占据 A 右侧空间（块级不感知浮动）
-            └──┘  └──┘
-             ↑ 行内内容围绕 B（左浮动）
+```mermaid
+flowchart TB
+    N0["浮动元素脱离文档流，但不完全脱离："]
+    N1["1. 浮动元素从正常流中抽出，位置向左/右移动"]
+    N2["2. 后续块级元素忽略浮动（但行内元素感知浮动）"]
+    N3["3. 浮动元素在行框内排列（行内内容围绕浮动元素）"]
+    N4["正常文档流："]
+    N5["块级元素垂直排列"]
+    N6["A 左浮动后："]
+    N7["B/C 占据 A 右侧空间（块级不感知浮动）"]
+    N8["行内内容围绕 B（左浮动）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 #### 9.2 清除浮动方式
@@ -985,16 +1027,21 @@ A 左浮动后：
 
 #### 9.3 overflow:hidden 清除浮动的原理
 
-```
-overflow: hidden 触发 BFC（块格式化上下文）
-→ BFC 的特性：计算高度时，浮动子元素也参与计算
-→ 所以父容器被浮动子元素撑开
-→ 视觉上等于"清除了浮动"
-
-┌──────────────────────┐
-│ float-child    ↑    │  ← float-child 仍在文档中
-│                │撑开父元素 │
-└──────────────────────┘
+```mermaid
+flowchart TB
+    N0["overflow: hidden 触发 BFC（块格式化上下文）"]
+    N1["BFC 的特性：计算高度时，浮动子元素也参与计算"]
+    N2["所以父容器被浮动子元素撑开"]
+    N3["视觉上等于'清除了浮动'"]
+    N4["float-child"]
+    N5["float-child 仍在文档中"]
+    N6["撑开父元素"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
 ```
 
 ---
@@ -1296,21 +1343,23 @@ el.style.width = '200px';          /* 差 */
 
 #### 14.1 transform 不触发回流的原因
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  渲染流水线：                                            │
-│                                                         │
-│  DOM → Style → Layout → Paint → Composite → 显示         │
-│                      ↑          ↑         ↑             │
-│                    回流        重绘       GPU合成        │
-│                  (昂贵)      (中等)      (快速)          │
-│                                                         │
-│  transform/opacity 变化：                                │
-│  DOM → Style → [跳过Layout] → [跳过Paint] → Composite →  │
-│                                                         │
-│  浏览器知道这些变化不影响几何属性，                        │
-│  可以直接交给 GPU 处理 → 不触发回流/重绘                   │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["渲染流水线："]
+    N1["DOM Style Layout Paint Composite"]
+    N2["回流 重绘 GPU合成"]
+    N3["(昂贵) (中等) (快速)"]
+    N4["transform/opacity 变化："]
+    N5["DOM Style [跳过Layout] [跳过Paint] C"]
+    N6["浏览器知道这些变化不影响几何属性，"]
+    N7["可以直接交给 GPU 处理 不触发回流/重绘"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
 ```
 
 #### 14.2 GPU 加速原理
@@ -1397,21 +1446,27 @@ transform: translateZ(0);
 
 #### 16.1 line-height 垂直居中原理
 
-```
-文字在行盒中垂直居中的原理：
-
-┌─ line-height（行高）───────┐  ← 上下 padding+content 共同撑起行高
-│                           │
-│   ┌─ line box（行盒）─────┐ │  ← 行盒高度 = line-height
-│   │                       │ │
-│   │  content area(内容区) │ │  ← content area 高度 ≈ font-size
-│   │  文字 x-height        │ │
-│   │  ════════════════     │ │
-│   │  ══════════════════  │ │  ← 文字在 content area 中按 baseline 对齐
-│   │                       │ │
-│   └───────────────────────┘ │
-│                           │
-└───────────────────────────┘
+```mermaid
+flowchart TB
+    N0["文字在行盒中垂直居中的原理："]
+    N1["line-height（行高） 上下 padding+content 共同撑"]
+    N2["line box（行盒）"]
+    N3["行盒高度 = line-height"]
+    N4["content area(内容区)"]
+    N5["content area 高度 ≈ font-size"]
+    N6["文字 x-height"]
+    N7["════════════════"]
+    N8["══════════════════"]
+    N9["文字在 content area 中按 baseline 对齐"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
 ```
 
 ```css
@@ -2383,37 +2438,57 @@ Site Isolation 是 Chrome 2018年引入的安全机制，确保**不同站点的
 
 #### 编译流程
 
-```javascript
-// 源代码
-function add(a, b) {
-  return a + b;
-}
-add(1, 2);
-add(3, 4);
-
-// Step 1: Scanner -> Token 流
-// Token: [function, add, (, a, ,, b, ), {, return, a, +, b, ;, }]
-
-// Step 2: Parser -> AST
-// Program
-//   └── FunctionDeclaration (add)
-//         ├── params: [a, b]
-//         └── body: ReturnStatement
-//               └── BinaryExpression (+)
-//                     ├── Identifier: a
-//                     └── Identifier: b
-
-// Step 3: Ignition (解释器) -> 字节码
-// LdaNamedProperty a0, [0]    ; 加载 a
-// Star r1                     ; 存到 r1
-// LdaNamedProperty a1, [1]    ; 加载 b
-// Add r1                      ; 相加
-// Return                      ; 返回
-
-// Step 4: Hot Code 触发 TurboFan 优化
-// 如果 add 函数被调用多次（如1000次+），TurboFan 识别热代码
-// 生成优化机器码，使用 SSA (Static Single Assignment)
-// 类型专门化: 如果 a,b 始终是整数，优化为快速整数加法
+```mermaid
+flowchart TB
+    N0["// 源代码"]
+    N1["function add(a, b) {"]
+    N2["return a + b;"]
+    N3["add(1, 2);"]
+    N4["add(3, 4);"]
+    N5["// Step 1: Scanner -> Token 流"]
+    N6["// Token: [function, add, (, a, ,, b, ),"]
+    N7["// Step 2: Parser -> AST"]
+    N8["// Program"]
+    N9["// FunctionDeclaration (add)"]
+    N10["// params: [a, b]"]
+    N11["// body: ReturnStatement"]
+    N12["// BinaryExpression (+)"]
+    N13["// Identifier: a"]
+    N14["// Identifier: b"]
+    N15["// Step 3: Ignition (解释器) -> 字节码"]
+    N16["// LdaNamedProperty a0, [0] ; 加载 a"]
+    N17["// Star r1 ; 存到 r1"]
+    N18["// LdaNamedProperty a1, [1] ; 加载 b"]
+    N19["// Add r1 ; 相加"]
+    N20["// Return ; 返回"]
+    N21["// Step 4: Hot Code 触发 TurboFan 优化"]
+    N22["// 如果 add 函数被调用多次（如1000次+），TurboFan 识别热代"]
+    N23["// 生成优化机器码，使用 SSA (Static Single Assignm"]
+    N24["// 类型专门化: 如果 a,b 始终是整数，优化为快速整数加法"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
 ```
 
 #### Hidden Class（隐藏类）
@@ -2473,95 +2548,115 @@ function getX(obj) {
 
 ### 5.5 浏览器输入 URL 到页面展示：完整 14 步
 
-```
-用户输入 URL
-     │
-     ▼
-Step 1: URL 解析
-     - 地址栏判断是搜索词还是 URL
-     - 若无协议前缀，自动补全 https://
-     - Chrome 同时启动预搜索（Omnibox suggestion）
-     │
-     ▼
-Step 2: 检查 HSTS 预加载列表
-     - 若命中 HSTS，从 HTTP 升级到 HTTPS
-     │
-     ▼
-Step 3: DNS 解析（详见 5.6 节）
-     - 浏览器 DNS 缓存 -> 系统 DNS 缓存 -> hosts 文件 -> DNS 服务器
-     │
-     ▼
-Step 4: 建立 TCP 连接（三次握手）
-     - 若 HTTPS，还要 TLS 握手
-     │
-     ▼
-Step 5: 发送 HTTP 请求
-     GET /index.html HTTP/1.1
-     Host: www.example.com
-     Accept: text/html
-     ...
-     │
-     ▼
-Step 6: 服务器处理请求，返回 HTTP 响应
-     │
-     ▼
-Step 7: 检查缓存（强缓存/协商缓存，详见 5.8 节）
-     │
-     ▼
-Step 8: 准备渲染进程（Render Process）
-     - 根据 Site Isolation 规则分配/复用渲染进程
-     - 若已存在相同站点的渲染进程，可能复用（process reuse）
-     │
-     ▼
-Step 9: 渲染进程主线程开始工作
-     │
-     ▼ 9a: 解析 HTML -> DOM Tree
-     │  HTML Parser 边扫描边构建 Token -> DOM 节点
-     │  遇到 <link> 触发 CSS 解析 -> CSSOM
-     │  遇到 <script> 阻塞 HTML 解析（无 defer/async）
-     │  遇到 <img>/<script src> 预扫描器发现并通知网络线程
-     │
-     ▼ 9b: 解析 CSS -> CSSOM Tree
-     │  CSS Parser 构建 CSS 规则树
-     │  计算每个 DOM 节点的最终样式（Style Calculation）
-     │
-     ▼ 9c: 生成 Render Tree
-     │  DOM Tree + CSSOM Tree -> Render Tree
-     │  可见节点 + 样式信息，display:none 的节点不进入 Render Tree
-     │
-     ▼ 9d: Layout（布局）
-     │  计算每个元素的几何信息（位置、大小）
-     │  涉及回流（reflow）—— 昂贵的布局计算
-     │
-     ▼ 9e: Paint（绘制）
-     │  将布局信息转换为绘制记录（Paint Records）
-     │  分层（Layer），每个合成层独立绘制
-     │
-     ▼ 9f: 分层与合成（Composite）
-     │  Compositor Thread 对各合成层进行光栅化
-     │  合成层按 z-index 叠加，生成最终帧
-     │
-     ▼
-Step 10: 显示页面内容（First Contentful Paint / FCP）
-     │
-     ▼
-Step 11: 执行 JavaScript（JS 线程）
-     - 若有 Web Worker，并行执行，不阻塞主线程
-     - requestAnimationFrame 调度
-     - Intersection Observer 触发懒加载
-     │
-     ▼
-Step 12: 加载执行剩余资源
-     - 懒加载图片、Code Splitting 动态导入
-     - Intersection Observer 触发图片加载
-     │
-     ▼
-Step 13: 页面可交互（Time to Interactive / TTI）
-     │
-     ▼
-Step 14: 后台标签静默期
-     - 预渲染（Back/Forward Cache / bfcache）
-     - 定期触发回流/重绘以保持活性
+```mermaid
+flowchart TB
+    N0["用户输入 URL"]
+    N1["Step 1: URL 解析"]
+    N2["- 地址栏判断是搜索词还是 URL"]
+    N3["- 若无协议前缀，自动补全 https://"]
+    N4["- Chrome 同时启动预搜索（Omnibox suggestion）"]
+    N5["Step 2: 检查 HSTS 预加载列表"]
+    N6["- 若命中 HSTS，从 HTTP 升级到 HTTPS"]
+    N7["Step 3: DNS 解析（详见 5.6 节）"]
+    N8["- 浏览器 DNS 缓存 -> 系统 DNS 缓存 -> hosts 文件 ->"]
+    N9["Step 4: 建立 TCP 连接（三次握手）"]
+    N10["- 若 HTTPS，还要 TLS 握手"]
+    N11["Step 5: 发送 HTTP 请求"]
+    N12["GET /index.html HTTP/1.1"]
+    N13["Host: www.example.com"]
+    N14["Accept: text/html"]
+    N15["..."]
+    N16["Step 6: 服务器处理请求，返回 HTTP 响应"]
+    N17["Step 7: 检查缓存（强缓存/协商缓存，详见 5.8 节）"]
+    N18["Step 8: 准备渲染进程（Render Process）"]
+    N19["- 根据 Site Isolation 规则分配/复用渲染进程"]
+    N20["- 若已存在相同站点的渲染进程，可能复用（process reuse）"]
+    N21["Step 9: 渲染进程主线程开始工作"]
+    N22["9a: 解析 HTML -> DOM Tree"]
+    N23["HTML Parser 边扫描边构建 Token -> DOM 节点"]
+    N24["遇到 <link> 触发 CSS 解析 -> CSSOM"]
+    N25["遇到 <script> 阻塞 HTML 解析（无 defer/async）"]
+    N26["遇到 <img>/<script src> 预扫描器发现并通知网络线程"]
+    N27["9b: 解析 CSS -> CSSOM Tree"]
+    N28["CSS Parser 构建 CSS 规则树"]
+    N29["计算每个 DOM 节点的最终样式（Style Calculation）"]
+    N30["9c: 生成 Render Tree"]
+    N31["DOM Tree + CSSOM Tree -> Render Tree"]
+    N32["可见节点 + 样式信息，display:none 的节点不进入 Render T"]
+    N33["9d: Layout（布局）"]
+    N34["计算每个元素的几何信息（位置、大小）"]
+    N35["涉及回流（reflow）—— 昂贵的布局计算"]
+    N36["9e: Paint（绘制）"]
+    N37["将布局信息转换为绘制记录（Paint Records）"]
+    N38["分层（Layer），每个合成层独立绘制"]
+    N39["9f: 分层与合成（Composite）"]
+    N40["Compositor Thread 对各合成层进行光栅化"]
+    N41["合成层按 z-index 叠加，生成最终帧"]
+    N42["Step 10: 显示页面内容（First Contentful Paint /"]
+    N43["Step 11: 执行 JavaScript（JS 线程）"]
+    N44["- 若有 Web Worker，并行执行，不阻塞主线程"]
+    N45["- requestAnimationFrame 调度"]
+    N46["- Intersection Observer 触发懒加载"]
+    N47["Step 12: 加载执行剩余资源"]
+    N48["- 懒加载图片、Code Splitting 动态导入"]
+    N49["- Intersection Observer 触发图片加载"]
+    N50["Step 13: 页面可交互（Time to Interactive / TTI"]
+    N51["Step 14: 后台标签静默期"]
+    N52["- 预渲染（Back/Forward Cache / bfcache）"]
+    N53["- 定期触发回流/重绘以保持活性"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
 ```
 
 ---
@@ -2570,27 +2665,29 @@ Step 14: 后台标签静默期
 
 #### DNS 解析流程
 
-```
-浏览器缓存 (Chrome: chrome://net-internals/#dns)
-     │
-     ▼ [不存在]
-系统缓存 (Windows: ipconfig /displaydns, macOS: lookupd)
-     │
-     ▼ [不存在]
-本地 DNS 解析器 (/etc/resolv.conf, 通常是 ISP 或 Google 8.8.8.8)
-     │
-     ▼
-根域名服务器 (.) —— 全球13组根服务器
-     │  .com .net .org ...
-     ▼
-顶级域名服务器 (TLD) —— .com 的 TLD 服务器
-     │
-     ▼
-权威域名服务器 —— example.com 的 NS 记录
-     │
-     ▼
-A 记录 / AAAA 记录
-     IP: 93.184.216.34
+```mermaid
+flowchart TB
+    N0["浏览器缓存 (Chrome: chrome://net-internals/"]
+    N1["[不存在]"]
+    N2["系统缓存 (Windows: ipconfig /displaydns, mac"]
+    N3["[不存在]"]
+    N4["本地 DNS 解析器 (/etc/resolv.conf, 通常是 ISP 或"]
+    N5["根域名服务器 (.) —— 全球13组根服务器"]
+    N6[".com .net .org ..."]
+    N7["顶级域名服务器 (TLD) —— .com 的 TLD 服务器"]
+    N8["权威域名服务器 —— example.com 的 NS 记录"]
+    N9["A 记录 / AAAA 记录"]
+    N10["IP: 93.184.216.34"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 #### DNS 缓存层级
@@ -2634,28 +2731,33 @@ const dnsQuery = async (domain) => {
 
 #### 完整缓存决策流程
 
-```
-HTTP 响应到达浏览器
-         │
-         ▼
-检查 Cache-Control: max-age / Expires (强缓存)
-         │
-    ┌────┴────┐
-    │  命中    │ 不命中
-    ▼         ▼
-直接使用缓存   检查 ETag / Last-Modified (协商缓存)
-(200 OK)          │
-             ┌────┴────┐
-             │  命中    │ 不命中
-             ▼         ▼
-         使用缓存    发送条件请求
-         (304)       (If-None-Match / If-Modified-Since)
-                         │
-                   ┌─────┴─────┐
-                   │ 服务端确认 │
-                   ▼           ▼
-              304 Not        200 返回
-              Modified       新资源
+```mermaid
+flowchart TB
+    N0["HTTP 响应到达浏览器"]
+    N1["检查 Cache-Control: max-age / Expires (强缓存"]
+    N2["命中"]
+    N3["不命中"]
+    N4["直接使用缓存 检查 ETag / Last-Modified (协商缓存)"]
+    N5["(200 OK)"]
+    N6["命中"]
+    N7["不命中"]
+    N8["使用缓存 发送条件请求"]
+    N9["(304) (If-None-Match / If-Modified-Since"]
+    N10["服务端确认"]
+    N11["304 Not 200 返回"]
+    N12["Modified 新资源"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
 ```
 
 #### 强缓存详解
@@ -2749,50 +2851,69 @@ app.get('/static/:filename', (req, res) => {
 
 #### 渲染流水线
 
-```
-HTML 字符串
-    │
-    ▼
-┌─────────────────┐
-│  HTML Parser     │  ── Tokenizer ──> HTML Token 流
-│  (HTML 解析器)    │
-└────────┬────────┘
-         │ 构建 DOM 节点
-         ▼
-┌─────────────────┐
-│   DOM Tree      │  ← JS 可以通过 DOM API 操作
-│   (DOM 树)       │
-└────────┬────────┘
-         │ + CSSOM 更新通知
-         ▼
-┌─────────────────┐
-│  Style          │  计算每个 DOM 节点的 Computed Style
-│  (样式计算)       │
-└────────┬────────┘
-         │ 可见节点
-         ▼
-┌─────────────────┐
-│  Render Tree   │  ← 不包含 display:none 节点
-│  (渲染树)        │    包含每个可见节点的样式信息
-└────────┬────────┘
-         │ Layout 信息
-         ▼
-┌─────────────────┐
-│  Layout        │  计算几何信息 (x, y, width, height)
-│  (布局/回流)     │  任何改变几何属性的操作都触发回流
-└────────┬────────┘
-         │ Paint 信息
-         ▼
-┌─────────────────┐
-│  Paint          │  生成绘制记录 (Paint Records)
-│  (绘制)          │  确定绘制顺序（按 z-index 分层）
-└────────┬────────┘
-         │ Layer 信息
-         ▼
-┌─────────────────┐
-│  Composite      │  合成层分组 -> 光栅化 -> 合成帧
-│  (合成)          │
-└─────────────────┘
+```mermaid
+flowchart TB
+    N0["HTML 字符串"]
+    N1["HTML Parser"]
+    N2["Tokenizer > HTML Token 流"]
+    N3["(HTML 解析器)"]
+    N4["构建 DOM 节点"]
+    N5["DOM Tree"]
+    N6["JS 可以通过 DOM API 操作"]
+    N7["(DOM 树)"]
+    N8["+ CSSOM 更新通知"]
+    N9["Style"]
+    N10["计算每个 DOM 节点的 Computed Style"]
+    N11["(样式计算)"]
+    N12["可见节点"]
+    N13["Render Tree"]
+    N14["不包含 display:none 节点"]
+    N15["(渲染树)"]
+    N16["包含每个可见节点的样式信息"]
+    N17["Layout 信息"]
+    N18["Layout"]
+    N19["计算几何信息 (x, y, width, height)"]
+    N20["(布局/回流)"]
+    N21["任何改变几何属性的操作都触发回流"]
+    N22["Paint 信息"]
+    N23["Paint"]
+    N24["生成绘制记录 (Paint Records)"]
+    N25["(绘制)"]
+    N26["确定绘制顺序（按 z-index 分层）"]
+    N27["Layer 信息"]
+    N28["Composite"]
+    N29["合成层分组 -> 光栅化 -> 合成帧"]
+    N30["(合成)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
 ```
 
 #### CSS 选择器优先级
@@ -2813,20 +2934,29 @@ HTML 字符串
 
 #### DOM Tree 与 Render Tree 生成
 
-```
-DOM Tree:                              Render Tree:
-                                       
-html ──> html                           html
-  ├── head ──> head (不可见，跳过)          │
-  │     └── link ──> link (不可见，跳过)    │
-  └── body ──> body                     body
-        ├── div ──> div                 ├── div (可见, 包含样式)
-        │     └── "text" ──> text       │     └── "text"
-        └── p#intro ──> p (可见)          └── p#intro (可见, 包含样式)
-              └── "Hello" ──> text            └── "Hello"
-
-注: display:none 元素的节点从 DOM 中保留，但不出现在 Render Tree 中
-    visibility:hidden 元素出现在 Render Tree 中，但不可见
+```mermaid
+flowchart TB
+    N0["DOM Tree: Render Tree:"]
+    N1["html > html html"]
+    N2["head > head (不可见，跳过)"]
+    N3["link > link (不可见，跳过)"]
+    N4["body > body body"]
+    N5["div > div div (可见, 包含样式)"]
+    N6["'text' > text"]
+    N7["'text'"]
+    N8["'Hello' > text 'Hello'"]
+    N9["注: display:none 元素的节点从 DOM 中保留，但不出现在 Ren"]
+    N10["visibility:hidden 元素出现在 Render Tree 中，但不"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 ---
@@ -2952,24 +3082,35 @@ element.style.opacity = '0.5'                   // 合成属性
 
 #### defer vs async 对比
 
-```
-时间轴:
-|--- HTML Parsing ---|-- PAINT --|
-                                     (defer 执行点)
-                      (async 执行点，立即)
-
-Case: <script src="a.js" defer></script>
-  HTML 解析 ────────── [a.js 完成后执行]
-  a.js 下载 ──────────────────────────────────
-
-Case: <script src="b.js" async></script>
-  HTML 解析 ────────
-  b.js 下载 ─── [b.js 执行] ─────────────────
-                (下载完立即执行，不保证顺序)
-
-Case: <script src="c.js"></script> (无属性)
-  HTML 解析 ──────────── [c.js 执行] ──────────
-  c.js 下载 ──────────────────────────────────
+```mermaid
+flowchart TB
+    N0["时间轴:"]
+    N1["|--- HTML Parsing ---|-- PAINT --|"]
+    N2["(defer 执行点)"]
+    N3["(async 执行点，立即)"]
+    N4["Case: <script src='a.js' defer></script>"]
+    N5["HTML 解析 [a.js 完成后执行]"]
+    N6["a.js 下载"]
+    N7["Case: <script src='b.js' async></script>"]
+    N8["HTML 解析"]
+    N9["b.js 下载 [b.js 执行]"]
+    N10["(下载完立即执行，不保证顺序)"]
+    N11["Case: <script src='c.js'></script> (无属性)"]
+    N12["HTML 解析 [c.js 执行]"]
+    N13["c.js 下载"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
 ```
 
 | 特性 | 无属性 | defer | async |
@@ -3085,15 +3226,21 @@ request.onsuccess = () => {
 
 ### 5.13 浏览器跨 Tab 通信
 
-```
-通信方式全景:
-
-Tab A                          Tab B
-  │                               │
-  │── BroadcastChannel ──────────>│
-  │── localStorage + storage 事件 ─>│
-  │── SharedWorker ─────────────>│
-  │── postMessage ─────────────>│  (需引用对方 window 对象)
+```mermaid
+flowchart TB
+    N0["通信方式全景:"]
+    N1["Tab A Tab B"]
+    N2["BroadcastChannel >"]
+    N3["localStorage + storage 事件 >"]
+    N4["SharedWorker >"]
+    N5["postMessage >"]
+    N6["(需引用对方 window 对象)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
 ```
 
 #### BroadcastChannel（现代，推荐）
@@ -3280,34 +3427,63 @@ performance.measure('Duration', 'start-operation', 'end-operation');
 
 #### Lighthouse 原理
 
-```
-Lighthouse 工作流程:
-
-1. 启动: 通过 Chrome DevTools Protocol (CDP) 控制无头浏览器
-
-2. 加载页面: 通过 CDP 导航到目标 URL
-
-3. 全局检查:
-   - Service Worker 检查
-   - Computed CSS 收集
-   - DOM 树信息收集
-
-4. 运行 Auditors（审计项）:
-   ┌──────────────────┬──────────────────┬──────────────────┐
-   │ Performance      │ PWA              │ Best Practices   │
-   ├──────────────────┼──────────────────┼──────────────────┤
-   │ FCP / LCP        │ manifest         │ image aspect    │
-   │ TBT / TTI        │ service worker   │ deprecated APIs │
-   │ CLS              │ offline          │ HTTPS           │
-   │ Speed Index      │ installable      │ console errors  │
-   └──────────────────┴──────────────────┴──────────────────┘
-
-5. 生成报告:
-   - 计算加权总分（0-100）
-   - 输出优化建议（Opportunities + Diagnostics）
-   - 支持 HTML/JSON/CSV 格式
-
-6. Lighthouse CI: 可集成到 CI/CD，阻止性能退化
+```mermaid
+flowchart TB
+    N0["Lighthouse 工作流程:"]
+    N1["1. 启动: 通过 Chrome DevTools Protocol (CDP)"]
+    N2["2. 加载页面: 通过 CDP 导航到目标 URL"]
+    N3["3. 全局检查:"]
+    N4["- Service Worker 检查"]
+    N5["- Computed CSS 收集"]
+    N6["- DOM 树信息收集"]
+    N7["4. 运行 Auditors（审计项）:"]
+    N8["Performance"]
+    N9["PWA"]
+    N10["Best Practices"]
+    N11["FCP / LCP"]
+    N12["manifest"]
+    N13["image aspect"]
+    N14["TBT / TTI"]
+    N15["service worker"]
+    N16["deprecated APIs"]
+    N17["CLS"]
+    N18["offline"]
+    N19["HTTPS"]
+    N20["Speed Index"]
+    N21["installable"]
+    N22["console errors"]
+    N23["5. 生成报告:"]
+    N24["- 计算加权总分（0-100）"]
+    N25["- 输出优化建议（Opportunities + Diagnostics）"]
+    N26["- 支持 HTML/JSON/CSV 格式"]
+    N27["6. Lighthouse CI: 可集成到 CI/CD，阻止性能退化"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
 ```
 
 ---
@@ -3372,60 +3548,93 @@ const Dashboard = React.lazy(() => import('./Dashboard'));
 
 #### 版本演进全景
 
-```
-HTTP/0.9 (1991)  ── 单行协议，只支持 GET，无 header
-HTTP/1.0 (1996)  ── 引入请求头/响应头、MIME 类型
-HTTP/1.1 (1997)  ── 引入 keep-alive、管道化、缓存控制
-HTTP/2 (2015)    ── 二进制分帧、多路复用、HPACK 压缩
-HTTP/3 (2022)    ── QUIC (UDP) 替代 TCP，消除 TCP 队头阻塞
+```mermaid
+flowchart TB
+    N0["HTTP/0.9 (1991) 单行协议，只支持 GET，无 header"]
+    N1["HTTP/1.0 (1996) 引入请求头/响应头、MIME 类型"]
+    N2["HTTP/1.1 (1997) 引入 keep-alive、管道化、缓存控制"]
+    N3["HTTP/2 (2015) 二进制分帧、多路复用、HPACK 压缩"]
+    N4["HTTP/3 (2022) QUIC (UDP) 替代 TCP，消除 TCP 队"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
 ```
 
 #### HTTP/1.1 的队头阻塞
 
-```
-HTTP/1.1 管道化（仍受队头阻塞影响）:
-
-客户端                                    服务器
-  ├─ GET /a.html ────────────────────────> │
-  ├─ GET /b.html ───────────────────────> │  管道中，后面的请求
-  ├─ GET /c.html ─────────────────────> │  等待队首响应
-  │                                        │
-  │<────────── Response: a.html ─────────┤  (a 响应慢，b/c 被卡)
-  │<────────── Response: b.html ─────────┤  (即使 b 已准备好)
-  │                                        │
-  问题: 队首的慢响应会阻塞后续所有请求
-
-  现代浏览器解决方案: 多个 TCP 连接（通常 6 个）
+```mermaid
+flowchart TB
+    N0["HTTP/1.1 管道化（仍受队头阻塞影响）:"]
+    N1["客户端 服务器"]
+    N2["GET /a.html >"]
+    N3["GET /b.html >"]
+    N4["管道中，后面的请求"]
+    N5["GET /c.html >"]
+    N6["等待队首响应"]
+    N7["< Response: a.html (a 响应慢，b/c 被卡)"]
+    N8["< Response: b.html (即使 b 已准备好)"]
+    N9["问题: 队首的慢响应会阻塞后续所有请求"]
+    N10["现代浏览器解决方案: 多个 TCP 连接（通常 6 个）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 #### HTTP/2 多路复用
 
-```
-HTTP/2 帧结构:
-+---------------+---------------+---------------+
-| Length (3B)   | Type (1B)     | Flags (1B)    |
-+---------------+---------------+---------------+
-|              Stream Identifier (4B)           |
-+-----------------------------------------------+
-|               Frame Payload (...)             |
-+-----------------------------------------------+
-
-HTTP/2 帧类型:
-  DATA      ── 传输实际数据（请求体/响应体）
-  HEADERS   ── 传输首部
-  SETTINGS  ── 连接级配置
-  WINDOW_UPDATE ── 流控
-  PING      ── 心跳检测
-
-多路复用示例:
-Stream 1 (GET /index.html):
-  HEADERS (stream=1) + DATA (stream=1)
-Stream 3 (GET /style.css):
-  HEADERS (stream=3) + DATA (stream=3)
-Stream 5 (GET /app.js):
-  HEADERS (stream=5) + DATA (stream=5)
-
-帧在同一个 TCP 连接上交织返回，完全并行，无队头阻塞
+```mermaid
+flowchart TB
+    N0["HTTP/2 帧结构:"]
+    N1["+---------------+---------------+-------"]
+    N2["| Length (3B) | Type (1B) | Flags (1B) |"]
+    N3["+---------------+---------------+-------"]
+    N4["| Stream Identifier (4B) |"]
+    N5["+---------------------------------------"]
+    N6["| Frame Payload (...) |"]
+    N7["+---------------------------------------"]
+    N8["HTTP/2 帧类型:"]
+    N9["DATA 传输实际数据（请求体/响应体）"]
+    N10["HEADERS 传输首部"]
+    N11["SETTINGS 连接级配置"]
+    N12["WINDOW_UPDATE 流控"]
+    N13["PING 心跳检测"]
+    N14["多路复用示例:"]
+    N15["Stream 1 (GET /index.html):"]
+    N16["HEADERS (stream=1) + DATA (stream=1)"]
+    N17["Stream 3 (GET /style.css):"]
+    N18["HEADERS (stream=3) + DATA (stream=3)"]
+    N19["Stream 5 (GET /app.js):"]
+    N20["HEADERS (stream=5) + DATA (stream=5)"]
+    N21["帧在同一个 TCP 连接上交织返回，完全并行，无队头阻塞"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
 ```
 
 #### HTTP/2 仍有队头阻塞的原因
@@ -3576,18 +3785,33 @@ QUIC 丢包恢复机制:
 
 #### TCP 滑动窗口
 
-```
-发送方滑动窗口（以字节为单位）:
-
-已发送并 ACK  │ 已发送未 ACK │   可发送区域    │   不能发送
-[SENT & ACKED] │  [SENT NOT ACK] │  [NOT SENT]  │   [CANNOT SEND]
-                ←──────────────────→←─────────────→
-                ↑                  ↑             ↑
-              SND.UNA           SND.NND       SND.UNA + SND.WND
-
-流量控制: 防止发送方超过接收方的处理能力 → 工具: rwnd
-拥塞控制: 防止发送方超过网络的承载能力 → 工具: cwnd
-发送窗口 = min(rwnd, cwnd)
+```mermaid
+flowchart TB
+    N0["发送方滑动窗口（以字节为单位）:"]
+    N1["已发送并 ACK"]
+    N2["已发送未 ACK"]
+    N3["可发送区域"]
+    N4["不能发送"]
+    N5["[SENT & ACKED]"]
+    N6["[SENT NOT ACK]"]
+    N7["[NOT SENT]"]
+    N8["[CANNOT SEND]"]
+    N9["SND.UNA SND.NND SND.UNA + SND.WND"]
+    N10["流量控制: 防止发送方超过接收方的处理能力 工具: rwnd"]
+    N11["拥塞控制: 防止发送方超过网络的承载能力 工具: cwnd"]
+    N12["发送窗口 = min(rwnd, cwnd)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
 ```
 
 #### 拥塞控制四算法
@@ -3643,34 +3867,64 @@ SYN Flood 攻击原理:
 
 #### 为什么是三次握手，不是两次
 
-```
-两次握手的问题:
-- 无法防止历史连接初始化混乱
-- 无法同步初始序列号 (ISN)
-
-三次握手完整过程:
-  Client                                          Server
-    │  ── SYN (seq=x) ──────────────────────> │  Client: 请求连接，发送 ISN=x
-    │  <── SYN+ACK (seq=y, ack=x+1) <───────── │  Server: 同意连接，发送 ISN=y
-    │  ── ACK (seq=x+1, ack=y+1) ───────────> │  握手完成，双方确认对方 ISN
+```mermaid
+flowchart TB
+    N0["两次握手的问题:"]
+    N1["- 无法防止历史连接初始化混乱"]
+    N2["- 无法同步初始序列号 (ISN)"]
+    N3["三次握手完整过程:"]
+    N4["Client Server"]
+    N5["SYN (seq=x) >"]
+    N6["Client: 请求连接，发送 ISN=x"]
+    N7["< SYN+ACK (seq=y, ack=x+1) <"]
+    N8["Server: 同意连接，发送 ISN=y"]
+    N9["ACK (seq=x+1, ack=y+1) >"]
+    N10["握手完成，双方确认对方 ISN"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 #### 为什么是四次挥手
 
-```
-原因: TCP 是全双工通信，每个方向需要单独关闭
-
-挥手详细过程:
-
-Client                                        Server
-  │  Client FIN ────────────────────────────> │  Client 发送完数据，请求关闭
-  │  <── ACK ─────────────────────────────── │  Server 确认收到 FIN
-  │       (Client 进入 FIN_WAIT_2)            │
-  │  此时: Client -> Server 方向已关闭        │
-  │        Server -> Client 方向仍开放        │
-  │  Server 发送 FIN ────────────────────────> │  Server 也发送完数据，请求关闭
-  │  <── ACK ──────────────────────────────── │  Client 确认收到 FIN
-Client 等待 2MSL 后关闭                         Server 关闭连接
+```mermaid
+flowchart TB
+    N0["原因: TCP 是全双工通信，每个方向需要单独关闭"]
+    N1["挥手详细过程:"]
+    N2["Client Server"]
+    N3["Client FIN >"]
+    N4["Client 发送完数据，请求关闭"]
+    N5["< ACK"]
+    N6["Server 确认收到 FIN"]
+    N7["(Client 进入 FIN_WAIT_2)"]
+    N8["此时: Client -> Server 方向已关闭"]
+    N9["Server -> Client 方向仍开放"]
+    N10["Server 发送 FIN >"]
+    N11["Server 也发送完数据，请求关闭"]
+    N12["< ACK"]
+    N13["Client 确认收到 FIN"]
+    N14["Client 等待 2MSL 后关闭 Server 关闭连接"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
 ```
 
 #### TIME_WAIT 存在的理由
@@ -3697,22 +3951,43 @@ Client 等待 2MSL 后关闭                         Server 关闭连接
 
 #### HTTPS 握手（TLS 1.2）
 
-```
-TLS 1.2: 需要 2-RTT
-
-Client                                        Server
-  │  1. TCP 三次握手 ──────────────────────────────────> │
-  │  ─── ClientHello ───────────────────────────────>  │ 支持的 TLS 版本、密码套件、SNI
-  │  <── ServerHello ────────────────────────────────  │ 选择 TLS 版本
-  │  <── Certificate ────────────────────────────────  │ 服务器证书链
-  │  <── ServerHelloDone ───────────────────────────  │
-  │  ─── ClientKeyExchange ────────────────────────>  │ 发送 pre-master secret
-  │  双方计算 master secret                          │
-  │  ─── ChangeCipherSpec ────────────────────────>  │
-  │  <── ChangeCipherSpec ────────────────────────  │
-  │  ─── Finished (加密) ──────────────────────────>  │
-  │  <── Finished (加密) ──────────────────────────  │
-  │  加密通信开始                                    │
+```mermaid
+flowchart TB
+    N0["TLS 1.2: 需要 2-RTT"]
+    N1["Client Server"]
+    N2["1. TCP 三次握手 >"]
+    N3["ClientHello >"]
+    N4["支持的 TLS 版本、密码套件、SNI"]
+    N5["< ServerHello"]
+    N6["选择 TLS 版本"]
+    N7["< Certificate"]
+    N8["服务器证书链"]
+    N9["< ServerHelloDone"]
+    N10["ClientKeyExchange >"]
+    N11["发送 pre-master secret"]
+    N12["双方计算 master secret"]
+    N13["ChangeCipherSpec >"]
+    N14["< ChangeCipherSpec"]
+    N15["Finished (加密) >"]
+    N16["< Finished (加密)"]
+    N17["加密通信开始"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
 ```
 
 #### TLS 1.3 优化
@@ -3769,22 +4044,27 @@ const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 20
 
 #### 证书链验证
 
-```
-证书链结构:
-                    根证书 (Root CA)  ─── 自签名，浏览器内置
-                         │
-                         ▼
-                   中间证书 (Intermediate CA)
-                         │
-                         ▼
-                    站点证书 (End-entity) ─── 域名持有者申请
-
-浏览器验证流程:
-1. 收到服务器证书
-2. 查找中间证书（AIA 字段下载）
-3. 验证每个证书的签名链
-4. 检查 CRL/OCSP 吊销状态
-5. 验证域名匹配、时间有效性
+```mermaid
+flowchart TB
+    N0["证书链结构:"]
+    N1["根证书 (Root CA) 自签名，浏览器内置"]
+    N2["中间证书 (Intermediate CA)"]
+    N3["站点证书 (End-entity) 域名持有者申请"]
+    N4["浏览器验证流程:"]
+    N5["1. 收到服务器证书"]
+    N6["2. 查找中间证书（AIA 字段下载）"]
+    N7["3. 验证每个证书的签名链"]
+    N8["4. 检查 CRL/OCSP 吊销状态"]
+    N9["5. 验证域名匹配、时间有效性"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
 ```
 
 ```http
@@ -3822,57 +4102,73 @@ DNS 污染防御:
 
 ### 6.11 CDN 原理
 
-```
-CDN 架构图:
-
-用户 ──> 浏览器
-            │
-            ▼
-     ┌─────────────────────────────┐
-     │      CDN 全球边缘节点        │
-     │   (Edge Server / PoP)       │
-     │                               │
-     │  北京用户 ──> 北京边缘节点    │  成都用户 ──> 成都边缘节点
-     │  上海用户 ──> 上海边缘节点    │  深圳用户 ──> 深圳边缘节点
-     └─────────────────────────────┘
-            │  (miss 时) 回源
-            ▼
-     ┌─────────────────┐
-     │   CDN 源站       │
-     │  (Origin Server) │
-     └─────────────────┘
+```mermaid
+flowchart TB
+    N0["CDN 架构图:"]
+    N1["用户 > 浏览器"]
+    N2["CDN 全球边缘节点"]
+    N3["(Edge Server / PoP)"]
+    N4["北京用户 > 北京边缘节点"]
+    N5["成都用户 > 成都边缘节点"]
+    N6["上海用户 > 上海边缘节点"]
+    N7["深圳用户 > 深圳边缘节点"]
+    N8["(miss 时) 回源"]
+    N9["CDN 源站"]
+    N10["(Origin Server)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 #### CDN 工作流程
 
-```
-Step 1: 用户首次访问
-  用户 ──> CDN 边缘节点 (MISS) ──> CDN 源站 ──> 返回并缓存
-
-Step 2: 其他用户访问
-  用户 ──> CDN 边缘节点 (HIT) ──> 直接返回（毫秒级）
-
-Step 3: 缓存过期
-  用户 ──> CDN 边缘节点 (EXPIRED) ──> 协商缓存 ──> 更新 TTL
-
-CDN 加速原理:
-1. 就近访问（地理优化）— 物理距离减少 = RTT 降低
-2. 减少源站压力 — 热点资源被边缘节点缓存
-3. 协议优化 — HTTP/2 多路复用、Brotli 压缩、TLS 终止
-4. 边缘计算 — Cloudflare Workers / AWS CloudFront Functions
+```mermaid
+flowchart TB
+    N0["Step 1: 用户首次访问"]
+    N1["用户 > CDN 边缘节点 (MISS) > CDN 源站 > 返回并缓存"]
+    N2["Step 2: 其他用户访问"]
+    N3["用户 > CDN 边缘节点 (HIT) > 直接返回（毫秒级）"]
+    N4["Step 3: 缓存过期"]
+    N5["用户 > CDN 边缘节点 (EXPIRED) > 协商缓存 > 更新 TTL"]
+    N6["CDN 加速原理:"]
+    N7["1. 就近访问（地理优化）— 物理距离减少 = RTT 降低"]
+    N8["2. 减少源站压力 — 热点资源被边缘节点缓存"]
+    N9["3. 协议优化 — HTTP/2 多路复用、Brotli 压缩、TLS 终止"]
+    N10["4. 边缘计算 — Cloudflare Workers / AWS Cloud"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 ---
 
 ### 6.12 WebSocket 原理
 
-```
-WebSocket 与 HTTP 对比:
-
-HTTP/1.1                  WebSocket
-  Client ── HTTP ──>         Client ── HTTP 升级 ──>
-  Client <── HTTP <──        Client <═══ WS 双向 ═══<──
-  Client ── HTTP ──>         (双向实时通信)
+```mermaid
+flowchart TB
+    N0["WebSocket 与 HTTP 对比:"]
+    N1["HTTP/1.1 WebSocket"]
+    N2["Client HTTP > Client HTTP 升级 >"]
+    N3["Client < HTTP < Client <═══ WS 双向 ═══<"]
+    N4["Client HTTP > (双向实时通信)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
 ```
 
 #### WebSocket 握手
@@ -4121,20 +4417,25 @@ SSE 的自动重连是面试高频考点：
 
 #### 6.13.5 选型决策树
 
-```
-需要实时通信？
-  │
-  ├─ 只需服务端推送（服务器→浏览器）？
-  │   │
-  │   ├─ 消息量极大（>10k 连接）？→ SSE（HTTP/2 多路复用更优）
-  │   ├─ 需 AI/LLM 流式输出？→ SSE（原生的 ReadableStream 支持，fetch + EventSource）
-  │   └─ 普通推送（通知、行情）→ SSE（最简单，推荐）
-  │
-  └─ 需要双向通信（浏览器→服务器）？
-      │
-      ├─ 延迟敏感（<100ms），游戏/协作？→ WebSocket
-      ├─ 消息可靠性要求极高？→ WebSocket + 应用层 ACK
-      └─ 低频（每隔几秒才发一条）→ SSE（客户端用 fetch POST 发请求）
+```mermaid
+flowchart TB
+    N0["需要实时通信？"]
+    N1["只需服务端推送（服务器 浏览器）？"]
+    N2["消息量极大（>10k 连接）？ SSE（HTTP/2 多路复用更优）"]
+    N3["需 AI/LLM 流式输出？ SSE（原生的 ReadableStream 支"]
+    N4["普通推送（通知、行情） SSE（最简单，推荐）"]
+    N5["需要双向通信（浏览器 服务器）？"]
+    N6["延迟敏感（<100ms），游戏/协作？ WebSocket"]
+    N7["消息可靠性要求极高？ WebSocket + 应用层 ACK"]
+    N8["低频（每隔几秒才发一条） SSE（客户端用 fetch POST 发请求）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 #### 6.13.6 常见坑点与最佳实践
@@ -4315,25 +4616,51 @@ query {
 
 ### 6.16 301/302/307/308 区别
 
-```http
-┌──────────┬───────────────┬────────────────────┐
-│ 状态码   │ 永久/临时      │ 方法是否改变        │
-├──────────┼───────────────┼────────────────────┤
-│ 301      │ 永久          │ ⚠️ POST 可能变 GET  │
-├──────────┼───────────────┼────────────────────┤
-│ 302      │ 临时          │ ⚠️ POST 可能变 GET  │
-├──────────┼───────────────┼────────────────────┤
-│ 303      │ 临时          │ ❌ 强制变为 GET     │
-├──────────┼───────────────┼────────────────────┤
-│ 307      │ 临时          │ ✅ 严格保持原方法   │
-├──────────┼───────────────┼────────────────────┤
-│ 308      │ 永久          │ ✅ 严格保持原方法   │
-└──────────┴───────────────┴────────────────────┘
-
-// 实际建议:
-永久重定向: 308 (标准) / 301 (兼容旧浏览器)
-临时重定向: 307 (标准) / 302 (兼容旧浏览器)
-POST 处理后重定向: 303 (强制 GET)
+```mermaid
+flowchart TB
+    N0["状态码"]
+    N1["永久/临时"]
+    N2["方法是否改变"]
+    N3["301"]
+    N4["永久"]
+    N5["⚠️ POST 可能变 GET"]
+    N6["302"]
+    N7["临时"]
+    N8["⚠️ POST 可能变 GET"]
+    N9["303"]
+    N10["临时"]
+    N11["❌ 强制变为 GET"]
+    N12["307"]
+    N13["临时"]
+    N14["✅ 严格保持原方法"]
+    N15["308"]
+    N16["永久"]
+    N17["✅ 严格保持原方法"]
+    N18["// 实际建议:"]
+    N19["永久重定向: 308 (标准) / 301 (兼容旧浏览器)"]
+    N20["临时重定向: 307 (标准) / 302 (兼容旧浏览器)"]
+    N21["POST 处理后重定向: 303 (强制 GET)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
 ```
 
 ---
@@ -4447,12 +4774,17 @@ try {
 3. Content-Type 不是简单值（如 application/json）
 ```
 
-```
-预检请求流程:
-浏览器 ── OPTIONS (Origin + Access-Control-Request-Method) ──> 服务器
-        <── Access-Control-Allow-Origin / Methods / Headers ─────
-        ── 实际请求 ─────────────────────────────────────────> 服务器
-        <── 正常响应 ───────────────────────────────────────────
+```mermaid
+flowchart TB
+    N0["预检请求流程:"]
+    N1["浏览器 OPTIONS (Origin + Access-Control-Req"]
+    N2["< Access-Control-Allow-Origin / Methods"]
+    N3["实际请求 > 服务器"]
+    N4["< 正常响应"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
 ```
 
 #### CORS 完整配置
@@ -4470,16 +4802,21 @@ Access-Control-Max-Age: 86400
 
 ### 6.20 nginx 正向代理 vs 反向代理 vs 负载均衡
 
-```
-正向代理 vs 反向代理:
-
-正向代理: 代理站在客户端侧，代表客户端
-          用户 ──> 正向代理 ──> 目标网站
-          用途: 翻墙、企业内网过滤
-
-反向代理: 代理站在服务器侧，代表服务器
-          用户 ──> 反向代理 ──> 应用服务器 A/B/C
-          用途: 负载均衡、安全防护、SSL 终止
+```mermaid
+flowchart TB
+    N0["正向代理 vs 反向代理:"]
+    N1["正向代理: 代理站在客户端侧，代表客户端"]
+    N2["用户 > 正向代理 > 目标网站"]
+    N3["用途: 翻墙、企业内网过滤"]
+    N4["反向代理: 代理站在服务器侧，代表服务器"]
+    N5["用户 > 反向代理 > 应用服务器 A/B/C"]
+    N6["用途: 负载均衡、安全防护、SSL 终止"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
 ```
 
 ```nginx
@@ -4579,37 +4916,68 @@ Web安全本质是**在不可信的网络环境中构建可信的应用**。攻�
 
 浏览器作为Web应用的运行时，是安全攻防的主战场。浏览器安全模型由多层防护机制构成：
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    浏览器安全模型                      │
-├─────────────────────────────────────────────────────┤
-│  1. 进程隔离          (渲染进程 vs 浏览器主进程)        │
-│  2. 同源策略 (SOP)     (域间隔离)                      │
-│  3. 沙箱机制           (限制代码能力)                   │
-│  4. 安全上下文          (HTTPS / localhost)           │
-│  5. CSP / CORS         (资源加载控制)                  │
-│  6. CORB / CORP / COEP  (侧信道攻击缓解)               │
-│  7. SameSite Cookie    (CSRF防护)                    │
-└─────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["浏览器安全模型"]
+    N1["1. 进程隔离 (渲染进程 vs 浏览器主进程)"]
+    N2["2. 同源策略 (SOP) (域间隔离)"]
+    N3["3. 沙箱机制 (限制代码能力)"]
+    N4["4. 安全上下文 (HTTPS / localhost)"]
+    N5["5. CSP / CORS (资源加载控制)"]
+    N6["6. CORB / CORP / COEP (侧信道攻击缓解)"]
+    N7["7. SameSite Cookie (CSRF防护)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
 ```
 
 #### 7.1.2 浏览器进程隔离
 
 现代浏览器使用**多进程架构**：
 
-```
-┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│  浏览器主进程  │   │  渲染进程 A   │   │  渲染进程 B   │
-│  (Browser)   │   │  (Renderer)  │   │  (Renderer)  │
-│              │   │              │   │              │
-│  - 地址栏     │   │  - JS引擎    │   │  - JS引擎    │
-│  - 网络请求   │   │  - DOM树     │   │  - DOM树     │
-│  - 插件管理   │   │  - 布局引擎   │   │  - 布局引擎   │
-│  - 存储管理   │   │  - 事件循环   │   │  - 事件循环   │
-└──────────────┘   └──────────────┘   └──────────────┘
-        ↑                  ↑                  ↑
-        └──────────────────┴──────────────────┘
-                    IPC 进程间通信
+```mermaid
+flowchart TB
+    N0["浏览器主进程"]
+    N1["渲染进程 A"]
+    N2["渲染进程 B"]
+    N3["(Browser)"]
+    N4["(Renderer)"]
+    N5["(Renderer)"]
+    N6["- 地址栏"]
+    N7["- JS引擎"]
+    N8["- JS引擎"]
+    N9["- 网络请求"]
+    N10["- DOM树"]
+    N11["- DOM树"]
+    N12["- 插件管理"]
+    N13["- 布局引擎"]
+    N14["- 布局引擎"]
+    N15["- 存储管理"]
+    N16["- 事件循环"]
+    N17["- 事件循环"]
+    N18["IPC 进程间通信"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
 ```
 
 每个标签页运行在独立的渲染进程中，通过IPC与浏览器主进程通信。渲染进程的JS无法直接访问文件系统、网络进程只能通过MessageChannel与渲染进程通信。
@@ -4633,20 +5001,25 @@ Web安全本质是**在不可信的网络环境中构建可信的应用**。攻�
 
 同源策略限制以下跨域行为：
 
-```
-┌──────────────────────────────────────────────┐
-│              同源策略 (SOP) 限制               │
-├──────────────────────────────────────────────┤
-│  ✗ Cookie / LocalStorage / IndexedDB 访问    │
-│  ✗ DOM 跨域读写                               │
-│  ✗ XMLHttpRequest / Fetch 跨域请求            │
-│  ✗ iframe 跨域内容访问                         │
-│                                               │
-│  ✓ <script src> (可跨域加载JS)                │
-│  ✓ <link href> (可跨域加载CSS)                │
-│  ✓ <img src> (可跨域加载图片)                  │
-│  ✓ @font-face 跨域字体                         │
-└──────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["同源策略 (SOP) 限制"]
+    N1["✗ Cookie / LocalStorage / IndexedDB 访问"]
+    N2["✗ DOM 跨域读写"]
+    N3["✗ XMLHttpRequest / Fetch 跨域请求"]
+    N4["✗ iframe 跨域内容访问"]
+    N5["✓ <script src> (可跨域加载JS)"]
+    N6["✓ <link href> (可跨域加载CSS)"]
+    N7["✓ <img src> (可跨域加载图片)"]
+    N8["✓ @font-face 跨域字体"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 #### 7.2.3 为什么必须有SOP
@@ -4686,18 +5059,43 @@ XSS 能做的事:
 
 #### 7.3.2 XSS分类
 
-```
-┌──────────────────────────────────────────────────────┐
-│                     XSS 三种类型                       │
-├──────────────┬───────────────┬───────────────────────┤
-│   存储型XSS   │   反射型XSS     │      DOM型XSS          │
-├──────────────┼───────────────┼───────────────────────┤
-│ 恶意代码永久   │ URL参数中携带   │ 前端JS从URL/DOM读取    │
-│ 保存在服务器   │ 恶意脚本,服务器 │ 数据并直接写入DOM,     │
-│               │ 直接拼接返回    │ 不经过服务器           │
-│ 危害最大       │ 危害较小       │ 危害较小               │
-│ 典型:评论/帖子  │ 典型:搜索结果   │ 典型: #fragment参数    │
-└──────────────┴───────────────┴───────────────────────┘
+```mermaid
+flowchart TB
+    N0["XSS 三种类型"]
+    N1["存储型XSS"]
+    N2["反射型XSS"]
+    N3["DOM型XSS"]
+    N4["恶意代码永久"]
+    N5["URL参数中携带"]
+    N6["前端JS从URL/DOM读取"]
+    N7["保存在服务器"]
+    N8["恶意脚本,服务器"]
+    N9["数据并直接写入DOM,"]
+    N10["直接拼接返回"]
+    N11["不经过服务器"]
+    N12["危害最大"]
+    N13["危害较小"]
+    N14["危害较小"]
+    N15["典型:评论/帖子"]
+    N16["典型:搜索结果"]
+    N17["典型:"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
 ```
 
 **反射型XSS示例：**
@@ -4915,28 +5313,41 @@ DOMPurify的核心原理：
 
 CSRF（Cross-Site Request Forgery）利用用户已登录的身份，诱导用户浏览器向目标站点发起非预期的请求：
 
-```
-正常用户登录银行:
-  银行网站 → 设置Cookie: sessionId=abc123
-
-攻击者构造恶意页面 https://evil.com/csrf:
-  ┌─────────────────────────────────────────────────┐
-  │ <html>                                           │
-  │ <body onload="document.forms[0].submit()">        │
-  │   <form action="https://bank.com/transfer"        │
-  │         method="POST">                           │
-  │     <input name="to" value="attacker" />         │
-  │     <input name="amount" value="10000" />         │
-  │   </form>                                        │
-  │ </body>                                          │
-  │ </html>                                          │
-  └─────────────────────────────────────────────────┘
-
-用户访问evil.com时:
-  1. 浏览器加载HTML,自动提交表单
-  2. 请求发送到bank.com,自动携带cookie
-  3. 银行验证cookie(有效),执行转账
-  4. 用户毫不知情
+```mermaid
+flowchart TB
+    N0["正常用户登录银行:"]
+    N1["银行网站 设置Cookie: sessionId=abc123"]
+    N2["攻击者构造恶意页面 https://evil.com/csrf:"]
+    N3["<html>"]
+    N4["<body onload='document.forms[0].submit()"]
+    N5["<form action='https://bank.com/transfer'"]
+    N6["method='POST'>"]
+    N7["<input name='to' value='attacker' />"]
+    N8["<input name='amount' value='10000' />"]
+    N9["</form>"]
+    N10["</body>"]
+    N11["</html>"]
+    N12["用户访问evil.com时:"]
+    N13["1. 浏览器加载HTML,自动提交表单"]
+    N14["2. 请求发送到bank.com,自动携带cookie"]
+    N15["3. 银行验证cookie(有效),执行转账"]
+    N16["4. 用户毫不知情"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
 ```
 
 #### 7.5.2 CSRF为什么能成功
@@ -5195,13 +5606,17 @@ DDoS攻击类型:
 
 #### 7.9.1 什么是中间人攻击
 
-```
-正常通信:
-  用户 ←─────── 加密 ───────→ 服务器
-
-中间人攻击:
-  用户 ←─── 攻击者的证书/隧道 ───→ 攻击者 ←─── 加密 ───→ 服务器
-         (解密后查看/修改内容)        (转发并重新加密)
+```mermaid
+flowchart TB
+    N0["正常通信:"]
+    N1["用户 加密 服务器"]
+    N2["中间人攻击:"]
+    N3["用户 攻击者的证书/隧道 攻击者 加密 服务器"]
+    N4["(解密后查看/修改内容) (转发并重新加密)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
 ```
 
 #### 7.9.2 HTTPS如何防止MITM
@@ -5423,27 +5838,33 @@ const issues = [
 
 ### 7.16 浏览器沙箱机制
 
-```
-浏览器沙箱层级:
-
-┌─────────────────────────────────────────────────┐
-│               操作系统 (Ring 0 - 内核)            │
-├─────────────────────────────────────────────────┤
-│  浏览器主进程 (网络/磁盘/GPU访问)                  │
-├─────────────────────────────────────────────────┤
-│  渲染进程 (沙箱内,受限syscall)                    │
-│    ├─ JS引擎 (V8)                               │
-│    ├─ DOM/CSS引擎                               │
-│    └─ 事件系统                                   │
-│         ↓                                       │
-│    只能通过IPC与浏览器主进程通信                    │
-│    无法直接访问文件系统                             │
-│    无法直接调用系统API                            │
-└─────────────────────────────────────────────────┘
-
-Chrome进程模型:
-  - Site Isolation: 不同站点页面在独立进程中
-  - 每个渲染进程沙箱化,即使V8被攻破也难以逃逸
+```mermaid
+flowchart TB
+    N0["浏览器沙箱层级:"]
+    N1["操作系统 (Ring 0 - 内核)"]
+    N2["浏览器主进程 (网络/磁盘/GPU访问)"]
+    N3["渲染进程 (沙箱内,受限syscall)"]
+    N4["JS引擎 (V8)"]
+    N5["DOM/CSS引擎"]
+    N6["事件系统"]
+    N7["只能通过IPC与浏览器主进程通信"]
+    N8["无法直接访问文件系统"]
+    N9["无法直接调用系统API"]
+    N10["Chrome进程模型:"]
+    N11["- Site Isolation: 不同站点页面在独立进程中"]
+    N12["- 每个渲染进程沙箱化,即使V8被攻破也难以逃逸"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
 ```
 
 ---
@@ -5611,28 +6032,37 @@ function FiberNode(tag, pendingProps, key, mode) {
 }
 ```
 
-```
-Fiber树结构 (双缓冲):
-
-  ┌─────────────────────────────────────────────┐
-  │          current tree (已渲染,显示中)          │
-  │           A (Fiber)                           │
-  │         /  |   \                              │
-  │        B   C    D                             │
-  │       / \       |                             │
-  │      E   F      G                             │
-  └─────────────────────────────────────────────┘
-                      ↓ setState
-                      ↓ 克隆A创建A' (workInProgress)
-  ┌─────────────────────────────────────────────┐
-  │        workInProgress tree (构建中)          │
-  │           A' (Fiber, alternate=A)           │
-  │         /  |   \                              │
-  │        B'  C'   D'                           │
-  │                                             │
-  │   构建完成后 → alternate指针切换              │
-  │   current = workInProgress  (原子性替换)     │
-  └─────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["Fiber树结构 (双缓冲):"]
+    N1["current tree (已渲染,显示中)"]
+    N2["A (Fiber)"]
+    N3["/ | \"]
+    N4["B C D"]
+    N5["/ \ |"]
+    N6["E F G"]
+    N7["setState"]
+    N8["克隆A创建A' (workInProgress)"]
+    N9["workInProgress tree (构建中)"]
+    N10["A' (Fiber, alternate=A)"]
+    N11["/ | \"]
+    N12["B' C' D'"]
+    N13["构建完成后 alternate指针切换"]
+    N14["current = workInProgress (原子性替换)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
 ```
 
 #### 8.2.3 Work Loop (可中断的协调)
@@ -5674,19 +6104,35 @@ React Diff是Fiber架构的"协调"阶段，通过比较新旧虚拟DOM树找出
 
 #### 8.3.1 三大策略
 
-```
-React Diff的三个核心前提:
-  1. Web DOM节点跨层级操作很少 → tree diff用O(n)算法
-  2. 不同类型的元素产生不同树 → component diff
-  3. 通过key标记稳定元素 → element diff
-
-                    React Diff
-                       │
-        ┌──────────────┼──────────────┐
-        │ Tree Diff    │ Component Diff│  Element Diff
-        │ O(n) 层级比较  │ 类型比较      │ key比较
-        │ 只同层比较     │ 不同→卸载重建  │ 移动/新增/删除
-        └──────────────┴──────────────┘
+```mermaid
+flowchart TB
+    N0["React Diff的三个核心前提:"]
+    N1["1. Web DOM节点跨层级操作很少 tree diff用O(n)算法"]
+    N2["2. 不同类型的元素产生不同树 component diff"]
+    N3["3. 通过key标记稳定元素 element diff"]
+    N4["React Diff"]
+    N5["Tree Diff"]
+    N6["Component Diff"]
+    N7["Element Diff"]
+    N8["O(n) 层级比较"]
+    N9["类型比较"]
+    N10["key比较"]
+    N11["只同层比较"]
+    N12["不同 卸载重建"]
+    N13["移动/新增/删除"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
 ```
 
 #### 8.3.2 Tree Diff
@@ -5771,27 +6217,39 @@ const lanes = {
 // lanes &= ~lane        清除已处理车道
 ```
 
-```
-Lane模型 (车道优先级):
-  Bit:  31 ... 12 ... 8 ... 4 ... 0
-         │           │    │    │
-         │           │    │    ├─ SyncLane (用户点击)
-         │           │    ├─ InputContinuousLane (拖拽)
-         │           │    ├─ DefaultLane (普通更新)
-         │           │    └─ TransitionLane (低优先)
-         └────────────┴── (更高位=更低优先级)
-
-调度流程:
-  setState() → 分配lane → root.pendingLanes |= lane
-    → scheduler.scheduleCallback(priority, callback)
-    → 等待主线程空闲时执行
-
-高优先级插队: 用户点击(SyncLane)可打断DefaultLane
-  → 先处理SyncLane → 完成后恢复DefaultLane
-
-useTransition:
-  startTransition(() => setCount(1000));
-  // setCount标记为TransitionLane (低优先级,可被打断)
+```mermaid
+flowchart TB
+    N0["Lane模型 (车道优先级):"]
+    N1["Bit: 31 ... 12 ... 8 ... 4 ... 0"]
+    N2["SyncLane (用户点击)"]
+    N3["InputContinuousLane (拖拽)"]
+    N4["DefaultLane (普通更新)"]
+    N5["TransitionLane (低优先)"]
+    N6["(更高位=更低优先级)"]
+    N7["调度流程:"]
+    N8["setState() 分配lane root.pendingLanes"]
+    N9["scheduler.scheduleCallback(priority, c"]
+    N10["等待主线程空闲时执行"]
+    N11["高优先级插队: 用户点击(SyncLane)可打断DefaultLane"]
+    N12["先处理SyncLane 完成后恢复DefaultLane"]
+    N13["useTransition:"]
+    N14["startTransition(() => setCount(1000));"]
+    N15["// setCount标记为TransitionLane (低优先级,可被打断)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
 ```
 
 ---
@@ -5800,26 +6258,49 @@ useTransition:
 
 #### 8.6.1 Hooks基于Fiber链表的存储
 
-```javascript
-// 每个组件的Hooks按调用顺序串联成链表
-// 挂在Fiber.memoizedState上
-
-function MyComponent() {
-  const [count, setCount] = useState(0);   // Hook #1
-  const [name, setName] = useState('');    // Hook #2
-  useEffect(() => {}, []);                  // Hook #3
-}
-
-// Fiber.memoizedState链表:
-// ┌─────────┐    ┌─────────┐    ┌──────────┐
-// │ Hook #1  │ → │ Hook #2  │ → │ Hook #3   │
-// │ state:0  │    │ state:'' │    │ effect:fn │
-// └─────────┘    └─────────┘    └──────────┘
-
-// 为什么不能用条件:
-// 第一次: [Hook#1, Hook#2, Hook#3]
-// 第二次: [Hook#1, Hook#3]  (条件跳过#2)
-// → Hook#3被错配到Hook#2的位置 → 状态错乱!
+```mermaid
+flowchart TB
+    N0["// 每个组件的Hooks按调用顺序串联成链表"]
+    N1["// 挂在Fiber.memoizedState上"]
+    N2["function MyComponent() {"]
+    N3["const [count, setCount] = useState(0); /"]
+    N4["const [name, setName] = useState(''); //"]
+    N5["useEffect(() => {}, []); // Hook"]
+    N6["// Fiber.memoizedState链表:"]
+    N7["//"]
+    N8["//"]
+    N9["Hook"]
+    N10["Hook"]
+    N11["Hook"]
+    N12["//"]
+    N13["state:0"]
+    N14["state:''"]
+    N15["effect:fn"]
+    N16["//"]
+    N17["// 为什么不能用条件:"]
+    N18["// 第一次: [Hook"]
+    N19["// 第二次: [Hook"]
+    N20["// Hook"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
 ```
 
 #### 8.6.2 Mount vs Update阶段
@@ -5902,18 +6383,23 @@ root.render(<App />);
 
 ### 8.8 Concurrent Mode (React 18)
 
-```
-阻塞渲染 vs 并发渲染:
-
-阻塞 (React 17):
-  Task1(500ms)→Task2(300ms)→Task3(200ms) = 1000ms
-
-并发 (React 18):
-  Task1(500ms)────────────→|
-  Task2(300ms)──────→|
-  Task3(200ms)→|           = ~500ms
-
-React可在执行中暂停/恢复 → 不阻塞主线程
+```mermaid
+flowchart TB
+    N0["阻塞渲染 vs 并发渲染:"]
+    N1["阻塞 (React 17):"]
+    N2["Task1(500ms) Task2(300ms) Task3(200ms) ="]
+    N3["并发 (React 18):"]
+    N4["Task1(500ms) |"]
+    N5["Task2(300ms) |"]
+    N6["Task3(200ms) | = ~500ms"]
+    N7["React可在执行中暂停/恢复 不阻塞主线程"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
 ```
 
 **Suspense:**
@@ -5974,13 +6460,17 @@ export async function getServerSideProps(context) {
 }
 ```
 
-```
-ISR (Incremental Static Regeneration):
-
-请求 → 检查缓存
-  ├─ 无缓存 → SSR → 缓存HTML → 返回
-  ├─ 未过期 → 直接返回缓存
-  └─ 已过期 → 返回旧缓存 + 触发后台revalidate → 下次返回新缓存
+```mermaid
+flowchart TB
+    N0["ISR (Incremental Static Regeneration):"]
+    N1["请求 检查缓存"]
+    N2["无缓存 SSR 缓存HTML 返回"]
+    N3["未过期 直接返回缓存"]
+    N4["已过期 返回旧缓存 + 触发后台revalidate 下次返回新缓存"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
 ```
 
 ---
@@ -6105,17 +6595,21 @@ const filteredState = selector({
 
 ### 8.12 Redux单向数据流
 
-```
-Action → Dispatch → Reducer → New State → View Update
-  ↑                                              │
-  └──────────────────────────────────────────────┘
-
-为什么单向数据流重要:
-  - 可预测性: 任何状态变化都来自明确的action
-  - 可追踪: action是纯文本描述 {type:'INCREMENT'}
-  - 可重现: 同action序列 → 同状态
-  - 可测试: reducer是纯函数
-  - 时间旅行: action序列可存储/回放(Redux DevTools)
+```mermaid
+flowchart TB
+    N0["Action Dispatch Reducer New State"]
+    N1["为什么单向数据流重要:"]
+    N2["- 可预测性: 任何状态变化都来自明确的action"]
+    N3["- 可追踪: action是纯文本描述 {type:'INCREMENT'}"]
+    N4["- 可重现: 同action序列 同状态"]
+    N5["- 可测试: reducer是纯函数"]
+    N6["- 时间旅行: action序列可存储/回放(Redux DevTools)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
 ```
 
 ```
@@ -6220,28 +6714,35 @@ function memo(Component, arePropsEqual) {
 
 ### 8.14 React合成事件原理
 
-```
-React 17+ Fiber上的事件处理:
-
-用户点击button → 浏览器dispatchEvent('click')
-  ↓
-React捕获事件(挂载在root节点, 而非document)
-  ↓
-构建SyntheticEvent (跨浏览器兼容)
-  ↓
-从target fiber向上遍历(通过return指针):
-  FiberNode(button) → fiber.return → ... → root
-    │
-    │ 收集所有onClick处理器
-    │ 按capturing → target → bubbling顺序执行
-    │
-  FiberNode(div)
-
-为什么用合成事件:
-  1. 跨浏览器兼容 (IE/Firefox/Chrome行为一致)
-  2. 事件委托 (减少绑定数量)
-  3. 对象池复用 (减少GC压力)
-  4. React 17+根节点隔离 (支持多版本React共存)
+```mermaid
+flowchart TB
+    N0["React 17+ Fiber上的事件处理:"]
+    N1["用户点击button 浏览器dispatchEvent('click')"]
+    N2["React捕获事件(挂载在root节点, 而非document)"]
+    N3["构建SyntheticEvent (跨浏览器兼容)"]
+    N4["从target fiber向上遍历(通过return指针):"]
+    N5["FiberNode(button) fiber.return ..."]
+    N6["收集所有onClick处理器"]
+    N7["按capturing target bubbling顺序执行"]
+    N8["FiberNode(div)"]
+    N9["为什么用合成事件:"]
+    N10["1. 跨浏览器兼容 (IE/Firefox/Chrome行为一致)"]
+    N11["2. 事件委托 (减少绑定数量)"]
+    N12["3. 对象池复用 (减少GC压力)"]
+    N13["4. React 17+根节点隔离 (支持多版本React共存)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
 ```
 
 ---
@@ -6451,46 +6952,70 @@ new ModuleFederationPlugin({
 const RemoteProductList = React.lazy(() => import('remoteApp/ProductList'));
 ```
 
-```
-Module Federation架构:
-
-┌────────────┐     remoteEntry.js     ┌────────────┐
-│  Host App  │ ←────────────────────  │ Remote App │
-│            │    ProductList.js      │            │
-│  <Remote   │ ←──── chunk ─────────→ │ exposes:   │
-│   Product  │                        │  ProductList│
-│   List />  │   (共享react/react-dom) │  UserProfile│
-└────────────┘                        └────────────┘
+```mermaid
+flowchart TB
+    N0["Module Federation架构:"]
+    N1["remoteEntry.js"]
+    N2["Host App"]
+    N3["Remote App"]
+    N4["ProductList.js"]
+    N5["<Remote"]
+    N6["chunk"]
+    N7["exposes:"]
+    N8["Product"]
+    N9["ProductList"]
+    N10["List />"]
+    N11["(共享react/react-dom)"]
+    N12["UserProfile"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
 ```
 
 ---
 
 ### 8.20 React大规模状态管理方案
 
-```
-大规模React应用状态分层:
-
-┌─────────────────────────────────────────────────────────┐
-│  Global (Redux Toolkit / Zustand)                       │
-│  → 用户认证, 主题, 全局通知, 跨页面共享状态              │
-└────────────────────┬────────────────────────────────────┘
-┌────────────────────┴────────────────────────────────────┐
-│  Feature (Context / Jotai)                              │
-│  → 功能模块内共享: 多个独立Context/Store                 │
-│  → 避免单一巨型Context (所有Consumer重渲染)               │
-└────────────────────┬────────────────────────────────────┘
-┌────────────────────┴────────────────────────────────────┐
-│  Local (useState / useReducer)                         │
-│  → 组件私有: 表单, 临时UI, 动画                          │
-└─────────────────────────────────────────────────────────┘
-
-实践建议:
-  1. 状态尽量下沉 (不放根组件)
-  2. Context按功能拆分 (AuthContext, ThemeContext分开)
-  3. Server State → React Query/SWR (不放Redux)
-  4. URL作为状态 (搜索/筛选/分页 → URLSearchParams)
-  5. 派生状态用selector/memo: 避免重复计算
-  6. Immutable优先: 方便DevTools调试
+```mermaid
+flowchart TB
+    N0["大规模React应用状态分层:"]
+    N1["Global (Redux Toolkit / Zustand)"]
+    N2["用户认证, 主题, 全局通知, 跨页面共享状态"]
+    N3["Feature (Context / Jotai)"]
+    N4["功能模块内共享: 多个独立Context/Store"]
+    N5["避免单一巨型Context (所有Consumer重渲染)"]
+    N6["Local (useState / useReducer)"]
+    N7["组件私有: 表单, 临时UI, 动画"]
+    N8["实践建议:"]
+    N9["1. 状态尽量下沉 (不放根组件)"]
+    N10["2. Context按功能拆分 (AuthContext, ThemeConte"]
+    N11["3. Server State React Query/SWR (不放Red"]
+    N12["4. URL作为状态 (搜索/筛选/分页 URLSearchParams)"]
+    N13["5. 派生状态用selector/memo: 避免重复计算"]
+    N14["6. Immutable优先: 方便DevTools调试"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
 ```
 
 ```
@@ -6733,17 +7258,21 @@ const doubleCount = computed(() => count.value * 2)
 
 **原理图**：
 
-```
-computed(() => a.value + b.value)
-    │
-    ├── 首次访问：执行 getter，返回结果，收集依赖 (a, b)
-    │
-    ├── a.value 变化 → trigger(computed)
-    │                   ├── computed.dirty = true（标记需要重新计算）
-    │                   └── 通知所有依赖 computed 的 effect（dirty check）
-    │
-    └── 下次访问：dirty=true → 重新执行 getter → 返回新值
-                  dirty=false → 直接返回缓存值
+```mermaid
+flowchart TB
+    N0["computed(() => a.value + b.value)"]
+    N1["首次访问：执行 getter，返回结果，收集依赖 (a, b)"]
+    N2["a.value 变化 trigger(computed)"]
+    N3["computed.dirty = true（标记需要重新计算）"]
+    N4["通知所有依赖 computed 的 effect（dirty check）"]
+    N5["下次访问：dirty=true 重新执行 getter 返回新值"]
+    N6["dirty=false 直接返回缓存值"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
 ```
 
 **源码级实现要点**：
@@ -6827,21 +7356,23 @@ async function update() {
 
 **原理**：
 
-```
-nextTick(callback)
-    │
-    ├── callback 推入 callbacks 队列
-    │
-    └── 调用 flushCallbacks（异步执行队列中所有回调）
-
-flushCallbacks 实现：
-    └── Promise.resolve().then(flushCallbacks)
-            │
-            └── 微任务执行 flushCallbacks
-                    │
-                    └── while(queue.length) queue.shift()()
-                            │
-                            └── 依次执行所有入队的回调
+```mermaid
+flowchart TB
+    N0["nextTick(callback)"]
+    N1["callback 推入 callbacks 队列"]
+    N2["调用 flushCallbacks（异步执行队列中所有回调）"]
+    N3["flushCallbacks 实现："]
+    N4["Promise.resolve().then(flushCallbacks)"]
+    N5["微任务执行 flushCallbacks"]
+    N6["while(queue.length) queue.shift()()"]
+    N7["依次执行所有入队的回调"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
 ```
 
 **微任务选择**：Vue3 优先使用 `Promise.resolve()` → 微任务；Vue2 依次降级：`Promise` → `MutationObserver` → `setImmediate` → `setTimeout(fn, 0)`。
@@ -6864,14 +7395,17 @@ Vue 批量更新（Batching）：同一事件循环内的多次状态变更会�
 
 #### diff策略（同层比较）
 
-```
-旧 VNode 树
-   │
-   ├── div (same) → diff children
-   │       ├── p (same) → diff children
-   │       └── span (moved) → move
-   │
-   └── h1 (removed)
+```mermaid
+flowchart TB
+    N0["旧 VNode 树"]
+    N1["div (same) diff children"]
+    N2["p (same) diff children"]
+    N3["span (moved) move"]
+    N4["h1 (removed)"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
 ```
 
 Vue2 diff 核心：`updateChildren` 方法，4指针头尾比较
@@ -7000,22 +7534,29 @@ return function render(_ctx, _cache) {
 
 #### 编译三阶段
 
-```
-template 字符串
-    │
-    ├── 1. parse（解析）: template → AST（抽象语法树）
-    │       └── 正则匹配标签、属性、指令、插值表达式
-    │
-    ├── 2. transform（转换）: AST → 增强AST（添加scopeId、patchFlag）
-    │       └── 插件化：v-if →三元表达式，v-for →循环函数
-    │
-    └── 3. codegen（代码生成）: 增强AST → render 函数代码字符串
-            └── new Function('with(this) { return ' + code)()
-                    │
-                    └── 生成类似：
-                        _c('div', { id: _ctx.id }, [
-                          _v(_toDisplayString(_ctx.msg))
-                        ])
+```mermaid
+flowchart TB
+    N0["template 字符串"]
+    N1["1. parse（解析）: template AST（抽象语法树）"]
+    N2["正则匹配标签、属性、指令、插值表达式"]
+    N3["2. transform（转换）: AST 增强AST（添加scopeId、"]
+    N4["插件化：v-if 三元表达式，v-for 循环函数"]
+    N5["3. codegen（代码生成）: 增强AST render 函数代码字符串"]
+    N6["new Function('with(this) { return ' + co"]
+    N7["生成类似："]
+    N8["_c('div', { id: _ctx.id }, ["]
+    N9["_v(_toDisplayString(_ctx.msg))"]
+    N10["])"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 #### AST 节点类型
@@ -7388,18 +7929,25 @@ const __sfc__ = {
 
 #### 核心流程
 
-```
-浏览器请求页面
-    │
-    ├── Server: VueSSR.createApp(app).renderToString(context)
-    │       ├── Vue组件树渲染 → 字符串拼接
-    │       ├── 生成HTML（路由数据注入）
-    │       └── 返回完整HTML给浏览器
-    │
-    └── 浏览器: 收到HTML → 显示首屏（可交互但未水合）
-            ├── 加载JS bundle
-            └── Client: hydrate(app, container)
-                    └── 激活HTML中的DOM节点，建立响应式绑定
+```mermaid
+flowchart TB
+    N0["浏览器请求页面"]
+    N1["Server: VueSSR.createApp(app).renderToSt"]
+    N2["Vue组件树渲染 字符串拼接"]
+    N3["生成HTML（路由数据注入）"]
+    N4["返回完整HTML给浏览器"]
+    N5["浏览器: 收到HTML 显示首屏（可交互但未水合）"]
+    N6["加载JS bundle"]
+    N7["Client: hydrate(app, container)"]
+    N8["激活HTML中的DOM节点，建立响应式绑定"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 #### 关键API
@@ -7500,23 +8048,39 @@ app.directive('permission', permission)
 
 ### 9.21 Vue 大型项目架构
 
-```
-src/
-├── apps/              # 多应用入口
-├── packages/         # 内部共享包（monorepo）
-│   ├── ui/           # 组件库
-│   ├── utils/        # 工具函数
-│   ├── hooks/        # 组合式函数
-│   └── constants/    # 常量
-├── layouts/          # 布局组件
-├── pages/             # 页面（按业务域分组）
-├── router/            # 路由配置
-├── store/             # 状态管理（Pinia）
-├── services/          # API 封装
-├── composables/       # 全局 composable
-├── directives/        # 全局指令
-├── plugins/           # Vue 插件
-└── assets/            # 静态资源
+```mermaid
+flowchart TB
+    N0["src/"]
+    N1["apps/"]
+    N2["packages/"]
+    N3["ui/"]
+    N4["utils/"]
+    N5["hooks/"]
+    N6["constants/"]
+    N7["layouts/"]
+    N8["pages/"]
+    N9["router/"]
+    N10["store/"]
+    N11["services/"]
+    N12["composables/"]
+    N13["directives/"]
+    N14["plugins/"]
+    N15["assets/"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
 ```
 
 **状态管理分层**：
@@ -7532,47 +8096,65 @@ src/
 
 #### 核心概念
 
-```
-webpack 入口 → 分析依赖图 → 打包成 chunk → 输出 bundle
-
-Entry (入口) → 解析模块
-  │
-  ├── 递归分析 import/require → module
-  ├── loader 处理非JS模块（ts, css, img等）
-  └── 合并多个 module → chunk（按 splitChunks 规则）
-          │
-          └── 生成 bundle（JS文件或代码分割后的分片）
+```mermaid
+flowchart TB
+    N0["webpack 入口 分析依赖图 打包成 chunk 输出 bund"]
+    N1["Entry (入口) 解析模块"]
+    N2["递归分析 import/require module"]
+    N3["loader 处理非JS模块（ts, css, img等）"]
+    N4["合并多个 module chunk（按 splitChunks 规则）"]
+    N5["生成 bundle（JS文件或代码分割后的分片）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
 ```
 
 #### 构建流程
 
-```
-webpack CLI 启动
-    │
-    ├── 1. 初始化：合并配置文件
-    │
-    ├── 2. 编译（Compiler.run）：
-    │       ├── 创建 Compilation 对象
-    │       ├── entry 模块 → 从文件读取 → 得到 module
-    │       ├── 分析 import/require → 递归处理依赖
-    │       ├── 应用 loader（use 数组，从右到左）
-    │       ├── 生成 chunk（图关系）
-    │       ├── 调用 plugin（emit 钩子）
-    │       └── 输出文件到 dist
-    │
-    └── 3. 完成
+```mermaid
+flowchart TB
+    N0["webpack CLI 启动"]
+    N1["1. 初始化：合并配置文件"]
+    N2["2. 编译（Compiler.run）："]
+    N3["创建 Compilation 对象"]
+    N4["entry 模块 从文件读取 得到 module"]
+    N5["分析 import/require 递归处理依赖"]
+    N6["应用 loader（use 数组，从右到左）"]
+    N7["生成 chunk（图关系）"]
+    N8["调用 plugin（emit 钩子）"]
+    N9["输出文件到 dist"]
+    N10["3. 完成"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 #### module / compilation / chunk 关系
 
-```
-module    : 每个源文件被解析后的对象（Source → AST → 编译后）
-compilation : 某一次编译过程中的所有 module 和 chunk 集合
-chunk     : 打包产物分组（由 entry / splitChunks / dynamic import 生成）
-             ├── entry chunk（入口 chunk，包含 runtime）
-             ├── async chunk（按需加载的异步 chunk）
-             └── vendor chunk（第三方库 chunk）
-bundle    : 最终输出文件（一个 chunk 对应一个 bundle）
+```mermaid
+flowchart TB
+    N0["module : 每个源文件被解析后的对象（Source AST 编译后"]
+    N1["compilation : 某一次编译过程中的所有 module 和 chunk"]
+    N2["chunk : 打包产物分组（由 entry / splitChunks / d"]
+    N3["entry chunk（入口 chunk，包含 runtime）"]
+    N4["async chunk（按需加载的异步 chunk）"]
+    N5["vendor chunk（第三方库 chunk）"]
+    N6["bundle : 最终输出文件（一个 chunk 对应一个 bundle）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
 ```
 
 #### plugin 机制（Tapable 钩子系统）
@@ -7626,36 +8208,48 @@ Vite Dev Server:
 
 #### ESM Dev Server（无Bundle）
 
-```
-浏览器请求: GET /src/main.ts
-    │
-    ├── Vite Server 拦截请求
-    ├── 解析 import（裸导入：'vue'）
-    │       └── 转换为本地路径
-    ├── 替换 import.meta.url
-    ├── 注入 HMR 运行时
-    ├── 处理 TypeScript/JSX（esbuild，ms级）
-    └── 返回 ES Module（浏览器直接执行）
-
-// 浏览器收到多个小文件，而不是一个巨大bundle
-// 浏览器利用 HTTP2 multiplexing 并行加载
+```mermaid
+flowchart TB
+    N0["浏览器请求: GET /src/main.ts"]
+    N1["Vite Server 拦截请求"]
+    N2["解析 import（裸导入：'vue'）"]
+    N3["转换为本地路径"]
+    N4["替换 import.meta.url"]
+    N5["注入 HMR 运行时"]
+    N6["处理 TypeScript/JSX（esbuild，ms级）"]
+    N7["返回 ES Module（浏览器直接执行）"]
+    N8["// 浏览器收到多个小文件，而不是一个巨大bundle"]
+    N9["// 浏览器利用 HTTP2 multiplexing 并行加载"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
 ```
 
 #### HMR 流程
 
-```
-文件修改
-    │
-    ├── Vite 监听到变化（fs.watch）
-    │
-    ├── 重新编译改动的模块（esbuild，ms级）
-    │
-    ├── 向浏览器推送 HMR 事件（WebSocket）
-    │
-    └── 浏览器端 HMR Runtime 接管：
-            ├── 接受 hot.accept(['./module'], callback)
-            ├── 根据边界更新受影响的模块
-            └── 更新后重新执行 render（通常 < 50ms）
+```mermaid
+flowchart TB
+    N0["文件修改"]
+    N1["Vite 监听到变化（fs.watch）"]
+    N2["重新编译改动的模块（esbuild，ms级）"]
+    N3["向浏览器推送 HMR 事件（WebSocket）"]
+    N4["浏览器端 HMR Runtime 接管："]
+    N5["接受 hot.accept(['./module'], callback)"]
+    N6["根据边界更新受影响的模块"]
+    N7["更新后重新执行 render（通常 < 50ms）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
 ```
 
 Vite 不需要 bundle 的原因：现代浏览器原生支持 ESM，Vite 直接利用浏览器的能力分发模块，只在必要时编译单个文件。
@@ -7757,25 +8351,33 @@ class BuildReportPlugin {
 
 ### 10.6 AST 原理（parser → traverser → transformer → generator）
 
-```
-源代码
-    │
-    ├── 1. Parser（解析）
-    │       source code → Token 流（词法分析）
-    │       Token 流 → AST（语法分析）
-    │
-    ├── 2. Traversal（遍历）
-    │       AST → 访问每个节点（enter/exit）
-    │       visitor = {
-    │         CallExpression: { enter(node) {}, exit(node) {} }
-    │       }
-    │
-    ├── 3. Transformer（转换）
-    │       遍历过程中修改/替换 AST 节点
-    │       Example: 把 require('fs') 替换为 ESM import
-    │
-    └── 4. Generator（生成）
-            新 AST → 目标代码（toCode）
+```mermaid
+flowchart TB
+    N0["源代码"]
+    N1["1. Parser（解析）"]
+    N2["source code Token 流（词法分析）"]
+    N3["Token 流 AST（语法分析）"]
+    N4["2. Traversal（遍历）"]
+    N5["AST 访问每个节点（enter/exit）"]
+    N6["visitor = {"]
+    N7["CallExpression: { enter(node) {}, exit(n"]
+    N8["3. Transformer（转换）"]
+    N9["遍历过程中修改/替换 AST 节点"]
+    N10["Example: 把 require('fs') 替换为 ESM import"]
+    N11["4. Generator（生成）"]
+    N12["新 AST 目标代码（toCode）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
 ```
 
 ```javascript
@@ -7798,26 +8400,33 @@ traverse(ast, {
 
 ### 10.7 Babel 编译流程
 
-```
-Babel 编译流程：
-
-源代码
-    │
-    ├── @babel/parser（Babylon）
-    │       → AST（符合 ESTree 规范）
-    │
-    ├── @babel/traverse
-    │       → 遍历 AST（使用 visitor 模式）
-    │       → 收集依赖、调用 plugin/preset 进行节点转换
-    │
-    ├── @babel/template
-    │       → 从字符串模板生成 AST 节点
-    │
-    └── @babel/generator
-            → 新 AST → 目标代码 + sourcemap
-
-preset = plugin 集合（@babel/preset-env = 所有现代语法转换 plugin 的集合）
-plugin 优先级高于 preset，plugin 按顺序执行
+```mermaid
+flowchart TB
+    N0["Babel 编译流程："]
+    N1["源代码"]
+    N2["@babel/parser（Babylon）"]
+    N3["AST（符合 ESTree 规范）"]
+    N4["@babel/traverse"]
+    N5["遍历 AST（使用 visitor 模式）"]
+    N6["收集依赖、调用 plugin/preset 进行节点转换"]
+    N7["@babel/template"]
+    N8["从字符串模板生成 AST 节点"]
+    N9["@babel/generator"]
+    N10["新 AST 目标代码 + sourcemap"]
+    N11["preset = plugin 集合（@babel/preset-env = 所"]
+    N12["plugin 优先级高于 preset，plugin 按顺序执行"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
 ```
 
 ```javascript
@@ -7924,28 +8533,39 @@ module.exports = {
 
 ### 10.10 HMR 原理（webpack-dev-server + WebSocket + HMR Runtime）
 
-```
-HMR 完整流程：
-
-文件变化
-    │
-    ├── webpack-dev-server 监听文件变化（chokidar）
-    │
-    ├── 重新编译变化的文件及其依赖链
-    │       （增量编译，比全量快很多）
-    │
-    ├── 通过 WebSocket 通知浏览器
-    │       → { type: 'ok', data: { modules: ['./module.js'] } }
-    │
-    └── 浏览器端 HMR Runtime 接管：
-            ├── hotCheck() → 比较模块版本
-            ├── 找到模块的父依赖链
-            ├── 调用 hot.accept(['module'], callback)
-            │       执行模块更新 + 回调
-            ├── 若父模块无法接受（无 accept），向上冒泡
-            │       直到找到接受者或到达 entry
-            │       若均不接受 → 整页刷新
-            └── 自底向上更新：子模块 → 父模块 → 视图
+```mermaid
+flowchart TB
+    N0["HMR 完整流程："]
+    N1["文件变化"]
+    N2["webpack-dev-server 监听文件变化（chokidar）"]
+    N3["重新编译变化的文件及其依赖链"]
+    N4["（增量编译，比全量快很多）"]
+    N5["通过 WebSocket 通知浏览器"]
+    N6["{ type: 'ok', data: { modules: ['./mod"]
+    N7["浏览器端 HMR Runtime 接管："]
+    N8["hotCheck() 比较模块版本"]
+    N9["找到模块的父依赖链"]
+    N10["调用 hot.accept(['module'], callback)"]
+    N11["执行模块更新 + 回调"]
+    N12["若父模块无法接受（无 accept），向上冒泡"]
+    N13["直到找到接受者或到达 entry"]
+    N14["若均不接受 整页刷新"]
+    N15["自底向上更新：子模块 父模块 视图"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
 ```
 
 **Vite vs webpack HMR**：
@@ -8002,12 +8622,17 @@ module.exports = {
 | 关系 | chunk 是 bundle 的中间态 | 一个或多个 chunk 组合成一个 bundle |
 | 类型 | entry chunk, async chunk, runtime chunk | JS/CSS/HTML bundle |
 
-```
-编译产物：
-  dist/
-    ├── main.js         ← main bundle（来自 entry chunk）
-    ├── vendors.js      ← vendor chunk bundle（splitChunks 生成）
-    └── Home.abc123.js  ← 异步 chunk bundle（dynamic import 生成）
+```mermaid
+flowchart TB
+    N0["编译产物："]
+    N1["dist/"]
+    N2["main.js main bundle（来自 entry chunk）"]
+    N3["vendors.js vendor chunk bundle（splitCh"]
+    N4["Home.abc123.js 异步 chunk bundle（dynamic"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
 ```
 
 ---
@@ -8262,19 +8887,25 @@ docker push my-registry.com/my-app:1.0
 
 #### qiankun 架构
 
-```
-┌─────────────────────────────────────────┐
-│           主应用 (Main App)              │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐ │
-│  │ Vue 3   │  │ Vue 2   │  │  React  │ │
-│  │ 子应用  │  │ 子应用  │  │  子应用 │ │
-│  └────┬────┘  └────┬────┘  └────┬────┘ │
-│       │            │            │       │
-│  ┌────┴────────────┴────────────┴────┐ │
-│  │        qiankun沙箱（JS隔离）        │ │
-│  │   + Shadow DOM（样式隔离）           │ │
-│  └───────────────────────────────────┘ │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["主应用 (Main App)"]
+    N1["Vue 3"]
+    N2["Vue 2"]
+    N3["React"]
+    N4["子应用"]
+    N5["子应用"]
+    N6["子应用"]
+    N7["qiankun沙箱（JS隔离）"]
+    N8["+ Shadow DOM（样式隔离）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
 ```
 
 #### 沙箱机制
@@ -8339,42 +8970,77 @@ start({ prefetch: 'all', singular: true })
 
 ### 10.18 Module Federation 原理（webpack5）
 
-```
-Module Federation = webpack5 内置的微前端/微模块方案
-  → 允许在运行时从远程构建加载模块（无需构建时依赖）
-
-架构：
-  ┌──────────────┐      ┌──────────────────┐
-  │  Host (主应用) │ ──→ │ Remote (远程构建) │
-  │              │      │                  │
-  │ import('     │      │ exposes: {        │
-  │   "remote/   │      │   './Button':     │
-  │    Button'   │      │   './Button'      │
-  │ ')           │      │ }                 │
-  │              │      │                  │
-  │ shared: [    │ ←←←← │ shared: [        │
-  │   'vue'      │ 共享  │   'vue'           │
-  │ ]            │ 单例  │ ]                │
-  └──────────────┘      └──────────────────┘
-
-// Host 配置
-new ModuleFederationPlugin({
-  name: 'host',
-  remotes: {
-    remote_app: 'remote_app@http://localhost:3001/remoteEntry.js'
-  },
-  shared: ['vue']
-})
-
-// Remote 配置
-new ModuleFederationPlugin({
-  name: 'remote_app',
-  filename: 'remoteEntry.js',
-  exposes: {
-    './Button': './src/Button.vue'
-  },
-  shared: ['vue']
-})
+```mermaid
+flowchart TB
+    N0["Module Federation = webpack5 内置的微前端/微模块方"]
+    N1["允许在运行时从远程构建加载模块（无需构建时依赖）"]
+    N2["架构："]
+    N3["Host (主应用)"]
+    N4["Remote (远程构建)"]
+    N5["import('"]
+    N6["exposes: {"]
+    N7["'remote/"]
+    N8["'./Button':"]
+    N9["Button'"]
+    N10["'./Button'"]
+    N11["')"]
+    N12["shared: ["]
+    N13["shared: ["]
+    N14["'vue'"]
+    N15["共享"]
+    N16["'vue'"]
+    N17["单例"]
+    N18["// Host 配置"]
+    N19["new ModuleFederationPlugin({"]
+    N20["name: 'host',"]
+    N21["remotes: {"]
+    N22["remote_app: 'remote_app@http://localhost"]
+    N23["},"]
+    N24["shared: ['vue']"]
+    N25["})"]
+    N26["// Remote 配置"]
+    N27["new ModuleFederationPlugin({"]
+    N28["name: 'remote_app',"]
+    N29["filename: 'remoteEntry.js',"]
+    N30["exposes: {"]
+    N31["'./Button': './src/Button.vue'"]
+    N32["},"]
+    N33["shared: ['vue']"]
+    N34["})"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
 ```
 
 **Module Federation vs qiankun**：
@@ -8385,22 +9051,29 @@ new ModuleFederationPlugin({
 
 ### 10.19 ESLint 原理（AST遍历 + 规则检测）
 
-```
-ESLint 工作流程：
-
-源代码
-    │
-    ├── 1. Parser（解析）
-    │       → ESPree → AST
-    │       → 支持 TypeScript/JSX 等（@typescript-eslint/parser）
-    │
-    ├── 2. Linter.lint()（执行）
-    │       ├── FlatConfig 或 .eslintrc.js 配置
-    │       ├── 加载 plugin/rule
-    │       └── 遍历 AST，调用各规则检测
-    │
-    └── 3. 报告违规
-            └── { ruleId, message, line, column, severity }
+```mermaid
+flowchart TB
+    N0["ESLint 工作流程："]
+    N1["源代码"]
+    N2["1. Parser（解析）"]
+    N3["ESPree AST"]
+    N4["支持 TypeScript/JSX 等（@typescript-eslint"]
+    N5["2. Linter.lint()（执行）"]
+    N6["FlatConfig 或 .eslintrc.js 配置"]
+    N7["加载 plugin/rule"]
+    N8["遍历 AST，调用各规则检测"]
+    N9["3. 报告违规"]
+    N10["{ ruleId, message, line, column, severit"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
 ```
 
 ```javascript
@@ -8527,24 +9200,35 @@ affected 流程（只构建测试受git变更影响的包）：
   nx affected:build → 只构建/测试受影响的包
 ```
 
-```
-Nx / Turborepo 架构对比：
-
-Nx:
-  ┌────────────┐
-  │  Project   │  ← Nx 理解项目依赖图
-  │  Graph     │
-  └─────┬──────┘
-        ├── 自动推断构建顺序
-        ├── affected: only rebuild what changed
-        ├── 缓存：本地 + Nx Cloud（分布式）
-        └── nx graph → 生成项目依赖可视化
-
-Turborepo:
-  turbo.json 定义 pipeline
-        ├── 任务拓扑排序（基于 dependsOn）
-        ├── 远程缓存（Vercel Remote Cache）
-        └── 增量构建
+```mermaid
+flowchart TB
+    N0["Nx / Turborepo 架构对比："]
+    N1["Nx:"]
+    N2["Project"]
+    N3["Nx 理解项目依赖图"]
+    N4["Graph"]
+    N5["自动推断构建顺序"]
+    N6["affected: only rebuild what changed"]
+    N7["缓存：本地 + Nx Cloud（分布式）"]
+    N8["nx graph 生成项目依赖可视化"]
+    N9["Turborepo:"]
+    N10["turbo.json 定义 pipeline"]
+    N11["任务拓扑排序（基于 dependsOn）"]
+    N12["远程缓存（Vercel Remote Cache）"]
+    N13["增量构建"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
 ```
 
 两者共同目标：**将大型 monorepo 的"全量构建"变为"增量构建"，从分钟级降至秒级**。

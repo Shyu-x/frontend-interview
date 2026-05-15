@@ -1,4 +1,3 @@
-
 > JavaScript 是前端工程师的核心技能，本章覆盖高频面试题，从数据类型到异步编程全面覆盖。
 
 ---
@@ -9,35 +8,45 @@
 
 JavaScript 共9种数据类型，分为两大类：
 
+```mermaid
+graph TB
+    root["数据类型"]
+    root --> primitive["原始类型（7种）"]
+    root --> reference["引用类型（1种）"]
+    
+    primitive --> num["number"]
+    primitive --> str["string"]
+    primitive --> bool["boolean"]
+    primitive --> und["undefined"]
+    primitive --> nil["null"]
+    primitive --> sym["symbol"]
+    primitive --> bi["bigint"]
+    
+    reference --> obj["object"]
+    obj --> po["plain object"]
+    obj --> arr["array"]
+    obj --> fn["function"]
+    obj --> date["date"]
+    obj --> reg["regexp"]
 ```
-数据类型分类：
-┌──────────────────────────────────────────────────┐
-│                   数据类型                        │
-├─────────────────────┬────────────────────────────┤
-│  原始类型（7种）      │  引用类型（1种）              │
-├─────────────────────┼────────────────────────────┤
-│  number             │  object                    │
-│  string             │    ├─ plain object        │
-│  boolean            │    ├─ array               │
-│  undefined          │    ├─ function            │
-│  null               │    ├─ date                │
-│  symbol             │    └─ regexp              │
-│  bigint             │                            │
-└─────────────────────┴────────────────────────────┘
 
-判断方法：typeof
-┌────────────────────────────────────────┐
-│  typeof 123        → "number"          │
-│  typeof "str"      → "string"          │
-│  typeof true       → "boolean"         │
-│  typeof undefined  → "undefined"       │
-│  typeof null       → "object"  ← 历史bug│
-│  typeof Symbol()   → "symbol"          │
-│  typeof BigInt(1)  → "bigint"         │
-│  typeof {}         → "object"          │
-│  typeof []         → "object"          │
-│  typeof function   → "function"        │
-└────────────────────────────────────────┘
+**typeof 判断方法：**
+
+```mermaid
+flowchart LR
+    subgraph table["typeof 判断结果"]
+        direction TB
+        A1["typeof 123"] --> B1["\"number\""]
+        A2["typeof \"str\""] --> B2["\"string\""]
+        A3["typeof true"] --> B3["\"boolean\""]
+        A4["typeof undefined"] --> B4["\"undefined\""]
+        A5["typeof null"] --> B5["\"object\" ⚠️"]
+        A6["typeof Symbol()"] --> B6["\"symbol\""]
+        A7["typeof BigInt(1)"] --> B7["\"bigint\""]
+        A8["typeof {}"] --> B8["\"object\""]
+        A9["typeof []"] --> B9["\"object\""]
+        A10["typeof function"] --> B10["\"function\""]
+    end
 ```
 
 存储方式区别：
@@ -54,14 +63,22 @@ let obj1 = { name: "张三" };
 let obj2 = obj1;    // obj2和obj1指向同一堆地址
 obj2.name = "李四";
 console.log(obj1.name); // "李四"，原对象被修改
+```
 
-// 内存模型：
-// 栈（Stack）              堆（Heap）
-// ┌─────────┐              ┌─────────────┐
-// │ a: 1    │              │ {name:"李四"}│  ← obj1/obj2指向这里
-// │ obj1──┼─┼──────→       └─────────────┘
-// │ obj2──┼─┘                (同一个对象)
-// └─────────┘
+```mermaid
+flowchart TB
+    subgraph stack["栈（Stack）"]
+        a["a: 1"]
+        obj1["obj1"] 
+        obj2["obj2"]
+    end
+    
+    subgraph heap["堆（Heap）"]
+        objRef["{name: \"李四\"}"]
+    end
+    
+    obj1 & obj2 -->|指向| objRef
+    style objRef fill:#e1f5fe
 ```
 
 #### 1.2 null vs undefined
@@ -124,18 +141,19 @@ console.log(0 == false);    // true
 console.log(1 === "1");     // false，类型不同
 console.log(true === 1);    // false
 
-// == 转换规则表：
-// ┌─────────┬──────────────────────────────────┐
-// │ 值       │ 转换后比较                         │
-// ├─────────┼──────────────────────────────────┤
-// │ null    │ 只和undefined相等                  │
-// │ undefined│ 只和null相等                       │
-// │ string  │ 和number比：转数字                  │
-// │ boolean │ 转数字（true=1, false=0）          │
-// │ object  │ toPrimitive转原始值后再比           │
-// └─────────┴──────────────────────────────────┘
-
 // 实际建议：始终使用 ===
+```
+
+```mermaid
+flowchart LR
+    subgraph conversion["== 隐式转换规则"]
+        direction TB
+        null["null"] -->|"只和 undefined 相等"| und["undefined"]
+        und2["undefined"] -->|"只和 null 相等"| null2["null"]
+        str["string"] -->|"和 number 比转数字"| num["number"]
+        bool["boolean"] -->|"转数字 true=1 false=0"| num2["数字"]
+        obj["object"] -->|"toPrimitive 转原始值"| result["再比较"]
+    end
 ```
 
 #### 2.2 Object.is vs ===
@@ -144,7 +162,7 @@ console.log(true === 1);    // false
 // Object.is 判断更精确
 console.log(Object.is(NaN, NaN));       // true（=== 为 false）
 console.log(Object.is(+0, -0));        // false（=== 为 true）
-console.log(Object.is({}, {}));        // false（引用不同）
+console.log(Object.is({}, {}));        // false（引用不同）)
 
 // Object.is 内部实现：
 function is(x, y) {
@@ -309,19 +327,24 @@ function outer() {
 }
 const fn = outer();
 fn(); // 10
+```
 
-// 闭包形成图解：
-// ┌─────────────────────────────────────────────┐
-// │  outer() 执行上下文                           │
-// │    x = 10                                    │
-// │    inner函数定义（携带 [[Scope]] → outer AO） │
-// │  outer返回inner，outer执行上下文关闭          │
-// │    但inner的[[Scope]]仍引用outer的变量对象    │
-// └─────────────────────────────────────────────┘
-// ┌─────────────────────────────────────────────┐
-// │  fn() 执行（inner）                          │
-// │    通过[[Scope]]访问已关闭的outer.x = 10      │
-// └─────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph outer["outer() 执行上下文"]
+        direction TB
+        x["x = 10"]
+        inner["inner 函数定义"]
+        inner -->|"[[Scope]] →"| outer_ao["outer AO"]
+    end
+    
+    outer -->|"返回 inner"| fn_call
+    
+    subgraph inner_exec["fn() 执行（inner）"]
+        direction TB
+        fn["fn = outer() 返回的 inner"]
+        fn -->|"通过 [[Scope]] 访问"| x_val["访问 outer.x = 10"]
+    end
 ```
 
 #### 5.2 为什么能访问外层变量
@@ -431,30 +454,36 @@ function f1() {
   f2();
 }
 f1();
+```
 
-// 作用域链图解：
-// ┌─────────────────────────────────────────┐
-// │  Global Scope                            │
-// │    a = 1                                 │
-// │    f1 = function                         │
-// │    └── f1[[Scope]] = [global]           │
-// └────────────┬────────────────────────────┘
-//              │ parent
-//              ▼
-// ┌─────────────────────────────────────────┐
-// │  f1() Scope                             │
-// │    b = 2                                │
-// │    f2 = function                        │
-// │    └── f2[[Scope]] = [f1, global]       │
-// └────────────┬────────────────────────────┘
-//              │ parent
-//              ▼
-// ┌─────────────────────────────────────────┐
-// │  f2() Scope（当前）                      │
-// │    c = 3                                │
-// │    查找：本地→f1→global                 │
-// └─────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph global["Global Scope"]
+        direction TB
+        a["a = 1"]
+        f1["f1 = function"]
+        f1 -->|"f1[[Scope]] = [global]"| global_ref[""]
+    end
+    
+    global -->|"parent"| f1_scope
+    
+    subgraph f1_scope["f1() Scope"]
+        direction TB
+        b["b = 2"]
+        f2["f2 = function"]
+        f2 -->|"f2[[Scope]] = [f1, global]"| f1_ref[""]
+    end
+    
+    f1_scope -->|"parent"| f2_scope
+    
+    subgraph f2_scope["f2() Scope（当前）"]
+        direction TB
+        c["c = 3"]
+        lookup["查找：本地 → f1 → global"]
+    end
+```
 
+```javascript
 // var vs let/const 作用域：
 // var：函数作用域，let/const：块级作用域
 function test() {
@@ -588,18 +617,21 @@ function Timer2() {
     // this.time++; // 报错
   }, 1000);
 }
+```
 
-// 箭头函数vs普通函数区别：
-// ┌─────────────┬──────────────────┬──────────────────┐
-// │ 特性         │ 箭头函数          │ 普通函数          │
-// ├─────────────┼──────────────────┼──────────────────┤
-// │ this        │ 继承外层          │ 调用时决定        │
-// │ arguments   │ 无（可用rest）    │ 有               │
-// │ constructor │ 无，不能new       │ 有               │
-// │ prototype   │ 无               │ 有               │
-// │ super       │ 无               │ 有               │
-// │ 简短写法    │ 支持隐式return    │ 不支持            │
-// └─────────────┴──────────────────┴──────────────────┘
+```mermaid
+flowchart LR
+    subgraph arrow["箭头函数"]
+        A1["this"] -->|"继承外层"| A2["词法绑定"]
+        A3["arguments"] -->|"无（用rest）"| A4["无"]
+        A5["constructor"] -->|"无，不能new"| A6["无"]
+    end
+    
+    subgraph normal["普通函数"]
+        N1["this"] -->|"调用时决定"| N2["动态绑定"]
+        N3["arguments"] -->|"有"| N4["有"]
+        N5["constructor"] -->|"有，可以new"| N6["有"]
+    end
 ```
 
 ---
@@ -722,22 +754,24 @@ Person.prototype.sayHi = function() { return `你好，我是${this.name}`; };
 const p = new Person("张三");
 console.log(p.__proto__ === Person.prototype); // true
 console.log(Person.prototype.constructor === Person); // true
+```
 
-// 关系图：
-// ┌─────────────────────────────────────────┐
-// │  Person.prototype（原型对象）            │
-// │    constructor → Person（回指）          │
-// │    sayHi → function                    │
-// │    __proto__ → Object.prototype         │
-// └─────────────────────────────────────────┘
-//              ▲
-//              │ __proto__
-//              │
-// ┌─────────────────────────────────────────┐
-// │  p（实例）                               │
-// │    name = "张三"                         │
-// │    __proto__ → Person.prototype         │
-// └─────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph prototype["Person.prototype（原型对象）"]
+        direction TB
+        constructor["constructor → Person（回指）"]
+        sayHi["sayHi → function"]
+        proto1["__proto__ → Object.prototype"]
+    end
+    
+    prototype -->|"__proto__"| instance
+    
+    subgraph instance["p（实例）"]
+        direction TB
+        name["name = \"张三\""]
+        proto2["__proto__ → Person.prototype"]
+    end
 ```
 
 #### 11.2 原型链
@@ -758,17 +792,19 @@ const c = new Child();
 console.log(c.child);   // "child"
 console.log(c.parent);  // "parent"（沿原型链找到）
 
-// 原型链图解：
-// c实例
-//   └── __proto__ → Child.prototype（new Parent()）
-//                    └── __proto__ → Parent.prototype
-//                                      └── __proto__ → Object.prototype
-//                                                              └── __proto__ → null
-
 // 顺原型链查找属性：
 console.log(c.hasOwnProperty('child'));   // true
 console.log(c.hasOwnProperty('parent'));  // false（在原型上）
 console.log('parent' in c);               // true（in会查找整条链）
+```
+
+```mermaid
+flowchart LR
+    c["c 实例"]
+    c -->|"__proto__"| child_proto["Child.prototype\n(new Parent())"]
+    child_proto -->|"__proto__"| parent_proto["Parent.prototype"]
+    parent_proto -->|"__proto__"| obj_proto["Object.prototype"]
+    obj_proto -->|"__proto__"| null["null"]
 ```
 
 ---
@@ -975,14 +1011,10 @@ class MyPromise {
 }
 
 // Promise.then 返回值规则：
-// ┌───────────────────────┬──────────────────────────┐
-// │ then返回值             │ 下一个Promise              │
-// ├───────────────────────┼──────────────────────────┤
-// │ 普通值                 │ resolved(该值)            │
-// │ Promise               │ 采用该Promise的最终状态     │
-// │ throw错误             │ rejected(错误)            │
-// │ thenable对象          │ resolved(thenable.then)  │
-// └───────────────────────┴──────────────────────────┘
+// 普通值 → resolved(该值)
+// Promise → 采用该Promise的最终状态
+// throw错误 → rejected(错误)
+// thenable对象 → resolved(thenable.then)
 
 // Promise链式调用原理：
 new Promise(r => r(1))
@@ -1001,6 +1033,25 @@ Promise.resolve(thenable).then(x => console.log(x)); // 42
 // 2. 有then方法的对象（thenable），包装后返回
 // 3. 其他值：resolved Promise
 // Promise.reject：永远是rejected
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> fulfilled : resolve
+    pending --> rejected : reject
+    fulfilled --> [*]
+    rejected --> [*]
+```
+
+```mermaid
+flowchart LR
+    subgraph then_return["then 返回值规则"]
+        val1["普通值"] -->|"resolved(该值)"| next1["下一个 Promise"]
+        val2["Promise"] -->|"采用最终状态"| next2["下一个 Promise"]
+        val3["throw 错误"] -->|"rejected(错误)"| next3["下一个 Promise"]
+        val4["thenable"] -->|"resolved(thenable.then)"| next4["下一个 Promise"]
+    end
 ```
 
 #### 13.2 async / await 原理
@@ -1201,27 +1252,11 @@ console.log('5');
 
 ```javascript
 // 浏览器Event Loop完整流程：
-/*
-   ┌─────────────────────────────────────────────────────┐
-   │  1. 执行同步代码（call stack）                        │
-   │     ↓                                              │
-   │  2. 清空微任务队列（microtask queue）                 │
-   │     ├── Promise.then                               │
-   │     ├── queueMicrotask                             │
-   │     └── MutationObserver                          │
-   │     循环直到队列空                                   │
-   │     ↓                                              │
-   │  3. 执行一个宏任务（macrotask queue）                 │
-   │     ├── setTimeout callback                        │
-   │     ├── setInterval callback                       │
-   │     ├── I/O callback                               │
-   │     └── UI render（每帧一次）                        │
-   │     ↓                                              │
-   │  4. 重复2-3（微任务 → 宏任务 → 微任务...）            │
-   └─────────────────────────────────────────────────────┘
+// 1. 执行同步代码（call stack）
+// 2. 清空微任务队列（microtask queue）
+// 3. 执行一个宏任务（macrotask queue）
+// 4. 重复2-3
 
-   示例分析：
-*/
 console.log('A');
 setTimeout(() => console.log('B'), 0);
 new Promise(resolve => {
@@ -1253,18 +1288,26 @@ console.log('D');
 // 微任务：打印B
 ```
 
+```mermaid
+flowchart TB
+    A["1. 执行同步代码\n（call stack）"] --> B["2. 清空微任务队列\n（microtask queue）"]
+    B --> B1["• Promise.then\n• queueMicrotask\n• MutationObserver\n循环直到队列空"]
+    B --> C["3. 执行一个宏任务\n（macrotask queue）"]
+    C --> C1["• setTimeout callback\n• setInterval callback\n• I/O callback\n• UI render（每帧一次）"]
+    C --> D["4. 重复2-3\n（微任务 → 宏任务 → 微任务...）"]
+    D --> B
+```
+
 #### 14.3 浏览器 vs Node Event Loop
 
 ```javascript
 // Node.js Event Loop（libuv）：
-// ┌────────────────────────────┐
-// │  timers（setTimeout/interval）│
-// │  pending callbacks          │
-// │  idle, prepare              │
-// │  poll（获取新I/O事件）       │
-// │  check（setImmediate）      │
-// │  close callbacks            │
-// └────────────────────────────┘
+// - timers（setTimeout/interval）
+// - pending callbacks
+// - idle, prepare
+// - poll（获取新I/O事件）
+// - check（setImmediate）
+// - close callbacks
 //
 // Node特点：
 // 1. setImmediate 在 I/O 回调之后、check阶段执行
@@ -1288,6 +1331,21 @@ Promise.resolve().then(() => console.log('microtask'));
 
 // Node中多个阶段的微任务：
 // 每个阶段之间都会执行微任务队列（类似浏览器每轮宏任务后清微任务）
+```
+
+```mermaid
+flowchart TB
+    subgraph node_loop["Node.js Event Loop（libuv）"]
+        direction TB
+        timers["timers\n（setTimeout/interval）"]
+        pending["pending callbacks"]
+        idle["idle, prepare"]
+        poll["poll\n（获取新I/O事件）"]
+        check["check\n（setImmediate）"]
+        close["close callbacks"]
+    end
+    
+    timers --> pending --> idle --> poll --> check --> close --> timers
 ```
 
 #### 14.4 MutationObserver 为什么是微任务
@@ -1524,18 +1582,6 @@ function deepClone(target, map = new WeakMap()) {
 
 ```javascript
 // Map vs Object：
-// ┌────────────────┬─────────────────────────┬─────────────────────────┐
-// │ 特性            │ Map                      │ Object                   │
-// ├────────────────┼─────────────────────────┼─────────────────────────┤
-// │ 键类型          │ 任意（函数、对象、NaN都行）│ 只能是string/symbol      │
-// │ 有序性          │ 按插入顺序                │ 基本有序（但插值顺序不确定） │
-// │ 大小            │ size属性                  │ Object.keys().length     │
-// │ 迭代           │ 可直接迭代                │ 需要Object.keys()       │
-// │ 性能            │ 插入/删除 O(1)           │ 插入/删除 O(1)（同）    │
-// │ 原型链          │ 无（可选Map设置）         │ 有（需hasOwnProperty）  │
-// │ JSON           │ 不能直接                  │ 可以（需手动处理）       │
-// └────────────────┴─────────────────────────┴─────────────────────────┘
-
 const map = new Map();
 map.set({}, 1);  // 对象作为键，===比较，{} !== {}
 map.set(NaN, 2);
@@ -1543,14 +1589,8 @@ console.log(map.get(NaN)); // 2
 console.log(map.size); // 2
 
 // Set vs Array：
-// ┌────────────────┬────────────────────────────────┐
-// │ 特性           │ Set                             │
-// ├────────────────┼────────────────────────────────┤
-// │ 唯一性          │ 自动去重                        │
-// │ 查找性能        │ O(1)（has）                    │
-// │ 添加/删除       │ O(1)                           │
-// │ 天然适合去重    │ [...new Set([1,2,2,3])]       │
-// └────────────────┴────────────────────────────────┘
+const set = new Set([1, 2, 2, 3]);
+console.log([...set]); // [1, 2, 3]
 
 // WeakMap vs Map（关键区别：弱引用）：
 // WeakMap：键只能是对象，值可以是任意类型
@@ -1586,6 +1626,38 @@ function dfs(node) {
   visited.add(node);
   // 访问node...
 }
+```
+
+```mermaid
+flowchart LR
+    subgraph comparison["Map vs Object"]
+        direction TB
+        M1["键类型：任意（函数、对象、NaN都行）"]
+        M2["有序性：按插入顺序"]
+        M3["大小：size属性"]
+        M4["迭代：可直接迭代"]
+        M5["原型链：无"]
+        M6["JSON：不能直接"]
+    end
+    
+    subgraph comparison2["Object"]
+        O1["键类型：只能是string/symbol"]
+        O2["有序性：基本有序"]
+        O3["大小：Object.keys().length"]
+        O4["迭代：需要Object.keys()"]
+        O5["原型链：有（需hasOwnProperty）"]
+        O6["JSON：可以"]
+    end
+```
+
+```mermaid
+flowchart LR
+    subgraph set_features["Set 特性"]
+        S1["唯一性：自动去重"]
+        S2["查找性能：O(1)（has）"]
+        S3["添加/删除：O(1)"]
+        S4["天然适合去重：[...new Set([1,2,2,3])]"]
+    end
 ```
 
 ---
@@ -1784,20 +1856,34 @@ const { proxy, revoke } = Proxy.revocable(target, handler);
 // ESModule（浏览器/Node ESM）：
 // export default / export
 // import
+```
 
-// ┌─────────────────┬──────────────────┬──────────────────┐
-// │ 特性             │ ESM              │ CJS              │
-// ├─────────────────┼──────────────────┼──────────────────┤
-// │ 编译时加载        │ 静态分析          │ 运行时解析        │
-// │ import          │ 必须顶层          │ require可动态     │
-// │ 导出值           │ 绑定（只读）       │ 值拷贝           │
-// │ 循环引用         │ 靠暂时性死区      │ 靠缓存           │
-// │ this            │ undefined        │ 当前模块对象      │
-// │ 严格模式         │ 自动开启          │ 不自动           │
-// │ 异步加载         │ 支持（import()）  │ 不支持           │
-// │ 浏览器环境        │ 需要type=module   │ 不支持           │
-// └─────────────────┴──────────────────┴──────────────────┘
+```mermaid
+flowchart LR
+    subgraph esm["ESM"]
+        E1["编译时加载：静态分析"]
+        E2["import：必须顶层"]
+        E3["导出值：绑定（只读）"]
+        E4["循环引用：靠暂时性死区"]
+        E5["this：undefined"]
+        E6["严格模式：自动开启"]
+        E7["异步加载：支持（import()）"]
+        E8["浏览器：需要type=module"]
+    end
+    
+    subgraph cjs["CJS"]
+        C1["运行时解析"]
+        C2["require可动态"]
+        C3["值拷贝"]
+        C4["靠缓存"]
+        C5["当前模块对象"]
+        C6["不自动"]
+        C7["不支持"]
+        C8["不支持"]
+    end
+```
 
+```javascript
 // ESM的import为什么必须顶层（静态性）：
 // 1. 可以在编译时确定导出依赖关系（静态分析）
 // 2. 打包工具（如rollup/webpack）可以实现tree shaking
@@ -1907,13 +1993,14 @@ export const libValue = value || 'default';
 
 ```javascript
 // V8 GC架构：
-// ┌──────────────────────────────────────────┐
-// │  新生代（New Space）│  老生代（Old Space）  │
-// │  1-8MB            │  几十MB~GB            │
-// │  Scavenge算法     │  Mark-Sweep + Mark-Compact │
-// │  存活短的对象       │  存活长的对象          │
-// │  复制-替换         │  标记-清除-整理       │
-// └──────────────────────────────────────────┘
+// 新生代（New Space）：
+//   - 1-8MB
+//   - Scavenge算法，复制-替换
+//   - 存活短的对象
+// 老生代（Old Space）：
+//   - 几十MB~GB
+//   - Mark-Sweep + Mark-Compact
+//   - 存活长的对象
 
 // 新生代：分成from space和to space
 // 1. From space存对象
@@ -1965,6 +2052,22 @@ b.prop = a; // a引用+1
 
 // 手动触发GC（调试用）：
 // % gc() // 在Node启动时加--expose-gc，或浏览器debug时用
+```
+
+```mermaid
+flowchart LR
+    subgraph v8_gc["V8 GC 架构"]
+        direction TB
+        subgraph new_space["新生代（New Space）1-8MB"]
+            S1["Scavenge算法\n复制-替换"]
+            S2["存活短的对象"]
+        end
+        
+        subgraph old_space["老生代（Old Space）几十MB~GB"]
+            O1["Mark-Sweep + Mark-Compact\n标记-清除-整理"]
+            O2["存活长的对象"]
+        end
+    end
 ```
 
 ---
@@ -2222,8 +2325,7 @@ function throttleFull(fn, delay, options = {}) {
 }
 
 // 应用区别：
-// 应用区别：
 // 搜索框输入：debounce（停笔后才搜）
 // 滚动加载：throttle（滚动时持续加载）
 // 窗口resize：debounce（停止调整后才处理）
-
+```

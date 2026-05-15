@@ -1,35 +1,12 @@
+# 前端性能优化全攻略
 
 > 前端性能直接影响用户体验和业务指标。本章覆盖从加载到渲染的全链路优化方案。
 
 ---
 
-### 1. 首屏优化方案
+## 1. 首屏优化方案
 
-```
-首屏优化总览：
-
-┌──────────────────────────────────────────────────────────┐
-│  首屏（FCP~TTI）                                          │
-│                                                          │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐     │
-│  │ JS/CSS  │→│ 渲染    │→│ 图片    │→│ 交互    │     │
-│  │ 压缩/分割│ │ 关键CSS │ │ 懒加载  │ │ 事件    │     │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘     │
-│                                                          │
-│  优化手段：                                               │
-│  1. 代码分割（code split）                                │
-│  2. 路由懒加载（dynamic import）                          │
-│  3. Tree shaking（去除未用代码）                          │
-│  4. 压缩（terser/terser for JS，cssnano for CSS）        │
-│  5. CDN部署（就近访问）                                   │
-│  6. HTTP缓存（Cache-Control/ETag）                       │
-│  7. HTTP/2（多路复用，头部压缩）                          │
-│  8. 预加载（preload/prefetch）                            │
-│  9. 内联关键CSS（inline critical CSS）                    │
-└──────────────────────────────────────────────────────────┘
-```
-
-#### 1.1 代码分割与懒加载
+### 1.1 代码分割与懒加载
 
 ```javascript
 // webpack/vite 配置：
@@ -45,8 +22,8 @@ function App() {
   return (
     <Suspense fallback={<Loading />}>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
+        <Route path="/" element={<Home} />
+        <Route path="/about" element={<About} />
       </Routes>
     </Suspense>
   );
@@ -76,7 +53,7 @@ new webpack.optimize.SplitChunksPlugin({
 // CSS代码分割：mini-css-extract-plugin
 ```
 
-#### 1.2 CDN 部署
+### 1.2 CDN 部署
 
 ```javascript
 // CDN工作原理：
@@ -95,7 +72,7 @@ new webpack.optimize.SplitChunksPlugin({
 // 动态内容：CDN缓存（Cache-Control: private/no-store）
 ```
 
-#### 1.3 预加载
+### 1.3 预加载
 
 ```html
 <!-- 预加载关键资源：-->
@@ -134,42 +111,33 @@ document.head.appendChild(link);
 // preload：当前导航需要，优先级高（用于当前页关键资源）
 ```
 
-#### 1.4 HTTP 缓存策略
+### 1.4 HTTP 缓存策略
 
-```
-HTTP 缓存策略图解：
+**缓存判断流程：**
 
-┌────────────────────────────────────────────────────────────┐
-│  缓存判断流程：                                              │
-│                                                            │
-│  1. 浏览器请求 → 检查缓存                                     │
-│     ├── 有缓存 → 检查新鲜度（Cache-Control/max-age）          │
-│     │            ├── 新鲜 → 直接返回（200 from cache）        │
-│     │            └── 陈旧 → 发起条件请求（If-None-Match/     │
-│     │                         If-Modified-Since）            │
-│     │                         ├── 304 Not Modified（用缓存）  │
-│     │                         └── 200 New（更新缓存）        │
-│     └── 无缓存 → 请求服务器（200）                           │
-└────────────────────────────────────────────────────────────┘
+![HTTP 缓存判断流程](assets/images/mermaid/performance-01.png)
 
-Cache-Control 常见值：
-- no-cache：每次验证后使用（可用本地缓存，但需验证）
-- no-store：禁止缓存
-- private：只允许浏览器缓存（CDN不可缓存）
-- public：CDN也可以缓存
-- max-age=3600：缓存有效期（秒）
-- must-revalidate：过期后必须验证
+**Cache-Control 常见值：**
 
-最佳实践：
-1. HTML：Cache-Control: no-cache（确保更新能及时下发）
-2. 静态资源（JS/CSS/图片）：max-age=31536000 + 内容hash
+| 值 | 说明 |
+|---|---|
+| no-cache | 每次验证后使用（可用本地缓存，但需验证） |
+| no-store | 禁止缓存 |
+| private | 只允许浏览器缓存（CDN不可缓存） |
+| public | CDN也可以缓存 |
+| max-age=3600 | 缓存有效期（秒） |
+| must-revalidate | 过期后必须验证 |
+
+**最佳实践：**
+
+1. HTML：`Cache-Control: no-cache`（确保更新能及时下发）
+2. 静态资源（JS/CSS/图片）：`max-age=31536000` + 内容hash
    （文件名带hash，改变URL即可更新，浏览器自动重新缓存）
-3. CDN：设置s-maxage，CDN节点缓存，浏览器不缓存（private）
-```
+3. CDN：设置`s-maxage`，CDN节点缓存，浏览器不缓存（`private`）
 
 ---
 
-### 2. 白屏时间优化
+## 2. 白屏时间优化
 
 ```javascript
 // 白屏原因：
@@ -204,7 +172,7 @@ Cache-Control 常见值：
 
 ---
 
-### 3. 长列表优化
+## 3. 长列表优化
 
 ```javascript
 // 长列表问题：DOM节点过多，渲染卡顿
@@ -241,7 +209,7 @@ function renderBatch(items, batchSize = 100) {
 
 ---
 
-### 4. 虚拟列表原理
+## 4. 虚拟列表原理
 
 ```javascript
 // 虚拟列表：只渲染可视区域的行，高性能渲染万级数据
@@ -326,21 +294,20 @@ function VirtualizedList({ items }) {
 
 ---
 
-### 5. 图片优化
+## 5. 图片优化
+
+**图片优化矩阵：**
+
+| 格式 | 压缩效果 | 场景 |
+|------|---------|------|
+| WebP | 比 JPEG 小 30% | 通用，兼容性已很好 |
+| AVIF | 比 WebP 小 30% | 现代浏览器，内容图片 |
+| SVG | 矢量无损 | 图标/插图 |
+| 原生懒加载 | 避免白嫖 | img loading="lazy" |
+| 响应式图片 | 避免下载大图 | srcset + sizes |
+| 渐进式 JPEG | 逐行显示 | 内容丰富的大图 |
 
 ```javascript
-// 图片优化矩阵：
-// ┌────────────────┬────────────┬────────────────────────┐
-// │ 格式            │ 压缩效果   │ 场景                   │
-// ├────────────────┼────────────┼────────────────────────┤
-// │ WebP           │ 30%更小    │ 通用，兼容性已很好       │
-// │ AVIF           │ 比WebP小30% │ 现代浏览器，内容图片    │
-// │ SVG            │ 矢量无损   │ 图标/插图               │
-// │ 原生懒加载      │ 避免白嫖   │ img loading="lazy"      │
-// │ 响应式图片      │ 避免下载大 │ srcset + sizes         │
-// │ 渐进式JPEG     │ 逐行显示   │ 内容丰富的大图           │
-// └────────────────┴────────────┴────────────────────────┘
-
 // WebP vs AVIF：
 // WebP：兼容性极好（95%+），压缩率比JPEG高30%，透明度OK
 // AVIF：压缩最强（比WebP再小30-50%），但兼容性差（Chrome/Firefox支持，Safari 16+）
@@ -390,7 +357,7 @@ function VirtualizedList({ items }) {
 
 ---
 
-### 6. 懒加载原理
+## 6. 懒加载原理
 
 ```javascript
 // 懒加载：按需加载，减少首屏资源量
@@ -439,7 +406,7 @@ window.addEventListener('scroll', throttle(lazyLoadImgs, 200));
 
 ---
 
-### 7. 路由懒加载原理
+## 7. 路由懒加载原理
 
 ```javascript
 // 路由懒加载：不一次性加载所有路由代码，按需加载
@@ -455,8 +422,8 @@ function App() {
   return (
     <Suspense fallback={<div>加载中...</div>}>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
+        <Route path="/" element={<Home} />
+        <Route path="/about" element={<About} />
       </Routes>
     </Suspense>
   );
@@ -490,18 +457,17 @@ router.beforeEach((to) => {
 
 ---
 
-### 8. gzip vs Brotli
+## 8. gzip vs Brotli
+
+**压缩算法对比：**
+
+| 算法 | 压缩率 | 压缩速度 | 支持情况 |
+|------|--------|---------|----------|
+| gzip | 较好 | 快 | 所有浏览器/服务器 |
+| brotli | 更好 | 稍慢 | 现代浏览器（95%+） |
+| deflate | 一般 | 快 | 老式环境 |
 
 ```javascript
-// 压缩算法对比：
-// ┌──────────────┬───────────┬──────────────┬───────────────────┐
-// │ 算法          │ 压缩率    │ 压缩速度     │ 支持情况           │
-// ├──────────────┼───────────┼──────────────┼───────────────────┤
-// │ gzip          │ 较好      │ 快           │ 所有浏览器/服务器   │
-// │ brotli        │ 更好      │ 稍慢         │ 现代浏览器（95%+）  │
-// │ deflate       │ 一般      │ 快           │ 老式环境           │
-// └──────────────┴───────────┴──────────────┴───────────────────┘
-
 // gzip vs brotli 压缩率对比（典型）：
 // 原始JS: 500KB
 // gzip:  ~150KB（70%压缩）
@@ -531,7 +497,7 @@ server {
 
 ---
 
-### 9. SSR 与性能
+## 9. SSR 与性能
 
 ```javascript
 // 为什么SSR提升性能：
@@ -574,7 +540,7 @@ function Page() {
 
 ---
 
-### 10. CDN 加速原理
+## 10. CDN 加速原理
 
 ```javascript
 // CDN工作流程：
@@ -602,95 +568,80 @@ function Page() {
 
 ---
 
-### 11. Lighthouse 性能评分
+## 11. Lighthouse 性能评分
 
-```
-Lighthouse 评分体系：
+**Lighthouse 评分体系：**
 
-┌─────────────────────────────────────────────────────┐
-│  Performance（性能分0-100）                          │
-│    ├── FCP（首次内容绘制）                          │
-│    ├── LCP（最大内容绘制）                          │
-│    ├── TBT（总阻塞时间）                            │
-│    ├── CLS（布局偏移）                              │
-│    └── TTI（可交互时间）                            │
-│                                                     │
-│  Accessibility（可访问性）                           │
-│  Best Practices（最佳实践）                          │
-│  SEO                                                   │
-│  PWA（渐进式Web应用）                                │
-└─────────────────────────────────────────────────────┘
+![Lighthouse 性能评分体系](assets/images/mermaid/performance-02.png)
 
-评分标准（Performance）：
-- 90-100：绿，优秀
-- 50-89：黄，需要改进
-- 0-49：红，差
+| 评分 | 等级 | 说明 |
+|------|------|------|
+| 90-100 | 绿 | 优秀 |
+| 50-89 | 黄 | 需要改进 |
+| 0-49 | 红 | 差 |
 
-各指标含义（详见"Core Web Vitals"节）
+```javascript
+// Lighthouse 使用：
+// 1. Chrome DevTools → Lighthouse面板
+// 2. `npx lighthouse https://example.com --output html`
+// 3. PageSpeed Insights（Google在线工具）
+// 4. Chrome插件：Lighthouse Checker
 
-Lighthouse 使用：
-1. Chrome DevTools → Lighthouse面板
-2. `npx lighthouse https://example.com --output html`
-3. PageSpeed Insights（Google在线工具）
-4. Chrome插件：Lighthouse Checker
-
-优化建议：
-1. 移除阻塞渲染的资源
-2. 减少主线程工作（JS执行时间）
-3. 优化图片（格式/大小/懒加载）
-4. 减少未使用的JS/CSS
-5. 使用现代图片格式（WebP/AVIF）
+// 优化建议：
+// 1. 移除阻塞渲染的资源
+// 2. 减少主线程工作（JS执行时间）
+// 3. 优化图片（格式/大小/懒加载）
+// 4. 减少未使用的JS/CSS
+// 5. 使用现代图片格式（WebP/AVIF）
 ```
 
 ---
 
-### 12. Core Web Vitals
+## 12. Core Web Vitals
 
-```
-Core Web Vitals（核心网页指标）：
+**核心网页指标：**
 
-┌────────────┬────────────┬────────────┬────────────────┐
-│ 指标        │ 名称        │ 达标标准    │ 说明            │
-├────────────┼────────────┼────────────┼────────────────┤
-│ LCP        │ 最大内容绘制│ ≤2.5s      │ 首屏加载体验     │
-│ CLS        │ 累积布局偏移│ ≤0.1       │ 视觉稳定性       │
-│ INP        │ 交互延迟    │ ≤200ms     │ 响应速度（新TTI）│
-│ FID        │ 首次输入延迟│ ≤100ms     │ 旧指标（被INP替代│
-│ FCP        │ 首次内容绘制│ ≤1.8s      │ 页面开始显示     │
-│ TTFB       │ 首字节时间  │ ≤0.8s      │ 服务器响应速度   │
-│ TTI        │ 可交互时间  │ ≤3.8s      │ 完全可交互       │
-│ TBT        │ 总阻塞时间  │ ≤200ms     │ JS阻塞主线程时间 │
-└────────────┴────────────┴────────────┴────────────────┘
+| 指标 | 名称 | 达标标准 | 说明 |
+|------|------|---------|------|
+| LCP | 最大内容绘制 | ≤2.5s | 首屏加载体验 |
+| CLS | 累积布局偏移 | ≤0.1 | 视觉稳定性 |
+| INP | 交互延迟 | ≤200ms | 响应速度（新TTI） |
+| FID | 首次输入延迟 | ≤100ms | 旧指标（被INP替代） |
+| FCP | 首次内容绘制 | ≤1.8s | 页面开始显示 |
+| TTFB | 首字节时间 | ≤0.8s | 服务器响应速度 |
+| TTI | 可交互时间 | ≤3.8s | 完全可交互 |
+| TBT | 总阻塞时间 | ≤200ms | JS阻塞主线程时间 |
 
-FID → INP：
-- FID只测量第一次交互的延迟
-- INP（Interaction to Next Paint）测量整个页面生命周期中所有交互
-- INP = 从用户交互到下一帧渲染的最大延迟
+```javascript
+// FID → INP：
+// - FID只测量第一次交互的延迟
+// - INP（Interaction to Next Paint）测量整个页面生命周期中所有交互
+// - INP = 从用户交互到下一帧渲染的最大延迟
 
-如何优化CLS（布局偏移）：
-1. 为图片/视频指定宽高（aspect-ratio）
-2. 不要在内容上方动态插入广告/弹窗
-3. font-display: optional（字体不阻塞，FOIT/FOUT减少）
-4. 避免iframe
-5. 使用CSS transform做动画（不触发重排）
+// 如何优化CLS（布局偏移）：
+// 1. 为图片/视频指定宽高（aspect-ratio）
+// 2. 不要在内容上方动态插入广告/弹窗
+// 3. font-display: optional（字体不阻塞，FOIT/FOUT减少）
+// 4. 避免iframe
+// 5. 使用CSS transform做动画（不触发重排）
 
-如何优化LCP：
-1. 优化关键内容（通常是hero图片或首屏大文本）
-2. preload最大的LCP资源（<link rel="preload">）
-3. 使用现代图片格式（WebP/AVIF）
-4. 使用content-visibility: auto（跳过屏外渲染）
-5. 服务端渲染（SSR）
+// 如何优化LCP：
+// 1. 优化关键内容（通常是hero图片或首屏大文本）
+// 2. preload最大的LCP资源（<link rel="preload">）
+// 3. 使用现代图片格式（WebP/AVIF）
+// 4. 使用content-visibility: auto（跳过屏外渲染）
+// 5. 服务端渲染（SSR）
 
-如何优化INP：
-1. 减少主线程阻塞（代码分割、web worker）
-2. 长任务拆分（requestIdleCallback）
-3. 避免大layout thrashing（批量DOM读写）
-4. 减少reflow/repaint
+// 如何优化INP：
+// 1. 减少主线程阻塞（代码分割、web worker）
+// 2. 长任务拆分（requestIdleCallback）
+// 3. 避免大layout thrashing（批量DOM读写）
+// 4. 减少reflow/repaint
 ```
 
 ---
 
-### 13. 性能瓶颈定位
+## 13. 性能瓶颈定位
 
 ```javascript
 // 性能监控工具：
@@ -750,7 +701,7 @@ function goodPattern() {
 
 ---
 
-### 14. React 性能优化
+## 14. React 性能优化
 
 ```javascript
 // React性能优化核心：
@@ -818,7 +769,7 @@ function GoodComponent() {
 
 ---
 
-### 15. Vue 性能优化
+## 15. Vue 性能优化
 
 ```javascript
 // Vue性能优化：
@@ -890,7 +841,7 @@ onUnmounted(() => {
 
 ---
 
-### 16. 大文件上传
+## 16. 大文件上传
 
 ```javascript
 // 大文件上传方案：分片 + 断点续传 + 秒传
@@ -985,7 +936,7 @@ async function mergeChunks(filename, totalChunks) {
 
 ---
 
-### 17. Web Worker 优化
+## 17. Web Worker 优化
 
 ```javascript
 // Web Worker：将耗时计算移到后台线程，不阻塞主线程
@@ -1039,7 +990,7 @@ const result = await api.heavyTask(data);
 
 ---
 
-### 18. requestIdleCallback 优化
+## 18. requestIdleCallback 优化
 
 ```javascript
 // requestIdleCallback：在浏览器空闲时执行低优先级任务
@@ -1088,62 +1039,82 @@ window.cancelIdleCallback = window.cancelIdleCallback || clearTimeout;
 
 ---
 
-### 19. 前端监控
+## 19. 前端监控
+
+**前端监控体系：**
+
+![前端监控体系](assets/images/mermaid/performance-03.png)
+
+**错误监控：**
 
 ```javascript
-// 前端监控体系：
-// ┌─────────────────────────────────────────────┐
-// │  监控类型                                     │
-// ├──────────────┬──────────────┬────────────────┤
-// │ 错误监控      │ 性能监控      │ 行为监控/埋点   │
-// ├──────────────┼──────────────┼────────────────┤
-// │ JS错误        │ 长任务        │ 页面访问        │
-// │ 资源加载错误   │ 渲染时间      │ 按钮点击        │
-// │ Promise异常   │ API响应时间   │ 表单提交        │
-// │ 自定义错误    │ CLS/FID/LCP │ 用户路径        │
-// └──────────────┴──────────────┴────────────────┘
-
-// 错误监控：
+// JS错误捕获
 window.onerror = (msg, src, line, col, error) => {
   sendToServer({ type: 'error', msg, line, col, stack: error?.stack });
   return false; // 不执行默认错误处理
 };
 
+// Promise异常捕获
 window.addEventListener('unhandledrejection', e => {
   sendToServer({ type: 'unhandledrejection', reason: e.reason });
 });
 
-// Vue错误捕获：
+// Vue错误捕获
 Vue.config.errorHandler = (err, vm, info) => {};
-// React错误边界：
-class ErrorBoundary extends React.Component {
-  componentDidCatch(error, info) { sendToServer(...); }
-}
 
-// 性能监控（Web Vitals）：
+// React错误边界
+class ErrorBoundary extends React.Component {
+  componentDidCatch(error, info) {
+    sendToServer(...);
+  }
+}
+```
+
+**性能监控（Web Vitals）：**
+
+```javascript
 import { onCLS, onLCP, onINP, onFCP, onTTFB } from 'web-vitals';
+
 function sendToAnalytics({ name, value, id }) {
-  // 发送到监控平台
+  // 发送到监控平台（不阻塞页面卸载）
   navigator.sendBeacon('/analytics', JSON.stringify({ name, value, id }));
 }
+
 onLCP(sendToAnalytics);
 onCLS(sendToAnalytics);
+onINP(sendToAnalytics);
+```
 
-// API性能监控：
+**API性能监控：**
+
+```javascript
 const origFetch = window.fetch;
 window.fetch = async (...args) => {
   const start = performance.now();
   try {
     const res = await origFetch(...args);
-    sendToServer({ type: 'api', url: args[0], duration: performance.now() - start, status: res.status });
+    sendToServer({
+      type: 'api',
+      url: args[0],
+      duration: performance.now() - start,
+      status: res.status
+    });
     return res;
   } catch (err) {
-    sendToServer({ type: 'api', url: args[0], duration: performance.now() - start, error: true });
+    sendToServer({
+      type: 'api',
+      url: args[0],
+      duration: performance.now() - start,
+      error: true
+    });
     throw err;
   }
 };
+```
 
-// 埋点系统：
+**埋点系统：**
+
+```javascript
 function track(event, properties = {}) {
   sendToServer({
     event,
@@ -1152,18 +1123,37 @@ function track(event, properties = {}) {
 }
 // 或者用navigator.sendBeacon（不阻塞页面卸载）
 navigator.sendBeacon('/track', JSON.stringify({ event: 'page_view' }));
+```
 
-// 常用监控平台（前端接入）：
-// Sentry（错误监控，JS/Vue/React/RN）
-// 阿里云ARMS（前端监控）
-// 腾讯云前端性能监控
-// Datadog / New Relic
-// 自建：用ClickHouse + Grafana存储和可视化
+**常用监控平台：**
 
-// 日志系统设计：
-// 1. 采集：SDK（自动采集错误/性能，手动埋点）
-// 2. 发送：sendBeacon + 批量合并（减少请求数）
-// 3. 存储：日志服务（ES/ClickHouse）
-// 4. 查询：Kibana/Grafana/自建看板
-// 5. 告警：错误率超阈值触发告警
+| 平台 | 特点 |
+|------|------|
+| Sentry | 错误监控，JS/Vue/React/RN |
+| 阿里云ARMS | 前端监控 |
+| 腾讯云前端性能监控 | 端到端 |
+| Datadog / New Relic | 全链路 |
+| 自建 | ClickHouse + Grafana |
 
+**日志系统设计：**
+
+![前端监控流程](assets/images/mermaid/performance-04.png)
+
+| 环节 | 技术选型 |
+|------|---------|
+| 采集 | SDK（自动+手动） |
+| 发送 | sendBeacon + 批量 |
+| 存储 | ES / ClickHouse |
+| 查询 | Kibana / Grafana |
+| 告警 | 阈值触发 |
+
+---
+
+## 参考资源
+
+| 资源 | 链接 |
+|------|------|
+| Google Web Vitals | https://web.dev/vitals/ |
+| Lighthouse 文档 | https://developer.chrome.com/docs/lighthouse/ |
+| MDN 性能 | https://developer.mozilla.org/zh-CN/docs/Web/Performance |
+| Web Vitals 库 | https://github.com/GoogleChrome/web-vitals |

@@ -1,4 +1,4 @@
-# MCP Server Ecosystem and Configurations
+# MCP 服务器生态系统与配置
 
 > 本文档全面介绍 MCP (Model Context Protocol) 服务器生态系统、官方与第三方服务器、配置方法以及自定义服务器开发指南。
 
@@ -6,39 +6,23 @@
 
 ## 目录
 
-1. [MCP Server Ecosystem Overview](#1-mcp-server-ecosystem-overview)
-2. [Official MCP Servers](#2-official-mcp-servers)
-3. [Third-Party MCP Servers](#3-third-party-mcp-servers)
-4. [Server Configuration and Setup](#4-server-configuration-and-setup)
-5. [Custom MCP Server Development](#5-custom-mcp-server-development)
-6. [Security and Permissions](#6-security-and-permissions)
-7. [Code Examples for Server Setup](#7-code-examples-for-server-setup)
+1. [MCP 服务器生态系统概述](#1-mcp-服务器生态系统概述)
+2. [官方 MCP 服务器](#2-官方-mcp-服务器)
+3. [第三方 MCP 服务器](#3-第三方-mcp-服务器)
+4. [服务器配置与安装](#4-服务器配置与安装)
+5. [自定义 MCP 服务器开发](#5-自定义-mcp-服务器开发)
+6. [安全与权限](#6-安全与权限)
+7. [服务器配置代码示例](#7-服务器配置代码示例)
 
 ---
 
-## 1. MCP Server Ecosystem Overview
+## 1. MCP 服务器生态系统概述
 
-### 1.1 Ecosystem Architecture
+### 1.1 生态系统架构
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      MCP Client (Claude Code)                   │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
-│  │  Built-in   │ │    MCP      │ │  Protocol   │               │
-│  │   Tools    │ │   Clients   │ │   Handlers  │               │
-│  └─────────────┘ └─────────────┘ └─────────────┘               │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│   Official      │ │  Third-Party    │ │   Custom        │
-│   Servers       │ │   Servers       │ │   Servers       │
-│   (core)        │ │   (community)   │ │   (self-built)  │
-└─────────────────┘ └─────────────────┘ └─────────────────┘
-```
+![MCP 服务器生态系统架构](assets/images/mermaid/mcp-01.png)
 
-### 1.2 Server Categories
+### 1.2 服务器分类
 
 | Category | Description | Examples |
 |----------|-------------|----------|
@@ -47,7 +31,7 @@
 | **Enterprise** | 企业级服务，内部系统 | database, api-gateway, internal-tools |
 | **Custom** | 自定义开发，特定业务需求 | domain-specific tools |
 
-### 1.3 Transport Modes
+### 1.3 传输模式
 
 MCP 服务器支持两种通信方式：
 
@@ -64,7 +48,7 @@ npx -y @modelcontextprotocol/server-filesystem /workspace
 curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"initialize",...}'
 ```
 
-### 1.4 Protocol Version Matrix
+### 1.4 协议版本矩阵
 
 | Protocol Version | Status | Key Features |
 |------------------|--------|--------------|
@@ -74,9 +58,9 @@ curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" -d '{
 
 ---
 
-## 2. Official MCP Servers
+## 2. 官方 MCP 服务器
 
-### 2.1 Core Server List
+### 2.1 核心服务器列表
 
 | Server | Package | Description |
 |--------|---------|-------------|
@@ -86,7 +70,7 @@ curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" -d '{
 | **Git** | `@modelcontextprotocol/server-git` | Git 操作接口 |
 | **AWS KB Retrieval** | `@modelcontextprotocol/server-aws-kb-retrieval-server` | AWS 知识库检索 |
 
-### 2.2 Filesystem Server
+### 2.2 文件系统服务器
 
 文件系统服务器提供安全的本地文件访问能力。
 
@@ -132,7 +116,7 @@ npx -y @modelcontextprotocol/server-filesystem /path/to/allowed/directory
 - 默认禁止所有目录访问
 - 不支持符号链接遍历
 
-### 2.3 GitHub Server
+### 2.3 GitHub 服务器
 
 GitHub 服务器提供完整的 GitHub API 集成。
 
@@ -188,7 +172,7 @@ npm install -g @modelcontextprotocol/server-github
 - `read:user`: 读取用户信息
 - `write:discussion`: 管理讨论（可选）
 
-### 2.4 Brave Search Server
+### 2.4 Brave Search 服务器
 
 Brave Search 服务器提供 Web 搜索功能。
 
@@ -232,7 +216,7 @@ npm install -g @modelcontextprotocol/server-brave-search
 2. 注册账户并申请 API 密钥
 3. 免费套餐：每月 2000 次请求
 
-### 2.5 Git Server
+### 2.5 Git 服务器
 
 Git 服务器提供 Git 操作接口。
 
@@ -272,9 +256,9 @@ npm install -g @modelcontextprotocol/server-git
 
 ---
 
-## 3. Third-Party MCP Servers
+## 3. 第三方 MCP 服务器
 
-### 3.1 Popular Community Servers
+### 3.1 热门社区服务器
 
 | Server | Package | Description |
 |--------|---------|-------------|
@@ -284,7 +268,7 @@ npm install -g @modelcontextprotocol/server-git
 | **Sentry** | `@modelcontextprotocol/server-sentry` | 错误追踪集成 |
 | **Fetch** | `@modelcontextprotocol/server-fetch` | HTTP 请求工具 |
 
-### 3.2 Slack Server
+### 3.2 Slack 服务器
 
 Slack 服务器用于消息和频道管理。
 
@@ -329,7 +313,7 @@ npm install -g @modelcontextprotocol/server-slack
 }
 ```
 
-### 3.3 PostgreSQL Server
+### 3.3 PostgreSQL 服务器
 
 PostgreSQL 服务器提供数据库查询能力。
 
@@ -372,7 +356,7 @@ npm install -g @modelcontextprotocol/server-postgres
 }
 ```
 
-### 3.4 Fetch Server
+### 3.4 Fetch 服务器
 
 Fetch 服务器提供通用 HTTP 请求能力。
 
@@ -403,7 +387,7 @@ npm install -g @modelcontextprotocol/server-fetch
 }
 ```
 
-### 3.5 MCP Server Gallery
+### 3.5 MCP 服务器画廊
 
 更多第三方服务器可在以下位置查找：
 
@@ -413,9 +397,9 @@ npm install -g @modelcontextprotocol/server-fetch
 
 ---
 
-## 4. Server Configuration and Setup
+## 4. 服务器配置与安装
 
-### 4.1 Configuration File Locations
+### 4.1 配置文件位置
 
 | Environment | 配置文件路径 |
 |-------------|-------------|
@@ -423,7 +407,7 @@ npm install -g @modelcontextprotocol/server-fetch
 | 项目级 | `<project>/.claude/settings.json` |
 | 工作区 | `.omc/settings.json` |
 
-### 4.2 Basic Configuration Structure
+### 4.2 基本配置结构
 
 ```json
 {
@@ -443,7 +427,7 @@ npm install -g @modelcontextprotocol/server-fetch
 }
 ```
 
-### 4.3 Configuration Fields
+### 4.3 配置字段说明
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -453,7 +437,7 @@ npm install -g @modelcontextprotocol/server-fetch
 | `metadata.description` | string | 服务器用途描述 |
 | `metadata.enabled` | boolean | 是否启用（默认 true） |
 
-### 4.4 Multi-Server Configuration
+### 4.4 多服务器配置
 
 ```json
 {
@@ -491,7 +475,7 @@ npm install -g @modelcontextprotocol/server-fetch
 }
 ```
 
-### 4.5 Environment Variable Management
+### 4.5 环境变量管理
 
 **本地 .env 文件：**
 
@@ -523,7 +507,7 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/mydb
 - `${VAR_NAME:-default}` - 带默认值
 - 不存在的变量将使用空字符串
 
-### 4.6 Server Startup Options
+### 4.6 服务器启动选项
 
 | Option | Description | Example |
 |--------|-------------|---------|
@@ -550,7 +534,7 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/mydb
 
 ---
 
-## 5. Custom MCP Server Development
+## 5. 自定义 MCP 服务器开发
 
 ### 5.1 Python (FastMCP) 实现
 
@@ -1119,29 +1103,13 @@ export class McpService {
 
 ---
 
-## 6. Security and Permissions
+## 6. 安全与权限
 
-### 6.1 Permission Model Overview
+### 6.1 权限模型概述
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Security Layers                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐           │
-│  │   Input     │   │   Access    │   │   Rate      │           │
-│  │  Validation │ → │   Control   │ → │   Limiting  │           │
-│  └─────────────┘   └─────────────┘   └─────────────┘           │
-│         │                │                │                    │
-│         ▼                ▼                ▼                    │
-│  ┌─────────────────────────────────────────────────┐           │
-│  │              Audit Logging                        │           │
-│  └─────────────────────────────────────────────────┘           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+![MCP 安全层次](assets/images/mermaid/mcp-02.png)
 
-### 6.2 Input Validation
+### 6.2 输入验证
 
 **参数验证装饰器：**
 
@@ -1220,7 +1188,7 @@ class InputValidator:
         return len(errors) == 0, errors
 ```
 
-### 6.3 Access Control
+### 6.3 访问控制
 
 **基于角色的访问控制：**
 
@@ -1326,7 +1294,7 @@ server.setRequestHandler('tools/call', async (request) => {
 });
 ```
 
-### 6.4 Rate Limiting
+### 6.4 速率限制
 
 **速率限制实现：**
 
@@ -1420,7 +1388,7 @@ server.setRequestHandler('tools/call', async (request) => {
 });
 ```
 
-### 6.5 Audit Logging
+### 6.5 审计日志
 
 **审计日志实现：**
 
@@ -1541,7 +1509,7 @@ server.setRequestHandler('tools/call', async (request) => {
 });
 ```
 
-### 6.6 Security Checklist
+### 6.6 安全检查清单
 
 - 验证所有用户输入
 - 使用白名单而非黑名单
@@ -1554,9 +1522,9 @@ server.setRequestHandler('tools/call', async (request) => {
 
 ---
 
-## 7. Code Examples for Server Setup
+## 7. 服务器配置代码示例
 
-### 7.1 Complete Python Server Example
+### 7.1 完整的 Python 服务器示例
 
 ```python
 # complete_server.py
@@ -1766,7 +1734,7 @@ if __name__ == "__main__":
     mcp.run()
 ```
 
-### 7.2 Complete TypeScript Server Example
+### 7.2 完整的 TypeScript 服务器示例
 
 ```typescript
 // complete-server.ts
@@ -2096,7 +2064,7 @@ async function main() {
 main().catch(console.error);
 ```
 
-### 7.3 Dockerized MCP Server
+### 7.3 Docker 化 MCP 服务器
 
 **Dockerfile：**
 
@@ -2142,7 +2110,7 @@ services:
       - MCP_SERVER_URL=http://mcp-server:8080
 ```
 
-### 7.4 Server Health Check
+### 7.4 服务器健康检查
 
 ```typescript
 // health-check.ts
@@ -2222,7 +2190,7 @@ server.setRequestHandler('health/check', async () => {
 
 ---
 
-## Reference Resources
+## 参考资源
 
 - [MCP Official Documentation](https://modelcontextprotocol.io)
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)

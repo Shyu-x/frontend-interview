@@ -18,16 +18,11 @@
 
 #### AWS Lambda + API Gateway
 
-```
-┌─────────────┐     ┌───────────────┐     ┌─────────────────┐
-│   Client    │────▶│ API Gateway   │────▶│  Lambda Function │
-└─────────────┘     └───────────────┘     └─────────────────┘
-                                                 │
-                                                 ▼
-                                        ┌─────────────────┐
-                                        │  Claude API     │
-                                        │  (via LangChain) │
-                                        └─────────────────┘
+```mermaid
+flowchart LR
+    A[Client] --> B[API Gateway]
+    B --> C[Lambda Function]
+    C --> D[Claude API via LangChain]
 ```
 
 **配置示例 (serverless.yml)**:
@@ -465,18 +460,13 @@ spec:
 
 ### 2.3 地理分布扩展
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Global Load Balancer                    │
-│                    (CloudFlare / Route53)                   │
-└─────────────────┬─────────────────────┬─────────────────────┘
-                  │                     │
-        ┌─────────▼─────────┐ ┌────────▼─────────┐
-        │   US East Region   │ │   EU West Region │
-        │   ┌───────────┐    │ │   ┌───────────┐  │
-        │   │ K8s Pool  │    │ │   │ K8s Pool  │  │
-        │   └───────────┘    │ │   └───────────┘  │
-        └────────────────────┘ └────────────────────┘
+```mermaid
+flowchart TB
+    GLB[Global Load Balancer CloudFlare / Route53]
+    GLB --> US[US East Region]
+    GLB --> EU[EU West Region]
+    US --> USK8s[K8s Pool]
+    EU --> EUK8s[K8s Pool]
 ```
 
 ### 2.4 队列驱动的扩展模式

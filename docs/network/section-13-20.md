@@ -12,75 +12,84 @@ HTTP 是互联网数据交换的核心协议，从 1991 年的单行协议演进
 
 ### ASCII 时序/架构图
 
+```mermaid
+timeline
+    title HTTP 版本演进
+    1991 : HTTP/0.9 - 单行协议，只支持 GET，无 header
+    1996 : HTTP/1.0 - 引入请求头/响应头、MIME 类型、POST 方法
+    1997 : HTTP/1.1 - keep-alive 持久连接、管道化、缓存控制
+        : 队头阻塞：管道中后续请求必须等待队首响应返回
+        : 现代浏览器解法：每个域名开 6 个 TCP 并发连接
+    2015 : HTTP/2 - 二进制分帧、多路复用、HPACK、Server Push
+        : 问题：TCP 层队头阻塞仍然存在
+    2022 : HTTP/3 - QUIC（UDP）替代 TCP，消除 TCP 队头阻塞
+        : 0-RTT / 1-RTT 握手、连接迁移、前向保密默认启用
 ```
-HTTP 版本演进时间轴
 
-1991  HTTP/0.9   ── 单行协议，只支持 GET，无 header
-       │
-1996  HTTP/1.0   ── 引入请求头/响应头、MIME 类型、POST 方法
-       │
-1997  HTTP/1.1   ── 引入 keep-alive 持久连接、管道化、缓存控制（RFC 2068）
-       │       队头阻塞：管道中后续请求必须等待队首响应返回
-       │       现代浏览器解法：每个域名开 6 个 TCP 并发连接
-       │
-2015  HTTP/2     ── 二进制分帧、多路复用、HPACK 头部压缩、Server Push
-       │       问题：TCP 层队头阻塞仍然存在（丢包会阻塞所有流）
-       │
-2022  HTTP/3     ── QUIC（UDP）替代 TCP，消除 TCP 队头阻塞（RFC 9114）
-                  ── 0-RTT / 1-RTT 握手、连接迁移、前向保密默认启用
+```mermaid
+sequenceDiagram
+    title HTTP/1.1 队头阻塞
+    participant C as 客户端
+    participant S as 服务器
 
-┌─────────────────────────────────────────────────────────────────┐
-│                        HTTP/1.1 队头阻塞                         │
-│  客户端                           服务器                         │
-│    ├─ GET /a.html ────────────────────────> │                    │
-│    ├─ GET /b.html ─────────────────────> │   管道中，后面的请求    │
-│    ├─ GET /c.html ──────────────────> │     等待队首响应         │
-│    │                                       │                     │
-│    │<────────── Response: a.html ─────────┤  (a 慢，b/c 被卡)    │
-│    │<────────── Response: b.html ─────────┤  (即使 b 已就绪)    │
-│    │<────────── Response: c.html ─────────┤                     │
-└─────────────────────────────────────────────────────────────────┘
+    C->>S: GET /a.html
+    C->>S: GET /b.html (管道中等待)
+    C->>S: GET /c.html (管道中等待)
+    Note over S: a 慢，b/c 被卡住
+    S-->>C: Response: a.html
+    S-->>C: Response: b.html (即使 b 已就绪)
+    S-->>C: Response: c.html
+```
 
-┌─────────────────────────────────────────────────────────────────┐
-│                      HTTP/2 多路复用（单 TCP 连接）                │
-│                                                                  │
-│  Stream 1 (GET /index.html):  HEADERS(stream=1) + DATA(stream=1)│
-│  Stream 3 (GET /style.css):   HEADERS(stream=3) + DATA(stream=3)│
-│  Stream 5 (GET /app.js):     HEADERS(stream=5) + DATA(stream=5) │
-│                                                                  │
-│  所有帧在同一个 TCP 连接上交织返回，真正并行，无队头阻塞          │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    title HTTP/2 多路复用
+    participant C as Client
+    participant S as Server
 
-┌─────────────────────────────────────────────────────────────────┐
-│               HTTP/2 TCP 层队头阻塞（仍然存在）                   │
-│                                                                  │
-│  Stream 1: [A][B][C][D][E][F][G][H]...                         │
-│  Stream 3: [a][b][c][d][e][f][g][h]...                         │
-│                                                                  │
-│  TCP 流中: [A][a][B][b][C][c][D][d]...                         │
-│                ↑                                                 │
-│           Stream 3 的 [c] 丢失了                                  │
-│           TCP 必须等 [c] 重传收到后，才能交付 [D]                  │
-│           → HTTP/2 的所有流都被阻塞（即使数据完好）               │
-└─────────────────────────────────────────────────────────────────┘
+    Note over C,S: Stream 1 (GET /index.html)
+    C->>S: HEADERS(stream=1) + DATA(stream=1)
+    Note over C,S: Stream 3 (GET /style.css)
+    C->>S: HEADERS(stream=3) + DATA(stream=3)
+    Note over C,S: Stream 5 (GET /app.js)
+    C->>S: HEADERS(stream=5) + DATA(stream=5)
+    Note over C,S: 所有帧在同一个 TCP 连接上交织返回，真正并行
+```
 
-┌─────────────────────────────────────────────────────────────────┐
-│                    HTTP/3 协议栈                                  │
-│  +-----------------------------+                                │
-│  │         HTTP/3              │  应用层                         │
-│  +-----------------------------+                                │
-│  │          QUIC               │  可靠的 UDP                    │
-│  │  +-----------------------+  │                                │
-│  │  │  Stream 1            │  │  每个流独立流控，无队头阻塞     │
-│  │  │  Stream 2            │  │                                │
-│  │  │  Stream 3            │  │                                │
-│  │  +-----------------------+  │                                │
-│  │  │  Connection ID        │  │  连接迁移（WiFi→4G 不重连）   │
-│  │  │  0-RTT / 1-RTT 握手  │  │  0-RTT：复用上次会话密钥       │
-│  +-----------------------------+                                │
-│  │          UDP                │  传输层（无需内核修改）         │
-│  +-----------------------------+                                │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    title HTTP/2 TCP 层队头阻塞
+    participant S as Stream 数据
+
+    S->>S: [A][a][B][b][C][c][D][d]...
+    Note over S: Stream 3 的 [c] 丢失了
+    Note over S: TCP 必须等 [c] 重传收到后，才能交付 [D]
+    Note over S: HTTP/2 的所有流都被阻塞（即使数据完好）
+```
+
+```mermaid
+flowchart TB
+    subgraph HTTP["应用层"]
+        H3["HTTP/3"]
+    end
+    subgraph QUIC["QUIC (可靠的 UDP)"]
+        S1["Stream 1"]
+        S2["Stream 2"]
+        S3["Stream 3"]
+        CID["Connection ID - 连接迁移(WiFi→4G)"]
+        RTT["0-RTT / 1-RTT 握手 - 复用上次会话密钥"]
+    end
+    subgraph UDP["传输层"]
+        U["UDP (无需内核修改)"]
+    end
+
+    H3 --> QUIC
+    S1 & S2 & S3 --> QUIC
+    CID & RTT --> QUIC
+    QUIC --> U
+
+    style H3 fill:#f9f
+    style U fill:#9cf
 ```
 
 ### HPACK 头部压缩原理
@@ -198,54 +207,35 @@ HTTP 无状态指服务器不保存客户端请求的历史记录，每次请求
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    HTTP 无状态设计                               │
-│                                                                  │
-│  请求 1:  Client ──────────────────────> Server (处理请求)       │
-│          Server 不保存请求 1 的任何信息                           │
-│                                                                  │
-│  请求 2:  Client ──────────────────────> Server (处理请求)       │
-│          Server 不记得请求 1，纯粹处理请求 2                      │
-│                                                                  │
-│  优势:                                                           │
-│  ✓ 服务器可任意水平扩展（无状态 = 任何服务器处理任何请求）       │
-│  ✓ 服务器崩溃不丢失状态（状态在客户端）                         │
-│  ✓ 服务器逻辑简单，无需维护会话表                                │
-│                                                                  │
-│  状态管理: 在应用层实现 → Cookie / Token / 自定义 Header         │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph A["HTTP 无状态设计"]
+        A1["请求 1: Client → Server (处理请求)"]
+        A2["Server 不保存请求 1 的任何信息"]
+        A3["请求 2: Client → Server (处理请求)"]
+        A4["Server 不记得请求 1，纯粹处理请求 2"]
+        A5["✓ 服务器可任意水平扩展（无状态 = 任何服务器处理任何请求）"]
+        A6["✓ 服务器崩溃不丢失状态（状态在客户端）"]
+        A7["✓ 服务器逻辑简单，无需维护会话表"]
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              HTTP/1.0 无 keep-alive（短连接）                    │
-│                                                                  │
-│  请求 1:  TCP建连 → GET / → 响应 → TCP关闭                       │
-│  请求 2:  TCP建连 → GET / → 响应 → TCP关闭                       │
-│  请求 3:  TCP建连 → GET / → 响应 → TCP关闭                       │
-│                                                                  │
-│  问题: 每个请求都要 TCP 三次握手 + 四次挥手 = 大量 RTT 损耗        │
-└─────────────────────────────────────────────────────────────────┘
+    subgraph B["HTTP/1.0 无 keep-alive（短连接）"]
+        B1["请求 1: TCP建连 → GET → 响应 → TCP关闭"]
+        B2["请求 2: TCP建连 → GET → 响应 → TCP关闭"]
+        B3["问题: 每个请求都要 TCP 三次握手 + 四次挥手 = 大量 RTT 损耗"]
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              HTTP/1.1 + keep-alive（持久连接）                    │
-│                                                                  │
-│  TCP建连 → GET /index → 响应 → GET /style.css → 响应 → GET /app.js → 响应 → 关闭│
-│                                                                  │
-│  请求头:                                                         │
-│  Connection: keep-alive  (HTTP/1.1 默认开启，可不写)             │
-│  Keep-Alive: timeout=5, max=1000  (可选，告诉对方约束)           │
-│                                                                  │
-│  优势: 减少 TCP 建连/断开的 RTT 损耗，复用 TCP 连接               │
-└─────────────────────────────────────────────────────────────────┘
+    subgraph C["HTTP/1.1 + keep-alive（持久连接）"]
+        C1["TCP建连 → GET /index → 响应 → GET /style.css → 响应 → TCP关闭"]
+        C2["Connection: keep-alive (HTTP/1.1 默认开启)"]
+        C3["优势: 减少 TCP 建连/断开的 RTT 损耗，复用 TCP 连接"]
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              keep-alive vs HTTP/2 多路复用                       │
-│                                                                  │
-│  keep-alive: 单连接，串行请求（虽然复用 TCP，但请求还是串行的）    │
-│  HTTP/2:   单连接，真正并行（多路复用，帧交织）                   │
-│                                                                  │
-│  HTTP/2 不需要 keep-alive，因为多路复用天然是持久连接             │
-└─────────────────────────────────────────────────────────────────┘
+    subgraph D["keep-alive vs HTTP/2 多路复用"]
+        D1["keep-alive: 单连接，串行请求（虽然复用 TCP，但请求还是串行的）"]
+        D2["HTTP/2: 单连接，真正并行（多路复用，帧交织）"]
+        D3["HTTP/2 不需要 keep-alive，因为多路复用天然是持久连接"]
+    end
 ```
 
 ### 完整代码示例（TS/JS）
@@ -382,72 +372,64 @@ QUIC 是 Google 于 2012 年提出的传输层协议，运行在 UDP 之上，�
 
 ### ASCII 原理图
 
+```mermaid
+flowchart TB
+    subgraph R["重新设计传输层协议的现实障碍"]
+        R1["1. 需要操作系统内核支持（更新内核协议栈 = 基本不可能）"]
+        R2["2. 需要网络中间设备（路由器/防火墙）支持新协议"]
+        R3["3. UDP 已有 40+ 年历史，广泛部署，无上述问题"]
+    end
+    R1 & R2 & R3 --> Q["QUIC = 在用户态实现可靠传输（绕过内核限制，快速迭代）"]
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                 QUIC 为什么选择 UDP？                             │
-│                                                                  │
-│  重新设计传输层协议的现实障碍:                                     │
-│  1. 需要操作系统内核支持（更新内核协议栈 = 基本不可能）             │
-│  2. 需要网络中间设备（路由器/防火墙）支持新协议                     │
-│  3. UDP 已有 40+ 年历史，广泛部署，无上述问题                       │
-│                                                                  │
-│  QUIC = 在用户态实现可靠传输（绕过内核限制，快速迭代）              │
-└─────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│              QUIC 丢包恢复机制                                    │
-│                                                                  │
-│  1. 丢包检测:                                                     │
-│     - 超时检测: 包发出后一段时间未收到 ACK，超时重传                │
-│     - Duplicate ACK: 收到 3 个 ACK（同一包序号重复确认）            │
-│                                                                  │
-│  2. ACK Ranges（选择性确认，比 TCP SACK 更精确）:                   │
-│     QUIC ACK 帧携带 "接收到的包范围" 而非单个序号                   │
-│     例如: 收到 1-10, 12-15 → ACK Ranges: [1,10],[12,15]          │
-│                                                                  │
-│  3. 包序号重排保护:                                               │
-│     包序号用紧凑编码（可重传时不增大序号），真正序号由 ACK 确认      │
-│     避免 TCP 语义混淆（重传的包序号相同）                          │
-│                                                                  │
-│  4. 前向纠错 (FEC，可选):                                         │
-│     丢包恢复不用重传，而是通过 FEC 包恢复数据                       │
-│     代价：带宽开销，通常用于丢包率高的网络                          │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph A["1. 丢包检测"]
+        A1["超时检测: 包发出后一段时间未收到 ACK，超时重传"]
+        A2["Duplicate ACK: 收到 3 个 ACK（同一包序号重复确认）"]
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              QUIC 连接迁移（Connection Migration）                │
-│                                                                  │
-│  场景: 用户从 WiFi 切换到 4G，移动设备 IP 变化                      │
-│                                                                  │
-│  TCP 方案: 连接断开 → 重新三次握手 → 重建 TLS → 几百毫秒到秒级延迟  │
-│                                                                  │
-│  QUIC 方案:                                                      │
-│  - 每个连接有一个稳定的 Connection ID（可变长，可有多个）           │
-│  - 切换网络时，继续使用同一 Connection ID                          │
-│  - 数据包到达新 IP，QUIC 层自动更新连接路径                        │
-│  - 用户无感知，延迟约等于 0                                       │
-│                                                                  │
-│  Client (WiFi IP: 192.168.1.100) ── QUIC 包 (CID=abc) ──> Server  │
-│       │                                                           │
-│       └── 切换到 4G (IP: 10.20.30.40)                              │
-│       │                                                           │
-│       └── QUIC 包 (CID=abc, NEW_IP=10.20.30.40) ──> Server        │
-│                                                                  │
-│  服务端识别 CID=abc，继续通信，无缝切换                            │
-└─────────────────────────────────────────────────────────────────┘
+    subgraph B["2. ACK Ranges（选择性确认，比 TCP SACK 更精确）"]
+        B1["QUIC ACK 帧携带接收到的包范围而非单个序号"]
+        B2["例如: 收到 1-10, 12-15 → ACK Ranges: [1,10],[12,15]"]
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              QUIC 帧 vs TCP 段                                    │
-│                                                                  │
-│  QUIC Packet:                                                   │
-│  ┌──────────┬──────────┬─────────────┬──────────────┐             │
-│  │ Header   │ 公共头部  │ 连接 ID     │ 包号         │             │
-│  │ 头部     │ (可变)   │ (可变长)    │ (可变长)     │             │
-│  ├──────────┴──────────┴─────────────┼──────────────┤             │
-│  │ 加密 payload (STREAM帧等)         │ 认证标签     │             │
-│  └──────────────────────────────────┴──────────────┘             │
-│  QUIC 所有 payload 均加密（比 TLS 更强的隐私保护）                 │
-└─────────────────────────────────────────────────────────────────┘
+    subgraph C["3. 包序号重排保护"]
+        C1["包序号用紧凑编码（可重传时不增大序号）"]
+        C2["真正序号由 ACK 确认，避免 TCP 语义混淆"]
+    end
+
+    subgraph D["4. 前向纠错 (FEC，可选)"]
+        D1["丢包恢复不用重传，而是通过 FEC 包恢复数据"]
+        D2["代价：带宽开销，通常用于丢包率高的网络"]
+    end
+```
+
+```mermaid
+sequenceDiagram
+    title QUIC 连接迁移
+    participant C as Client (WiFi)
+    participant S as Server
+    participant C4 as Client (4G)
+
+    Note over C,S: 场景：用户从 WiFi 切换到 4G，IP 变化
+    C->>S: QUIC 包 (CID=abc)
+    Note over C,S: IP: 192.168.1.100
+    C4->>S: QUIC 包 (CID=abc, NEW_IP=10.20.30.40)
+    Note over C,S: 服务端识别 CID=abc，继续通信，无缝切换
+
+    Note over C4,S: TCP 方案：连接断开 → 重新三次握手 → 重建 TLS → 几百毫秒到秒级延迟
+    Note over C4,S: QUIC 方案延迟约等于 0
+```
+
+```mermaid
+flowchart LR
+    H1["公共头部"] --> E["认证标签"]
+    H2["连接 ID"] --> E
+    H3["包号"] --> E
+    P["STREAM帧等"] --> E
+
+    Note over E: QUIC 所有 payload 均加密（比 TLS 更强的隐私保护）
 ```
 
 ### 完整代码示例（TS/JS）
@@ -576,62 +558,59 @@ TCP、UDP 和 QUIC 是三种传输层协议：TCP 是面向连接、可靠但有
 
 ### ASCII 原理图
 
+```mermaid
+flowchart TB
+    TCP["TCP\n可靠传输\n面向连接\n1981 RFC"]
+    UDP["UDP\n不可靠传输\n无连接\n1980 RFC"]
+    QUIC["QUIC\n可靠传输\n逻辑连接\n2012 Google"]
+    IP["IP 层"]
+
+    TCP & UDP & QUIC --> IP
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    传输层协议三分天下                            │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │     TCP      │  │     UDP      │  │    QUIC      │          │
-│  │  可靠传输    │  │  不可靠传输  │  │  可靠传输    │          │
-│  │  面向连接    │  │  无连接      │  │  逻辑连接    │          │
-│  │  1981 RFC    │  │  1980 RFC    │  │  2012 Google │          │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
-│         │                 │                 │                   │
-│  ┌──────┴─────────────────┴─────────────────┴───────┐          │
-│  │                    IP 层                          │          │
-│  └───────────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│              TCP vs UDP 核心行为对比                              │
-│                                                                  │
-│  TCP（三次握手 + 可靠传输）:                                      │
-│  Client ── SYN ─────────> Server   (请求连接)                    │
-│  Client <── SYN+ACK ───── Server   (同意，ISN=y)                 │
-│  Client ── ACK ─────────> Server   (确认，连接建立)               │
-│  Client ── DATA ────────> Server   (可靠传输，有 ACK)             │
-│  Client <── DATA ──────── Server   (保序，无重复)                 │
-│                                                                  │
-│  UDP（直接发送，无连接）:                                         │
-│  Client ── DATA ────────> Server   (发完就走，不管不顾)            │
-│  Client ── DATA ────────> Server   (可能丢包/乱序/重复)           │
-│                                                                  │
-│  QUIC（在 UDP 上可靠传输）:                                       │
-│  Client ── Initial (版本协商+加密握手) ──> Server                  │
-│  Client <── Handshake (确认密钥) <────────────── Server           │
-│  Client ── STREAM帧 (业务数据，已加密) ──> Server                  │
-│  Client <── STREAM帧 (业务数据，已加密) <── Server                 │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    title TCP vs UDP vs QUIC 核心行为对比
 
-┌─────────────────────────────────────────────────────────────────┐
-│              队头阻塞：TCP vs QUIC 的关键差异                     │
-│                                                                  │
-│  TCP（连接级队头阻塞）:                                           │
-│  连接: [Stream1-pkg1][Stream2-pkg1][Stream1-pkg2][Stream3-pkg1] │
-│              ↓                                                    │
-│          Stream2-pkg1 丢失了                                       │
-│              ↓                                                    │
-│  → Stream1-pkg2, Stream3-pkg1 全被阻塞（即使数据完好）            │
-│                                                                  │
-│  QUIC（流级独立，无队头阻塞）:                                     │
-│  连接: [Stream1-pkg1][Stream2-pkg1][Stream1-pkg2][Stream3-pkg1]  │
-│              ↓                                                    │
-│          Stream2-pkg1 丢失了                                       │
-│              ↓                                                    │
-│  → Stream1-pkg2 正常交付（流 1 不受影响）                         │
-│  → Stream3-pkg1 正常交付（流 3 不受影响）                         │
-│  → 只有 Stream2 等待重传                                          │
-└─────────────────────────────────────────────────────────────────┘
+    rect rgb(200, 220, 255)
+        Note over C,S: TCP（三次握手 + 可靠传输）
+        C->>S: SYN (请求连接)
+        S-->>C: SYN+ACK (同意，ISN=y)
+        C->>S: ACK (确认，连接建立)
+        C->>S: DATA (可靠传输，有 ACK)
+        S-->>C: DATA (保序，无重复)
+    end
+
+    rect rgb(255, 220, 200)
+        Note over C,S: UDP（直接发送，无连接）
+        C->>S: DATA (发完就走，不管不顾)
+        C->>S: DATA (可能丢包/乱序/重复)
+    end
+
+    rect rgb(220, 255, 220)
+        Note over C,S: QUIC（在 UDP 上可靠传输）
+        C->>S: Initial (版本协商+加密握手)
+        S-->>C: Handshake (确认密钥)
+        C->>S: STREAM帧 (业务数据，已加密)
+        S-->>C: STREAM帧 (业务数据，已加密)
+    end
+```
+
+```mermaid
+flowchart TB
+    subgraph TCP["TCP（连接级队头阻塞）"]
+        T1["连接: Stream1-pkg1 → Stream2-pkg1 → Stream1-pkg2 → Stream3-pkg1"]
+        T2["Stream2-pkg1 丢失了"]
+        T3["→ Stream1-pkg2, Stream3-pkg1 全被阻塞（即使数据完好）"]
+    end
+
+    subgraph QUIC["QUIC（流级独立，无队头阻塞）"]
+        Q1["连接: Stream1-pkg1 → Stream2-pkg1 → Stream1-pkg2 → Stream3-pkg1"]
+        Q2["Stream2-pkg1 丢失了"]
+        Q3["→ Stream1-pkg2 正常交付（流 1 不受影响）"]
+        Q4["→ Stream3-pkg1 正常交付（流 3 不受影响）"]
+        Q5["→ 只有 Stream2 等待重传"]
+    end
 ```
 
 ### 完整代码示例（TS/JS）
@@ -794,99 +773,89 @@ TCP 滑动窗口是流量控制机制，防止发送方超过接收方处理能�
 
 ### ASCII 原理图
 
+```mermaid
+flowchart LR
+    subgraph W["TCP 滑动窗口（发送方视角）"]
+        A["已发送并 ACK\nSND.UNA 之前"] --> B["已发送未 ACK\nSND.UNA ~ SND.NXT"]
+        B --> C["可发送区域\nSND.NXT ~ SND.UNA+SND.WND"]
+        C --> D["不能发送"]
+    end
+
+    subgraph L["窗口变量说明"]
+        L1["SND.UNA: 第一个未被确认的字节序号"]
+        L2["SND.NXT: 下一个可发送的字节序号"]
+        L3["SND.WND: 接收方通告的窗口大小（rwnd）"]
+    end
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│              TCP 滑动窗口（发送方视角）                           │
-│                                                                  │
-│  已发送并 ACK  │ 已发送未 ACK  │   可发送区域   │   不能发送     │
-│ [SENT & ACKED] │ [SENT NOT ACK]│   [NOT SENT]  │ [CANNOT SEND] │
-│                 ←──────────────────→←─────────────→              │
-│                 ↑                  ↑            ↑                │
-│              SND.UNA           SND.NXT       SND.UNA+SND.WND   │
-│                                                                  │
-│  SND.UNA: 第一个未被确认的字节序号                                │
-│  SND.NXT: 下一个可发送的字节序号                                 │
-│  SND.WND: 接收方通告的窗口大小（rwnd）                           │
-│                                                                  │
-│  ┌──────────┬──────────────────┬──────────────────┬───────────┐ │
-│  │ 已确认    │   已发未确认      │    可发送        │  不能发   │ │
-│  │ [0-999]  │   [1000-1999]    │   [2000-2999]   │ [3000+]  │ │
-│  │          │  (发送窗口)      │   (拥塞窗口)    │           │ │
-│  └──────────┴──────────────────┴──────────────────┴───────────┘ │
-└─────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│              发送窗口 = min(rwnd, cwnd)                          │
-│                                                                  │
-│  流量控制: rwnd（接收窗口）                                       │
-│  - 目的: 防止发送方超过接收方的处理能力                           │
-│  - 工具: 接收方在 ACK 中通告剩余接收缓存大小                      │
-│  - 机制: 接收方通过 ACK 告诉发送方 "我还能收多少"                │
-│                                                                  │
-│  拥塞控制: cwnd（拥塞窗口）                                       │
-│  - 目的: 防止发送方超过网络的承载能力                             │
-│  - 工具: 慢启动阈值 ssthresh、丢包事件                           │
-│  - 机制: 根据网络反馈（丢包/RTT）调整发送速率                     │
-│                                                                  │
-│  发送窗口 = min(rwnd, cwnd)                                       │
-│  → 两者同时生效，取较小值                                         │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph A["发送窗口 = min(rwnd, cwnd)"]
+        A1["流量控制: rwnd（接收窗口）"]
+        A2["防止发送方超过接收方的处理能力"]
+        A3["接收方通过 ACK 告诉发送方我还能收多少"]
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              TCP 拥塞控制四算法                                    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 1. 慢启动 (Slow Start)                                    │   │
-│  │    - cwnd 初始值 = 1 MSS（约 1460 bytes）                  │   │
-│  │    - 每收到一个 ACK: cwnd += 1 MSS（指数增长）              │   │
-│  │    - 直到 cwnd >= ssthresh，进入拥塞避免                   │   │
-│  │                                                            │   │
-│  │    cwnd → 1 → 2 → 4 → 8 → ... (翻倍增长)                   │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                          ↓ ssthresh                             │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 2. 拥塞避免 (Congestion Avoidance)                         │   │
-│  │    - 每收到一个 ACK: cwnd += MSS²/cwnd（线性增长）         │   │
-│  │    - 每 RTT 增加 1 MSS                                     │   │
-│  │                                                            │   │
-│  │    cwnd → 慢启动到 ssthresh 后，平滑线性增长               │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                          ↓ 丢包检测                              │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 3. 快速重传 (Fast Retransmit)                               │   │
-│  │    - 收到 3 个 Duplicate ACK（同一序号重复确认）            │   │
-│  │    - 不等超时，立即重传丢失的包                             │   │
-│  │    - ssthresh = cwnd / 2, cwnd = ssthresh + 3*MSS         │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                          ↓ 进入                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ 4. 快速恢复 (Fast Recovery)                                │   │
-│  │    - cwnd = ssthresh + 3*MSS                              │   │
-│  │    - 收到新 ACK 后进入拥塞避免                             │   │
-│  │    - 丢包恢复后，速率更快恢复（而非重新慢启动）             │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+    subgraph B["拥塞控制: cwnd（拥塞窗口）"]
+        B1["防止发送方超过网络的承载能力"]
+        B2["根据网络反馈（丢包/RTT）调整发送速率"]
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              TCP BBR vs CUBIC（两种拥塞控制算法）                 │
-│                                                                  │
-│  CUBIC（Linux 默认，TCP Reno 的后代）:                           │
-│  - 基于丢包检测：丢包 = 网络拥塞                                 │
-│  - 周期性地增加 cwnd，检测到丢包后减少                           │
-│  - 问题：高带宽高延迟网络（BDP 大）效率低                        │
-│  - 问题：缓冲区膨胀（Bufferbloat）导致额外延迟                  │
-│                                                                  │
-│  BBR（Google 2016，提出第一性原理）:                              │
-│  - 丢包 ≠ 拥塞（丢包可能是缓冲区满，不代表利用率满）               │
-│  - 测量：RTprop（物理最小延迟）和 BtlBw（物理最大带宽）           │
-│  - 目标：精确地在 BtlBw 附近运行，不填满缓冲区                    │
-│  - 优势：高 BDP 网络效率高，延迟更低                             │
-│                                                                  │
-│  BBR vs CUBIC 在高 BDP 链路:                                     │
-│  BDP = 带宽 × 延迟 = 10 Gbps × 100ms = 1 Gbit = 125 MB          │
-│  CUBIC: 过度填充缓冲区，延迟飙升                                  │
-│  BBR: 精确控制，延迟稳定                                         │
-└─────────────────────────────────────────────────────────────────┘
+    A1 & A2 & A3 --> R["发送窗口 = min(rwnd, cwnd)"]
+    B1 & B2 --> R
+```
+
+```mermaid
+flowchart TB
+    subgraph S1["1. 慢启动 (Slow Start)"]
+        S1A["cwnd 初始值 = 1 MSS（约 1460 bytes）"]
+        S1B["每收到一个 ACK: cwnd += 1 MSS（指数增长）"]
+        S1C["直到 cwnd >= ssthresh，进入拥塞避免"]
+        S1D["cwnd → 1 → 2 → 4 → 8 → ... (翻倍增长)"]
+    end
+
+    subgraph S2["2. 拥塞避免 (Congestion Avoidance)"]
+        S2A["每收到一个 ACK: cwnd += MSS²/cwnd（线性增长）"]
+        S2B["每 RTT 增加 1 MSS"]
+        S2C["慢启动到 ssthresh 后，平滑线性增长"]
+    end
+
+    subgraph S3["3. 快速重传 (Fast Retransmit)"]
+        S3A["收到 3 个 Duplicate ACK（同一序号重复确认）"]
+        S3B["不等超时，立即重传丢失的包"]
+        S3C["ssthresh = cwnd / 2, cwnd = ssthresh + 3*MSS"]
+    end
+
+    subgraph S4["4. 快速恢复 (Fast Recovery)"]
+        S4A["cwnd = ssthresh + 3*MSS"]
+        S4B["收到新 ACK 后进入拥塞避免"]
+        S4C["丢包恢复后，速率更快恢复（而非重新慢启动）"]
+    end
+
+    S1 -->|"ssthresh"| S2
+    S2 -->|"丢包检测"| S3
+    S3 -->|"进入"| S4
+```
+
+```mermaid
+flowchart LR
+    subgraph C["CUBIC（Linux 默认）"]
+        CA["基于丢包检测：丢包 = 网络拥塞"]
+        CB["周期性地增加 cwnd，检测到丢包后减少"]
+        CC["问题：高 BDP 网络效率低"]
+        CD["问题：缓冲区膨胀导致额外延迟"]
+    end
+
+    subgraph B["BBR（Google 2016）"]
+        BA["丢包 ≠ 拥塞（丢包可能是缓冲区满）"]
+        BB["测量 RTprop（物理最小延迟）和 BtlBw（物理最大带宽）"]
+        BC["目标：精确地在 BtlBw 附近运行，不填满缓冲区"]
+        BD["优势：高 BDP 网络效率高，延迟更低"]
+    end
+
+    B --> BF["BDP = 带宽 × 延迟 = 10 Gbps × 100ms = 1 Gbit"]
+    BF --> CUBIC["CUBIC: 过度填充缓冲区，延迟飙升"]
+    BF --> BBR["BBR: 精确控制，延迟稳定"]
 ```
 
 ### 完整代码示例（TS/JS）
@@ -1038,91 +1007,91 @@ SYN Flood 是最经典的 DDoS 攻击方式，攻击者发送大量 SYN 包但�
 
 ### ASCII 原理图
 
+```mermaid
+sequenceDiagram
+    title 正常三次握手（资源分配时机）
+    participant C as Client
+    participant S as Server
+
+    S->>S: Server 收到 SYN 后:
+    S->>S: 1. 创建 TCB（消耗内存）
+    S->>S: 2. 分配 socket 缓冲区
+    S->>S: 3. 进入 SYN_RCVD 状态
+    C->>S: SYN (seq=x)
+    S->>S: 创建 TCB, 状态=SYN_RCVD
+    C->>S: ACK (ack=x+1)
+    S->>S: 状态=ESTABLISHED，连接建立
+
+    Note over S: 结论：Server 在第二次握手后分配了资源
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│              正常三次握手（资源分配时机）                          │
-│                                                                  │
-│  Server 收到 SYN 后:                                             │
-│  1. 创建 TCB（Transmission Control Block）← 消耗内存             │
-│  2. 分配 socket 缓冲区                                           │
-│  3. 进入 SYN_RCVD 状态                                           │
-│  4. 等待 client 的 ACK（最多等几分钟）                            │
-│                                                                  │
-│  Client ── SYN (seq=x) ──────> Server                           │
-│  Server: 创建 TCB, 状态=SYN_RCVD                                 │
-│  Client ── ACK (ack=x+1) ────> Server                           │
-│  Server: 状态=ESTABLISHED，连接建立                              │
-│                                                                  │
-│  结论: 三次握手期间，Server 在第二次握手后分配了资源              │
-└─────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│              SYN Flood 攻击原理                                   │
-│                                                                  │
-│  攻击者（或僵尸网络）发送海量 SYN，但不发送最终 ACK:              │
-│                                                                  │
-│  Client(攻击者) ── SYN ──> Server  (TCB #1 创建)                 │
-│  Client(攻击者) ── SYN ──> Server  (TCB #2 创建)                 │
-│  Client(攻击者) ── SYN ──> Server  (TCB #3 创建)                 │
-│  ...                                                             │
-│  Client(攻击者) ── SYN ──> Server  (TCB #100000 创建)            │
-│                                                                  │
-│  最终状态:                                                       │
-│  - Server: 100000 个 TCB，状态=SYN_RCVD（半开连接）              │
-│  - 内存耗尽 → 无法处理正常请求                                    │
-│  - ACK 永远不会来 → 这些连接永远不会完成                           │
-│                                                                  │
-│  攻击来源伪造:                                                   │
-│  - Source IP 可以随机伪造（IP 协议不验证源地址）                   │
-│  - 所以攻击者不需要控制僵尸网络也可以发起                         │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    title SYN Flood 攻击原理
+    participant A as 攻击者
+    participant S as Server
 
-┌─────────────────────────────────────────────────────────────────┐
-│              SYN Cookies 防御（核心思想：不分配资源）             │
-│                                                                  │
-│  传统 SYN Queue（无 Cookies）:                                    │
-│  SYN ──> 分配 TCB ──> 进入 SYN Queue ──> 等 ACK ──> 移入 accept │
-│                                                                  │
-│  SYN Cookies（有 Cookies）:                                       │
-│  SYN ──> 不分配 TCB ──> seq = hash(IP, Port, Secret, 时间戳) ──> │
-│           用 seq 代替 TCB，存储连接信息                           │
-│                                                                  │
-│  第三次握手（ACK 到来）:                                          │
-│  Server 验证 cookie = hash(IP, Port, Secret, 时间戳)              │
-│  验证通过 → 重建 TCB → ESTABLISHED                               │
-│  验证失败 → 丢弃 → 不分配任何资源                                │
-│                                                                  │
-│  SYN Cookies 本质:                                                │
-│  用 "密码学承诺"（cookie）代替 "内存承诺"（TCB）                  │
-│  第三次握手时才验证，之前不占用任何服务器资源                      │
-└─────────────────────────────────────────────────────────────────┘
+    loop 大量 SYN
+        A->>S: SYN (TCB 创建)
+    end
 
-┌─────────────────────────────────────────────────────────────────┐
-│              SYN Flood 防御策略总览                               │
-│                                                                  │
-│  1. SYN Cookies（Linux 内核默认启用）:                            │
-│     - 不保存半开连接，用加密 Cookie 代替                          │
-│     - 验证 ACK 中的 cookie 才建立连接                             │
-│     - 缺点: 不能使用 TCP 选项（如 SACK、MSS 等）                   │
-│     - 适用: 正常防御，大多数场景足够                               │
-│                                                                  │
-│  2. SYN Cache:                                                   │
-│     - 压缩半开连接信息（不保存完整 TCB）                          │
-│     - 牺牲部分 TCP 功能换取资源节省                               │
-│                                                                  │
-│  3. 限流（SYN Rate Limiting）:                                   │
-│     - 限制来自单个 IP 的 SYN 速率                                  │
-│     - 缺点: 误伤 NAT 后的多用户（共享 IP）                         │
-│                                                                  │
-│  4. 延迟分配（Delayed TCB Allocation）:                          │
-│     - BSD 方案：收到 ACK 才分配 TCB                               │
-│     - 等于 syncookies 的变体                                      │
-│                                                                  │
-│  5. 反向代理 / DDoS 清洗:                                        │
-│     - Cloudflare / Akamai / 阿里云 DDoS 防护                      │
-│     - 流量先到清洗中心，干净流量回源                               │
-│     - 适用: 大规模攻击                                             │
-└─────────────────────────────────────────────────────────────────┘
+    Note over S: 最终状态:
+    Note over S: - 大量 TCB，状态=SYN_RCVD（半开连接）
+    Note over S: - 内存耗尽 → 无法处理正常请求
+    Note over S: - ACK 永远不会来
+
+    Note over A: Source IP 可随机伪造
+    Note over A: IP 协议不验证源地址
+```
+
+```mermaid
+flowchart TB
+    subgraph O["传统 SYN Queue（无 Cookies）"]
+        O1["SYN"] --> O2["分配 TCB"]
+        O2 --> O3["进入 SYN Queue"]
+        O3 --> O4["等 ACK"]
+        O4 --> O5["移入 accept"]
+    end
+
+    subgraph C["SYN Cookies（有 Cookies）"]
+        C1["SYN"] --> C2["不分配 TCB"]
+        C2 --> C3["seq = hash(IP, Port, Secret, 时间戳)"]
+        C3 --> C4["第三次握手验证"]
+        C4 --> C5{"验证通过?"}
+        C5 -->|"是"| C6["重建 TCB → ESTABLISHED"]
+        C5 -->|"否"| C7["丢弃 → 不分配任何资源"]
+    end
+
+    Note over O,C: 本质：用密码学承诺（cookie）代替内存承诺（TCB）
+```
+
+```mermaid
+flowchart TB
+    subgraph M1["1. SYN Cookies（Linux 内核默认启用）"]
+        M1A["不保存半开连接，用加密 Cookie 代替"]
+        M1B["验证 ACK 中的 cookie 才建立连接"]
+        M1C["缺点：不能使用 TCP 选项（如 SACK、MSS）"]
+    end
+
+    subgraph M2["2. SYN Cache"]
+        M2A["压缩半开连接信息（不保存完整 TCB）"]
+        M2B["牺牲部分 TCP 功能换取资源节省"]
+    end
+
+    subgraph M3["3. 限流（SYN Rate Limiting）"]
+        M3A["限制来自单个 IP 的 SYN 速率"]
+        M3B["缺点：误伤 NAT 后的多用户（共享 IP）"]
+    end
+
+    subgraph M4["4. 延迟分配（Delayed TCB Allocation）"]
+        M4A["BSD 方案：收到 ACK 才分配 TCB"]
+        M4B["等于 syncookies 的变体"]
+    end
+
+    subgraph M5["5. 反向代理 / DDoS 清洗"]
+        M5A["Cloudflare / Akamai / 阿里云 DDoS 防护"]
+        M5B["流量先到清洗中心，干净流量回源"]
+    end
 ```
 
 ### 完整代码示例（TS/JS）
@@ -1275,128 +1244,96 @@ TCP 三次握手建立可靠连接，确保双方都能发送和接收数据并�
 
 ### ASCII 时序图
 
+```mermaid
+sequenceDiagram
+    title TCP 三次握手（建立连接）
+    participant C as Client
+    participant S as Server
+
+    C->>S: SYN (seq=x)
+    Note over S: Client: 我想连接，发送 ISN=x，状态: SYN_SENT
+    S-->>C: SYN+ACK (seq=y, ack=x+1)
+    Note over S: Server: 同意，发送 ISN=y，ack=x+1，状态: SYN_RCVD
+    C->>S: ACK (seq=x+1, ack=y+1)
+    Note over C,S: 双方确认 ISN，状态: ESTABLISHED
+
+    Note over C,S: 为什么是三次？
+    Note over C,S: 问题1: 历史 SYN - Client发了SYN A（旧连接），服务器建立连接
+    Note over C,S: Client早已放弃，但服务器保留连接 → 资源浪费
+    Note over C,S: 三次握手：Client最后ACK确认的是对当前SYN的确认
+    Note over C,S: 问题2: 无法同步双方初始序列号
+    Note over C,S: Client发SYN，Server同意，但Client不知道Server的ISN
+    Note over C,S: 三次握手：Server的SYN+ACK携带Server的ISN
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    TCP 三次握手（建立连接）                       │
-│                                                                  │
-│  Client                                         Server           │
-│    │  ── SYN (seq=x) ────────────────────────> │                │
-│    │                                            │  Client: 我想连接  │
-│    │                                            │  发送 ISN=x       │
-│    │                                            │  状态: SYN_SENT  │
-│    │  <── SYN+ACK (seq=y, ack=x+1) <────────── │                │
-│    │                                            │  Server: 同意     │
-│    │                                            │  发送 ISN=y       │
-│    │                                            │  ack=x+1（确认）  │
-│    │                                            │  状态: SYN_RCVD  │
-│    │  ── ACK (seq=x+1, ack=y+1) ────────────> │                │
-│    │                                            │  双方确认 ISN     │
-│    │  状态: ESTABLISHED ──────────────────────>│  状态: ESTABLISHED│
-│                                                                  │
-│  为什么是三次？                                                  │
-│  ──────────────                                                  │
-│  两次握手的问题 1: 历史 SYN（Old Duplicate SYN）                 │
-│  Client 发了 SYN A（旧连接），服务器收到后建立连接                 │
-│  Client 早已放弃，但服务器保留连接 → 资源浪费                      │
-│  三次握手：Client 最后 ACK 确认的是"对当前 SYN 的确认"           │
-│                                                                  │
-│  两次握手的问题 2: 无法同步双方初始序列号                         │
-│  Client 发 SYN，Server 同意（一次握手）                           │
-│  但 Client 不知道 Server 的 ISN → 无法可靠传输                    │
-│  三次握手：Server 的 SYN+ACK 携带 Server 的 ISN                  │
-│            Client 的 ACK 确认 Server 的 ISN                       │
-└─────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│                    TCP 四次挥手（关闭连接）                       │
-│                                                                  │
-│  背景: TCP 是全双工通信 = 两个方向独立关闭                         │
-│                                                                  │
-│  Client                                         Server           │
-│    │  Client FIN ────────────────────────────> │                │
-│    │                                            │  Client 发完数据 │
-│    │                                            │  请求关闭写方向  │
-│    │  <── ACK ──────────────────────────────── │                │
-│    │                                            │  Server 确认     │
-│    │  状态: FIN_WAIT_1 ──────────────────────> │                │
-│    │  Client → Server 方向已关闭               │  状态: CLOSE_WAIT│
-│    │  （Client 不能再发数据，但能收数据）        │                │
-│    │                                            │                │
-│    │  Server 发送剩余数据 ──────────────────────>│  (半关闭状态)    │
-│    │                                            │  Server 继续处理 │
-│    │                                            │  剩余数据        │
-│    │  Server FIN ─────────────────────────────> │                │
-│    │                                            │  Server 发完数据 │
-│    │                                            │  请求关闭        │
-│    │  <── ACK ──────────────────────────────── │                │
-│    │  Client 确认 FIN                          │  Server 关闭     │
-│    │                                            │                │
-│    │  Client: 等待 2MSL                        │                │
-│    │  (MSL=60s, TIME_WAIT=120s)                │                │
-│    │  Client 关闭                              │                │
-│                                                                  │
-│  为什么是四次？                                                  │
-│  ──────────────                                                  │
-│  TCP 全双工 = 双方各有一套发送缓冲区 + 接收缓冲区                  │
-│  FIN 只关闭"发送方向"，接收方向仍可工作                            │
-│  Server 收到 Client FIN → 确认 → 继续发送剩余数据 → 再发 FIN      │
-│  这两个阶段不可合并（Client FIN 时 Server 未必已发完数据）         │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    title TCP 四次挥手（关闭连接）
+    participant C as Client
+    participant S as Server
 
-┌─────────────────────────────────────────────────────────────────┐
-│              TIME_WAIT 状态详解（为什么等 2MSL）                  │
-│                                                                  │
-│  TIME_WAIT = 2 * MSL（Maximum Segment Lifetime）                 │
-│  MSL: 报文在网络中最长存活时间，Linux 约定为 60 秒                │
-│  TIME_WAIT: 通常为 120-240 秒                                     │
-│                                                                  │
-│  TIME_WAIT 存在的两个理由:                                        │
-│                                                                  │
-│  理由 1: 保证最后 ACK 可靠到达被动关闭方                          │
-│  Client 的最后一个 ACK 可能丢失                                    │
-│  Server 会重发 FIN → Client 需要再次发送 ACK                       │
-│  2MSL 确保 Server 有足够时间重传 FIN                              │
-│  Client 收到 FIN 后重置 2MSL 计时器                               │
-│                                                                  │
-│  理由 2: 让旧连接的重复数据包在网络中消散                          │
-│  网络中可能还有延迟的旧连接数据包                                  │
-│  新连接使用相同端口时，延迟包可能干扰                              │
-│  2MSL 等待后，旧包基本已从网络中消失                              │
-│                                                                  │
-│  2MSL 而不是 1MSL 的原因:                                         │
-│  MSL 时间内，所有旧包应该消失                                      │
-│  但 ACK 也需要 MSL 时间到达对端                                    │
-│  所以需要 2 * MSL                                                 │
-│                                                                  │
-│  Server 进入 CLOSE_WAIT（而不是 TIME_WAIT）的情况:                │
-│  Server 被动关闭（收到 Client FIN → 发 ACK → 等待应用层关闭）     │
-└─────────────────────────────────────────────────────────────────┘
+    Note over C,S: TCP 是全双工通信 = 两个方向独立关闭
+    C->>S: Client FIN
+    Note over S: Client 发完数据，请求关闭写方向
+    S-->>C: ACK
+    Note over C: 状态: FIN_WAIT_1，Client → Server 方向已关闭
+    Note over S: 状态: CLOSE_WAIT
+    S-->>C: Server 发送剩余数据
+    Note over S: Server 继续处理剩余数据（半关闭状态）
+    S->>C: Server FIN
+    Note over S: Server 发完数据，请求关闭
+    S-->>C: ACK
+    Note over S: Server 关闭
+    Note over C: Client: 等待 2MSL
+    Note over C: MSL=60s, TIME_WAIT=120s
+    Note over C: Client 关闭
 
-┌─────────────────────────────────────────────────────────────────┐
-│              TCP 连接状态转换图（简化版）                         │
-│                                                                  │
-│  CLOSED ──listen──> LISTEN ──recv SYN──> SYN_RCVD                 │
-│     ^                 │                │                        │
-│     │                 │                │                        │
-│     │                 │                ▼                        │
-│     │                 │           ESTABLISHED                   │
-│     │                 │                │                        │
-│     │                 │ send FIN       ▼                        │
-│     │                 └───────< FIN_WAIT_1 <─ ─ ─ ─             │
-│     │                           │    │                          │
-│     │                    recv   │    │ send ACK                 │
-│     │                    ACK ▼  │    ▼                          │
-│     │                 FIN_WAIT_2│ CLOSING                       │
-│     │                           │    │                          │
-│     │                           │    │ recv ACK                 │
-│     │                           └──► │◄───                       │
-│     │                           TIME_WAIT                        │
-│     │                              │                            │
-│     │                        2MSL ▼                            │
-│     └──────────────────────<── CLOSED                           │
-│                                                                  │
-│  CLOSE_WAIT ──应用层 close──> LAST_ACK ──recv ACK──> CLOSED       │
-└─────────────────────────────────────────────────────────────────┘
+    Note over C,S: 为什么是四次？
+    Note over C,S: TCP 全双工 = 双方各有一套发送缓冲区 + 接收缓冲区
+    Note over C,S: FIN 只关闭发送方向，接收方向仍可工作
+    Note over C,S: Server 收到 Client FIN → 确认 → 继续发送剩余数据 → 再发 FIN
+```
+
+```mermaid
+flowchart TB
+    subgraph T["TIME_WAIT = 2 * MSL"]
+        T1["MSL: 报文在网络中最长存活时间，Linux 约定为 60 秒"]
+        T2["TIME_WAIT: 通常为 120-240 秒"]
+    end
+
+    subgraph R1["理由 1: 保证最后 ACK 可靠到达"]
+        R1A["Client 的最后一个 ACK 可能丢失"]
+        R1B["Server 会重发 FIN → Client 需要再次发送 ACK"]
+        R1C["2MSL 确保 Server 有足够时间重传 FIN"]
+    end
+
+    subgraph R2["理由 2: 让旧连接的重复数据包消散"]
+        R2A["网络中可能还有延迟的旧连接数据包"]
+        R2B["新连接使用相同端口时，延迟包可能干扰"]
+        R2C["2MSL 等待后，旧包基本已从网络中消失"]
+    end
+
+    Note over T,R1: Server 进入 CLOSE_WAIT（而不是 TIME_WAIT）的情况
+    Note over T,R1: Server 被动关闭（收到 Client FIN → 发 ACK → 等待应用层关闭）
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> CLOSED
+    CLOSED --> LISTEN: listen
+    LISTEN --> SYN_RCVD: recv SYN
+    SYN_RCVD --> ESTABLISHED: recv ACK
+    ESTABLISHED --> FIN_WAIT_1: send FIN
+    FIN_WAIT_1 --> FIN_WAIT_2: recv ACK
+    FIN_WAIT_1 --> CLOSING: recv FIN
+    FIN_WAIT_2 --> TIME_WAIT: recv FIN
+    CLOSING --> TIME_WAIT: recv ACK
+    TIME_WAIT --> CLOSED: 2MSL
+
+    CLOSED --> [*]
+    ESTABLISHED --> CLOSE_WAIT: recv FIN
+    CLOSE_WAIT --> LAST_ACK: 应用层 close
+    LAST_ACK --> CLOSED: recv ACK
 ```
 
 ### 完整代码示例（TS/JS）
@@ -1570,107 +1507,104 @@ HTTPS = HTTP over TLS，TLS 1.2 需要 2-RTT（TCP 握手 + TLS 握手分开）�
 
 ### ASCII 时序图
 
+```mermaid
+sequenceDiagram
+    title TLS 1.2 握手（2-RTT）
+    participant C as Client
+    participant S as Server
+
+    C->>S: TCP 三次握手
+    Note over C,S: RTT 1
+
+    C->>S: ClientHello
+    Note right of C: 支持的 TLS 版本, 密码套件列表, 客户端随机数, Session ID, SNI
+    S-->>C: ServerHello
+    Note left of S: 选中的 TLS 版本, 密码套件, 服务器随机数
+    S-->>C: Certificate
+    Note left of S: 服务器证书链: 站点证书 + 中间证书
+    S-->>C: ServerHelloDone
+    Note over C,S: RTT 2
+
+    C->>S: ClientKeyExchange
+    Note right of C: 使用服务器公钥加密 pre_master_secret
+    C->>S: ChangeCipherSpec
+    C->>S: Finished (加密)
+    S-->>C: ChangeCipherSpec
+    S-->>C: Finished (加密)
+
+    Note over C,S: 加密通信开始
+    Note over C,S: 总耗时: TCP(1) + TLS(2) = 3 RTT
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│              TLS 1.2 握手（2-RTT）                               │
-│                                                                  │
-│  Client                                         Server           │
-│    │                                              │               │
-│    │  ──── TCP 三次握手 ─────────────────────────> │ (RTT 1)        │
-│    │                                              │               │
-│    │  ──── ClientHello ──────────────────────────> │               │
-│    │        (支持的 TLS 版本, 密码套件列表,        │               │
-│    │         客户端随机数, Session ID, SNI)         │               │
-│    │                                              │               │
-│    │  <─── ServerHello ─────────────────────────── │               │
-│    │        (选中的 TLS 版本, 密码套件,            │               │
-│    │         服务器随机数)                         │               │
-│    │  <─── Certificate ────────────────────────── │               │
-│    │        (服务器证书链: 站点证书 + 中间证书)      │               │
-│    │  <─── ServerHelloDone ────────────────────── │               │
-│    │                                              │ (RTT 2)        │
-│    │  ──── ClientKeyExchange ────────────────────> │               │
-│    │        (使用服务器公钥加密 pre_master_secret) │               │
-│    │  ──── ChangeCipherSpec ────────────────────> │               │
-│    │  ──── Finished (加密) ──────────────────────> │               │
-│    │  <─── ChangeCipherSpec ────────────────────  │               │
-│    │  <─── Finished (加密) ─────────────────────  │               │
-│    │                                              │               │
-│    │  ========= 加密通信开始 =========             │               │
-│    │  总耗时: TCP 握手(1-RTT) + TLS 握手(2-RTT) = 3 RTT (HTTP时)  │
-│    │  HTTPS 总耗时: TCP(1) + TLS(2) = 3 RTT 基础上叠加              │
-│    │  如果 TLS 复用 Session: TCP(1) + TLS(0.5) ≈ 1.5 RTT            │
-└─────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│              TLS 1.3 握手（1-RTT / 0-RTT）                      │
-│                                                                  │
-│  TLS 1.3 关键优化:                                               │
-│  1. 移除 RSA 密钥传输（只保留 ECDHE 密钥交换）                     │
-│  2. 将 Key Share 合并到 ClientHello 中（减少一次往返）              │
-│  3. ServerHello 直接带加密参数                                     │
-│                                                                  │
-│  首次连接（1-RTT）:                                               │
-│  Client                                         Server           │
-│    │  ──── TCP 三次握手 ─────────────────────────> │ (RTT 1)        │
-│    │  ──── ClientHello ────────────────────────────> │               │
-│    │       (TLS 版本, 密码套件, 随机数,             │               │
-│    │        key_share: ECDHE 公钥)                  │               │
-│    │       (已可选带加密应用数据 early_data)        │               │
-│    │                                              │ (RTT 2)        │
-│    │  <─── ServerHello ──────────────────────────── │               │
-│    │       (选中密码套件, 随机数,                   │               │
-│    │        key_share: ECDHE 公钥)                  │               │
-│    │       (可直接推导出主密钥)                      │               │
-│    │  <─── (EncryptedExtensions - 可选)            │               │
-│    │  <─── (Certificate + Proof) ─────────────────── │               │
-│    │  <─── Finished ─────────────────────────────── │               │
-│    │  ──── Finished ──────────────────────────────> │               │
-│    │  ========= 加密通信立即开始 =========             │               │
-│    │  总耗时: TCP(1) + TLS(1) = 2 RTT (比 TLS 1.2 减少 1 RTT)     │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    title TLS 1.3 握手（1-RTT）
+    participant C as Client
+    participant S as Server
 
-┌─────────────────────────────────────────────────────────────────┐
-│              TLS 1.3 0-RTT（重复连接）                          │
-│                                                                  │
-│  第二次连接（使用上次会话票据）:                                   │
-│  Client                                         Server           │
-│    │  ──── TCP 三次握手（可能与 TLS 合并）───────> │                │
-│    │  ──── ClientHello ────────────────────────────> │               │
-│    │       (session_ticket: 上次会话密钥加密的票据, │               │
-│    │        early_data: 用预派生密钥加密的应用数据) │               │
-│    │  ──── (Encrypted Application Data) ──────────> │               │
-│    │                                              │                │
-│    │  <─── ServerHello ──────────────────────────── │               │
-│    │  <─── Finished ─────────────────────────────── │               │
-│    │  ========= 0-RTT 后就开始通信 =========         │               │
-│    │                                                      │
-│    │  ⚠️ 0-RTT 警告: 存在重放攻击风险                   │
-│    │     early_data 中的请求可能被恶意重放              │
-│    │     解决: 对 0-RTT 请求进行幂等性验证               │
-└─────────────────────────────────────────────────────────────────┘
+    Note over C,S: TLS 1.3 关键优化:
+    Note over C,S: 1. 移除 RSA 密钥传输（只保留 ECDHE 密钥交换）
+    Note over C,S: 2. 将 Key Share 合并到 ClientHello 中（减少一次往返）
+    Note over C,S: 3. ServerHello 直接带加密参数
 
-┌─────────────────────────────────────────────────────────────────┐
-│              对称加密 vs 非对称加密 vs 混合加密                   │
-│                                                                  │
-│  1. 对称加密（加密和解密用同一个密钥）:                           │
-│     AES-256-GCM, ChaCha20-Poly1305                              │
-│     优点: 快（比非对称快 100-1000 倍）                            │
-│     缺点: 密钥交换问题（如何安全传输密钥？）                       │
-│                                                                  │
-│  2. 非对称加密（加密和解密用不同密钥）:                           │
-│     RSA: 公钥加密，私钥解密                                        │
-│     缺点: 慢；无前向保密（私钥泄露 → 历史全可解密）               │
-│                                                                  │
-│  3. 混合加密（TLS 使用）:                                         │
-│     ECDHE 密钥交换（双方各自生成临时密钥对，交换公钥）             │
-│     双方用 ECDH 计算 pre_master_secret（私钥不传输！）            │
-│     用 HKDF 派生出对称密钥                                        │
-│     用对称密钥加密实际通信数据                                    │
-│                                                                  │
-│     前向保密(PFS): 即使长期私钥泄露，历史通信仍安全               │
-│     （因为每次会话用的是临时密钥，不依赖长期私钥）                 │
-└─────────────────────────────────────────────────────────────────┘
+    C->>S: TCP 三次握手
+    C->>S: ClientHello
+    Note right of C: TLS 版本, 密码套件, 随机数, key_share: ECDHE 公钥
+    Note right of C: (已可选带加密应用数据 early_data)
+    S-->>C: ServerHello
+    Note left of S: 选中密码套件, 随机数, key_share: ECDHE 公钥
+    Note left of S: (可直接推导出主密钥)
+    S-->>C: (EncryptedExtensions - 可选)
+    S-->>C: (Certificate + Proof)
+    S-->>C: Finished
+    C->>S: Finished
+
+    Note over C,S: 加密通信立即开始，总耗时: TCP(1) + TLS(1) = 2 RTT
+```
+
+```mermaid
+sequenceDiagram
+    title TLS 1.3 0-RTT（重复连接）
+    participant C as Client
+    participant S as Server
+
+    C->>S: TCP 三次握手（可能与 TLS 合并）
+    C->>S: ClientHello
+    Note right of C: session_ticket: 上次会话密钥加密的票据
+    Note right of C: early_data: 用预派生密钥加密的应用数据
+    C->>S: (Encrypted Application Data)
+    S-->>C: ServerHello
+    S-->>C: Finished
+
+    Note over C,S: 0-RTT 后就开始通信
+
+    Note over C,S: ⚠️ 0-RTT 警告: 存在重放攻击风险
+    Note over C,S: early_data 中的请求可能被恶意重放
+    Note over C,S: 解决: 对 0-RTT 请求进行幂等性验证
+```
+
+```mermaid
+flowchart TB
+    subgraph S1["1. 对称加密"]
+        S1A["加密和解密用同一个密钥"]
+        S1B["AES-256-GCM, ChaCha20-Poly1305"]
+        S1C["优点: 快（比非对称快 100-1000 倍）"]
+        S1D["缺点: 密钥交换问题"]
+    end
+
+    subgraph S2["2. 非对称加密"]
+        S2A["加密和解密用不同密钥"]
+        S2B["RSA: 公钥加密，私钥解密"]
+        S2C["缺点: 慢；无前向保密"]
+    end
+
+    subgraph S3["3. 混合加密（TLS 使用）"]
+        S3A["ECDHE 密钥交换（双方各自生成临时密钥对，交换公钥）"]
+        S3B["双方用 ECDH 计算 pre_master_secret（私钥不传输！）"]
+        S3C["用 HKDF 派生出对称密钥"]
+        S3D["用对称密钥加密实际通信数据"]
+        S3E["前向保密(PFS): 即使长期私钥泄露，历史通信仍安全"]
+    end
 ```
 
 ### 完整代码示例（TS/JS）
@@ -1859,98 +1793,127 @@ CA 证书链是由根证书（浏览器内置）、中间证书（CA 签发）�
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              PKI（公钥基础设施）与证书链                        │
-│                                                                  │
-│  信任锚（Trust Anchor）                                          │
-│       │                                                          │
-│       ▼                                                          │
-│  ┌──────────────────────────────────────────────┐               │
-│  │        根证书 (Root CA)                      │               │
-│  │  自签名证书，浏览器/OS 厂商内置                │               │
-│  │  示例: DigiCert Global Root G2               │               │
-│  │        GlobalSign Root CA                    │               │
-│  │        ISRG Root X1 (Let's Encrypt)          │               │
-│  │  数量: 数百个（浏览器维护独立信任库）           │               │
-│  └─────────────────────────────────────────────┘               │
-│       │ (根 CA 签发中间 CA)                                     │
-│       │ 根 CA 私钥签名                                           │
-│       ▼                                                          │
-│  ┌─────────────────────────────────────────────┐               │
-│  │      中间证书 (Intermediate CA)               │               │
-│  │  运营主体: Let's Encrypt / DigiCert / 阿里云  │               │
-│  │  用于签发终端实体证书                         │               │
-│  │  通常有 1-2 级中间 CA（交叉签发等）            │               │
-│  └─────────────────────────────────────────────┘               │
-│       │ (中间 CA 签发站点证书)                                    │
-│       │ 中间 CA 私钥签名                                          │
-│       ▼                                                          │
-│  ┌─────────────────────────────────────────────┐               │
-│  │      站点证书 (End-Entity Certificate)        │               │
-│  │  域名: *.example.com                         │               │
-│  │  公钥: 用于 TLS 握手                         │               │
-│  │  包含: CN/SAN, 公钥, 有效期, 序列号, 签名    │               │
-│  └─────────────────────────────────────────────┘               │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              浏览器证书验证流程                                  │
-│                                                                  │
-│  Step 1: 收到服务器证书（example.com）                          │
-│                                                                  │
-│  Step 2: 构建证书链                                              │
-│    example.com ←(签发)─ Intermediate CA ←(签发)─ Root CA        │
-│    浏览器尝试构建链，可能需要 AIA 下载中间证书                    │
-│    (Authority Information Access 字段包含签发者 URL)             │
-│                                                                  │
-│  Step 3: 验证每个证书签名                                        │
-│    用 Root CA 公钥验证 Intermediate CA 签名                      │
-│    用 Intermediate CA 公钥验证站点证书签名                        │
-│                                                                  │
-│  Step 4: 检查证书有效性                                          │
-│    - 时间有效性: NotBefore ≤ 当前时间 ≤ NotAfter                │
-│    - 域名匹配: CN/SAN 包含请求的域名                            │
-│    - 使用限制: keyUsage / extendedKeyUsage 正确                  │
-│                                                                  │
-│  Step 5: 检查证书吊销状态                                        │
-│    - CRL (Certificate Revocation List): 下载吊销列表           │
-│    - OCSP (Online Certificate Status Protocol): 在线查询        │
-│    - OCSP Stapling: 服务器附带 OCSP 响应（减少查询）             │
-│                                                                  │
-│  Step 6: 验证通过 → 提取公钥 → TLS 继续                         │
-│           验证失败 → 显示证书错误页面                            │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              HSTS（HTTP Strict Transport Security）              │
-│                                                                  │
-│  服务器响应头:                                                   │
-│  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload│
-│                                                                  │
-│  参数详解:                                                       │
-│  max-age: 浏览器强制 HTTPS 的时间（秒）                          │
-│    31536000 = 1年（合理值: 至少 6 个月）                         │
-│    0 = 禁用 HSTS（清除浏览器记录）                               │
-│                                                                  │
-│  includeSubDomains: 子域名也强制 HTTPS                          │
-│    如果主域名开启，子域名也受约束                                  │
-│    ⚠️ 设置前确保所有子域名都支持 HTTPS                           │
-│                                                                  │
-│  preload: 申请加入浏览器内置 HSTS 预加载列表                     │
-│    https://hstspreload.org 提交                                   │
-│    Chrome/Firefox/Safari/Edge 等内置列表                         │
-│    一旦加入，极难撤销（需要提交移除申请并等待浏览器更新）          │
-│                                                                  │
-│  HSTS 效果:                                                     │
-│  首次访问（HTTP） → 浏览器记录 max-age                           │
-│  后续访问（HTTP） → 浏览器内部重定向为 HTTPS（不发 HTTP 请求）   │
-│                                                                  │
-│  防止的攻击:                                                     │
-│  1. SSL Stripping（MIMT）: 中间人 无法降级为 HTTP                │
-│  2. 混合内容警告: HTTPS 页面禁止加载 HTTP 子资源                 │
-│  3. HTTPS Only 模式（Firefox）: 所有 HTTP 请求强制升级           │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["PKI（公钥基础设施）与证书链"]
+    N1["信任锚（Trust Anchor）"]
+    N2["根证书 (Root CA)"]
+    N3["自签名证书，浏览器/OS 厂商内置"]
+    N4["示例: DigiCert Global Root G2"]
+    N5["GlobalSign Root CA"]
+    N6["ISRG Root X1 (Let's Encrypt)"]
+    N7["数量: 数百个（浏览器维护独立信任库）"]
+    N8["(根 CA 签发中间 CA)"]
+    N9["根 CA 私钥签名"]
+    N10["中间证书 (Intermediate CA)"]
+    N11["运营主体: Let's Encrypt / DigiCert / 阿里云"]
+    N12["用于签发终端实体证书"]
+    N13["通常有 1-2 级中间 CA（交叉签发等）"]
+    N14["(中间 CA 签发站点证书)"]
+    N15["中间 CA 私钥签名"]
+    N16["站点证书 (End-Entity Certificate)"]
+    N17["域名: *.example.com"]
+    N18["公钥: 用于 TLS 握手"]
+    N19["包含: CN/SAN, 公钥, 有效期, 序列号, 签名"]
+    N20["浏览器证书验证流程"]
+    N21["Step 1: 收到服务器证书（example.com）"]
+    N22["Step 2: 构建证书链"]
+    N23["example.com (签发) Intermediate CA (签发)"]
+    N24["浏览器尝试构建链，可能需要 AIA 下载中间证书"]
+    N25["(Authority Information Access 字段包含签发者 UR"]
+    N26["Step 3: 验证每个证书签名"]
+    N27["用 Root CA 公钥验证 Intermediate CA 签名"]
+    N28["用 Intermediate CA 公钥验证站点证书签名"]
+    N29["Step 4: 检查证书有效性"]
+    N30["- 时间有效性: NotBefore ≤ 当前时间 ≤ NotAfter"]
+    N31["- 域名匹配: CN/SAN 包含请求的域名"]
+    N32["- 使用限制: keyUsage / extendedKeyUsage 正确"]
+    N33["Step 5: 检查证书吊销状态"]
+    N34["- CRL (Certificate Revocation List): 下载吊"]
+    N35["- OCSP (Online Certificate Status Protoc"]
+    N36["- OCSP Stapling: 服务器附带 OCSP 响应（减少查询）"]
+    N37["Step 6: 验证通过 提取公钥 TLS 继续"]
+    N38["验证失败 显示证书错误页面"]
+    N39["HSTS（HTTP Strict Transport Security）"]
+    N40["服务器响应头:"]
+    N41["Strict-Transport-Security: max-age=31536"]
+    N42["参数详解:"]
+    N43["max-age: 浏览器强制 HTTPS 的时间（秒）"]
+    N44["31536000 = 1年（合理值: 至少 6 个月）"]
+    N45["0 = 禁用 HSTS（清除浏览器记录）"]
+    N46["includeSubDomains: 子域名也强制 HTTPS"]
+    N47["如果主域名开启，子域名也受约束"]
+    N48["⚠️ 设置前确保所有子域名都支持 HTTPS"]
+    N49["preload: 申请加入浏览器内置 HSTS 预加载列表"]
+    N50["https://hstspreload.org 提交"]
+    N51["Chrome/Firefox/Safari/Edge 等内置列表"]
+    N52["一旦加入，极难撤销（需要提交移除申请并等待浏览器更新）"]
+    N53["HSTS 效果:"]
+    N54["首次访问（HTTP） 浏览器记录 max-age"]
+    N55["后续访问（HTTP） 浏览器内部重定向为 HTTPS（不发 HTTP 请求）"]
+    N56["防止的攻击:"]
+    N57["1. SSL Stripping（MIMT）: 中间人 无法降级为 HTTP"]
+    N58["2. 混合内容警告: HTTPS 页面禁止加载 HTTP 子资源"]
+    N59["3. HTTPS Only 模式（Firefox）: 所有 HTTP 请求强制升"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
+    N54 --> N55
+    N55 --> N56
+    N56 --> N57
+    N57 --> N58
+    N58 --> N59
 ```
 
 ### 完整代码示例（TS/JS）
@@ -2135,97 +2098,131 @@ DNS 主要用 UDP 53 端口查询（无握手、低延迟），但当响应超�
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              DNS 查询流程（递归 + UDP）                          │
-│                                                                  │
-│  用户浏览器                                                      │
-│      │                                                           │
-│      │ DNS 查询: example.com                                      │
-│      ▼                                                           │
-│  本地 DNS 解析器（递归 resolver）                                 │
-│  (通常是 ISP 提供 / 8.8.8.8 / 1.1.1.1)                           │
-│      │                                                           │
-│      │ 1. 查缓存 → 命中 → 返回                                    │
-│      │ 2. 未命中 → 迭代查询:                                      │
-│      │                                                           │
-│      │ ──> 根 DNS (.): 找 .com 的 NS 记录                       │
-│      │ ◄── .com NS 服务器地址                                    │
-│      │                                                           │
-│      │ ──> .com NS: 找 example.com 的 NS 记录                    │
-│      │ ◄── example.com NS 服务器地址                            │
-│      │                                                           │
-│      │ ──> example.com NS: 找 A/AAAA 记录                        │
-│      │ ◄── 93.184.216.34 (IP 地址)                               │
-│      │                                                           │
-│      ◄── 返回 IP 给浏览器                                         │
-│                                                                  │
-│  全部使用 UDP 53 端口（轻量快速）                                 │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              DNS 使用 TCP 的场景                                 │
-│                                                                  │
-│  场景 1: 响应超过 512 字节                                        │
-│  原始 DNS 协议设计：UDP 响应最大 512 字节                        │
-│  DNSSEC 签名数据量大 → 超 512 字节 → 切换 TCP                     │
-│  EDNS(0) 扩展: 客户端声明自己支持大包（通常 4096 字节）          │
-│                                                                  │
-│  场景 2: 区域传输（AXFR）                                         │
-│  主 DNS 服务器 → 从 DNS 服务器同步整个 zone 数据                 │
-│  数据量大 → 必须用 TCP                                            │
-│  TCP 端口 53（与 UDP 53 同一个端口）                             │
-│                                                                  │
-│  场景 3: DoT / DoH（DNS over TLS / HTTPS）                       │
-│  TLS 加密 → 防止 DNS 污染和中间人                                │
-│  DoT: 端口 853（RFC 7858）                                        │
-│  DoH: 端口 443，路径 /dns-query（RFC 8484）                       │
-│                                                                  │
-│  场景 4: 客户端或服务器明确要求 TCP                              │
-│  响应被截断（Truncated）→ 客户端用 TCP 重试                       │
-│  DNS 查询太大 → Truncated = 1 → TCP 重试                         │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              DNS 污染与防御                                        │
-│                                                                  │
-│  DNS 污染攻击（DNS Spoofing / DNS Poisoning）:                   │
-│  攻击者在 DNS 响应到达本地解析器之前，注入伪造的 DNS 响应          │
-│  原理: DNS 使用无连接 UDP，无握手，源 IP 不验证                   │
-│                                                                  │
-│  攻击流程:                                                       │
-│  正常: Resolver ── DNS Query ──> Auth NS                         │
-│              <── Correct Response (IP A)                         │
-│              浏览器 ← IP A                                        │
-│                                                                  │
-│  被污染: Resolver ── DNS Query ──> Auth NS                       │
-│              <── Correct Response (IP A)                         │
-│         Attacker ── Fake Response (IP evil) ──> Resolver         │
-│              (先于正确响应到达)                                    │
-│              伪造的响应被缓存                                      │
-│              浏览器 ← IP evil (错误 IP)                          │
-│                                                                  │
-│  防御手段:                                                       │
-│                                                                  │
-│  1. DNSSEC（DNS Security Extensions）:                           │
-│     - 用公钥密码学签名 DNS 记录                                   │
-│     - Resolver 验证签名是否由正确的 CA 签发                       │
-│     - 伪造响应没有正确签名 → 被拒绝                               │
-│     - 缺点: 部署不完整（很多 TLD 尚不支持）                       │
-│                                                                  │
-│  2. DoT（DNS over TLS）:                                         │
-│     - DNS 查询通过 TLS 加密隧道传输                              │
-│     - 防止网络层监听和注入                                        │
-│     - 端口: 853                                                    │
-│     - 公共 DoT: 8.8.8.8, 1.1.1.1                                  │
-│                                                                  │
-│  3. DoH（DNS over HTTPS）:                                       │
-│     - DNS 查询通过 HTTPS（HTTP/2 或 HTTP/3）传输                 │
-│     - 伪装成普通 HTTPS 流量，更难被识别和阻断                      │
-│     - 公共 DoH: Cloudflare (1.1.1.1), Google (8.8.8.8)           │
-│     - 浏览器内置（Chrome, Firefox 已支持）                        │
-│     - 缺点: 企业无法监控员工 DNS 查询（隐私 vs 管控）             │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["DNS 查询流程（递归 + UDP）"]
+    N1["用户浏览器"]
+    N2["DNS 查询: example.com"]
+    N3["本地 DNS 解析器（递归 resolver）"]
+    N4["(通常是 ISP 提供 / 8.8.8.8 / 1.1.1.1)"]
+    N5["1. 查缓存 命中 返回"]
+    N6["2. 未命中 迭代查询:"]
+    N7["> 根 DNS (.): 找 .com 的 NS 记录"]
+    N8["◄ .com NS 服务器地址"]
+    N9["> .com NS: 找 example.com 的 NS 记录"]
+    N10["◄ example.com NS 服务器地址"]
+    N11["> example.com NS: 找 A/AAAA 记录"]
+    N12["◄ 93.184.216.34 (IP 地址)"]
+    N13["◄ 返回 IP 给浏览器"]
+    N14["全部使用 UDP 53 端口（轻量快速）"]
+    N15["DNS 使用 TCP 的场景"]
+    N16["场景 1: 响应超过 512 字节"]
+    N17["原始 DNS 协议设计：UDP 响应最大 512 字节"]
+    N18["DNSSEC 签名数据量大 超 512 字节 切换 TCP"]
+    N19["EDNS(0) 扩展: 客户端声明自己支持大包（通常 4096 字节）"]
+    N20["场景 2: 区域传输（AXFR）"]
+    N21["主 DNS 服务器 从 DNS 服务器同步整个 zone 数据"]
+    N22["数据量大 必须用 TCP"]
+    N23["TCP 端口 53（与 UDP 53 同一个端口）"]
+    N24["场景 3: DoT / DoH（DNS over TLS / HTTPS）"]
+    N25["TLS 加密 防止 DNS 污染和中间人"]
+    N26["DoT: 端口 853（RFC 7858）"]
+    N27["DoH: 端口 443，路径 /dns-query（RFC 8484）"]
+    N28["场景 4: 客户端或服务器明确要求 TCP"]
+    N29["响应被截断（Truncated） 客户端用 TCP 重试"]
+    N30["DNS 查询太大 Truncated = 1 TCP 重试"]
+    N31["DNS 污染与防御"]
+    N32["DNS 污染攻击（DNS Spoofing / DNS Poisoning）:"]
+    N33["攻击者在 DNS 响应到达本地解析器之前，注入伪造的 DNS 响应"]
+    N34["原理: DNS 使用无连接 UDP，无握手，源 IP 不验证"]
+    N35["攻击流程:"]
+    N36["正常: Resolver DNS Query > Auth NS"]
+    N37["< Correct Response (IP A)"]
+    N38["浏览器 IP A"]
+    N39["被污染: Resolver DNS Query > Auth NS"]
+    N40["< Correct Response (IP A)"]
+    N41["Attacker Fake Response (IP evil) > Resol"]
+    N42["(先于正确响应到达)"]
+    N43["伪造的响应被缓存"]
+    N44["浏览器 IP evil (错误 IP)"]
+    N45["防御手段:"]
+    N46["1. DNSSEC（DNS Security Extensions）:"]
+    N47["- 用公钥密码学签名 DNS 记录"]
+    N48["- Resolver 验证签名是否由正确的 CA 签发"]
+    N49["- 伪造响应没有正确签名 被拒绝"]
+    N50["- 缺点: 部署不完整（很多 TLD 尚不支持）"]
+    N51["2. DoT（DNS over TLS）:"]
+    N52["- DNS 查询通过 TLS 加密隧道传输"]
+    N53["- 防止网络层监听和注入"]
+    N54["- 端口: 853"]
+    N55["- 公共 DoT: 8.8.8.8, 1.1.1.1"]
+    N56["3. DoH（DNS over HTTPS）:"]
+    N57["- DNS 查询通过 HTTPS（HTTP/2 或 HTTP/3）传输"]
+    N58["- 伪装成普通 HTTPS 流量，更难被识别和阻断"]
+    N59["- 公共 DoH: Cloudflare (1.1.1.1), Google ("]
+    N60["- 浏览器内置（Chrome, Firefox 已支持）"]
+    N61["- 缺点: 企业无法监控员工 DNS 查询（隐私 vs 管控）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
+    N54 --> N55
+    N55 --> N56
+    N56 --> N57
+    N57 --> N58
+    N58 --> N59
+    N59 --> N60
+    N60 --> N61
 ```
 
 ### 完整代码示例（TS/JS）
@@ -2407,88 +2404,117 @@ CDN（Content Delivery Network）通过在全球部署边缘节点，将内容�
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CDN 全球架构图                                │
-│                                                                  │
-│  用户 ──> 浏览器                                                 │
-│      │                                                           │
-│      ▼                                                           │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              CDN 全球边缘节点 (Edge / PoP)                   │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │  │
-│  │  │ 北京 PoP     │  │ 上海 PoP     │  │ 深圳 PoP     │       │  │
-│  │  │ 39.9ms       │  │ 12.1ms       │  │ 28.5ms       │       │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘       │  │
-│  │                                                           │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │  │
-│  │  │ 洛杉矶 PoP   │  │ 法兰克福 PoP │  │ 新加坡 PoP   │       │  │
-│  │  │ 150ms        │  │ 180ms        │  │ 45ms         │       │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘       │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│      │                                                           │
-│      │ Cache Miss 时，回源                                        │
-│      ▼                                                           │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              CDN 源站（Origin Server）                     │  │
-│  │  真实服务器，存放原始内容                                   │  │
-│  │  通常放在单个数据中心，不暴露公网 IP                        │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              CDN 请求流程（分层缓存）                            │
-│                                                                  │
-│  Step 1: 用户请求 https://example.com/static/app.js             │
-│                                                                  │
-│  Step 2: DNS 解析 → CDN 智能 DNS → 返回最近 PoP 的 IP           │
-│          北京用户 → 北京 PoP IP                                  │
-│          用户本机 DNS: example.com → 39.9ms 延迟节点             │
-│                                                                  │
-│  Step 3: CDN 边缘节点查找缓存                                    │
-│          ┌──────────────────────────────────┐                    │
-│          │ Cache HIT  → 直接返回 (毫秒级)    │                    │
-│          │ Cache MISS → 进入 Step 4        │                    │
-│          │ Cache EXPIRED → 条件请求 (协商)  │                    │
-│          │ Cache STALE → 回源同时返回旧数据  │                    │
-│          └──────────────────────────────────┘                    │
-│                                                                  │
-│  Step 4: 回源（Cache Miss）                                      │
-│          北京 PoP → 回源站 example.com:8080                      │
-│          请求原始内容                                             │
-│          源站返回 → 北京 PoP 缓存 → 返回给用户                   │
-│                                                                  │
-│  Step 5: 缓存更新（可选）                                        │
-│          设置 Cache-Control / TTL                               │
-│          缓存键（Cache Key）: URL + Query + Vary               │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              CDN 加速原理（全面分析）                             │
-│                                                                  │
-│  1. 就近访问（地理优化）:                                        │
-│     物理距离减少 → 光速延迟降低 → 带宽质量提升                    │
-│     公式: 延迟 = 距离 / 光速 ≈ 城市间 5ms/百公里                  │
-│                                                                  │
-│  2. 减少源站压力:                                                │
-│     热点资源被边缘节点缓存 → 源站 QPS 大幅降低                    │
-│     缓存命中率（HIT Rate）= 缓存命中数 / 总请求数                  │
-│     好的 CDN 配置: HIT Rate > 95%                                │
-│                                                                  │
-│  3. 协议优化:                                                    │
-│     - HTTP/2 多路复用（单个连接并行请求）                         │
-│     - Brotli 压缩（比 gzip 压缩率高 15-25%）                     │
-│     - TLS 终止（边缘节点完成 TLS，源站用 HTTP）                  │
-│     - 连接复用（HTTP/2 Server Push / Early Hints）              │
-│                                                                  │
-│  4. 边缘计算（Edge Computing）:                                  │
-│     Cloudflare Workers / AWS CloudFront Functions               │
-│     在 CDN 节点执行轻量逻辑（鉴权/重写/AB测试）                   │
-│                                                                  │
-│  5. DDoS 防护:                                                   │
-│     CDN 节点吸收攻击流量 → 干净流量回源                          │
-│     Anycast 架构：全球同 IP，攻击被分散                          │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["CDN 全球架构图"]
+    N1["用户 > 浏览器"]
+    N2["CDN 全球边缘节点 (Edge / PoP)"]
+    N3["北京 PoP"]
+    N4["上海 PoP"]
+    N5["深圳 PoP"]
+    N6["39.9ms"]
+    N7["12.1ms"]
+    N8["28.5ms"]
+    N9["洛杉矶 PoP"]
+    N10["法兰克福 PoP"]
+    N11["新加坡 PoP"]
+    N12["150ms"]
+    N13["180ms"]
+    N14["45ms"]
+    N15["Cache Miss 时，回源"]
+    N16["CDN 源站（Origin Server）"]
+    N17["真实服务器，存放原始内容"]
+    N18["通常放在单个数据中心，不暴露公网 IP"]
+    N19["CDN 请求流程（分层缓存）"]
+    N20["Step 1: 用户请求 https://example.com/static/"]
+    N21["Step 2: DNS 解析 CDN 智能 DNS 返回最近 PoP 的"]
+    N22["北京用户 北京 PoP IP"]
+    N23["用户本机 DNS: example.com 39.9ms 延迟节点"]
+    N24["Step 3: CDN 边缘节点查找缓存"]
+    N25["Cache HIT 直接返回 (毫秒级)"]
+    N26["Cache MISS 进入 Step 4"]
+    N27["Cache EXPIRED 条件请求 (协商)"]
+    N28["Cache STALE 回源同时返回旧数据"]
+    N29["Step 4: 回源（Cache Miss）"]
+    N30["北京 PoP 回源站 example.com:8080"]
+    N31["请求原始内容"]
+    N32["源站返回 北京 PoP 缓存 返回给用户"]
+    N33["Step 5: 缓存更新（可选）"]
+    N34["设置 Cache-Control / TTL"]
+    N35["缓存键（Cache Key）: URL + Query + Vary"]
+    N36["CDN 加速原理（全面分析）"]
+    N37["1. 就近访问（地理优化）:"]
+    N38["物理距离减少 光速延迟降低 带宽质量提升"]
+    N39["公式: 延迟 = 距离 / 光速 ≈ 城市间 5ms/百公里"]
+    N40["2. 减少源站压力:"]
+    N41["热点资源被边缘节点缓存 源站 QPS 大幅降低"]
+    N42["缓存命中率（HIT Rate）= 缓存命中数 / 总请求数"]
+    N43["好的 CDN 配置: HIT Rate > 95%"]
+    N44["3. 协议优化:"]
+    N45["- HTTP/2 多路复用（单个连接并行请求）"]
+    N46["- Brotli 压缩（比 gzip 压缩率高 15-25%）"]
+    N47["- TLS 终止（边缘节点完成 TLS，源站用 HTTP）"]
+    N48["- 连接复用（HTTP/2 Server Push / Early Hints）"]
+    N49["4. 边缘计算（Edge Computing）:"]
+    N50["Cloudflare Workers / AWS CloudFront Func"]
+    N51["在 CDN 节点执行轻量逻辑（鉴权/重写/AB测试）"]
+    N52["5. DDoS 防护:"]
+    N53["CDN 节点吸收攻击流量 干净流量回源"]
+    N54["Anycast 架构：全球同 IP，攻击被分散"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
 ```
 
 ### 完整代码示例（TS/JS）
@@ -2669,90 +2695,131 @@ WebSocket 是基于 TCP 的全双工通信协议，通过 HTTP Upgrade 握手建
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              HTTP vs WebSocket 建立连接对比                     │
-│                                                                  │
-│  HTTP/1.1 (无状态，请求-响应):                                     │
-│  Client ─── GET / ───> Server                                    │
-│  Client <── 200 OK <── Server (响应后连接关闭)                    │
-│                                                                  │
-│  WebSocket (全双工，持久连接):                                    │
-│  Client ─── HTTP Upgrade 请求 ───> Server                        │
-│  Client <── 101 Switching Protocols <── Server                  │
-│  Client <═══════ 双向帧交换 ═══════> Server                       │
-│  (服务器随时推送，客户端随时发送，无需 HTTP 请求)                   │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              WebSocket 握手过程                                   │
-│                                                                  │
-│  Step 1: HTTP Upgrade 请求（浏览器自动完成）                      │
-│  GET /ws HTTP/1.1                                                │
-│  Host: api.example.com                                          │
-│  Upgrade: websocket         ← 告诉服务器我想升级协议               │
-│  Connection: Upgrade       ← 连接升级                             │
-│  Sec-WebSocket-Version: 13 ← 协议版本                            │
-│  Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ== ← 随机 key          │
-│  Origin: https://example.com   ← 浏览器自动添加                   │
-│                                                                  │
-│  Step 2: 服务器验证并响应                                        │
-│  HTTP/1.1 101 Switching Protocols                               │
-│  Upgrade: websocket                                             │
-│  Connection: Upgrade                                            │
-│  Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=            │
-│  ← 服务器对 Key 做 SHA1 + Base64，验证握手合法性                  │
-│                                                                  │
-│  Step 3: 连接升级完成                                             │
-│  后续所有数据通过 WebSocket 帧传输                                │
-│  不再使用 HTTP                                                   │
-│                                                                  │
-│  Key 验证原理:                                                   │
-│  Client Key = "dGhlIHNhbXBsZSBub25jZQ=="                         │
-│  Server 拼接固定字符串 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"   │
-│  SHA1(Combined) → Base64 = Sec-WebSocket-Accept                 │
-│  防止非浏览器客户端错误地建立 WebSocket 连接                      │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              WebSocket 帧结构（RFC 6455）                        │
-│                                                                  │
-│  0                   1                   2                   3    │
-│  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1  │
-│ +-+-+-+-+-------+-+---------------+-------------------------------+│
-│ |F|R|R|R| opcode|M|     mask      |         payload length        |│
-│ |I|S|S|S|  (4)  |A|     (1)       |             (7/16/64)         |│
-│ |N|V|V|V|       |S|K|             |                               |│
-│ +-+-+-+-+-------+-+---------------+-------------------------------+│
-│ |     payload len (7 bits)       |  extended payload length      ││
-│ +---------------------------------+-------------------------------+│
-│ |                   Masking-Key (if mask bit is 1)                ││
-│ +---------------------------------+-------------------------------+│
-│ |                           Payload Data                           ││
-│ +-----------------------------------------------------------------------------:│
-│                                                                  │
-│  字段详解:                                                         │
-│  FIN (1 bit): 1=消息结束, 0=消息未完（分片消息）                   │
-│  opcode (4 bits):                                                │
-│    0x1 = 文本帧, 0x2 = 二进制帧                                   │
-│    0x8 = Close, 0x9 = Ping, 0xA = Pong                           │
-│    0x0 = 继续帧（接上条分片消息）                                  │
-│  MASK (1 bit): 1=客户端帧（必须掩码）, 0=服务端帧                  │
-│  Masking-Key: 0-4 字节（如果 MASK=1）                            │
-│  payload length: 7/16/64 位可变长度编码                           │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              WebSocket 分片（消息分帧）                          │
-│                                                                  │
-│  大消息分片传输:                                                   │
-│  Client → FIN=0, opcode=0x1, "Hello "     ← 分片 1 (文本)        │
-│  Client → FIN=0, opcode=0x0, "World"      ← 继续帧               │
-│  Client → FIN=1, opcode=0x0, "!"          ← 最后一个分片          │
-│  服务器重组: "Hello World!"                                      │
-│                                                                  │
-│  注意: 只有第一个分片有 opcode，后续都用 opcode=0x0                 │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["HTTP vs WebSocket 建立连接对比"]
+    N1["HTTP/1.1 (无状态，请求-响应):"]
+    N2["Client GET / > Server"]
+    N3["Client < 200 OK < Server (响应后连接关闭)"]
+    N4["WebSocket (全双工，持久连接):"]
+    N5["Client HTTP Upgrade 请求 > Server"]
+    N6["Client < 101 Switching Protocols < Serve"]
+    N7["Client <═══════ 双向帧交换 ═══════> Server"]
+    N8["(服务器随时推送，客户端随时发送，无需 HTTP 请求)"]
+    N9["WebSocket 握手过程"]
+    N10["Step 1: HTTP Upgrade 请求（浏览器自动完成）"]
+    N11["GET /ws HTTP/1.1"]
+    N12["Host: api.example.com"]
+    N13["Upgrade: websocket 告诉服务器我想升级协议"]
+    N14["Connection: Upgrade 连接升级"]
+    N15["Sec-WebSocket-Version: 13 协议版本"]
+    N16["Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZ"]
+    N17["Origin: https://example.com 浏览器自动添加"]
+    N18["Step 2: 服务器验证并响应"]
+    N19["HTTP/1.1 101 Switching Protocols"]
+    N20["Upgrade: websocket"]
+    N21["Connection: Upgrade"]
+    N22["Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzz"]
+    N23["服务器对 Key 做 SHA1 + Base64，验证握手合法性"]
+    N24["Step 3: 连接升级完成"]
+    N25["后续所有数据通过 WebSocket 帧传输"]
+    N26["不再使用 HTTP"]
+    N27["Key 验证原理:"]
+    N28["Client Key = 'dGhlIHNhbXBsZSBub25jZQ=='"]
+    N29["Server 拼接固定字符串 '258EAFA5-E914-47DA-95CA-"]
+    N30["SHA1(Combined) Base64 = Sec-WebSocket-"]
+    N31["防止非浏览器客户端错误地建立 WebSocket 连接"]
+    N32["WebSocket 帧结构（RFC 6455）"]
+    N33["0 1 2 3"]
+    N34["0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9"]
+    N35["+-+-+-+-+-------+-+---------------+-----"]
+    N36["|F|R|R|R| opcode|M| mask | payload lengt"]
+    N37["|I|S|S|S| (4) |A| (1) | (7/16/64) |"]
+    N38["|N|V|V|V| |S|K| | |"]
+    N39["+-+-+-+-+-------+-+---------------+-----"]
+    N40["| payload len (7 bits) | extended payloa"]
+    N41["+---------------------------------+-----"]
+    N42["| Masking-Key (if mask bit is 1)"]
+    N43["+---------------------------------+-----"]
+    N44["| Payload Data"]
+    N45["+---------------------------------------"]
+    N46["字段详解:"]
+    N47["FIN (1 bit): 1=消息结束, 0=消息未完（分片消息）"]
+    N48["opcode (4 bits):"]
+    N49["0x1 = 文本帧, 0x2 = 二进制帧"]
+    N50["0x8 = Close, 0x9 = Ping, 0xA = Pong"]
+    N51["0x0 = 继续帧（接上条分片消息）"]
+    N52["MASK (1 bit): 1=客户端帧（必须掩码）, 0=服务端帧"]
+    N53["Masking-Key: 0-4 字节（如果 MASK=1）"]
+    N54["payload length: 7/16/64 位可变长度编码"]
+    N55["WebSocket 分片（消息分帧）"]
+    N56["大消息分片传输:"]
+    N57["Client FIN=0, opcode=0x1, 'Hello ' 分"]
+    N58["Client FIN=0, opcode=0x0, 'World' 继续"]
+    N59["Client FIN=1, opcode=0x0, '!' 最后一个分片"]
+    N60["服务器重组: 'Hello World!'"]
+    N61["注意: 只有第一个分片有 opcode，后续都用 opcode=0x0"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
+    N54 --> N55
+    N55 --> N56
+    N56 --> N57
+    N57 --> N58
+    N58 --> N59
+    N59 --> N60
+    N60 --> N61
 ```
 
 ### 完整代码示例（TS/JS）
@@ -3029,70 +3096,91 @@ SSE（Server-Sent Events）基于 HTTP 的单向服务端推送，适用于服�
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              SSE vs WebSocket vs 长轮询 时序对比                  │
-│                                                                  │
-│  SSE（服务端 → 客户端单向）:                                      │
-│  Client ── HTTP GET /stream ──> Server                          │
-│  Client <── data: {...}\n\n <────────────── Server (随时推送)    │
-│  Client <── data: {...}\n\n <────────────── Server              │
-│  Client <── event: close\n\n <─────────────── Server (完成)      │
-│                                                                  │
-│  WebSocket（全双工）:                                             │
-│  Client ── HTTP Upgrade ──> Server                              │
-│  Client <═══ 双向帧交换 ═══> Server                              │
-│  (服务器随时推送，客户端随时发送，真正对等通信)                    │
-│                                                                  │
-│  长轮询:                                                         │
-│  Client ── HTTP GET /poll ──> Server  (服务器挂起)               │
-│  Client <── 200 {...data} <─────────────── Server (有新数据)     │
-│  Client ── HTTP GET /poll ──> Server  (立即发起新请求)            │
-│  Client <── 200 timeout <─────────────── Server (无数据，超时)    │
-│  Client ── HTTP GET /poll ──> Server  (立即发起新请求)           │
-│  (不断重复，请求之间有间隙)                                       │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              SSE 事件流格式                                       │
-│                                                                  │
-│  每个事件以双换行符 (\n\n) 分隔:                                  │
-│                                                                  │
-│  event: stock_update\n                                          │
-│  id: 42\n                                                        │
-│  data: {"symbol":"AAPL","price":175.3}\n\n                      │
-│                                                                  │
-│  event: notification\n                                           │
-│  data: You have 3 new messages\n\n                               │
-│                                                                  │
-│  :comment\n              ← 注释（心跳保活）                        │
-│  retry: 5000\n              ← 断线重连间隔(ms)                       │
-│                                                                  │
-│  字段说明:                                                       │
-│  data:     事件数据（最重要，多行 data: 会拼接）                   │
-│  event:    事件类型（自定义，如 stock_update）                    │
-│  id:       事件 ID（浏览器维护 Last-Event-ID，断线后自动发送）    │
-│  retry:    重连间隔（毫秒）                                       │
-│  :comment: 注释行（心跳，可被浏览器忽略）                          │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              SSE vs WebSocket 选型决策树                         │
-│                                                                  │
-│  需要实时通信？                                                   │
-│    │                                                             │
-│    ├─ 只需服务端推送（服务器 → 浏览器）？                         │
-│    │   │                                                         │
-│    │   ├─ 需要兼容 IE / 旧浏览器？ → 长轮询（兼容但低效）          │
-│    │   ├─ 需要 AI/LLM 流式输出？ → SSE（ReadableStream 原生）   │
-│    │   └─ 普通推送（通知、行情）→ SSE（最简单，推荐）              │
-│    │                                                             │
-│    └─ 需要双向通信（浏览器 ↔ 服务器）？                           │
-│        │                                                         │
-│        ├─ 延迟 < 100ms（游戏、实时协作）？ → WebSocket            │
-│        ├─ 消息可靠性要求极高？ → WebSocket + 应用层 ACK           │
-│        └─ 低频交互 + 高并发推送？ → SSE + fetch POST              │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["SSE vs WebSocket vs 长轮询 时序对比"]
+    N1["SSE（服务端 客户端单向）:"]
+    N2["Client HTTP GET /stream > Server"]
+    N3["Client < data: {...}\n\n < Server (随时推送)"]
+    N4["Client < data: {...}\n\n < Server"]
+    N5["Client < event: close\n\n < Server (完成)"]
+    N6["WebSocket（全双工）:"]
+    N7["Client HTTP Upgrade > Server"]
+    N8["Client <═══ 双向帧交换 ═══> Server"]
+    N9["(服务器随时推送，客户端随时发送，真正对等通信)"]
+    N10["长轮询:"]
+    N11["Client HTTP GET /poll > Server (服务器挂起)"]
+    N12["Client < 200 {...data} < Server (有新数据)"]
+    N13["Client HTTP GET /poll > Server (立即发起新请求)"]
+    N14["Client < 200 timeout < Server (无数据，超时)"]
+    N15["Client HTTP GET /poll > Server (立即发起新请求)"]
+    N16["(不断重复，请求之间有间隙)"]
+    N17["SSE 事件流格式"]
+    N18["每个事件以双换行符 (\n\n) 分隔:"]
+    N19["event: stock_update\n"]
+    N20["id: 42\n"]
+    N21["data: {'symbol':'AAPL','price':175.3}\n\"]
+    N22["event: notification\n"]
+    N23["data: You have 3 new messages\n\n"]
+    N24[":comment\n 注释（心跳保活）"]
+    N25["retry: 5000\n 断线重连间隔(ms)"]
+    N26["字段说明:"]
+    N27["data: 事件数据（最重要，多行 data: 会拼接）"]
+    N28["event: 事件类型（自定义，如 stock_update）"]
+    N29["id: 事件 ID（浏览器维护 Last-Event-ID，断线后自动发送）"]
+    N30["retry: 重连间隔（毫秒）"]
+    N31[":comment: 注释行（心跳，可被浏览器忽略）"]
+    N32["SSE vs WebSocket 选型决策树"]
+    N33["需要实时通信？"]
+    N34["只需服务端推送（服务器 浏览器）？"]
+    N35["需要兼容 IE / 旧浏览器？ 长轮询（兼容但低效）"]
+    N36["需要 AI/LLM 流式输出？ SSE（ReadableStream 原生）"]
+    N37["普通推送（通知、行情） SSE（最简单，推荐）"]
+    N38["需要双向通信（浏览器 ↔ 服务器）？"]
+    N39["延迟 < 100ms（游戏、实时协作）？ WebSocket"]
+    N40["消息可靠性要求极高？ WebSocket + 应用层 ACK"]
+    N41["低频交互 + 高并发推送？ SSE + fetch POST"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
 ```
 
 ### 完整代码示例（TS/JS）
@@ -3316,75 +3404,91 @@ RESTful 是基于 HTTP 语义的资源导向架构风格，通过 URL 表示资�
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              RESTful API 风格                                    │
-│                                                                  │
-│  资源: /users, /orders, /products                               │
-│                                                                  │
-│  HTTP 方法 = 操作语义:                                            │
-│  GET    /users      ──> 获取用户列表（查）                       │
-│  GET    /users/123  ──> 获取单个用户（查）                       │
-│  POST   /users      ──> 创建用户（增）                           │
-│  PUT    /users/123 ──> 完整替换用户（改）                        │
-│  PATCH  /users/123 ──> 部分修改用户（改）                        │
-│  DELETE /users/123 ──> 删除用户（删）                            │
-│                                                                  │
-│  REST 响应:                                                      │
-│  GET /users/123 → { "id": 123, "name": "Alice", "email": "...",   │
-│                      "phone": "...", "address": {...}, "orders": [...] }│
-│                                                                  │
-│  问题: 前端只需要 name + email，但拿到了整个对象                  │
-│  → Over-fetching（过度获取）：浪费带宽 + 解析时间                │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              GraphQL API 风格                                    │
-│                                                                  │
-│  单一端点: POST /graphql                                         │
-│                                                                  │
-│  查询（Query）:                                                  │
-│  query {                                                         │
-│    user(id: "123") {          ← 精确指定                         │
-│      name                                                   │
-│      email                                                 │
-│    }                                                            │
-│  }                                                              │
-│                                                                  │
-│  GraphQL 响应（只返回请求的字段）:                                │
-│  {                                                              │
-│    "data": {                                                    │
-│      "user": {                                                  │
-│        "name": "Alice",                                         │
-│        "email": "alice@example.com"                            │
-│      }                                                          │
-│    }                                                            │
-│  }                                                              │
-│                                                                  │
-│  vs REST: 返回整个 user 对象（Over-fetching）                    │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              RESTful 的 N+1 问题 vs GraphQL 解决                  │
-│                                                                  │
-│  RESTful:                                                       │
-│  首页需要: 用户信息 + 朋友列表 + 最新帖子                         │
-│  请求 1: GET /users/123        → 1 次请求                        │
-│  请求 2: GET /users/123/friends → 1 次请求                       │
-│  请求 3: GET /users/123/posts  → 1 次请求                       │
-│  总计: 3 个 HTTP 请求（N+1 问题）                                │
-│                                                                  │
-│  GraphQL:                                                       │
-│  POST /graphql                                                  │
-│  query {                                                         │
-│    user(id: "123") {                                            │
-│      name                                                        │
-│      friends(first: 5) { name avatar }                          │
-│      posts(last: 3) { title content }                           │
-│    }                                                            │
-│  }                                                              │
-│  总计: 1 个请求，服务器内部做 DataLoader（批量查询优化）           │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["RESTful API 风格"]
+    N1["资源: /users, /orders, /products"]
+    N2["HTTP 方法 = 操作语义:"]
+    N3["GET /users > 获取用户列表（查）"]
+    N4["GET /users/123 > 获取单个用户（查）"]
+    N5["POST /users > 创建用户（增）"]
+    N6["PUT /users/123 > 完整替换用户（改）"]
+    N7["PATCH /users/123 > 部分修改用户（改）"]
+    N8["DELETE /users/123 > 删除用户（删）"]
+    N9["REST 响应:"]
+    N10["GET /users/123 { 'id': 123, 'name': 'A"]
+    N11["'phone': '...', 'address': {...}, 'order"]
+    N12["问题: 前端只需要 name + email，但拿到了整个对象"]
+    N13["Over-fetching（过度获取）：浪费带宽 + 解析时间"]
+    N14["GraphQL API 风格"]
+    N15["单一端点: POST /graphql"]
+    N16["查询（Query）:"]
+    N17["query {"]
+    N18["user(id: '123') { 精确指定"]
+    N19["name"]
+    N20["email"]
+    N21["GraphQL 响应（只返回请求的字段）:"]
+    N22["'data': {"]
+    N23["'user': {"]
+    N24["'name': 'Alice',"]
+    N25["'email': 'alice@example.com'"]
+    N26["vs REST: 返回整个 user 对象（Over-fetching）"]
+    N27["RESTful 的 N+1 问题 vs GraphQL 解决"]
+    N28["RESTful:"]
+    N29["首页需要: 用户信息 + 朋友列表 + 最新帖子"]
+    N30["请求 1: GET /users/123 1 次请求"]
+    N31["请求 2: GET /users/123/friends 1 次请求"]
+    N32["请求 3: GET /users/123/posts 1 次请求"]
+    N33["总计: 3 个 HTTP 请求（N+1 问题）"]
+    N34["GraphQL:"]
+    N35["POST /graphql"]
+    N36["query {"]
+    N37["user(id: '123') {"]
+    N38["name"]
+    N39["friends(first: 5) { name avatar }"]
+    N40["posts(last: 3) { title content }"]
+    N41["总计: 1 个请求，服务器内部做 DataLoader（批量查询优化）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
 ```
 
 ### 完整代码示例（TS/JS）
@@ -3605,91 +3709,135 @@ HTTP 状态码是服务器对客户端请求的响应状态，用三位数字表
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              HTTP 状态码全景图                                    │
-│                                                                  │
-│  1xx 信息性（处理中，实验性协议）                                  │
-│  ├── 100 Continue          客户端继续发送（上传大文件前确认）    │
-│  ├── 101 Switching Protocols WebSocket 协议升级                  │
-│  └── 102 Processing        处理中（WebDAV，长操作）             │
-│                                                                  │
-│  2xx 成功                                                        │
-│  ├── 200 OK                 标准成功                            │
-│  ├── 201 Created            资源创建成功（POST/PUT）             │
-│  ├── 202 Accepted           异步任务已接受（处理中）             │
-│  ├── 204 No Content         成功无返回体（DELETE成功）           │
-│  ├── 206 Partial Content    分段下载/断点续传                   │
-│  └── 207 Multi-Status       多状态（WebDAV）                    │
-│                                                                  │
-│  3xx 重定向                                                      │
-│  ├── 301 Moved Permanently  永久重定向（SEO，浏览器缓存）         │
-│  ├── 302 Found              临时重定向（保持原方法，但不可靠）    │
-│  ├── 303 See Other          临时重定向（强制变 GET）             │
-│  ├── 304 Not Modified       协商缓存命中（不返回 body）          │
-│  ├── 307 Temporary Redirect 临时重定向（严格保持原方法）         │
-│  └── 308 Permanent Redirect 永久重定向（严格保持原方法）         │
-│                                                                  │
-│  4xx 客户端错误                                                  │
-│  ├── 400 Bad Request        请求格式错误（参数/语法错误）        │
-│  ├── 401 Unauthorized       未认证（需要登录）                   │
-│  ├── 403 Forbidden          已认证但无权限                       │
-│  ├── 404 Not Found          资源不存在                          │
-│  ├── 405 Method Not Allowed HTTP 方法不支持                      │
-│  ├── 408 Request Timeout    请求超时                            │
-│  ├── 409 Conflict           资源冲突（版本冲突/重复唯一键）      │
-│  ├── 410 Gone               资源永久删除（比 404 更明确）        │
-│  ├── 413 Payload Too Large  请求体过大                          │
-│  ├── 414 URI Too Long       URL 过长（GET 参数过多）             │
-│  ├── 415 Unsupported Media  Content-Type 不支持                 │
-│  ├── 422 Unprocessable Entity 请求格式正确但语义错误              │
-│  ├── 429 Too Many Requests  频率限制（Rate Limiting）           │
-│  └── 499 Client Closed Request 客户端主动关闭（nginx 扩展码）     │
-│                                                                  │
-│  5xx 服务端错误                                                  │
-│  ├── 500 Internal Server Error 一般性服务器错误（未处理异常）     │
-│  ├── 501 Not Implemented    功能未实现                          │
-│  ├── 502 Bad Gateway        上游服务器错误响应（网关/代理）      │
-│  ├── 503 Service Unavailable服务不可用（过载/维护）              │
-│  ├── 504 Gateway Timeout    上游服务器超时（网关/代理）          │
-│  └── 599 Origin Connect Timeout 源站连接超时（CDN 特有）         │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              502 vs 504 的本质区别                               │
-│                                                                  │
-│  502 Bad Gateway:                                              │
-│  网关/代理 收到了上游服务器的响应，但响应是错误的                  │
-│  （例如: upstream 返回 500 / 503 / 非 HTTP 响应）                 │
-│                                                                  │
-│  504 Gateway Timeout:                                           │
-│  网关/代理 等了很久没收到上游服务器的响应（超时）                  │
-│  （例如: upstream 处理太慢 / 完全无响应）                         │
-│                                                                  │
-│  常见场景:                                                       │
-│  CDN 回源 → 源站 502 → 源站崩溃/返回错误页面                      │
-│  nginx 反向代理 → 后端服务 504 → 后端服务超时/无响应              │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              304 Not Modified 原理                              │
-│                                                                  │
-│  首次请求:                                                       │
-│  Client ── GET /style.css ──> Server                            │
-│  Client <── 200 OK, ETag: "abc123" <──────── Server              │
-│  Client 保存 ETag: "abc123"                                      │
-│                                                                  │
-│  后续请求（带协商）:                                              │
-│  Client ── GET /style.css ─────────────────────────────────────>│
-│  If-None-Match: "abc123"  ────────────────────────────────────────│
-│                                                                  │
-│  Server 发现 ETag 匹配:                                          │
-│  Client <── 304 Not Modified (无 body) <──────────────────────────│
-│  Client 继续使用本地缓存                                          │
-│                                                                  │
-│  节省: 整个响应 body 的传输（通常几百 KB）                        │
-│  304 响应只有 HTTP 头（约 200 字节）                               │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["HTTP 状态码全景图"]
+    N1["1xx 信息性（处理中，实验性协议）"]
+    N2["100 Continue 客户端继续发送（上传大文件前确认）"]
+    N3["101 Switching Protocols WebSocket 协议升级"]
+    N4["102 Processing 处理中（WebDAV，长操作）"]
+    N5["2xx 成功"]
+    N6["200 OK 标准成功"]
+    N7["201 Created 资源创建成功（POST/PUT）"]
+    N8["202 Accepted 异步任务已接受（处理中）"]
+    N9["204 No Content 成功无返回体（DELETE成功）"]
+    N10["206 Partial Content 分段下载/断点续传"]
+    N11["207 Multi-Status 多状态（WebDAV）"]
+    N12["3xx 重定向"]
+    N13["301 Moved Permanently 永久重定向（SEO，浏览器缓存）"]
+    N14["302 Found 临时重定向（保持原方法，但不可靠）"]
+    N15["303 See Other 临时重定向（强制变 GET）"]
+    N16["304 Not Modified 协商缓存命中（不返回 body）"]
+    N17["307 Temporary Redirect 临时重定向（严格保持原方法）"]
+    N18["308 Permanent Redirect 永久重定向（严格保持原方法）"]
+    N19["4xx 客户端错误"]
+    N20["400 Bad Request 请求格式错误（参数/语法错误）"]
+    N21["401 Unauthorized 未认证（需要登录）"]
+    N22["403 Forbidden 已认证但无权限"]
+    N23["404 Not Found 资源不存在"]
+    N24["405 Method Not Allowed HTTP 方法不支持"]
+    N25["408 Request Timeout 请求超时"]
+    N26["409 Conflict 资源冲突（版本冲突/重复唯一键）"]
+    N27["410 Gone 资源永久删除（比 404 更明确）"]
+    N28["413 Payload Too Large 请求体过大"]
+    N29["414 URI Too Long URL 过长（GET 参数过多）"]
+    N30["415 Unsupported Media Content-Type 不支持"]
+    N31["422 Unprocessable Entity 请求格式正确但语义错误"]
+    N32["429 Too Many Requests 频率限制（Rate Limiting"]
+    N33["499 Client Closed Request 客户端主动关闭（nginx"]
+    N34["5xx 服务端错误"]
+    N35["500 Internal Server Error 一般性服务器错误（未处理异常"]
+    N36["501 Not Implemented 功能未实现"]
+    N37["502 Bad Gateway 上游服务器错误响应（网关/代理）"]
+    N38["503 Service Unavailable服务不可用（过载/维护）"]
+    N39["504 Gateway Timeout 上游服务器超时（网关/代理）"]
+    N40["599 Origin Connect Timeout 源站连接超时（CDN 特有"]
+    N41["502 vs 504 的本质区别"]
+    N42["502 Bad Gateway:"]
+    N43["网关/代理 收到了上游服务器的响应，但响应是错误的"]
+    N44["（例如: upstream 返回 500 / 503 / 非 HTTP 响应）"]
+    N45["504 Gateway Timeout:"]
+    N46["网关/代理 等了很久没收到上游服务器的响应（超时）"]
+    N47["（例如: upstream 处理太慢 / 完全无响应）"]
+    N48["常见场景:"]
+    N49["CDN 回源 源站 502 源站崩溃/返回错误页面"]
+    N50["nginx 反向代理 后端服务 504 后端服务超时/无响应"]
+    N51["304 Not Modified 原理"]
+    N52["首次请求:"]
+    N53["Client GET /style.css > Server"]
+    N54["Client < 200 OK, ETag: 'abc123' < Server"]
+    N55["Client 保存 ETag: 'abc123'"]
+    N56["后续请求（带协商）:"]
+    N57["Client GET /style.css >"]
+    N58["If-None-Match: 'abc123'"]
+    N59["Server 发现 ETag 匹配:"]
+    N60["Client < 304 Not Modified (无 body) <"]
+    N61["Client 继续使用本地缓存"]
+    N62["节省: 整个响应 body 的传输（通常几百 KB）"]
+    N63["304 响应只有 HTTP 头（约 200 字节）"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
+    N54 --> N55
+    N55 --> N56
+    N56 --> N57
+    N57 --> N58
+    N58 --> N59
+    N59 --> N60
+    N60 --> N61
+    N61 --> N62
+    N62 --> N63
 ```
 
 ### 完整代码示例（TS/JS）
@@ -3888,81 +4036,95 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              HTTP 重定向状态码完整对比                           │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    永久重定向（Permanent）               │    │
-│  │                                                         │    │
-│  │  301 Moved Permanently                                   │    │
-│  │  ┌───────────────────────────────────────────────────┐  │    │
-│  │  │ 方法: ⚠️ 不保证（浏览器可能改 POST → GET）         │  │    │
-│  │  │ Body: 通常保留（不可靠）                          │  │    │
-│  │  │ 兼容: 旧浏览器兼容性最好                          │  │    │
-│  │  │ 用途: 旧系统兼容（不知道 308）                    │  │    │
-│  │  └───────────────────────────────────────────────────┘  │    │
-│  │                                                         │    │
-│  │  308 Permanent Redirect                                  │    │
-│  │  ┌───────────────────────────────────────────────────┐  │    │
-│  │  │ 方法: ✅ 严格保持（POST/PUT 不变）                  │  │    │
-│  │  │ Body: ✅ 保留                                    │  │    │
-│  │  │ 兼容: 现代浏览器（2015 RFC 7538）                 │  │    │
-│  │  │ 用途: API 版本迁移，永久重定向 + 方法不变         │  │    │
-│  │  └───────────────────────────────────────────────────┘  │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    临时重定向（Temporary）               │    │
-│  │                                                         │    │
-│  │  302 Found (= 302 Moved Temporarily，历史上叫 Moved Temporarily）│    │
-│  │  ┌───────────────────────────────────────────────────┐  │    │
-│  │  │ 方法: ⚠️ 不保证（浏览器可能改 POST → GET）         │  │    │
-│  │  │ Body: 通常保留（不可靠）                          │  │    │
-│  │  │ 兼容: 旧浏览器兼容性最好                          │  │    │
-│  │  │ 用途: 临时维护页面（知道 307 后，应避免）         │  │    │
-│  │  └───────────────────────────────────────────────────┘  │    │
-│  │                                                         │    │
-│  │  303 See Other                                          │    │
-│  │  ┌───────────────────────────────────────────────────┐  │    │
-│  │  │ 方法: ❌ 强制变为 GET（即使原请求是 POST/PUT）     │  │    │
-│  │  │ Body: ❌ 丢弃                                    │  │    │
-│  │  │ 兼容: 现代浏览器                                 │  │    │
-│  │  │ 用途: POST 处理后重定向到结果页（302→303）       │  │    │
-│  │  └───────────────────────────────────────────────────┘  │    │
-│  │                                                         │    │
-│  │  307 Temporary Redirect                                 │    │
-│  │  ┌───────────────────────────────────────────────────┐  │    │
-│  │  │ 方法: ✅ 严格保持（POST/PUT 不变，body 保留）      │  │    │
-│  │  │ Body: ✅ 保留（客户端必须重新发送相同 body）       │  │    │
-│  │  │ 兼容: 现代浏览器                                 │  │    │
-│  │  │ 用途: 临时重定向，保持 HTTP 方法不变              │  │    │
-│  │  │ 特殊: 不允许自动重定向（浏览器必须问用户）        │  │    │
-│  │  └───────────────────────────────────────────────────┘  │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              重定向的实际选择指南                                 │
-│                                                                  │
-│  永久重定向（资源永久移走）:                                       │
-│  → 使用 308（标准）                                              │
-│  → 兼容旧浏览器时才用 301                                        │
-│  → 场景: 域名迁移、API 版本 v1→v2、URL 结构重写                   │
-│                                                                  │
-│  临时重定向（资源暂时在别处）:                                     │
-│  → 使用 307（标准）                                              │
-│  → 兼容旧浏览器时才用 302                                        │
-│  → 场景: 负载均衡、灰度发布、AB测试                               │
-│                                                                  │
-│  POST 处理后重定向:                                              │
-│  → 必须用 303（强制 GET，防止重复提交）                           │
-│  → 场景: 表单提交后重定向到结果页                                  │
-│                                                                  │
-│  常见错误:                                                       │
-│  ❌ POST 后用 302 → 浏览器可能重试 GET → 错误                    │
-│  ✅ POST 后用 303 → 浏览器改为 GET → 正确                         │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["HTTP 重定向状态码完整对比"]
+    N1["永久重定向（Permanent）"]
+    N2["301 Moved Permanently"]
+    N3["方法: ⚠️ 不保证（浏览器可能改 POST GET）"]
+    N4["Body: 通常保留（不可靠）"]
+    N5["兼容: 旧浏览器兼容性最好"]
+    N6["用途: 旧系统兼容（不知道 308）"]
+    N7["308 Permanent Redirect"]
+    N8["方法: ✅ 严格保持（POST/PUT 不变）"]
+    N9["Body: ✅ 保留"]
+    N10["兼容: 现代浏览器（2015 RFC 7538）"]
+    N11["用途: API 版本迁移，永久重定向 + 方法不变"]
+    N12["临时重定向（Temporary）"]
+    N13["302 Found (= 302 Moved Temporarily，历史上叫"]
+    N14["方法: ⚠️ 不保证（浏览器可能改 POST GET）"]
+    N15["Body: 通常保留（不可靠）"]
+    N16["兼容: 旧浏览器兼容性最好"]
+    N17["用途: 临时维护页面（知道 307 后，应避免）"]
+    N18["303 See Other"]
+    N19["方法: ❌ 强制变为 GET（即使原请求是 POST/PUT）"]
+    N20["Body: ❌ 丢弃"]
+    N21["兼容: 现代浏览器"]
+    N22["用途: POST 处理后重定向到结果页（302 303）"]
+    N23["307 Temporary Redirect"]
+    N24["方法: ✅ 严格保持（POST/PUT 不变，body 保留）"]
+    N25["Body: ✅ 保留（客户端必须重新发送相同 body）"]
+    N26["兼容: 现代浏览器"]
+    N27["用途: 临时重定向，保持 HTTP 方法不变"]
+    N28["特殊: 不允许自动重定向（浏览器必须问用户）"]
+    N29["重定向的实际选择指南"]
+    N30["永久重定向（资源永久移走）:"]
+    N31["使用 308（标准）"]
+    N32["兼容旧浏览器时才用 301"]
+    N33["场景: 域名迁移、API 版本 v1 v2、URL 结构重写"]
+    N34["临时重定向（资源暂时在别处）:"]
+    N35["使用 307（标准）"]
+    N36["兼容旧浏览器时才用 302"]
+    N37["场景: 负载均衡、灰度发布、AB测试"]
+    N38["POST 处理后重定向:"]
+    N39["必须用 303（强制 GET，防止重复提交）"]
+    N40["场景: 表单提交后重定向到结果页"]
+    N41["常见错误:"]
+    N42["❌ POST 后用 302 浏览器可能重试 GET 错误"]
+    N43["✅ POST 后用 303 浏览器改为 GET 正确"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
 ```
 
 ### 完整代码示例（TS/JS）
@@ -4122,70 +4284,93 @@ export async function POST(request: Request) {
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              HTTP 方法幂等性全景                                 │
-│                                                                  │
-│  幂等方法（Idempotent）: 一次和多次执行效果相同                   │
-│  ├── GET    ── 读资源 ── 幂等 ✓                                 │
-│  ├── HEAD   ── 读元数据 ── 幂等 ✓                                │
-│  ├── PUT    ── 完整替换 ── 幂等 ✓                                │
-│  ├── DELETE ── 删除资源 ── 幂等 ✓（重复删除 = 状态不变）          │
-│  └── TRACE  ── 回环检测 ── 幂等 ✓                                │
-│                                                                  │
-│  非幂等方法:                                                     │
-│  ├── POST   ── 创建/处理 ── 非幂等 ✗（每次都新建资源）           │
-│  └── PATCH  ── 部分修改 ── 非幂等 ✗（除非实现幂等）              │
-│                                                                  │
-│  安全方法（Safe）: 不修改服务器资源                               │
-│  ├── GET / HEAD / OPTIONS / TRACE ── 安全 ✓                     │
-│  └── POST / PUT / DELETE / PATCH ── 不安全 ✗                     │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │              幂等性示例                                  │    │
-│  │                                                         │    │
-│  │  PUT /users/123                                        │    │
-│  │  Body: { "name": "Alice" }                             │    │
-│  │                                                         │    │
-│  │  第1次执行: name = "Alice"                              │    │
-│  │  第2次执行: name = "Alice" (没有变化)                    │    │
-│  │  第3次执行: name = "Alice" (仍然没变化)                  │    │
-│  │  → 幂等！                                               │    │
-│  │                                                         │    │
-│  │  POST /users                                           │    │
-│  │  Body: { "name": "Alice" }                             │    │
-│  │                                                         │    │
-│  │  第1次执行: 创建 user #1，name=Alice                    │    │
-│  │  第2次执行: 创建 user #2，name=Alice                    │    │
-│  │  第3次执行: 创建 user #3，name=Alice                    │    │
-│  │  → 非幂等！多次执行 ≠ 一次执行                          │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              PUT vs PATCH 的区别                                 │
-│                                                                  │
-│  PUT /users/123                                                 │
-│  Body: { "name": "Alice", "email": "alice@example.com" }        │
-│                                                                  │
-│  语义: 完整替换资源                                              │
-│  第1次: user #123 = { name:"Alice", email:"alice@example.com" }│
-│  第2次: user #123 = { name:"Alice", email:"alice@example.com" }│
-│  → 即使只有 name 字段，也传入所有字段（否则其他字段被清空）       │
-│                                                                  │
-│  PATCH /users/123                                               │
-│  Body: { "email": "new@example.com" }                          │
-│                                                                  │
-│  语义: 部分修改字段                                              │
-│  第1次: user #123.email = "new@example.com"                     │
-│  第2次: user #123.email = "new@example.com" (无变化)             │
-│  → 只传需要修改的字段（其他字段保持不变）                         │
-│                                                                  │
-│  注意: PATCH 天然非幂等                                          │
-│  但可以通过实现变为幂等：                                         │
-│  PATCH + 条件判断（如版本号/ETag）                               │
-│  → 第2次执行时，如果版本已更新，拒绝修改                          │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["HTTP 方法幂等性全景"]
+    N1["幂等方法（Idempotent）: 一次和多次执行效果相同"]
+    N2["GET 读资源 幂等 ✓"]
+    N3["HEAD 读元数据 幂等 ✓"]
+    N4["PUT 完整替换 幂等 ✓"]
+    N5["DELETE 删除资源 幂等 ✓（重复删除 = 状态不变）"]
+    N6["TRACE 回环检测 幂等 ✓"]
+    N7["非幂等方法:"]
+    N8["POST 创建/处理 非幂等 ✗（每次都新建资源）"]
+    N9["PATCH 部分修改 非幂等 ✗（除非实现幂等）"]
+    N10["安全方法（Safe）: 不修改服务器资源"]
+    N11["GET / HEAD / OPTIONS / TRACE 安全 ✓"]
+    N12["POST / PUT / DELETE / PATCH 不安全 ✗"]
+    N13["幂等性示例"]
+    N14["PUT /users/123"]
+    N15["Body: { 'name': 'Alice' }"]
+    N16["第1次执行: name = 'Alice'"]
+    N17["第2次执行: name = 'Alice' (没有变化)"]
+    N18["第3次执行: name = 'Alice' (仍然没变化)"]
+    N19["幂等！"]
+    N20["POST /users"]
+    N21["Body: { 'name': 'Alice' }"]
+    N22["第1次执行: 创建 user"]
+    N23["第2次执行: 创建 user"]
+    N24["第3次执行: 创建 user"]
+    N25["非幂等！多次执行 ≠ 一次执行"]
+    N26["PUT vs PATCH 的区别"]
+    N27["PUT /users/123"]
+    N28["Body: { 'name': 'Alice', 'email': 'alice"]
+    N29["语义: 完整替换资源"]
+    N30["第1次: user"]
+    N31["第2次: user"]
+    N32["即使只有 name 字段，也传入所有字段（否则其他字段被清空）"]
+    N33["PATCH /users/123"]
+    N34["Body: { 'email': 'new@example.com' }"]
+    N35["语义: 部分修改字段"]
+    N36["第1次: user"]
+    N37["第2次: user"]
+    N38["只传需要修改的字段（其他字段保持不变）"]
+    N39["注意: PATCH 天然非幂等"]
+    N40["但可以通过实现变为幂等："]
+    N41["PATCH + 条件判断（如版本号/ETag）"]
+    N42["第2次执行时，如果版本已更新，拒绝修改"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
 ```
 
 ### 完整代码示例（TS/JS）
@@ -4369,98 +4554,157 @@ OAuth2 是一个授权框架，允许第三方应用在用户授权下访问其�
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              OAuth2 四种授权模式                                  │
-│                                                                  │
-│  1. Authorization Code（授权码模式，最安全，推荐）                │
-│     适用于：有后端服务器的 Web 应用                               │
-│                                                                  │
-│  2. PKCE Authorization Code（Auth Code + 动态密钥，推荐移动端）   │
-│     适用于：无后端的单页应用（SPA）/ 移动 App                      │
-│                                                                  │
-│  3. Client Credentials（客户端凭证）                            │
-│     适用于：服务端之间通信（无用户参与）                           │
-│                                                                  │
-│  4. Implicit（隐式，已废弃，不推荐）                              │
-│     问题: token 在 URL 中暴露，无 refresh token                   │
-│                                                                  │
-│  5. Resource Owner Password Credentials（密码模式，极少使用）     │
-│     问题: 第三方获取用户密码，不推荐                              │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              OAuth2 Authorization Code 完整流程                  │
-│                                                                  │
-│  用户 ── 点击"用 Google 登录" ──>                                │
-│                                                                  │
-│  Step 1: 浏览器重定向到授权服务器                                 │
-│  GET https://accounts.google.com/o/oauth2/v2/auth?               │
-│    client_id=YOUR_CLIENT_ID                                      │
-│    &redirect_uri=https://your-app.com/callback                   │
-│    &response_type=code                                           │
-│    &scope=openid%20profile%20email                               │
-│    &state=RANDOM_STATE                                           │
-│    &code_challenge=PKCE_CODE_CHALLENGE                           │
-│    &code_challenge_method=S256                                   │
-│                                                                  │
-│  Step 2: 用户在 Google 登录并授权（浏览器与授权服务器之间）        │
-│  （your-app 服务器不接触用户名/密码）                             │
-│                                                                  │
-│  Step 3: 授权服务器重定向回 your-app                             │
-│  GET https://your-app.com/callback?                              │
-│    code=AUTH_CODE        ← 一次性授权码（有效期短，约 60 秒）     │
-│    &state=RANDOM_STATE   ← 验证防 CSRF                          │
-│                                                                  │
-│  Step 4: your-app 后端用 code 换 token（服务端对服务端）          │
-│  POST https://oauth2.googleapis.com/token                       │
-│  Content-Type: application/x-www-form-urlencoded                 │
-│                                                                  │
-│  grant_type=authorization_code                                    │
-│  &code=AUTH_CODE                                                 │
-│  &client_id=YOUR_CLIENT_ID                                       │
-│  &client_secret=YOUR_CLIENT_SECRET      ← 后端持有，不泄露       │
-│  &redirect_uri=https://your-app.com/callback                    │
-│  &code_verifier=PKCE_CODE_VERIFIER       ← 验证 PKCE             │
-│                                                                  │
-│  Step 5: 授权服务器返回 token                                    │
-│  {                                                              │
-│    "access_token": "ya29.xxx",          ← 访问令牌（1小时）      │
-│    "refresh_token": "1//xxx",           ← 刷新令牌（长期有效）   │
-│    "expires_in": 3600,                                        │
-│    "token_type": "Bearer"                                      │
-│  }                                                              │
-│                                                                  │
-│  Step 6: your-app 用 access_token 访问 Google API                 │
-│  GET https://www.googleapis.com/oauth2/v3/userinfo              │
-│  Authorization: Bearer ya29.xxx                                  │
-│                                                                  │
-│  Step 7: 用户信息返回                                            │
-│  { "sub": "...", "name": "Alice", "email": "alice@example.com" }│
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              JWT vs Session（Token 认证对比）                    │
-│                                                                  │
-│  JWT (Stateless Token):                                          │
-│  服务器不存储 Token，只验证签名                                   │
-│  Token 包含用户信息和签名，由客户端存储                           │
-│                                                                  │
-│  Session (Stateful):                                              │
-│  服务器存储会话数据，客户端持有 Session ID                       │
-│  每次请求携带 Session ID，服务器查表获取用户信息                  │
-│                                                                  │
-│  ┌────────────────┬────────────────┬────────────────┐           │
-│  │ 特性           │ JWT            │ Session        │           │
-│  ├────────────────┼────────────────┼────────────────┤           │
-│  │ 存储位置       │ 客户端(Token)  │ 服务器(Redis)   │           │
-│  │ 扩展性         │ 好（无状态）  │ 需 Session 共享 │           │
-│  │ 撤销           │ 困难（需黑名单）│ 简单（删除表项）│           │
-│  │ 安全性         │ ⚠️ token 泄露  │ ✅ 可立即撤销  │           │
-│  │ 体积           │ 大（自包含）  │ 小（仅 ID）   │           │
-│  │ 过期控制       │ 精准（内嵌）  │ 服务端控制    │           │
-│  └────────────────┴────────────────┴────────────────┘           │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["OAuth2 四种授权模式"]
+    N1["1. Authorization Code（授权码模式，最安全，推荐）"]
+    N2["适用于：有后端服务器的 Web 应用"]
+    N3["2. PKCE Authorization Code（Auth Code + 动"]
+    N4["适用于：无后端的单页应用（SPA）/ 移动 App"]
+    N5["3. Client Credentials（客户端凭证）"]
+    N6["适用于：服务端之间通信（无用户参与）"]
+    N7["4. Implicit（隐式，已废弃，不推荐）"]
+    N8["问题: token 在 URL 中暴露，无 refresh token"]
+    N9["5. Resource Owner Password Credentials（密"]
+    N10["问题: 第三方获取用户密码，不推荐"]
+    N11["OAuth2 Authorization Code 完整流程"]
+    N12["用户 点击'用 Google 登录' >"]
+    N13["Step 1: 浏览器重定向到授权服务器"]
+    N14["GET https://accounts.google.com/o/oauth2"]
+    N15["client_id=YOUR_CLIENT_ID"]
+    N16["&redirect_uri=https://your-app.com/callb"]
+    N17["&response_type=code"]
+    N18["&scope=openid%20profile%20email"]
+    N19["&state=RANDOM_STATE"]
+    N20["&code_challenge=PKCE_CODE_CHALLENGE"]
+    N21["&code_challenge_method=S256"]
+    N22["Step 2: 用户在 Google 登录并授权（浏览器与授权服务器之间）"]
+    N23["（your-app 服务器不接触用户名/密码）"]
+    N24["Step 3: 授权服务器重定向回 your-app"]
+    N25["GET https://your-app.com/callback?"]
+    N26["code=AUTH_CODE 一次性授权码（有效期短，约 60 秒）"]
+    N27["&state=RANDOM_STATE 验证防 CSRF"]
+    N28["Step 4: your-app 后端用 code 换 token（服务端对服务"]
+    N29["POST https://oauth2.googleapis.com/token"]
+    N30["Content-Type: application/x-www-form-url"]
+    N31["grant_type=authorization_code"]
+    N32["&code=AUTH_CODE"]
+    N33["&client_id=YOUR_CLIENT_ID"]
+    N34["&client_secret=YOUR_CLIENT_SECRET 后端持有"]
+    N35["&redirect_uri=https://your-app.com/callb"]
+    N36["&code_verifier=PKCE_CODE_VERIFIER 验证 P"]
+    N37["Step 5: 授权服务器返回 token"]
+    N38["'access_token': 'ya29.xxx', 访问令牌（1小时）"]
+    N39["'refresh_token': '1//xxx', 刷新令牌（长期有效）"]
+    N40["'expires_in': 3600,"]
+    N41["'token_type': 'Bearer'"]
+    N42["Step 6: your-app 用 access_token 访问 Googl"]
+    N43["GET https://www.googleapis.com/oauth2/v3"]
+    N44["Authorization: Bearer ya29.xxx"]
+    N45["Step 7: 用户信息返回"]
+    N46["{ 'sub': '...', 'name': 'Alice', 'email'"]
+    N47["JWT vs Session（Token 认证对比）"]
+    N48["JWT (Stateless Token):"]
+    N49["服务器不存储 Token，只验证签名"]
+    N50["Token 包含用户信息和签名，由客户端存储"]
+    N51["Session (Stateful):"]
+    N52["服务器存储会话数据，客户端持有 Session ID"]
+    N53["每次请求携带 Session ID，服务器查表获取用户信息"]
+    N54["特性"]
+    N55["JWT"]
+    N56["Session"]
+    N57["存储位置"]
+    N58["客户端(Token)"]
+    N59["服务器(Redis)"]
+    N60["扩展性"]
+    N61["好（无状态）"]
+    N62["需 Session 共享"]
+    N63["撤销"]
+    N64["困难（需黑名单）"]
+    N65["简单（删除表项）"]
+    N66["安全性"]
+    N67["⚠️ token 泄露"]
+    N68["✅ 可立即撤销"]
+    N69["体积"]
+    N70["大（自包含）"]
+    N71["小（仅 ID）"]
+    N72["过期控制"]
+    N73["精准（内嵌）"]
+    N74["服务端控制"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
+    N54 --> N55
+    N55 --> N56
+    N56 --> N57
+    N57 --> N58
+    N58 --> N59
+    N59 --> N60
+    N60 --> N61
+    N61 --> N62
+    N62 --> N63
+    N63 --> N64
+    N64 --> N65
+    N65 --> N66
+    N66 --> N67
+    N67 --> N68
+    N68 --> N69
+    N69 --> N70
+    N70 --> N71
+    N71 --> N72
+    N72 --> N73
+    N73 --> N74
 ```
 
 ### 完整代码示例（TS/JS）
@@ -4709,102 +4953,139 @@ CORS（Cross-Origin Resource Sharing）是浏览器安全机制，允许服务�
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              同源策略（Same-Origin Policy）                      │
-│                                                                  │
-│  同源 = 协议 + 域名 + 端口 三者完全相同                          │
-│                                                                  │
-│  https://a.example.com:443                                      │
-│  vs https://a.example.com:443    → 同源 ✓                       │
-│  vs https://b.example.com:443    → 不同源（域名不同）            │
-│  vs http://a.example.com:443     → 不同源（协议不同）            │
-│  vs https://a.example.com:8080  → 不同源（端口不同）            │
-│                                                                  │
-│  SOP 限制:                                                       │
-│  ✗ Fetch/XHR 跨域请求 → 被浏览器拦截                            │
-│  ✗ Cookie / LocalStorage 跨域访问                               │
-│  ✗ DOM 跨域读写                                                  │
-│  ✗ iframe 跨域内容访问                                           │
-│                                                                  │
-│  SOP 不限制:                                                     │
-│  ✓ <script src> ── 可跨域加载 JS（JSONP 的原理）                 │
-│  ✓ <link href> ── 可跨域加载 CSS                                │
-│  ✓ <img src> ─── 可跨域加载图片                                 │
-│  ✓ @font-face ── 可跨域加载字体                                 │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              简单请求 vs 复杂请求                                │
-│                                                                  │
-│  简单请求（同时满足全部条件）:                                    │
-│  ✅ 方法: GET / HEAD / POST                                     │
-│  ✅ Header: 只能是简单 Header 或 自定义安全 Header                │
-│     - Accept, Accept-Language, Content-Language                 │
-│     - Content-Type 只能是:                                      │
-│       • application/x-www-form-urlencoded                       │
-│       • multipart/form-data                                      │
-│       • text/plain                                              │
-│                                                                  │
-│  复杂请求（满足任一条件）:                                        │
-│  ❌ PUT / DELETE / PATCH 方法                                    │
-│  ❌ 非简单 Header (Authorization, Content-Type 不是简单值)      │
-│  ❌ Content-Type 不是简单值（如 application/json）              │
-│  ❌ 请求发送 Cookie（credentials: include）                      │
-│                                                                  │
-│  → 复杂请求 需要预检（Preflight）                                 │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              预检请求（Preflight）完整流程                       │
-│                                                                  │
-│  浏览器 ── OPTIONS /api/data ─────────────────────────────────> │
-│  Origin: https://example.com ─────────────────────────────────> │
-│  Access-Control-Request-Method: PUT ───────────────────────────>│
-│  Access-Control-Request-Headers: Content-Type, Authorization ─>│
-│                                                               │
-│  服务器响应:                                                    │
-│  <── Access-Control-Allow-Origin: https://example.com ─────────│
-│  <── Access-Control-Allow-Methods: GET, POST, PUT, DELETE ────│
-│  <── Access-Control-Allow-Headers: Content-Type, Authorization │
-│  <── Access-Control-Max-Age: 86400    ← 预检结果缓存 24 小时    │
-│                                                               │
-│  浏览器检查: 预检通过？                                         │
-│  ├─ 是 → 发送真实 PUT 请求                                      │
-│  └─ 否 → 抛出 CORS 错误                                         │
-│                                                               │
-│  真实 PUT 请求:                                                │
-│  ── PUT /api/data ───────────────────────────────────────────>│
-│  Origin: https://example.com                                  │
-│  Authorization: Bearer xxx                                     │
-│  Content-Type: application/json                               │
-│                                                               │
-│  服务器响应:                                                   │
-│  <── Access-Control-Allow-Origin: https://example.com          │
-│  <── 200 OK, { "data": ... }                                   │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              CORS 关键响应头详解                                 │
-│                                                                  │
-│  Access-Control-Allow-Origin: * | https://example.com          │
-│  ← 允许的来源，* 表示允许所有（credentials:include 时不能用 *） │
-│                                                                  │
-│  Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS │
-│  ← 允许的 HTTP 方法                                             │
-│                                                                  │
-│  Access-Control-Allow-Headers: Content-Type, Authorization     │
-│  ← 允许的请求头                                                  │
-│                                                                  │
-│  Access-Control-Allow-Credentials: true                        │
-│  ← 是否允许携带 Cookie（此时 Allow-Origin 不能是 *）            │
-│                                                                  │
-│  Access-Control-Expose-Headers: X-Request-ID, X-Custom-Header  │
-│  ← 哪些响应头可以被 JS 读取（默认只有 7 个简单响应头）            │
-│                                                                  │
-│  Access-Control-Max-Age: 86400                                  │
-│  ← 预检结果缓存时间（秒），减少预检请求                          │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["同源策略（Same-Origin Policy）"]
+    N1["同源 = 协议 + 域名 + 端口 三者完全相同"]
+    N2["https://a.example.com:443"]
+    N3["vs https://a.example.com:443 同源 ✓"]
+    N4["vs https://b.example.com:443 不同源（域名不同）"]
+    N5["vs http://a.example.com:443 不同源（协议不同）"]
+    N6["vs https://a.example.com:8080 不同源（端口不同"]
+    N7["SOP 限制:"]
+    N8["✗ Fetch/XHR 跨域请求 被浏览器拦截"]
+    N9["✗ Cookie / LocalStorage 跨域访问"]
+    N10["✗ DOM 跨域读写"]
+    N11["✗ iframe 跨域内容访问"]
+    N12["SOP 不限制:"]
+    N13["✓ <script src> 可跨域加载 JS（JSONP 的原理）"]
+    N14["✓ <link href> 可跨域加载 CSS"]
+    N15["✓ <img src> 可跨域加载图片"]
+    N16["✓ @font-face 可跨域加载字体"]
+    N17["简单请求 vs 复杂请求"]
+    N18["简单请求（同时满足全部条件）:"]
+    N19["✅ 方法: GET / HEAD / POST"]
+    N20["✅ Header: 只能是简单 Header 或 自定义安全 Header"]
+    N21["- Accept, Accept-Language, Content-Langu"]
+    N22["- Content-Type 只能是:"]
+    N23["• application/x-www-form-urlencoded"]
+    N24["• multipart/form-data"]
+    N25["• text/plain"]
+    N26["复杂请求（满足任一条件）:"]
+    N27["❌ PUT / DELETE / PATCH 方法"]
+    N28["❌ 非简单 Header (Authorization, Content-Typ"]
+    N29["❌ Content-Type 不是简单值（如 application/json）"]
+    N30["❌ 请求发送 Cookie（credentials: include）"]
+    N31["复杂请求 需要预检（Preflight）"]
+    N32["预检请求（Preflight）完整流程"]
+    N33["浏览器 OPTIONS /api/data >"]
+    N34["Origin: https://example.com >"]
+    N35["Access-Control-Request-Method: PUT >"]
+    N36["Access-Control-Request-Headers: Content-"]
+    N37["服务器响应:"]
+    N38["< Access-Control-Allow-Origin: https://e"]
+    N39["< Access-Control-Allow-Methods: GET, POS"]
+    N40["< Access-Control-Allow-Headers: Content-"]
+    N41["< Access-Control-Max-Age: 86400 预检结果缓存"]
+    N42["浏览器检查: 预检通过？"]
+    N43["是 发送真实 PUT 请求"]
+    N44["否 抛出 CORS 错误"]
+    N45["真实 PUT 请求:"]
+    N46["PUT /api/data >"]
+    N47["Origin: https://example.com"]
+    N48["Authorization: Bearer xxx"]
+    N49["Content-Type: application/json"]
+    N50["服务器响应:"]
+    N51["< Access-Control-Allow-Origin: https://e"]
+    N52["< 200 OK, { 'data': ... }"]
+    N53["CORS 关键响应头详解"]
+    N54["Access-Control-Allow-Origin: * | https:/"]
+    N55["允许的来源，* 表示允许所有（credentials:include 时不能"]
+    N56["Access-Control-Allow-Methods: GET, POST,"]
+    N57["允许的 HTTP 方法"]
+    N58["Access-Control-Allow-Headers: Content-Ty"]
+    N59["允许的请求头"]
+    N60["Access-Control-Allow-Credentials: true"]
+    N61["是否允许携带 Cookie（此时 Allow-Origin 不能是 *）"]
+    N62["Access-Control-Expose-Headers: X-Request"]
+    N63["哪些响应头可以被 JS 读取（默认只有 7 个简单响应头）"]
+    N64["Access-Control-Max-Age: 86400"]
+    N65["预检结果缓存时间（秒），减少预检请求"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
+    N54 --> N55
+    N55 --> N56
+    N56 --> N57
+    N57 --> N58
+    N58 --> N59
+    N59 --> N60
+    N60 --> N61
+    N61 --> N62
+    N62 --> N63
+    N63 --> N64
+    N64 --> N65
 ```
 
 ### 完整代码示例（TS/JS）
@@ -4992,111 +5273,143 @@ function diagnoseCORSError(response: Response): void {
 
 ### ASCII 原理图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              正向代理 vs 反向代理 vs 负载均衡                     │
-│                                                                  │
-│  正向代理（Forward Proxy）:                                       │
-│                                                                  │
-│  用户浏览器                                                      │
-│    │ (配置代理服务器 IP)                                         │
-│    ▼                                                             │
-│  ┌──────────────────┐                                            │
-│  │   正向代理服务器  │  ← 代理站在客户端侧                       │
-│  │  (Proxy Server)  │  ← 代表用户访问外部网络                    │
-│  └──────────────────┘                                            │
-│    │                                                             │
-│    ▼                                                             │
-│  目标网站 A / 目标网站 B / ...                                    │
-│                                                                  │
-│  用途:                                                           │
-│  - 企业内网过滤（禁止访问某些网站）                                │
-│  - 翻墙（用户通过境外代理访问被墙网站）                            │
-│  - 缓存加速（代理缓存常用资源）                                    │
-│  - 匿名访问（隐藏用户真实 IP）                                     │
-│                                                                  │
-│  客户端必须配置代理:                                              │
-│  Browser → Proxy IP:Port  → Target Website                      │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│  反向代理（Reverse Proxy）:                                       │
-│                                                                  │
-│  用户浏览器                                                      │
-│    │ 以为访问的是 example.com                                    │
-│    ▼                                                             │
-│  ┌──────────────────┐                                            │
-│  │   反向代理/ nginx │  ← 代理站在服务器侧                       │
-│  │  (Reverse Proxy) │  ← 代表服务器接收请求                      │
-│  └──────────────────┘                                            │
-│    │                                                             │
-│    ├─> 真实服务器 A (10.0.0.1:8080)                              │
-│    ├─> 真实服务器 B (10.0.0.2:8080)                              │
-│    └─> 真实服务器 C (10.0.0.3:8080)                              │
-│                                                                  │
-│  用途:                                                           │
-│  - 隐藏源站真实 IP（安全）                                        │
-│  - SSL 终止（TLS 在 nginx 终止，源站用 HTTP）                     │
-│  - 负载均衡                                                      │
-│  - 静态资源服务                                                  │
-│  - 缓存加速                                                      │
-│  - 安全防护（WAF / DDoS）                                        │
-│                                                                  │
-│  用户不知道真实服务器存在:                                        │
-│  Browser → https://example.com → nginx → upstream servers       │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              nginx 负载均衡算法                                   │
-│                                                                  │
-│  1. 轮询（Round Robin）—— 默认                                    │
-│     请求 1 → A → 请求 2 → B → 请求 3 → C → 请求 4 → A            │
-│     问题: 不考虑服务器性能差异                                    │
-│                                                                  │
-│  2. 加权轮询（Weighted Round Robin）                              │
-│     A(weight=3) B(weight=1)                                      │
-│     → A → A → A → B → A → A → A → B ...                         │
-│     问题: 无法解决 session 亲和性                                │
-│                                                                  │
-│  3. IP Hash                                                      │
-│     hash(IP) % 3 → 同一 IP 始终路由 到同一 server                 │
-│     优点: Session 保持（同一个用户去同一台服务器）                │
-│     缺点: server 下线时 hash 重算，用户 session 丢失             │
-│                                                                  │
-│  4. 最少连接（Least Connections）                                │
-│     新请求 → 当前连接数最少的 server                              │
-│     适合: 请求处理时间差异大的场景                                │
-│                                                                  │
-│  5. URL Hash                                                     │
-│     hash(URL) % N → 同一资源 URL 始终路由到同一 server            │
-│     优点: 缓存友好（同一资源总去同一台 server）                   │
-│     缺点: server 下线时重算                                       │
-│                                                                  │
-│  6. 一致性哈希（Consistent Hash）                                 │
-│     改进的 URL Hash，server 下线时影响范围最小                    │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              nginx HTTP 请求处理流程                             │
-│                                                                  │
-│  Client Request                                                   │
-│       │                                                          │
-│       ▼                                                          │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ 1. 读取 HTTP 请求行 / 请求头                            │    │
-│  │ 2. Server Name 匹配（virtual server）                    │    │
-│  │ 3. Location 匹配（URL path 匹配）                       │    │
-│  │ 4. Rewrite 模块（重写 URL）                             │    │
-│  │ 5. 权限控制（allow / deny）                            │    │
-│  │ 6. Try Files（尝试静态文件）                           │    │
-│  │ 7. Proxy Pass / FastCGI Pass（反向代理 / FastCGI）     │    │
-│  │ 8. 响应头处理（gzip / cache / add_header）              │    │
-│  │ 9. 日志记录（access_log）                               │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│       │                                                          │
-│       ▼                                                          │
-│  Client Response                                                  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["正向代理 vs 反向代理 vs 负载均衡"]
+    N1["正向代理（Forward Proxy）:"]
+    N2["用户浏览器"]
+    N3["(配置代理服务器 IP)"]
+    N4["正向代理服务器"]
+    N5["代理站在客户端侧"]
+    N6["(Proxy Server)"]
+    N7["代表用户访问外部网络"]
+    N8["目标网站 A / 目标网站 B / ..."]
+    N9["用途:"]
+    N10["- 企业内网过滤（禁止访问某些网站）"]
+    N11["- 翻墙（用户通过境外代理访问被墙网站）"]
+    N12["- 缓存加速（代理缓存常用资源）"]
+    N13["- 匿名访问（隐藏用户真实 IP）"]
+    N14["客户端必须配置代理:"]
+    N15["Browser Proxy IP:Port Target Website"]
+    N16["反向代理（Reverse Proxy）:"]
+    N17["用户浏览器"]
+    N18["以为访问的是 example.com"]
+    N19["反向代理/ nginx"]
+    N20["代理站在服务器侧"]
+    N21["(Reverse Proxy)"]
+    N22["代表服务器接收请求"]
+    N23["> 真实服务器 A (10.0.0.1:8080)"]
+    N24["> 真实服务器 B (10.0.0.2:8080)"]
+    N25["> 真实服务器 C (10.0.0.3:8080)"]
+    N26["用途:"]
+    N27["- 隐藏源站真实 IP（安全）"]
+    N28["- SSL 终止（TLS 在 nginx 终止，源站用 HTTP）"]
+    N29["- 负载均衡"]
+    N30["- 静态资源服务"]
+    N31["- 缓存加速"]
+    N32["- 安全防护（WAF / DDoS）"]
+    N33["用户不知道真实服务器存在:"]
+    N34["Browser https://example.com nginx"]
+    N35["nginx 负载均衡算法"]
+    N36["1. 轮询（Round Robin）—— 默认"]
+    N37["请求 1 A 请求 2 B 请求 3 C 请求 4"]
+    N38["问题: 不考虑服务器性能差异"]
+    N39["2. 加权轮询（Weighted Round Robin）"]
+    N40["A(weight=3) B(weight=1)"]
+    N41["A A A B A A A B ..."]
+    N42["问题: 无法解决 session 亲和性"]
+    N43["3. IP Hash"]
+    N44["hash(IP) % 3 同一 IP 始终路由 到同一 server"]
+    N45["优点: Session 保持（同一个用户去同一台服务器）"]
+    N46["缺点: server 下线时 hash 重算，用户 session 丢失"]
+    N47["4. 最少连接（Least Connections）"]
+    N48["新请求 当前连接数最少的 server"]
+    N49["适合: 请求处理时间差异大的场景"]
+    N50["5. URL Hash"]
+    N51["hash(URL) % N 同一资源 URL 始终路由到同一 server"]
+    N52["优点: 缓存友好（同一资源总去同一台 server）"]
+    N53["缺点: server 下线时重算"]
+    N54["6. 一致性哈希（Consistent Hash）"]
+    N55["改进的 URL Hash，server 下线时影响范围最小"]
+    N56["nginx HTTP 请求处理流程"]
+    N57["Client Request"]
+    N58["1. 读取 HTTP 请求行 / 请求头"]
+    N59["2. Server Name 匹配（virtual server）"]
+    N60["3. Location 匹配（URL path 匹配）"]
+    N61["4. Rewrite 模块（重写 URL）"]
+    N62["5. 权限控制（allow / deny）"]
+    N63["6. Try Files（尝试静态文件）"]
+    N64["7. Proxy Pass / FastCGI Pass（反向代理 / Fast"]
+    N65["8. 响应头处理（gzip / cache / add_header）"]
+    N66["9. 日志记录（access_log）"]
+    N67["Client Response"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
+    N44 --> N45
+    N45 --> N46
+    N46 --> N47
+    N47 --> N48
+    N48 --> N49
+    N49 --> N50
+    N50 --> N51
+    N51 --> N52
+    N52 --> N53
+    N53 --> N54
+    N54 --> N55
+    N55 --> N56
+    N56 --> N57
+    N57 --> N58
+    N58 --> N59
+    N59 --> N60
+    N60 --> N61
+    N61 --> N62
+    N62 --> N63
+    N63 --> N64
+    N64 --> N65
+    N65 --> N66
+    N66 --> N67
 ```
 
 ### 完整代码示例（TS/JS）
@@ -5390,33 +5703,97 @@ http {
 
 > ## 面试速查卡（Chapter 6）
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                    Chapter 6 速查要点                          │
-├────────────────────────────────────────────────────────────────┤
-│ HTTP 各版本   │ HTTP/1.1 队头阻塞 → HTTP/2 多路复用 → HTTP/3 QUIC │
-│ HTTP 无状态    │ Cookie/Session/Token 在应用层实现              │
-│ QUIC          │ UDP + 用户态可靠传输 = 低延迟 + 无 TCP 队头阻塞  │
-│ TCP vs UDP    │ TCP 可靠有序，UDP 快但不可靠，QUIC 兼两者优点    │
-│ 拥塞控制      │ 慢启动 → 拥塞避免 → 快速重传 → 快速恢复         │
-│ SYN Flood     │ 半开连接耗尽资源，SYN Cookies 不用 TCB        │
-│ 三次握手      │ 同步 ISN + 防止历史连接                         │
-│ 四次挥手      │ 全双工两个方向单独关闭 + TIME_WAIT 2MSL         │
-│ TLS 1.2 vs 1.3│ 1.3: 1-RTT / 0-RTT，移除 RSA，PFS 默认          │
-│ CA 证书链     │ 根 CA → 中间 CA → 站点证书，逐级签名验证         │
-│ DNS           │ UDP 53 查询（快），TCP（大响应/区域传输）       │
-│ DNS 污染防御  │ DNSSEC（签名）+ DoH/DoT（加密）                │
-│ CDN           │ 就近访问 + 缓存 + 协议优化 + DDoS 防护         │
-│ WebSocket     │ HTTP Upgrade → 全双工 TCP 帧交换                 │
-│ SSE           │ HTTP 单向服务端推送，EventSource + Last-Event-ID │
-│ REST vs GraphQL│ REST: 多端点固定返回，GraphQL: 单端点精确获取   │
-│ 状态码        │ 2xx 成功 3xx 重定向 4xx 客户端错 5xx 服务端错   │
-│ 重定向        │ 永久: 308(推荐)/301，临时: 307(推荐)/302，POST:303│
-│ 幂等性        │ GET/PUT/DELETE 幂等，POST/PATCH 非幂等           │
-│ OAuth2        │ Auth Code + PKCE 最安全，JWT 无状态但难撤销       │
-│ CORS          │ 简单请求直接发，复杂请求先预检（OPTIONS）         │
-│ nginx         │ 反向代理隐藏源站 + 负载均衡 + 静态资源服务        │
-└────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    N0["Chapter 6 速查要点"]
+    N1["HTTP 各版本"]
+    N2["HTTP/1.1 队头阻塞 HTTP/2 多路复用 HTTP/3 QUI"]
+    N3["HTTP 无状态"]
+    N4["Cookie/Session/Token 在应用层实现"]
+    N5["QUIC"]
+    N6["UDP + 用户态可靠传输 = 低延迟 + 无 TCP 队头阻塞"]
+    N7["TCP vs UDP"]
+    N8["TCP 可靠有序，UDP 快但不可靠，QUIC 兼两者优点"]
+    N9["拥塞控制"]
+    N10["慢启动 拥塞避免 快速重传 快速恢复"]
+    N11["SYN Flood"]
+    N12["半开连接耗尽资源，SYN Cookies 不用 TCB"]
+    N13["三次握手"]
+    N14["同步 ISN + 防止历史连接"]
+    N15["四次挥手"]
+    N16["全双工两个方向单独关闭 + TIME_WAIT 2MSL"]
+    N17["TLS 1.2 vs 1.3"]
+    N18["1.3: 1-RTT / 0-RTT，移除 RSA，PFS 默认"]
+    N19["CA 证书链"]
+    N20["根 CA 中间 CA 站点证书，逐级签名验证"]
+    N21["DNS"]
+    N22["UDP 53 查询（快），TCP（大响应/区域传输）"]
+    N23["DNS 污染防御"]
+    N24["DNSSEC（签名）+ DoH/DoT（加密）"]
+    N25["CDN"]
+    N26["就近访问 + 缓存 + 协议优化 + DDoS 防护"]
+    N27["WebSocket"]
+    N28["HTTP Upgrade 全双工 TCP 帧交换"]
+    N29["SSE"]
+    N30["HTTP 单向服务端推送，EventSource + Last-Event-ID"]
+    N31["REST vs GraphQL"]
+    N32["REST: 多端点固定返回，GraphQL: 单端点精确获取"]
+    N33["状态码"]
+    N34["2xx 成功 3xx 重定向 4xx 客户端错 5xx 服务端错"]
+    N35["重定向"]
+    N36["永久: 308(推荐)/301，临时: 307(推荐)/302，POST:303"]
+    N37["幂等性"]
+    N38["GET/PUT/DELETE 幂等，POST/PATCH 非幂等"]
+    N39["OAuth2"]
+    N40["Auth Code + PKCE 最安全，JWT 无状态但难撤销"]
+    N41["CORS"]
+    N42["简单请求直接发，复杂请求先预检（OPTIONS）"]
+    N43["nginx"]
+    N44["反向代理隐藏源站 + 负载均衡 + 静态资源服务"]
+    N0 --> N1
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> N6
+    N6 --> N7
+    N7 --> N8
+    N8 --> N9
+    N9 --> N10
+    N10 --> N11
+    N11 --> N12
+    N12 --> N13
+    N13 --> N14
+    N14 --> N15
+    N15 --> N16
+    N16 --> N17
+    N17 --> N18
+    N18 --> N19
+    N19 --> N20
+    N20 --> N21
+    N21 --> N22
+    N22 --> N23
+    N23 --> N24
+    N24 --> N25
+    N25 --> N26
+    N26 --> N27
+    N27 --> N28
+    N28 --> N29
+    N29 --> N30
+    N30 --> N31
+    N31 --> N32
+    N32 --> N33
+    N33 --> N34
+    N34 --> N35
+    N35 --> N36
+    N36 --> N37
+    N37 --> N38
+    N38 --> N39
+    N39 --> N40
+    N40 --> N41
+    N41 --> N42
+    N42 --> N43
+    N43 --> N44
 ```
 
 ---
