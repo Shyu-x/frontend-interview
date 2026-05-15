@@ -20,24 +20,8 @@
 
 ### 1.1 为什么 Agent 需要记忆
 
-```mermaid
-flowchart TB
-    subgraph no_memory["无记忆的 Agent"]
-        N1["用户: 帮我重构用户模块"]
-        N2["Agent: 请问用户模块在哪里？"]
-        N3["用户: 就是上个对话里提到的"]
-        N4["Agent: 抱歉，我没有上一个对话的上下文"]
-    end
+![有无记忆对比](assets/images/mermaid/no-memory-vs-with-memory.png)
 
-    subgraph with_memory["有记忆的 Agent"]
-        W1["用户: 帮我重构用户模块"]
-        W2["Agent: [从记忆中提取]"]
-        W3["用户项目: /src/users/*"]
-        W4["上次讨论: 计划使用 Repository 模式"]
-        W5["约束: 需要保持向后兼容"]
-        W6["Agent: 好的，我找到上次讨论的内容。开始重构..."]
-    end
-```
 
 ### 1.2 记忆类型分类
 

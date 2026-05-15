@@ -36,18 +36,8 @@ addTS("1", 2); // 编译错误：Argument of type 'string' is not assignable to 
 
 #### 1.2 TS 编译流程
 
-```mermaid
-flowchart TD
-    A[.ts / .tsx 文件] --> B[解析 Parse]
-    B --> C[AST 抽象语法树]
-    C --> D[类型检查 Type Check]
-    D --> E[类型错误报告]
-    E --> F[发射 Emit]
-    F --> G[.js 文件 + .d.ts 类型声明]
-    style A fill:#e1f5fe
-    style G fill:#e8f5e8
-    note1[编译选项 tsconfig.json 决定行为]
-```
+![TypeScript 编译流程](assets/images/mermaid/ts-compile-flow.png)
+
 
 // tsc --noEmit：只做类型检查，不输出文件
 // tsc --emitDeclarationOnly：只生成 .d.ts
@@ -172,13 +162,8 @@ type A = IsString<"hello">; // true
 type B = IsString<123>;    // false
 
 // 总结：
-```mermaid
-table
-| 类型 | 可赋值给 | 可访问属性 |
-| any | 任意类型 | 任意属性 |
-| unknown | 任意类型 | 不可（需缩小） |
-| never | 无（不可赋值） | 不可 |
-```
+![any/unknown/never 类型对比](assets/images/mermaid/any-unknown-never.png)
+
 ```
 
 #### 2.2 void vs never
@@ -230,18 +215,8 @@ type UserType = {
 };
 
 // 两者都能描述对象结构，区别如下：
-```mermaid
-table
-| 特性 | interface | type |
-| 对象结构 | 支持 | 支持 |
-| 合并（扩展） | 声明合并 | 不支持 |
-| 重复声明 | 可以 | 不可以（报错） |
-| 联合类型 | 不支持 | 支持 |
-| 交叉类型 | 不支持 | 支持 |
-| 计算属性 | 不支持 | 支持 |
-| 映射类型 | 有限支持 | 完全支持 |
-| 元组 | 不支持 | 支持 |
-```
+![interface vs type 对比](assets/images/mermaid/interface-vs-type.png)
+
 
 // interface 声明合并（最独特的能力）：
 interface Config {

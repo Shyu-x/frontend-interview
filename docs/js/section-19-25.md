@@ -470,27 +470,7 @@ console.log(count); // 1（因为 increment 修改了）
 
 Tree Shaking 是打包工具（Rollup、Webpack 4+）通过静态分析 ESM 依赖图，消除未使用的导出代码（dead code elimination）。
 
-```
-Tree Shaking 原理
-
-```mermaid
-flowchart LR
-    subgraph 源代码["源代码（ESM）"]
-        A1["// utils.js<br/>export function used() { return 1; }<br/>export function unused() { return 2; }"]
-        A2["// main.js<br/>import { used } from './utils.js';<br/>console.log(used());"]
-    end
-    subgraph 分析["静态分析依赖图（打包阶段）"]
-        B["打包工具检测到：<br/>used() 被引用 ✓ 保留<br/>unused() 无引用者 ✗ dead"]
-    end
-    subgraph 结果["最终打包结果"]
-        C["// 只包含 used<br/>export function used() { return 1; }"]
-    end
-    A1 --> B
-    A2 --> B
-    B --> C
-    style B fill:#fff3cd
-    style C fill:#d4edda
-```
+![Tree Shaking 原理](assets/images/mermaid/tree-shaking-process.png)
 
 ### 20.5 Tree Shaking 条件
 
@@ -587,18 +567,7 @@ ESM 的 `import`/`export` 是编译时静态分析，依赖关系在打包阶段
 
 #### 标记-清除（Mark-Sweep）
 
-```mermaid
-flowchart LR
-    R[Root] --> A["A"]
-    R --> E["E"]
-    A --> B["B"]
-    B --> C["C"]
-    B --> D["D"]:::dead
-    E --> F["F"]
-    style D fill:#ffcccc,stroke:#ff0000,stroke-width:2px,stroke-dasharray:5
-    note1["可达对象：<br/>A, B, C, E, F"]
-    note2["不可达对象：<br/>D（待回收）"]
-```
+![标记-清除算法](assets/images/mermaid/mark-sweep.png)
 
 
 #### 标记-整理（Mark-Compact）

@@ -365,15 +365,8 @@ llm = ChatOpenAI(callbacks=[handler])
 ```
 
 **Dify 工作流事件驱动**:
-```mermaid
-flowchart LR
-    A[开始] --> B[LLM节点]
-    B --> C[工具调用]
-    C --> D{条件分支}
-    D -->|分支1| E[节点 A]
-    D -->|分支2| F[节点 B]
-    D -->|分支3| G[节点 C]
-```
+
+![Agent 工作流程](assets/images/mermaid/agent-workflow.png)
 
 ---
 
@@ -609,16 +602,8 @@ print(result)
 
 ### 5.3 框架选型决策树
 
-```mermaid
-flowchart TD
-    A{您的技术背景？}
-    A -->|非技术| B{是否需要快速原型？}
-    A -->|技术| C{是否需要复杂多Agent协作？}
-    B -->|是| D[Coze]
-    B -->|否| E[Dify]
-    C -->|是| F[AutoGen]
-    C -->|否| G[LangGraph]
-```
+![框架选型决策](assets/images/mermaid/framework-selection.png)
+
 
 ---
 
