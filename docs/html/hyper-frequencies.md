@@ -1255,6 +1255,8 @@ window.visualViewport?.addEventListener('resize', () => {
     `${window.visualViewport.height * 0.01}px`
   );
 });
+```
+
 ```mermaid
 flowchart TB
     subgraph Layout["Layout Viewport（布局视口）"]
@@ -6258,7 +6260,8 @@ export default function Hero() {
       sizes="(max-width: 768px) 100vw, 50vw"
     />
   );
-}
+```
+
 ```mermaid
 flowchart LR
     A["LCP 问题根因"] --> B["TTFB 过高"]
