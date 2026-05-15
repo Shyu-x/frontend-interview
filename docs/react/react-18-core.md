@@ -341,15 +341,7 @@ function App() {
 
 **工作流程：**
 
-```mermaid
-flowchart TD
-    A[渲染 Profile] --> B{数据是否就绪?}
-    B -->|否| C[抛出 Promise]
-    C --> D[Suspense 捕获]
-    D --> E[显示 Loading fallback]
-    F[数据加载完成] --> G[重新渲染]
-    G --> H[显示实际内容]
-```
+![react-18-core diagram](assets/images/mermaid/react-react-18-core-4.png)
 
 ### 4.2 Streaming SSR
 

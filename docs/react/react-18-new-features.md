@@ -10,13 +10,7 @@ React 18 于 2022 年 3 月正式发布，带来了革命性的并发渲染（Co
 
 批处理是 React 的一种优化机制，将多个状态更新合并为一次渲染，以减少不必要的 DOM 操作次数。
 
-```mermaid
-flow LR
-    A["setState(1)"] --> B["setState(2)"]
-    B --> C["setState(3)"]
-    C --> D["合并为单次渲染"]
-    D --> E["DOM 更新"]
-```
+![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-2.png)
 
 ### React 17 vs React 18 批处理差异表
 
@@ -166,19 +160,7 @@ function SearchComponent() {
 
 ### 并发调度流程图
 
-```mermaid
-flowchart TD
-    A["用户输入"] --> B["立即渲染输入框"]
-    B --> C["startTransition"]
-    C --> D["标记为可中断"]
-    D --> E{"高优先级任务?"}
-    E -->|是| F["继续执行"]
-    E -->|否| G["让出渲染权"]
-    G --> H["处理其他任务"]
-    H --> I["恢复渲染"]
-    F --> J["最终渲染"]
-    I --> J
-```
+![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-4.png)
 
 ---
 
@@ -487,20 +469,7 @@ async function handler(request) {
 
 ### Progressive Hydration 渐进式水合
 
-```mermaid
-sequenceDiagram
-    participant Browser as "浏览器"
-    participant Server as "服务端"
-    participant React as "React"
-
-    Server->>Browser: HTML 流式传输
-    Browser->>React: 接收首个 HTML chunk
-    React->>Browser: 立即显示内容
-    Browser->>React: 加载 JS
-    React->>Browser: 并行水合已加载部分
-    Browser->>React: 继续接收 HTML
-    React->>Browser: 水合新内容
-```
+![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-6.png)
 
 ### 实现示例
 

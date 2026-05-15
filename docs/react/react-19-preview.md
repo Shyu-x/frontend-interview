@@ -160,16 +160,7 @@ function TodoList() {
 
 ### 2.2 乐观更新的生命周期
 
-```mermaid
-flowchart TD
-    A[用户操作] --> B[立即更新 UI<br/>useOptimistic]
-    B --> C[后台异步处理<br/>API 调用]
-    C --> D{成功?}
-    D -->|是| E[保留更新<br/>合并到真实状态]
-    D -->|否| F[显示错误提示<br/>移除乐观状态]
-    E --> G[完成]
-    F --> G
-```
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-1.png)
 
 ### 2.3 表单乐观更新
 
@@ -345,13 +336,7 @@ function Layout({ children }) {
 
 ### 4.2 元数据渲染流程
 
-```mermaid
-flowchart LR
-    A[组件树] --> B[React 检测到元数据标签]
-    B --> C[自动提升到 head]
-    C --> D[SSR/水合保持一致]
-    D --> E[客户端导航更新 head]
-```
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-2.png)
 
 ### 4.3 样式表支持
 
@@ -444,21 +429,7 @@ function InteractiveComponent() {
 
 ### 5.2 资源预加载时序图
 
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant R as React
-    participant B as 浏览器
-
-    U->>R: 访问页面
-    R->>B: 执行 preload()
-    Note over B: 浏览器开始下载资源
-    U->>R: 触发交互
-    R->>B: 请求资源
-    Note over B: 资源已缓存，直接使用
-    B-->>R: 快速响应
-    R-->>U: 即时反馈
-```
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-3.png)
 
 ### 5.3 资源加载状态追踪
 
@@ -562,19 +533,9 @@ class RecoverableErrorBoundary extends Component {
 
 ### 6.3 错误边界架构
 
-```mermaid
-flowchart TD
-    A[渲染过程] --> B{组件抛出错误?}
-    B -->|否| C[正常渲染]
-    B -->|是| D[错误边界捕获]
-    D --> E[getDerivedStateFromError]
-    E --> F[显示错误 UI]
-    F --> G[componentDidCatch]
-    G --> H[上报监控]
-    H --> I[用户提供重置操作]
-    I --> J[handleReset]
-    J --> C
-```
+### 6.3 错误边界架构
+
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-4.png)
 
 ---
 
@@ -706,21 +667,7 @@ function getData(key) {
 
 ### 8.4 React 18 vs React 19 重渲染对比
 
-```mermaid
-flowchart LR
-    subgraph React18
-        A1[Props 变化] --> B1[重新渲染整个组件]
-        B1 --> C1[需要手动优化]
-    end
-
-    subgraph React19
-        A2[Props 变化] --> B2[React Compiler 自动优化]
-        B2 --> C2[最小化重渲染]
-    end
-
-    C1 -.->|繁琐| D[useMemo/useCallback]
-    C2 -.->|自动| E[无需手动优化]
-```
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-5.png)
 
 ---
 
@@ -728,65 +675,11 @@ flowchart LR
 
 ### 9.1 新特性全景图
 
-```mermaid
-flowchart TD
-    subgraph Core["核心改进"]
-        A1[Actions API]
-        A2[useOptimistic]
-        A3[use Hook]
-        A4[useTransition]
-    end
-
-    subgraph Resource["资源管理"]
-        B1[Document Metadata]
-        B2[样式表优先级]
-        B3[资源预加载 API]
-    end
-
-    subgraph Error["错误处理"]
-        C1[错误边界升级]
-        C2[详细错误信息]
-        C3[恢复机制]
-    end
-
-    subgraph Compiler["编译器"]
-        D1[自动 memoization]
-        D2[安全规则验证]
-        D3[性能优化]
-    end
-
-    subgraph Web["Web 互操作"]
-        E1[自定义元素]
-        E2[属性映射]
-    end
-
-    Core --> Final[React 19]
-    Resource --> Final
-    Error --> Final
-    Compiler --> Final
-    Web --> Final
-```
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-6.png)
 
 ### 9.2 渲染架构变化
 
-```mermaid
-flowchart LR
-    subgraph Old["React 18 架构"]
-        A1[React App] --> A2[Client Render]
-        A2 --> A3[HTML + JS]
-        A3 --> A4[Hydration]
-    end
-
-    subgraph New["React 19 架构"]
-        B1[React App] --> B2[Server Components]
-        B2 --> B3[RSC Stream]
-        B3 --> B4[选择性水合]
-        B4 --> B5[并行渲染]
-    end
-
-    style Old fill:#f5c6cb
-    style New fill:#c3e6cb
-```
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-7.png)
 
 ### 9.3 并发特性演进
 
@@ -829,14 +722,7 @@ const value = useRef(initialValue);
 
 ### 10.4 推荐的迁移路径
 
-```mermaid
-flowchart LR
-    A[评估现有代码] --> B[识别受影响的组件]
-    B --> C[更新到 React 19]
-    C --> D[测试核心功能]
-    D --> E[逐步采用新特性]
-    E --> F[启用编译器]
-```
+![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-8.png)
 
 ---
 
