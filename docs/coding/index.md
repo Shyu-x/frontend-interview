@@ -2108,5 +2108,62 @@ app.listen(3000, () => console.log('Server running at 3000'));
 
 ---
 
+## 附录 A：参考资料
+
+### A.1 JavaScript 核心
+
+| 分类 | 资源 | 说明 |
+|------|------|------|
+| Promise | [MDN - Promise](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise) | Promise 规范与用法 |
+| Promise | [MDN - Using Promises](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Using_promises) | Promise 使用指南 |
+| 事件循环 | [MDN - Event Loop](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Event_loop) | 事件循环机制详解 |
+| 微任务 | [MDN - queueMicrotask](https://developer.mozilla.org/zh-CN/docs/Web/API/queueMicrotask) | 微任务队列 API |
+| 定时器 | [MDN - setTimeout](https://developer.mozilla.org/zh-CN/docs/Web/API/setTimeout) | 定时器详解 |
+| 动画帧 | [MDN - setAnimationFrame](https://developer.mozilla.org/zh-CN/docs/Web/API/setAnimationFrame) | requestAnimationFrame |
+
+### A.2 数据结构
+
+| 分类 | 资源 | 说明 |
+|------|------|------|
+| Map/Set | [MDN - Map](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Map) | Map 对象 |
+| Map/Set | [MDN - Set](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Set) | Set 对象 |
+| Map/Set | [CSDN - Map/Set/WeakMap/WeakSet 详解](https://www.jb51.net/article/282533.htm) | 2025 Map/Set/WeakMap/WeakSet 详解 |
+
+### A.3 代理与响应式
+
+| 分类 | 资源 | 说明 |
+|------|------|------|
+| 代理 | [MDN - Proxy](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy) | Proxy 代理对象 |
+| 反射 | [MDN - Reflect](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Reflect) | Reflect 反射 |
+| 响应式 | [腾讯云 - Vue3 Proxy + Reflect](https://cloud.tencent.com/developer/news/2263970) | Vue3 响应式原理 |
+| 结构化克隆 | [MDN - structuredClone](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/structuredClone) | 结构化克隆算法 |
+
+### A.4 迭代器与生成器
+
+| 分类 | 资源 | 说明 |
+|------|------|------|
+| 迭代器 | [MDN - Iterators and Generators](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Iterators_and_generators) | 迭代器与生成器指南 |
+| 异步迭代 | [MDN - asyncIterator](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Symbol/asyncIterator) | Symbol.asyncIterator |
+
+### A.5 垃圾回收与内存
+
+| 分类 | 资源 | 说明 |
+|------|------|------|
+| GC | [CSDN - V8 垃圾回收原理](https://blog.csdn.net/qi_bai_jin/article/details/158261107) | V8 垃圾回收机制 |
+
+---
+
+## 附录 B：手写题分类索引
+
+| 分类 | 题号 | 内容 |
+|------|------|------|
+| **Promise** | 1-6 | Promise、all、race、allSettled、retry、async/await |
+| **this 与函数** | 7-12 | call、apply、bind、new、instanceof、Object.create |
+| **手写实现** | 13-21 | 深拷贝、防抖、节流、EventEmitter、观察者、柯里化、compose、flatten、LRU |
+| **框架原理** | 22-25 | vdom+diff、useState、Router、reactive |
+| **工程实践** | 26-30 | 并发控制、图片懒加载、虚拟列表、JSONP、Koa中间件 |
+
+---
+
 *以上为前十二章内容。JavaScript（第三章）、TypeScript（第四章）、性能优化（第十一章）、手写代码（第十二章）均已完整收录。*
 
