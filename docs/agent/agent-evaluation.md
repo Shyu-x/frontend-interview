@@ -24,18 +24,8 @@
 
 **覆盖的环境**：
 
-```mermaid
-flowchart LR
-    subgraph AgentBench评测环境
-        A[OS操作系统] --> B[DB数据库]
-        B --> C[KG知识图谱]
-        C --> D[DCG数字卡牌游戏]
-        D --> E[LTP横向思维]
-        E --> F[HH家务管理]
-        F --> G[WS网络购物]
-        G --> H[WB网页浏览]
-    end
-```
+![AgentBench 评测环境](assets/images/mermaid/agentbench-env.png)
+
 
 | 任务 | 领域 | 描述 |
 |------|------|------|
@@ -127,16 +117,8 @@ python -m swebench.harness.run_evaluation \
 - 基于地图的导航，实现真实的多页面工作流
 - 5 大类评测：
 
-```mermaid
-flowchart TD
-    subgraph WebArena评测分类
-        A[社交论坛] --> E[WebArena]
-        B[业务管理系统] --> E
-        C[游戏开发平台] --> E
-        D[信息检索] --> E
-        F[技术文档] --> E
-    end
-```
+![WebArena 评测分类](assets/images/mermaid/webarena-categories.png)
+
 
 - 社交论坛
 - 业务管理系统
@@ -213,26 +195,8 @@ flowchart TD
 
 ### 2.3 基准测试分类
 
-```mermaid
-mindmap
-  root((基准测试分类))
-    软件工程
-      SWE-bench
-      HumanEval
-      MBPP
-    网页交互
-      WebArena
-      WebShop
-      MiniWob++
-    通用推理
-      AgentBench
-      τ-bench
-      MINT
-    安全与对齐
-      HarmBench
-      红队测试
-      宪法AI
-```
+![AgentBench 评测环境](assets/images/mermaid/agentbench-env.png)
+
 
 #### 软件工程
 

@@ -637,32 +637,8 @@ flowchart TD
 
 ### 6.2 学习曲线对比
 
-```mermaid
-flowchart LR
-    subgraph legend["学习难度"]
-        H[高]
-        M[中]
-        L[低]
-    end
+![框架学习曲线](assets/images/mermaid/learning-curve.png)
 
-    subgraph complexity["功能复杂度"]
-        LC[LangChain]
-        LG[LangGraph]
-        LI[LlamaIndex]
-        AU[AutoGen]
-        CR[CrewAI]
-        DF[Dify]
-        CZ[Coze]
-    end
-
-    H -.->|"最难"| LC
-    H -.->|"最难"| LG
-    H -.->|"最难"| LI
-    M -.->|"中等"| AU
-    M -.->|"中等"| CR
-    L -.->|"最易"| DF
-    L -.->|"最易"| CZ
-```
 
 | 框架 | 上手难度 | 文档质量 | 社区活跃度 | 教程资源 |
 |-----|---------|---------|-----------|---------|
@@ -702,15 +678,8 @@ flowchart LR
 
 在实际项目中，框架可以组合使用以发挥各自优势：
 
-```mermaid
-flowchart TB
-    subgraph combo["组合方案示例"]
-        direction TB
-        C1["Dify (工作流编排) + LangChain (工具) + LlamaIndex (RAG)"]
-        C2["Coze (快速 Bot) + 自定义 Agent (特殊逻辑)"]
-        C3["LangGraph (复杂状态机) + AutoGen (多Agent对话)"]
-    end
-```
+![Promise 状态转换图](assets/images/mermaid/promise-state.png)
+
 
 ---
 

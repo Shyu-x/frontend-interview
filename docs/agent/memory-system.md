@@ -52,23 +52,8 @@ flowchart TB
 
 ### 1.3 记忆层次结构
 
-```mermaid
-flowchart TB
-    subgraph memory_hierarchy["记忆层次"]
-        L6["L6: 元认知 (Metacognition)<br/>- 学习如何学习<br/>- 自我监控和调整"]
-        L5["L5: 程序记忆 (Procedural Memory)<br/>- 技能、工作流、模式<br/>- 如何做的知识"]
-        L4["L4: 语义记忆 (Semantic Memory)<br/>- 概念、事实、通用知识<br/>- 是什么的知识"]
-        L3["L3: 情景记忆 (Episodic Memory)<br/>- 经验、事件、具体案例<br/>- 何时发生的知识"]
-        L2["L2: 短期记忆 (Short-term Memory)<br/>- 当前任务相关信息<br/>- 激活的知识"]
-        L1["L1: 工作记忆 (Working Memory)<br/>- 即时处理的信息<br/>- 注意力焦点"]
-    end
+![Agent 工作流程](assets/images/mermaid/agent-workflow.png)
 
-    L6 --> L5
-    L5 --> L4
-    L4 --> L3
-    L3 --> L2
-    L2 --> L1
-```
 
 ---
 

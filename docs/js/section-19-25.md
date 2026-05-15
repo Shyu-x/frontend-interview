@@ -8,29 +8,8 @@
 
 `Proxy` 是 ES6 引入的元编程能力，用于拦截和自定义对象的基本操作（get、set、delete 等）。每个拦截行为称为一个 **trap**（陷阱），与 `Reflect` API 一一对应。
 
-```mermaid
-flowchart TB
-    subgraph Proxy["Proxy（代理对象）"]
-        subgraph handler["new Proxy(target, handler)"]
-            A["proxy.name<br/>proxy.age = 18<br/>delete proxy.name<br/>'name' in proxy<br/>Object.keys(proxy)<br/>proxy()<br/>new proxy()"]
-        end
-    end
-    A -->|"get trap"| B["Reflect.get()"]
-    A -->|"set trap"| C["Reflect.set()"]
-    A -->|"deleteProperty trap"| D["deleteProperty"]
-    A -->|"has trap"| E["Reflect.has()"]
-    A -->|"ownKeys trap"| F["Reflect.ownKeys"]
-    A -->|"apply trap"| G["Reflect.apply()"]
-    A -->|"construct trap"| H["construct trap"]
-    style A fill:#e3f2fd
-    style B fill:#fff3e0
-    style C fill:#fff3e0
-    style D fill:#fff3e0
-    style E fill:#fff3e0
-    style F fill:#fff3e0
-    style G fill:#fff3e0
-    style H fill:#fff3e0
-```
+![Proxy 拦截方法](assets/images/mermaid/proxy-traps.png)
+
 
 #### 完整 Proxy Handler 示例
 
@@ -400,21 +379,8 @@ revoke(); // 一旦调用，proxy 的所有操作都抛出 TypeError
 
 ### 20.1 核心区别与对比
 
-```mermaid
-table
-| 特性 | ESM（ES Module） | CJS（CommonJS） |
-| 语法 | import / export | require / module.exports |
-| 加载时机 | 编译时（静态分析） | 运行时（动态解析） |
-| import 位置 | 必须在模块顶层 | 可以在条件语句中 |
-| 导出值 | 绑定（只读 live binding） | 值拷贝 |
-| 循环引用 | 暂时性死区（TDZ） | 缓存机制 |
-| this | undefined | 当前模块对象 |
-| 严格模式 | 自动开启 | 不自动开启 |
-| 浏览器 | 需要 type="module" | 不支持 |
-| 异步加载 | 支持（import()） | 不支持 |
-| Tree Shaking | 支持 | 不支持（但 rollup 可） |
-| 导出数量 | 可多导出 | 通常单个 module.exports |
-```
+![ESM 与 CJS 对比](assets/images/mermaid/esm-vs-cjs.png)
+
 
 ### 20.2 编译时 vs 运行时
 
@@ -613,31 +579,8 @@ ESM 的 `import`/`export` 是编译时静态分析，依赖关系在打包阶段
 
 ### 21.1 V8 内存架构与 GC 分代
 
-```mermaid
-flowchart TB
-    subgraph Heap["V8 堆内存（Heap）"]
-        subgraph NewSpace["新生代（New Space）1~8MB"]
-            A["from-space"]:::young
-            B["to-space"]:::young
-        end
-        subgraph OldSpace["老生代（Old Space）几十MB~GB"]
-            C["Old Pointer Space"]:::old
-            D["Old Data Space"]:::old
-            E["Large Object Space"]:::old
-            F["Code Space"]:::old
-            G["Cell/PropertyCell/Map Space"]:::old
-        end
-        subgraph Code["代码区（Code）"]
-            H["机器码存放区"]:::code
-        end
-    end
-    A -->|"Scavenge<br/>Minor GC<br/>存活对象复制到to<br/>to和from互换<br/>速度极快(牺牲50%空间)"| B
-    C & D & E & F & G -->|"Mark-Sweep + Mark-Compact<br/>Major GC / Full GC<br/>速度慢，但频率低"| garbage["垃圾回收"]
-    style garbage fill:#ffcccc
-    classDef young fill:#e3f2fd
-    classDef old fill:#fff3e0
-    classDef code fill:#e8f5e8
-```
+![Map 与 Object 对比](assets/images/mermaid/map-vs-object.png)
+
 
 
 ### 21.2 GC 算法详解
@@ -790,31 +733,10 @@ Chrome DevTools → Memory 面板：1. 使用 **Allocation Timeline** 记录一�
 
 ### 22.1 为什么需要 Web Worker
 
-```
-浏览器主线程 vs Web Worker 架构
+![浏览器事件循环流程](assets/images/mermaid/event-loop.png)
 
-主线程（UI 线程）：
-┌──────────────────────────────────────────────────────────┐
-│  JavaScript 引擎    DOM 树        渲染引擎              │
-│  ┌──────────────┐  ┌──────────┐  ┌──────────────┐       │
-│  │ JS 执行      │  │ CSSOM    │  │ 布局/绘制    │       │
-│  │ 事件循环     │  │ 样式计算  │  │ 合成         │       │
-│  │ 微/宏任务    │  │          │  │              │       │
-│  └──────────────┘  └──────────┘  └──────────────┘       │
-│                                                          │
-│  问题：计算密集型任务会阻塞 UI 渲染                        │
-└──────────────────────────────────────────────────────────┘
-                          ↑ postMessage ↓
-Web Worker（独立线程）：
-┌──────────────────────────────────────────────────────────┐
-│  独立 JavaScript 执行环境                                 │
-│  ┌──────────────┐  ┌──────────┐                         │
-│  │ JS 执行      │  │ 独立事件  │                         │
-│  │ 独立堆内存    │  │ 循环     │                         │
-│  └──────────────┘  └──────────┘                         │
-│  不能访问 DOM / window / document                        │
-└──────────────────────────────────────────────────────────┘
-```
+
+
 
 JavaScript 单线程的根本原因：DOM 是单线程共享的。如果 JS 多线程同时修改 DOM，结果不可预测。Web Worker 通过独立线程执行 JS，不共享内存，通过消息传递通信，不阻塞主线程。
 
@@ -970,20 +892,8 @@ DedicatedWorker 只能被创建它的页面使用，关闭页面即终止。Shar
 
 ### 24.1 概念定义与对比
 
-```mermaid
-flowchart LR
-    subgraph Debounce["防抖 Debounce"]
-        A1["用户输入: a b c d e f g h"] --> A2["等待500ms"]
-        A2 -->|"无新触发"| A3["执行(f)"]
-        note1["N秒内无新触发才执行"]
-    end
-    subgraph Throttle["节流 Throttle"]
-        B1["用户输入: a b c d e f..."] --> B2["固定200ms间隔"]
-        B2 --> B3["a"]
-        B2 -->|"..."| B4["b"] --> B5["c"]
-        note2["规定时间内只执行一次"]
-    end
-```
+![防抖与节流对比](assets/images/mermaid/debounce-vs-throttle.png)
+
 
 
 | 维度 | 防抖（Debounce） | 节流（Throttle） |

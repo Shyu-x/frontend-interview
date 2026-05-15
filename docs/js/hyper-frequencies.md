@@ -8,46 +8,13 @@
 
 JavaScript 共9种数据类型，分为两大类：
 
-```mermaid
-graph TB
-    root["数据类型"]
-    root --> primitive["原始类型（7种）"]
-    root --> reference["引用类型（1种）"]
-    
-    primitive --> num["number"]
-    primitive --> str["string"]
-    primitive --> bool["boolean"]
-    primitive --> und["undefined"]
-    primitive --> nil["null"]
-    primitive --> sym["symbol"]
-    primitive --> bi["bigint"]
-    
-    reference --> obj["object"]
-    obj --> po["plain object"]
-    obj --> arr["array"]
-    obj --> fn["function"]
-    obj --> date["date"]
-    obj --> reg["regexp"]
-```
+![数据类型分类图](assets/images/mermaid/data-types.png)
+
 
 **typeof 判断方法：**
 
-```mermaid
-flowchart LR
-    subgraph table["typeof 判断结果"]
-        direction TB
-        A1["typeof 123"] --> B1["\"number\""]
-        A2["typeof \"str\""] --> B2["\"string\""]
-        A3["typeof true"] --> B3["\"boolean\""]
-        A4["typeof undefined"] --> B4["\"undefined\""]
-        A5["typeof null"] --> B5["\"object\" ⚠️"]
-        A6["typeof Symbol()"] --> B6["\"symbol\""]
-        A7["typeof BigInt(1)"] --> B7["\"bigint\""]
-        A8["typeof {}"] --> B8["\"object\""]
-        A9["typeof []"] --> B9["\"object\""]
-        A10["typeof function"] --> B10["\"function\""]
-    end
-```
+![typeof 判断结果对照表](assets/images/mermaid/typeof-results.png)
+
 
 存储方式区别：
 
@@ -619,20 +586,8 @@ function Timer2() {
 }
 ```
 
-```mermaid
-flowchart LR
-    subgraph arrow["箭头函数"]
-        A1["this"] -->|"继承外层"| A2["词法绑定"]
-        A3["arguments"] -->|"无（用rest）"| A4["无"]
-        A5["constructor"] -->|"无，不能new"| A6["无"]
-    end
-    
-    subgraph normal["普通函数"]
-        N1["this"] -->|"调用时决定"| N2["动态绑定"]
-        N3["arguments"] -->|"有"| N4["有"]
-        N5["constructor"] -->|"有，可以new"| N6["有"]
-    end
-```
+![箭头函数与普通函数对比](assets/images/mermaid/arrow-vs-normal.png)
+
 
 ---
 
@@ -1044,15 +999,8 @@ stateDiagram-v2
     rejected --> [*]
 ```
 
-```mermaid
-flowchart LR
-    subgraph then_return["then 返回值规则"]
-        val1["普通值"] -->|"resolved(该值)"| next1["下一个 Promise"]
-        val2["Promise"] -->|"采用最终状态"| next2["下一个 Promise"]
-        val3["throw 错误"] -->|"rejected(错误)"| next3["下一个 Promise"]
-        val4["thenable"] -->|"resolved(thenable.then)"| next4["下一个 Promise"]
-    end
-```
+![Promise 状态转换图](assets/images/mermaid/promise-state.png)
+
 
 #### 13.2 async / await 原理
 
@@ -1288,15 +1236,8 @@ console.log('D');
 // 微任务：打印B
 ```
 
-```mermaid
-flowchart TB
-    A["1. 执行同步代码\n（call stack）"] --> B["2. 清空微任务队列\n（microtask queue）"]
-    B --> B1["• Promise.then\n• queueMicrotask\n• MutationObserver\n循环直到队列空"]
-    B --> C["3. 执行一个宏任务\n（macrotask queue）"]
-    C --> C1["• setTimeout callback\n• setInterval callback\n• I/O callback\n• UI render（每帧一次）"]
-    C --> D["4. 重复2-3\n（微任务 → 宏任务 → 微任务...）"]
-    D --> B
-```
+![Promise 状态转换图](assets/images/mermaid/promise-state.png)
+
 
 #### 14.3 浏览器 vs Node Event Loop
 
@@ -1333,20 +1274,8 @@ Promise.resolve().then(() => console.log('microtask'));
 // 每个阶段之间都会执行微任务队列（类似浏览器每轮宏任务后清微任务）
 ```
 
-```mermaid
-flowchart TB
-    subgraph node_loop["Node.js Event Loop（libuv）"]
-        direction TB
-        timers["timers\n（setTimeout/interval）"]
-        pending["pending callbacks"]
-        idle["idle, prepare"]
-        poll["poll\n（获取新I/O事件）"]
-        check["check\n（setImmediate）"]
-        close["close callbacks"]
-    end
-    
-    timers --> pending --> idle --> poll --> check --> close --> timers
-```
+![浏览器事件循环流程](assets/images/mermaid/event-loop.png)
+
 
 #### 14.4 MutationObserver 为什么是微任务
 
@@ -1650,15 +1579,8 @@ flowchart LR
     end
 ```
 
-```mermaid
-flowchart LR
-    subgraph set_features["Set 特性"]
-        S1["唯一性：自动去重"]
-        S2["查找性能：O(1)（has）"]
-        S3["添加/删除：O(1)"]
-        S4["天然适合去重：[...new Set([1,2,2,3])]"]
-    end
-```
+![Set 特性说明](assets/images/mermaid/set-features.png)
+
 
 ---
 
@@ -1858,30 +1780,8 @@ const { proxy, revoke } = Proxy.revocable(target, handler);
 // import
 ```
 
-```mermaid
-flowchart LR
-    subgraph esm["ESM"]
-        E1["编译时加载：静态分析"]
-        E2["import：必须顶层"]
-        E3["导出值：绑定（只读）"]
-        E4["循环引用：靠暂时性死区"]
-        E5["this：undefined"]
-        E6["严格模式：自动开启"]
-        E7["异步加载：支持（import()）"]
-        E8["浏览器：需要type=module"]
-    end
-    
-    subgraph cjs["CJS"]
-        C1["运行时解析"]
-        C2["require可动态"]
-        C3["值拷贝"]
-        C4["靠缓存"]
-        C5["当前模块对象"]
-        C6["不自动"]
-        C7["不支持"]
-        C8["不支持"]
-    end
-```
+![ESM 与 CJS 对比](assets/images/mermaid/esm-vs-cjs.png)
+
 
 ```javascript
 // ESM的import为什么必须顶层（静态性）：
@@ -2054,21 +1954,8 @@ b.prop = a; // a引用+1
 // % gc() // 在Node启动时加--expose-gc，或浏览器debug时用
 ```
 
-```mermaid
-flowchart LR
-    subgraph v8_gc["V8 GC 架构"]
-        direction TB
-        subgraph new_space["新生代（New Space）1-8MB"]
-            S1["Scavenge算法\n复制-替换"]
-            S2["存活短的对象"]
-        end
-        
-        subgraph old_space["老生代（Old Space）几十MB~GB"]
-            O1["Mark-Sweep + Mark-Compact\n标记-清除-整理"]
-            O2["存活长的对象"]
-        end
-    end
-```
+![V8 GC 架构](assets/images/mermaid/v8-gc-architecture.png)
+
 
 ---
 

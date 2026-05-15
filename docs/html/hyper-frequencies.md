@@ -263,28 +263,22 @@ request.onsuccess = (e) => {
 
 ##### 1.6.3 握手与连接建立流程
 
-```
-客户端                                          服务器
-  │                                              │
-  │  ① HTTP Upgrade 请求                          │
-  │  ──────────────────────────────────────────> │
-  │  GET /ws HTTP/1.1                             │
-  │  Host: api.example.com                        │
-  │  Upgrade: websocket                           │
-  │  Connection: Upgrade                         │
-  │  Sec-WebSocket-Key: dGhlIHNhbXBsZSBb25seQ==  │
-  │  Sec-WebSocket-Version: 13                    │
-  │                                              │
-  │  ② HTTP 101 Switching Protocols              │
-  │  <───────────────────────────────────────── │
-  │  HTTP/1.1 101 Switching Protocols            │
-  │  Upgrade: websocket                          │
-  │  Connection: Upgrade                         │
-  │  Sec-WebSocket-Accept: SldF1dFZlZWRXbGtleQ== │
-  │                                              │
-  │  ③ WebSocket 全双工通信开始                  │
-  │  <═══════════════════════════════════════>  │
-  │  （双向帧传输，无 HTTP 头开销）               │
+```mermaid
+sequenceDiagram
+    participant Client as 客户端
+    participant Server as 服务器
+
+    Client->>Server: ① HTTP Upgrade 请求
+    Note over Client,Server: GET /ws HTTP/1.1
+    Note over Client,Server: Upgrade: websocket
+    Note over Client,Server: Connection: Upgrade
+    Note over Client,Server: Sec-WebSocket-Key
+
+    Server-->>Client: ② HTTP 101 Switching Protocols
+    Note over Client,Server: Sec-WebSocket-Accept
+
+    Client<->Server: ③ WebSocket 全双工通信开始
+    Note over Client,Server: 双向帧传输，无 HTTP 头开销
 ```
 
 **握手算法（Sec-WebSocket-Key 验证）：**
@@ -1084,19 +1078,21 @@ Open Graph Protocol 由 Facebook 2010 年发布，已被微信、Twitter、Linke
 
 **三个 viewport 体系（PPK，2011）：**
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              Layout Viewport（布局视口）                   │
-│  CSS 布局参照的虚拟画布，默认 980px（各浏览器不同）        │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │           Visual Viewport（视觉视口）              │   │
-│  │  用户在屏幕上实际看到的区域，受缩放操作影响          │   │
-│  │  ┌─────────────────────────────────────────┐    │   │
-│  │  │        Ideal Viewport（理想视口）         │    │   │
-│  │  │  CSS 像素 = 物理像素 的宽度，即 device-width │    │   │
-│  │  └─────────────────────────────────────────┘    │   │
-│  └─────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Layout["Layout Viewport（布局视口）"]
+        A["CSS 布局参照的虚拟画布<br/>默认 980px（各浏览器不同）"]
+    end
+    subgraph Visual["Visual Viewport（视觉视口）"]
+        B["用户在屏幕上实际看到的区域<br/>受缩放操作影响"]
+    end
+    subgraph Ideal["Ideal Viewport（理想视口）"]
+        C["CSS 像素 = 物理像素 ÷ 缩放比例<br/>即 device-width"]
+    end
+    Layout --> Visual --> Ideal
+    style Layout fill:#e3f2fd
+    style Visual fill:#fff3e0
+    style Ideal fill:#e8f5e8
 ```
 
 | 视口类型 | 说明 | 获取方式 | 决定因素 |
@@ -1259,110 +1255,21 @@ window.visualViewport?.addEventListener('resize', () => {
     `${window.visualViewport.height * 0.01}px`
   );
 });
-```
-
-#### 4.7 高频面试追问
-
-**Q1：为什么不写 viewport meta 标签，移动端页面会缩得很小？**
-> 移动浏览器默认将 layout viewport 设为 980px，而移动端屏幕只有 375-428px CSS 像素宽。浏览器必须将 980px 的内容缩放到 ~375px 的屏幕中——相当于把一个页面缩小到原来的 ~38%，导致内容极小难以阅读。
-> 加上 `width=device-width` 后，layout viewport 等于设备宽度（Ideal Viewport），无需缩放。
-
-**Q2：`window.innerWidth` 和 `document.documentElement.clientWidth` 在用户缩放后，哪个值会变？**
-> `document.documentElement.clientWidth` = **Layout Viewport 宽度** → **不变**（缩放不改变 layout viewport）
-> `window.innerWidth` = **Visual Viewport 宽度** → **变小**（缩放时 Visual Viewport 包含的内容变少）
-> 这两个值在**窗口大小改变**时都会变，但缩放只影响 `window.innerWidth`。
-
-**Q3：双击缩放（double-tap zoom）后，Layout Viewport 会改变吗？**
-> 双击缩放改变的是 **Visual Viewport 缩放比例**，`window.innerWidth` 会变小，但 `document.documentElement.clientWidth`（Layout Viewport）**不变**。
-> 布局仍然基于 Layout Viewport，所以双击缩放不会改变 CSS 布局，只是视觉上放大了。
-
-> 📚 参考：
-> - [PPK — A tale of two viewports](https://www.quirksmode.org/mobile/viewports.html)
-> - [MDN — viewport meta tag](https://developer.mozilla.org/zh-CN/docs/Web/HTML/Guides/Viewport_meta_element)
-> - [MDN — Visual Viewport API](https://developer.mozilla.org/en-US/docs/Web/API/Visual_Viewport)
-> - [CSS Values and Units — CSS pixel](https://developer.mozilla.org/en-US/docs/Glossary/CSS_pixel)
-
----
-
-### 5. src vs href 区别
-
-## 5.1 基本定义
-
-### src (Source)
-
-`src` 是 **source** 的缩写，意为"来源"。它告诉浏览器**替换当前元素的内容**——浏览器必须下载并解析该资源才能呈现该元素。
-
-- **会阻塞渲染**（render-blocking）
-- 下载和解析是**同步**的，浏览器必须等待资源就绪才能继续
-- 用于替换型元素：`<img>`、`<script>`、`<iframe>`、`<video>`、`<audio>`、`<input type="image">`
-
-### href (Hypertext Reference)
-
-`href` 是 **Hypertext Reference** 的缩写，意为"超文本引用"。它用于**建立当前文档与引用资源之间的关联关系**，但不替换任何元素内容。
-
-- **不会阻塞渲染**（non-render-blocking）
-- 浏览器可以**并行下载**资源，同时继续解析 HTML
-- 用于链接型元素：`<link>`、`<a>`、`<area>`
-
----
-
-## 5.2 浏览器行为对比 ASCII 图
-
-```
-[无 src/href 属性时的 HTML 解析过程]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  HTML Parse    ████████████░░░░░░░░░░░░░░░░░░░░
-               ├──────────┬──────────────────────┤
-               0ms        100ms                   200ms
-
-
-[有 href 属性的 <link>（如 CSS）]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  HTML Parse    ████████████████████████████████  ← 不阻塞，持续进行
-               ├───────────────────────────────┤
-               0ms                              300ms
-
-  Link Fetch   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                ← 并行下载，不阻塞解析
-
-
-[有 src 属性的 <script>（无 async/defer）]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  HTML Parse    ████░░░░░░░░░░░░░░░░░░░░░░░░░░░
-               ├──────┬──────────────────────────┤
-               0ms   50ms                        200ms
-                      ▼
-               遇到 <script src> → 暂停解析 → 下载JS → 执行JS → 恢复解析
-                      ◄──── 阻塞点 ────►
-
-
-[有 src 属性的 <img>]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  HTML Parse    ██████████████████████████████████████████████
-               ├─────────────────────────────────────────────┤
-               0ms                                              300ms
-
-  Img Fetch              ▓▓▓▓▓▓▓▓▓▓▓▓  ← 图片下载与解析并行
-                         [img 在下载期间不阻塞解析，但渲染时需要等待]
-```
-
-**核心差异**：`href` 告诉浏览器"这份资源与你有关联，去提前获取"，浏览器会并行处理；`src` 告诉浏览器"这份资源是这个元素的内容，你必须等它就绪才能继续"。
-
----
-
-## 5.3 典型场景对比
-
-### 5.3.1 img src — 图片加载（可延迟渲染）
-
-```html
-<!-- src: 浏览器必须获取图片才能渲染该 <img> 元素 -->
-<img src="avatar.png" alt="User Avatar" />
-
-<!-- 图片加载期间，HTML 解析继续（不阻塞解析器）， -->
-<!-- 但图片位置会留下一个空白占位区域。 -->
+```mermaid
+flowchart TB
+    subgraph Layout["Layout Viewport（布局视口）"]
+        A["CSS 布局参照的虚拟画布<br/>默认 980px（各浏览器不同）"]
+    end
+    subgraph Visual["Visual Viewport（视觉视口）"]
+        B["用户在屏幕上实际看到的区域<br/>受缩放操作影响"]
+    end
+    subgraph Ideal["Ideal Viewport（理想视口）"]
+        C["CSS 像素 = 物理像素 ÷ 缩放比例<br/>即 device-width"]
+    end
+    Layout --> Visual --> Ideal
+    style Layout fill:#e3f2fd
+    style Visual fill:#fff3e0
+    style Ideal fill:#e8f5e8
 ```
 
 **行为**：
@@ -1380,21 +1287,31 @@ window.visualViewport?.addEventListener('resize', () => {
 <!-- 1. 发现 href，识别为 CSS 资源 -->
 <!-- 2. 发起并行下载，不停顿地继续解析 HTML -->
 <!-- 3. CSS 下载完成后，应用样式 -->
-```
+```mermaid
+gantt
+    title HTML 解析与资源加载时序
+    dateFormat X
+    axisFormat %sms
 
-**行为**：
-- **下载**与解析并行
-- CSSOM（CSS Object Model）构建期间，**渲染被阻塞**（因为 CSS 是渲染阻塞资源）
-- 但 HTML 解析器本身**不被阻塞**，可以继续构建 DOM
+    section 无属性 (sync)
+    HTML解析    :0, 80
+    JS下载      :80, 130
+    JS执行      :130, 150
+    HTML恢复    :150, 200
 
-### 5.3.3 script src — 脚本加载（阻塞解析）
+    section link href
+    HTML解析    :0, 300
+    CSS下载     :0, 150
 
-```html
-<!-- 无属性: 同步加载+执行，完全阻塞解析 -->
-<script src="app.js"></script>
+    section script src
+    HTML解析    :0, 50
+    JS下载      :50, 150
+    JS执行      :150, 200
+    HTML恢复    :200, 250
 
-<!-- 阻塞过程： HTML parser ──► 遇到 script ──► 暂停 ──►
-               下载 JS ──► 执行 JS ──► 恢复 HTML 解析 -->
+    section img src
+    HTML解析    :0, 300
+    图片下载    :100, 180
 ```
 
 **关键区别**：即使 `<link>` 和 `<script src>` 都会在下载期间引发资源请求，`link` 的下载**不暂停解析器**，而 `script src` **会暂停解析器**。
@@ -1511,58 +1428,47 @@ window.visualViewport?.addEventListener('resize', () => {
 
 ## 6.2 时序图：三种模式的完整对比
 
-```
-时间 ──► ─────────────────────────────────────────────────────────►
+```mermaid
+gantt
+    title HTML 解析与资源加载时序
+    dateFormat X
+    axisFormat %sms
 
-[1] 无属性 (sync)：
-    HTML Parse:  ████████[    PAUSE: 下载 JS      ][恢复]
-                              ████████████████
-                              └──────┬──────────┘
-                                     ▼
-                              JS Execute: ████████
-                                         ↑ 执行时页面"死机"
+    section 无属性 (sync)
+    HTML解析    :0, 80
+    JS下载      :80, 130
+    JS执行      :130, 150
+    HTML恢复    :150, 200
 
-    DOMContentLoaded 触发于: JS 执行完毕后 ───────────────────► DCL
-    首屏 FCP: 被延迟到 JS 执行完
+    section link href
+    HTML解析    :0, 300
+    CSS下载     :0, 150
 
+    section script src
+    HTML解析    :0, 50
+    JS下载      :50, 150
+    JS执行      :150, 200
+    HTML恢复    :200, 250
 
-[2] async 属性：
-    HTML Parse:  ████████████████[继续]────────────────────────
-                                     ████████████  ← JS 下载并行
-                              └───┬──┘
-                                  ▼
-                              执行: ████         ← 下载完即执行
-                                        ↑
-                                    可能发生在解析完成前或后
-                                    （顺序不确定！）
-
-    DOMContentLoaded: 在 async 脚本执行后触发（不保证顺序）
-    ⚠️ DOM 可能尚未完全构建，访问 DOM 需谨慎
-
-
-[3] defer 属性：
-    HTML Parse:  ██████████████████████████████████████
-    （完整解析 HTML，不中断）────────────────────────────►
-                                               ↓
-                                    JS 下载（并行）: ████████████
-                                               ↓
-                              执行: ████████  ← DCL 之前，按顺序执行
-
-    DOMContentLoaded 触发于: 所有 defer 脚本执行完毕之后
-    保证顺序，保证 DOM 已就绪
+    section img src
+    HTML解析    :0, 300
+    图片下载    :100, 180
 ```
 
 ### 关键时间点标记
 
-```
-                         DCL (DOMContentLoaded)
-                              │
-HTML ──┬──► parse ───► complete ──────────────────────►
-        │                  │                          │
-     遇到script         遇到async              defer执行窗口
-        │                  │                     ↓ DCL
-     同步下载+执行       下载完即执行
-     (阻塞解析)          (不阻塞解析)
+```mermaid
+sequenceDiagram
+    participant HTML as HTML Parser
+    participant DOM as DOM
+    participant JS as JS
+    participant DCL as DOMContentLoaded
+
+    HTML->>DOM: 构建 DOM 树
+    HTML->>JS: 遇到 script
+    JS->>JS: 下载并执行
+    DOM-->>DCL: DOM 构建完成
+    Note over DCL: 所有同步脚本执行完毕
 ```
 
 ---
@@ -1571,50 +1477,60 @@ HTML ──┬──► parse ───► complete ─────────�
 
 ### 默认（sync）脚本的渲染阻塞链
 
-```
-HTML Parser  ──► 遇到 <script src>  ──► PAUSE
-                                             │
-                    ┌─────────────────────────┤
-                    ▼                         ▼
-               网络下载 JS              下载期间：
-               （可能 100-500ms+）       页面无响应，无法渲染
-                    │
-                    ▼
-               执行 JS（可能修改 DOM/CSSOM）
-                    │
-                    ▼
-              恢复 HTML 解析  ──► 渲染树  ──► 首屏绘制
+```mermaid
+flowchart LR
+    A["HTML Parser"] -->|"->遇到 <script src>"| B["PAUSE"]
+    B -->|"下载 JS"| C["下载期间<br/>页面无响应"]
+    C -->|"执行 JS"| D["执行"]
+    D -->|"恢复解析"| E["渲染树 → 首屏绘制"]
+    style B fill:#ffcccc
 ```
 
 ### async 的渲染阻塞
 
-```
-HTML Parser  ──► 遇到 <script async>  ──► 继续解析（不 PAUSE）
-                                             │
-                                    JS 下载与解析并行
-                                             │
-                              JS 下载完成 ──► PAUSE（执行）
-                                             │
-                                        可能阻塞解析（取决于到达时间）
-                                             │
-                                        执行完继续解析或渲染
+```mermaid
+gantt
+    title HTML 解析与资源加载时序
+    dateFormat X
+    axisFormat %sms
+
+    section 无属性 (sync)
+    HTML解析    :0, 80
+    JS下载      :80, 130
+    JS执行      :130, 150
+    HTML恢复    :150, 200
+
+    section link href
+    HTML解析    :0, 300
+    CSS下载     :0, 150
+
+    section script src
+    HTML解析    :0, 50
+    JS下载      :50, 150
+    JS执行      :150, 200
+    HTML恢复    :200, 250
+
+    section img src
+    HTML解析    :0, 300
+    图片下载    :100, 180
 ```
 
 **async 的陷阱**：如果 JS 在解析完成前下载完毕，会再次暂停解析器来执行脚本，这仍是渲染阻塞。async 只保证"不等待下载"，不保证"不阻塞执行"。
 
 ### defer 的渲染阻塞
 
-```
-HTML Parser  ──► 遇到 <script defer>  ──► 继续解析（完全不阻塞）
-                                             │
-                                    JS 下载与解析并行
-                                    解析完毕时：scripts 已下载但未执行
-                                             │
-                              HTML 解析完成 ──► DOMContentLoaded 之前
-                                             │
-                                    defer scripts 按顺序执行
-                                             │
-                                        执行完 → DCL 触发 → 渲染
+```mermaid
+sequenceDiagram
+    participant HTML as HTML Parser
+    participant DOM as DOM
+    participant JS as JS
+    participant DCL as DOMContentLoaded
+
+    HTML->>DOM: 构建 DOM 树
+    HTML->>JS: 遇到 script
+    JS->>JS: 下载并执行
+    DOM-->>DCL: DOM 构建完成
+    Note over DCL: 所有同步脚本执行完毕
 ```
 
 **defer 是最理想的**：`async` 下载期间不阻塞，但**执行时**可能阻塞解析；`defer` 完全不阻塞解析，**执行时 DOM 已就绪**，且按顺序执行。
@@ -2901,19 +2817,20 @@ BOM 是浏览器厂商提供的**非标准扩展**，用于访问和操作浏览
 
 ### 两者关系
 
-```
-window (BOM 顶级对象)
- ├── document    ──► DOM 的入口（HTMLDocument 类型的实例）
- ├── navigator   ──► 浏览器信息
- ├── location    ──► URL 信息与导航
- ├── history     ──► 访问历史
- ├── screen      ──► 屏幕信息
- ├── frames      ──► 子窗口（iframe）
- ├── localStorage / sessionStorage
- ├── XMLHttpRequest / fetch
- ├── alert() / confirm() / prompt()
- ├── setTimeout / setInterval
- └── ...（更多浏览器 API）
+```mermaid
+flowchart TB
+    window["window（BOM 顶级对象）"]
+
+    window --> doc["document<br/>DOM 入口"]
+    window --> nav["navigator<br/>浏览器信息"]
+    window --> loc["location<br/>URL 信息与导航"]
+    window --> hist["history<br/>访问历史"]
+    window --> scr["screen<br/>屏幕信息"]
+    window --> frames["frames<br/>子窗口 iframe"]
+    window --> storage["localStorage / sessionStorage"]
+    window --> ajax["XMLHttpRequest / fetch"]
+    window --> dialog["alert / confirm / prompt"]
+    window --> timer["setTimeout / setInterval"]
 ```
 
 **关键关系**：`window.document` 是 DOM 的入口——DOM 嵌在 BOM 内，DOM 是 BOM 的子集。
@@ -2922,41 +2839,26 @@ window (BOM 顶级对象)
 
 ## 10.2 对象层级结构图
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      window (BOM 全局对象)               │
-│  ┌─────────────────────────────────────────────────────┤
-│  │  BOM 对象                                            │
-│  │  ├── navigator  ── 用户代理、浏览器信息               │
-│  │  ├── location   ── URL、协议、路径、查询参数          │
-│  │  ├── history    ── 浏览器历史记录栈                   │
-│  │  ├── screen     ── 屏幕分辨率、色深                    │
-│  │  ├── frames[]   ── 子窗口 / iframe 引用              │
-│  │  ├── localStorage / sessionStorage                   │
-│  │  ├── indexedDB                                          │
-│  │  ├── postMessage / addEventListener                   │
-│  │  ├── alert / confirm / prompt                       │
-│  │  ├── setTimeout / setInterval                       │
-│  │  └── open / close                                   │
-│  │                                                      │
-│  │  DOM 对象（通过 window.document 访问）                │
-│  │  └── document ──► HTMLDocument                       │
-│  │       ├── getElementById()                          │
-│  │       ├── querySelector()                            │
-│  │       ├── createElement()                            │
-│  │       ├── forms / images / links（集合）             │
-│  │       ├── body                                      │
-│  │       └── cookie / domain / title / URL              │
-│  │                                                      │
-│  │  Element 节点（Node 子类型）                          │
-│  │  ├── HTMLDivElement                                 │
-│  │  ├── HTMLInputElement                               │
-│  │  ├── HTMLElement                                   │
-│  │  └── SVGElement                                    │
-│  │                                                      │
-│  │  Text / Comment / DocumentFragment 等 Node 子类型     │
-│  └─────────────────────────────────────────────────────┘
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    window["window（BOM 全局对象）"]
+
+    subgraph bom["BOM 对象"]
+        navigator["navigator<br/>用户代理、浏览器信息"]:::blue
+        location["location<br/>URL 信息与导航"]:::blue
+        history["history<br/>访问历史"]:::blue
+        screen["screen<br/>屏幕信息"]:::blue
+    end
+
+    subgraph dom["DOM"]
+        document["document<br/>DOM 入口"]:::green
+    end
+
+    window --> bom
+    window --> dom
+
+    classDef green fill:#e8f5e8
+    classDef blue fill:#e3f2fd
 ```
 
 ---
@@ -3406,65 +3308,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
-```
+```mermaid
+flowchart TB
+    window["window（BOM 全局对象）"]
 
-注意：`history.pushState` 和 `replaceState` **不会触发** `popstate` 事件，只有浏览器的前进/后退按钮会触发。手动点击链接需要用 `pushState` 配合自定义事件系统。
+    subgraph bom["BOM 对象"]
+        navigator["navigator<br/>用户代理、浏览器信息"]:::blue
+        location["location<br/>URL 信息与导航"]:::blue
+        history["history<br/>访问历史"]:::blue
+        screen["screen<br/>屏幕信息"]:::blue
+    end
 
----
+    subgraph dom["DOM"]
+        document["document<br/>DOM 入口"]:::green
+    end
 
-### Q3：window、document、navigator 之间的层级关系是什么？
+    window --> bom
+    window --> dom
 
-**答**：
-
-```
-window（最外层，所有 BOM 对象的根容器）
-  └── document（DOM 入口，HTMLDocument 实例）
-        ├── querySelector / getElementById 等 DOM API
-        └── cookie / domain / title / URL 等文档元数据
-
-navigator（独立 BOM 对象，与 document 平级）
-  └── userAgent / hardwareConcurrency / onLine 等浏览器信息
-
-location（独立 BOM 对象）
-  └── href / protocol / hostname / pathname / search / hash
-
-history（独立 BOM 对象）
-  └── back / forward / go / pushState / replaceState
-
-screen（独立 BOM 对象）
-  └── width / height / availWidth / availHeight
-```
-
-**记忆口诀**：
-- `window` 是**最大的盒子**（整个浏览器窗口）
-- `document` 是**盒子里的文档**（HTML 内容）
-- `navigator` 是**盒子外面的标签**（告诉别人这是什么浏览器）
-- `location` 是**盒子上的地址栏**（当前在哪里）
-- `history` 是**盒子里的后退按钮**（访问历史）
-
----
-
-## 10.8 常见坑与最佳实践
-
-### 坑 1：在 SSR 环境中访问 window
-
-```typescript
-// ❌ 服务端渲染时会报错：window is not defined
-const width = window.innerWidth;
-
-// ✅ 正确做法：环境检测
-if (typeof window !== 'undefined') {
-  const width = window.innerWidth;
-}
-
-// ✅ React 中的正确做法：useEffect 只在客户端运行
-function Component() {
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    setWidth(window.innerWidth);
-  }, []);
-  return <div>Width: {width}</div>;
-}
+    classDef green fill:#e8f5e8
+    classDef blue fill:#e3f2fd
 ```
 
 ### 坑 2：navigator.userAgent 不可靠
@@ -4369,46 +4232,16 @@ if (selection.toString()) {
 
 <!-- 链接默认可拖拽（拖拽 URL） -->
 <a href="https://example.com" draggable="true">链接</a>
-```
-
-### 拖拽事件顺序
-
-```
-dragstart → drag → dragenter → dragover → dragleave → drop → dragend
-   │        │       │           │
-   │        │       │           └── 持续触发（需要 preventDefault 允许放置）
-   │        │       │
-   │        │       └── 进入放置目标
-   │        │
-   └── 开始拖拽（设置 dataTransfer）
-```
-
-### DataTransfer 对象
-
-```javascript
-el.addEventListener('dragstart', (e) => {
-  // 设置拖拽数据
-  e.dataTransfer.setData('text/plain', '纯文本');
-  e.dataTransfer.setData('text/html', '<b>HTML内容</b>');
-  e.dataTransfer.setData('text/uri-list', 'https://example.com');
-  e.dataTransfer.setData('application/json', JSON.stringify({ id: 1 }));
-
-  // 设置拖拽效果
-  e.dataTransfer.effectAllowed = 'copyMove'; // 允许复制/移动
-
-  // 设置自定义拖拽图标
-  const img = new Image();
-  img.src = 'drag-icon.png';
-  e.dataTransfer.setDragImage(img, 10, 10);
-});
-
-el.addEventListener('drop', (e) => {
-  e.preventDefault(); // 阻止默认行为
-  const text = e.dataTransfer.getData('text/plain');
-  const json = JSON.parse(e.dataTransfer.getData('application/json'));
-  const files = e.dataTransfer.files; // 拖拽文件
-  const urls = e.dataTransfer.getData('text/uri-list'); // URL 列表
-});
+```mermaid
+flowchart LR
+    A["dragstart"] --> B["drag"]
+    B --> C["dragenter"]
+    C --> D["dragover"]
+    D --> E["dragleave"]
+    E --> F["drop"]
+    style A fill:#e3f2fd
+    style F fill:#e8f5e8
+    note1["dragover 需要 preventDefault 才能接收 drop"]
 ```
 
 ### effectAllowed 值
@@ -5113,49 +4946,23 @@ const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
   Username
   <input type="text" name="username" />
 </label>
-```
+```mermaid
+flowchart TB
+    subgraph explicit["显式关联（for + id）"]
+        L1["<label for=\"username\">"]
+        I1["<input id=\"username\">"]
+        L1 -->|"for"| I1
+    end
 
-### 结构对比
+    subgraph implicit["隐式关联（嵌套）"]
+        L2["<label><br/>用户名<input></label>"]
+    end
 
-```
-显式关联：
-+------------------------------------------+
-| <label for="username">  ←──[for 属性]──┐ |
-|                                          │ 点击 label
-| <input id="username">  ──────────────────┘ |
-+------------------------------------------+  触发 input#username 焦点
-
-隐式关联：
-+------------------------------------------+
-| <label>                                   |
-|   Username                                |
-|   <input type="text">  ←──[自动关联]──┘  |
-| </label>                                  |
-+------------------------------------------+
-```
-
-## 17.2 点击区域扩展机制
-
-`<label>` 的核心特性：**点击 label 等价于点击对应的 input**。
-
-### 隐式关联的自动匹配
-
-HTML 规范自动将 `<label>` 内的第一个可关联后代 input/select/textarea 与该 label 关联：
-
-```html
-<!-- ✅ 关联成功 -->
-<label>
-  Email:
-  <input type="email" />
-</label>
-
-<!-- ✅ 也关联成功（嵌套层级） -->
-<label>
-  Details:
-  <span>
-    <textarea></textarea>
-  </span>
-</label>
+    subgraph aria["ARIA 标注"]
+        C["combobox"]
+        I2["input aria-expanded<br/>aria-haspopup<br/>aria-controls"]
+        C --> I2
+    end
 ```
 
 ### 可关联的控件类型
@@ -6452,42 +6259,26 @@ export default function Hero() {
     />
   );
 }
-```
+```mermaid
+flowchart LR
+    A["LCP 问题根因"] --> B["TTFB 过高"]
+    A --> C["渲染阻塞"]
+    A --> D["加载策略"]
 
-#### LCP 优化决策表
+    B --> B1["使用 CDN"]
+    B --> B2["启用 SSG/ISR"]
 
-```
-LCP 问题根因                → 推荐解决方案
-─────────────────────────────────────────────────────
-服务器响应慢（TTFB 高）      → 启用 CDN、使用 SSG/ISR 减少服务端计算
-LCP 图片未优化              → WebP/AVIF 格式 + 图片 CDN + preload
-字体阻塞                    → preload 字体文件 + font-display:swap
-渲染阻塞 JS/CSS             → 内联关键 CSS，defer 非关键 JS
-内联关键 CSS，异步加载其余   → Critical CSS 提取工具（critters）
-```
+    C --> C1["关键 CSS 内联"]
+    C --> C2["defer 非关键 JS"]
 
-> 📚 参考：前端性能优化：LCP 与 CLS 指标的优化策略（CSDN 2025），https://blog.csdn.net/2501_93895491/article/details/154149853
+    D --> D1["Critical CSS 提取"]
 
-### 24.1.3 CLS 优化策略
-
-**CLS 衡量页面生命周期中非预期布局偏移的累积值。偏移越大，用户体验越差（误点按钮、阅读被打断）。**
-
-#### 核心原则：给所有媒体元素预留空间
-
-```tsx
-// ✅ 所有图片/视频必须指定 width 和 height（或 aspect-ratio）
-<Image
-  src="/product.jpg"
-  alt="商品图"
-  width={800}
-  height={600}
-  style={{ aspectRatio: '4/3' }} // 备用方案
-/>
-
-// ✅ 动态内容（广告、推荐）预留固定容器高度
-<div style={{ minHeight: '120px' }}>
-  {/* 动态加载的内容 */}
-</div>
+    style A fill:#e3f2fd
+    style B1 fill:#e8f5e8
+    style B2 fill:#e8f5e8
+    style C1 fill:#fff3e0
+    style C2 fill:#fff3e0
+    style D1 fill:#d4edda
 ```
 
 ### 24.1.4 INP 优化策略
@@ -6633,60 +6424,31 @@ export const dynamic = 'force-dynamic';
 
 // PPR（Partial Prerendering）- Next.js 15 实验特性
 // 同时流式输出静态 HTML shell + 动态 Suspense 边界
-```
+```mermaid
+gantt
+    title HTML 解析与资源加载时序
+    dateFormat X
+    axisFormat %sms
 
-### 24.3.3 渲染策略选择决策树
+    section 无属性 (sync)
+    HTML解析    :0, 80
+    JS下载      :80, 130
+    JS执行      :130, 150
+    HTML恢复    :150, 200
 
-```
-内容是否需要实时个性化？
-├── 是 → CSR（个性化首页、用户 Dashboard）
-├── 否 → 内容是否经常变化？
-    ├── 是（频繁更新） → ISR（新闻、博客）
-    ├── 否 → 页面数量是否有限？
-        ├── 是（<1000页）→ SSG（文档、营销页）
-        └── 否（>1000页）→ SSR + 缓存（大型电商）
-```
+    section link href
+    HTML解析    :0, 300
+    CSS下载     :0, 150
 
----
+    section script src
+    HTML解析    :0, 50
+    JS下载      :50, 150
+    JS执行      :150, 200
+    HTML恢复    :200, 250
 
-## 24.4 JSON-LD 结构化数据
-
-**JSON-LD 是 Google 推荐的结构化数据格式，放置在 `<head>` 中的 `<script type="application/ld+json">` 内。**
-
-### 常见 Schema 类型
-
-| 页面类型 | 推荐 Schema | 说明 |
-|---------|------------|------|
-| 博客文章 | Article | 博客、新闻、教程 |
-| 产品 | Product | 商品信息、价格、评分 |
-| 视频 | VideoObject | 视频内容、时长、缩略图 |
-| 本地商家 | LocalBusiness | 地址、电话、营业时间 |
-| 问答 | FAQPage | 常见问题解答 |
-| 面包屑 | BreadcrumbList | 导航路径 |
-
-### Article 类型示例
-
-```tsx
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "headline": "前端面试完整题库 2026",
-  "image": "https://example.com/cover.jpg",
-  "author": {
-    "@type": "Person",
-    "name": "张三",
-    "url": "https://example.com/about"
-  },
-  "publisher": {
-    "@type": "Organization",
-    "name": "前端面试指南",
-    "logo": { "@type": "ImageObject", "url": "https://example.com/logo.png" }
-  },
-  "datePublished": "2026-01-15",
-  "dateModified": "2026-05-10"
-}
-</script>
+    section img src
+    HTML解析    :0, 300
+    图片下载    :100, 180
 ```
 
 验证工具：https://search.google.com/test/rich-results
