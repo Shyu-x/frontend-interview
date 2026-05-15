@@ -172,3 +172,39 @@ git log --oneline -10               # 最近 10 条 commit
 git status                          # 当前状态
 git diff                            # 未提交的改动
 ```
+
+## Mermaid 图表规范
+
+### 使用原则
+| 场景 | 决策 |
+|------|------|
+| 流程有分支/循环/多路径 | ✅ 使用 Mermaid flowchart |
+| 架构图（多组件交互） | ✅ 使用 Mermaid flowchart |
+| 状态机/状态转换 | ✅ 使用 Mermaid stateDiagram |
+| 仅单一从上往下结构 | ❌ 使用纯文本表格或 ASCII 图 |
+| 简单的线性步骤 | ❌ 使用有序列表 |
+
+### 语法规范
+1. 节点 ID 使用英文+数字，不用中文
+2. subgraph 内不嵌套 direction
+3. 长文本用 \n 换行
+4. 避免使用已废弃语法
+5. 单图节点数 ≤ 20
+6. 嵌套层级 ≤ 2
+
+### 示例
+```mermaid
+%% 正确 ✅
+flowchart LR
+    subgraph group["分组"]
+        A --> B
+    end
+    group --> C
+
+%% 错误 ❌
+flowchart TB
+    subgraph g1
+        direction TB
+        A --> B
+    end
+```
