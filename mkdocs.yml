@@ -122,6 +122,26 @@ nav:
       - agent/index.md
       - agent/agent-comparison.md
       - agent/agent-frameworks.md
+  - React 篇:
+    - 核心基础:
+      - React 18 核心概念: react/react-18-core.md
+      - React Hooks 深入原理: react/react-hooks-deep.md
+      - React Fiber 架构: react/fiber-architecture.md
+    - 版本特性:
+      - React 18 新特性完全指南: react/react-18-new-features.md
+      - React 19 新特性预览: react/react-19-preview.md
+    - 手写代码:
+      - React 手写代码题 (上): react/react-coding-part1.md
+      - React 手写代码题 (下): react/react-coding-part2.md
+    - 性能与架构:
+      - React 性能优化实战: react/performance-optimization.md
+      - React 状态管理方案: react/state-management.md
+      - React 组件模式大全: react/component-patterns.md
+  - AI Agent 篇:
+    - 概述与入门:
+      - agent/index.md
+      - agent/agent-comparison.md
+      - agent/agent-frameworks.md
     - 核心架构:
       - agent/layered-architecture.md
       - agent/state-machine-patterns.md
