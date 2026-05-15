@@ -212,26 +212,7 @@ class ToolRegistry {
 
 ### 2.1 完整生命周期流程
 
-```mermaid
-flowchart LR
-    subgraph lifecycle["工具执行生命周期"]
-        L1[LLM 请求]
-        L2[验证]
-        L3[执行]
-        L4[后处理]
-        L5[完成]
-    end
-
-    L1 -->|"1. 接收工具调用"| L2
-    L2 -->|"2. Schema 验证"| L3
-    L3 -->|"3. 沙箱执行"| L4
-    L4 -->|"4. 结果转换"| L5
-    L5 -->|"5. 返回LLM"| L6[完成]
-
-    L2 -.->|"参数填充"| L2
-    L3 -.->|"超时检测"| L3
-    L3 -.->|"错误处理与重试"| L7[错误处理]
-```
+![工具执行生命周期](../assets/images/mermaid/tool-patterns-1.png)
 
 ### 2.2 生命周期实现
 
@@ -1315,22 +1296,7 @@ class ContextPropagator {
 
 ### 6.1 沙箱架构
 
-```mermaid
-flowchart TB
-    subgraph main["主进程"]
-        TE["ToolExecutor<br/>- 输入验证<br/>- 资源限制<br/>- 结果收集"]
-    end
-
-    subgraph sandbox["沙箱进程池"]
-        S1[Sandbox 1 隔离进程]
-        S2[Sandbox 2 隔离进程]
-        SN[Sandbox N 隔离进程]
-    end
-
-    TE -->|"IPC / 消息传递"| S1
-    TE -->|"IPC / 消息传递"| S2
-    TE -->|"IPC / 消息传递"| SN
-```
+![沙箱架构](../assets/images/mermaid/tool-patterns-2.png)
 
 ### 6.2 进程级沙箱
 

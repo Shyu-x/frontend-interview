@@ -173,42 +173,7 @@ enum AgentEvent {
 
 ### 2.2 状态转换图
 
-```mermaid
-flowchart TB
-    N0["start think execute"]
-    N1["idle"]
-    N2["thinking"]
-    N3["executing"]
-    N4["waiting"]
-    N5["resume"]
-    N6["complete"]
-    N7["paused"]
-    N8["waiting"]
-    N9["wait for"]
-    N10["external event"]
-    N11["fail"]
-    N12["completed"]
-    N13["error"]
-    N14["reset"]
-    N15["aborted"]
-    N16["idle"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-    N9 --> N10
-    N10 --> N11
-    N11 --> N12
-    N12 --> N13
-    N13 --> N14
-    N14 --> N15
-    N15 --> N16
-```
+![Agent State Transition](../assets/images/mermaid/state-machine-1.png)
 
 ### 2.3 Agent 状态机实现
 
@@ -1755,54 +1720,7 @@ class AgentOrchestrator {
 
 ## 状态图汇总
 
-```mermaid
-flowchart TB
-    N0["AGENT LIFECYCLE"]
-    N1["start execute"]
-    N2["idle"]
-    N3["thinking"]
-    N4["executing"]
-    N5["abort complete"]
-    N6["paused"]
-    N7["waiting"]
-    N8["completed"]
-    N9["resume"]
-    N10["fail reset"]
-    N11["error"]
-    N12["aborted"]
-    N13["idle"]
-    N14["TASK QUEUE STATES"]
-    N15["enqueue dequeue complete"]
-    N16["pending"]
-    N17["ready"]
-    N18["running"]
-    N19["retry"]
-    N20["done"]
-    N21["failed"]
-    N22["retry"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-    N9 --> N10
-    N10 --> N11
-    N11 --> N12
-    N12 --> N13
-    N13 --> N14
-    N14 --> N15
-    N15 --> N16
-    N16 --> N17
-    N17 --> N18
-    N18 --> N19
-    N19 --> N20
-    N20 --> N21
-    N21 --> N22
-```
+![Agent and Task Queue States](../assets/images/mermaid/state-machine-2.png)
 
 ---
 

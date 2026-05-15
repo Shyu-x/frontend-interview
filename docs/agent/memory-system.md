@@ -20,7 +20,7 @@
 
 ### 1.1 为什么 Agent 需要记忆
 
-![有无记忆对比](assets/images/mermaid/no-memory-vs-with-memory.png)
+![有无记忆对比](assets/images/mermaid/memory-system-1.png)
 
 
 ### 1.2 记忆类型分类

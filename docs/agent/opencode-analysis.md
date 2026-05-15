@@ -45,99 +45,11 @@ OpenCode 是一个开源的 AI 编程代理（AI Coding Agent），帮助开发�
 
 ### 2.1 整体架构图
 
-```mermaid
-flowchart TB
-    N0["用户交互层"]
-    N1["CLI"]
-    N2["TUI"]
-    N3["Desktop"]
-    N4["IDE Plugin"]
-    N5["命令行入口 (cmd/)"]
-    N6["Cobra CLI 框架"]
-    N7["应用核心层 (internal/app/)"]
-    N8["会话管理"]
-    N9["消息处理"]
-    N10["状态管理"]
-    N11["(session)"]
-    N12["(message)"]
-    N13["(app state)"]
-    N14["LLM 层 (internal/llm/)"]
-    N15["Provider"]
-    N16["Tools"]
-    N17["Streaming"]
-    N18["Config"]
-    N19["Manager"]
-    N20["System"]
-    N21["Handler"]
-    N22["Manager"]
-    N23["集成层"]
-    N24["MCP Server"]
-    N25["LSP Client"]
-    N26["Database"]
-    N27["(MCP)"]
-    N28["(LSP)"]
-    N29["(SQLite)"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-    N9 --> N10
-    N10 --> N11
-    N11 --> N12
-    N12 --> N13
-    N13 --> N14
-    N14 --> N15
-    N15 --> N16
-    N16 --> N17
-    N17 --> N18
-    N18 --> N19
-    N19 --> N20
-    N20 --> N21
-    N21 --> N22
-    N22 --> N23
-    N23 --> N24
-    N24 --> N25
-    N25 --> N26
-    N26 --> N27
-    N27 --> N28
-    N28 --> N29
-```
+![整体架构图](../assets/images/mermaid/opencode-1.png)
 
 ### 2.2 核心模块划分
 
-```mermaid
-flowchart TB
-    N0["internal/"]
-    N1["app/"]
-    N2["config/"]
-    N3["db/"]
-    N4["llm/"]
-    N5["provider/"]
-    N6["tools/"]
-    N7["streaming/"]
-    N8["tui/"]
-    N9["logging/"]
-    N10["message/"]
-    N11["session/"]
-    N12["lsp/"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-    N9 --> N10
-    N10 --> N11
-    N11 --> N12
-```
+![核心模块划分](../assets/images/mermaid/opencode-2.png)
 
 ### 2.3 技术栈
 
@@ -216,18 +128,7 @@ type Request struct {
 
 #### 工具调用流程
 
-```mermaid
-flowchart TB
-    N0["用户输入 消息构建 LLM 调用 工具调用请求"]
-    N1["ToolCallRequest ToolCallResult"]
-    N2["User Approval Tool Execution"]
-    N3["Approved Denied"]
-    N4["Execute Tool Send Result Return Error Se"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-```
+![工具调用流程](../assets/images/mermaid/opencode-3.png)
 
 ### 3.3 状态管理
 
@@ -272,136 +173,7 @@ CREATE TABLE sessions (
 
 ### 4.1 目录树
 
-```mermaid
-flowchart TB
-    N0["opencode/"]
-    N1["cmd/"]
-    N2["root.go"]
-    N3["interactive.go"]
-    N4["noninteractive.go"]
-    N5["flags.go"]
-    N6["internal/"]
-    N7["app/"]
-    N8["app.go"]
-    N9["session.go"]
-    N10["messaging.go"]
-    N11["config/"]
-    N12["config.go"]
-    N13["models.go"]
-    N14["tools.go"]
-    N15["db/"]
-    N16["db.go"]
-    N17["session.go"]
-    N18["message.go"]
-    N19["migrations/"]
-    N20["llm/"]
-    N21["provider.go"]
-    N22["openai/"]
-    N23["anthropic/"]
-    N24["gemini/"]
-    N25["..."]
-    N26["tools/"]
-    N27["bash.go"]
-    N28["file.go"]
-    N29["glob.go"]
-    N30["grep.go"]
-    N31["view.go"]
-    N32["write.go"]
-    N33["edit.go"]
-    N34["fetch.go"]
-    N35["sourcegraph.go"]
-    N36["tui/"]
-    N37["tea.go"]
-    N38["chat.go"]
-    N39["editor.go"]
-    N40["dialog.go"]
-    N41["model.go"]
-    N42["mcp/"]
-    N43["client.go"]
-    N44["server.go"]
-    N45["protocol.go"]
-    N46["lsp/"]
-    N47["client.go"]
-    N48["protocol.go"]
-    N49["diagnostics.go"]
-    N50["session/"]
-    N51["manager.go"]
-    N52["history.go"]
-    N53["compact.go"]
-    N54["message/"]
-    N55["builder.go"]
-    N56["history.go"]
-    N57["streaming.go"]
-    N58["logging/"]
-    N59["docs/"]
-    N60["scripts/"]
-    N61["go.mod"]
-    N62["go.sum"]
-    N63["README.md"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-    N9 --> N10
-    N10 --> N11
-    N11 --> N12
-    N12 --> N13
-    N13 --> N14
-    N14 --> N15
-    N15 --> N16
-    N16 --> N17
-    N17 --> N18
-    N18 --> N19
-    N19 --> N20
-    N20 --> N21
-    N21 --> N22
-    N22 --> N23
-    N23 --> N24
-    N24 --> N25
-    N25 --> N26
-    N26 --> N27
-    N27 --> N28
-    N28 --> N29
-    N29 --> N30
-    N30 --> N31
-    N31 --> N32
-    N32 --> N33
-    N33 --> N34
-    N34 --> N35
-    N35 --> N36
-    N36 --> N37
-    N37 --> N38
-    N38 --> N39
-    N39 --> N40
-    N40 --> N41
-    N41 --> N42
-    N42 --> N43
-    N43 --> N44
-    N44 --> N45
-    N45 --> N46
-    N46 --> N47
-    N47 --> N48
-    N48 --> N49
-    N49 --> N50
-    N50 --> N51
-    N51 --> N52
-    N52 --> N53
-    N53 --> N54
-    N54 --> N55
-    N55 --> N56
-    N56 --> N57
-    N57 --> N58
-    N58 --> N59
-    N59 --> N60
-    N60 --> N61
-    N61 --> N62
-    N62 --> N63
-```
+![目录树](../assets/images/mermaid/opencode-4.png)
 
 ### 4.2 各模块职责
 
@@ -448,16 +220,7 @@ type Tool interface {
 
 基于 Bubble Tea 的组件化 UI：
 
-```mermaid
-flowchart TB
-    N0["[Model Selector] [Ctrl+K Commands]"]
-    N1["AI: How can I help you today?"]
-    N2["User: I need to fix a bug in the auth mo"]
-    N3["[i] Edit message..."]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-```
+![TUI 界面](../assets/images/mermaid/opencode-5.png)
 
 ---
 
@@ -715,28 +478,7 @@ OpenCode ← MCP Client ← Tool Result
 
 #### 工具执行权限
 
-```mermaid
-flowchart TB
-    N0["type Permission struct {"]
-    N1["Tool string"]
-    N2["Args map[string]interface{}"]
-    N3["Approved bool"]
-    N4["ExpiresAt time.Time"]
-    N5["// 权限对话框"]
-    N6["Tool Execution Permission"]
-    N7["bash: 'rm -rf node_modules'"]
-    N8["⚠️ This will delete files"]
-    N9["[Allow] [Allow Session] [Deny]"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-```
+![工具执行权限](../assets/images/mermaid/opencode-6.png)
 
 ### 6.3 LSP 集成
 
