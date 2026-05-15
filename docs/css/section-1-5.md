@@ -997,17 +997,26 @@ function resolveFlex(config: FlexItemConfig): string {
 
 ---
 
-## 📚 参考
+## 附录：参考资料
 
-- [MDN CSS 盒模型](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Box_Model)
-- [MDN box-sizing](https://developer.mozilla.org/zh-CN/docs/Web/CSS/box-sizing)
-- [MDN BFC 块格式化上下文](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Display)
-- [MDN z-index 与层叠上下文](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Positioning/Understanding_z_index)
-- [MDN CSS Flexbox](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Flexible_Box_Layout)
-- [MDN CSS Grid](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Grid_Layout)
-- [CSS 100道面试题及答案 - 腾讯云开发者社区](https://cloud.tencent.com/developer/article/2564400)
-- [CSS 专题之 BFC - 掘金](https://blog.csdn.net/m0_56326830/article/details/147133068)
-- [CSS display:flow-root 详解 - 张鑫旭](https://www.zhangxinxu.com/wordpress/?p=9404)
-- [CSS @layer 级联层 - PHP中文网](https://www.php.cn/faq/490369.html)
-- [CSS Flexbox Container - W3Schools](https://www.w3schools.com/css/css3_flexbox.asp)
-- [CSS Grid Layout Going Responsive - Envato Tuts](https://webdesign.tutsplus.com/tutorials/css-grid-layout-going-responsive--cms-27270)
+### 官方文档
+
+| 资源 | 说明 |
+|------|------|
+| [MDN - CSS 盒模型](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Box_Model) | 盒模型详解 |
+| [MDN - box-sizing](https://developer.mozilla.org/zh-CN/docs/Web/CSS/box-sizing) | box-sizing 属性 |
+| [MDN - BFC 块格式化上下文](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Display) | BFC 定义 |
+| [MDN - z-index 与层叠上下文](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Positioning/Understanding_z_index) | 层叠顺序 |
+| [MDN - CSS Flexbox](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Flexible_Box_Layout) | Flexbox 布局 |
+| [MDN - CSS Grid](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_Grid_Layout) | Grid 布局 |
+
+### 精选文章
+
+| 资源 | 说明 |
+|------|------|
+| [腾讯云 - CSS 100道面试题](https://cloud.tencent.com/developer/article/2564400) | CSS 面试题汇总 |
+| [CSDN - CSS 专题之 BFC](https://blog.csdn.net/m0_56326830/article/details/147133068) | BFC 详解 |
+| [张鑫旭 - flow-root 详解](https://www.zhangxinxu.com/wordpress/?p=9404) | display:flow-root |
+| [PHP中文网 - CSS @layer 级联层](https://www.php.cn/faq/490369.html) | CSS 级联层 |
+| [W3Schools - Flexbox](https://www.w3schools.com/css/css3_flexbox.asp) | Flexbox 教程 |
+| [Envato - CSS Grid 响应式](https://webdesign.tutsplus.com/tutorials/css-grid-layout-going-responsive--cms-27270) | Grid 响应式 |

@@ -1310,20 +1310,43 @@ fn.flush();  // 立即执行
 
 ---
 
-> 📚 参考：
-> - https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy
-> - https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Reflect
-> - https://cloud.tencent.com/developer/news/2263970（Vue3 Proxy + Reflect 响应式原理）
-> - https://zhuanlan.zhihu.com/p/109252446（Vue3 Proxy 详解）
-> - https://blog.csdn.net/caishuangxi111/article/details/146554747（Vue3 响应式 Proxy vs defineProperty）
-> - https://blog.csdn.net/iChangebaobao/article/details/124176936（ESM vs CJS + Tree Shaking）
-> - https://cloud.tencent.com/developer/article/2567183（Webpack Tree Shaking 实践）
-> - https://blog.csdn.net/qi_bai_jin/article/details/158261107（V8 GC 分代回收详解）
-> - https://blog.csdn.net/yjh_OK/article/details/145779677（V8 垃圾回收原理）
-> - https://www.jb51.net/article/2602211（Web Workers 基本概念）
-> - https://blog.csdn.net/2501_92234528/article/details/148566011（Web Worker + OffscreenCanvas 多线程渲染）
-> - https://blog.csdn.net/liudadaxuexi/article/details/147349479（Web Worker + OffscreenCanvas 图像处理）
-> - https://blog.csdn.net/achievek/article/details/119696960（防抖与节流原理与实践）
-> - https://cloud.tencent.com/developer/article/2552090（Throttle 与 Debounce 函数实现）
-> - https://blog.csdn.net/weixin_44889399/article/details/122333502（防抖与节流实现）
-> - https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WeakRef（WeakRef MDN）
+## 附录：参考资料
+
+### Proxy 与 Reflect
+
+| 资源 | 说明 |
+|------|------|
+| [MDN - Proxy](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy) | Proxy 代理对象 |
+| [MDN - Reflect](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Reflect) | Reflect 反射 |
+| [腾讯云 - Vue3 Proxy + Reflect](https://cloud.tencent.com/developer/news/2263970) | Vue3 响应式原理 |
+| [知乎 - Vue3 Proxy 详解](https://zhuanlan.zhihu.com/p/109252446) | Vue3 Proxy 详解 |
+| [CSDN - Proxy vs defineProperty](https://blog.csdn.net/caishuangxi111/article/details/146554747) | Vue3 响应式对比 |
+
+### 模块与打包
+
+| 资源 | 说明 |
+|------|------|
+| [CSDN - ESM vs CJS](https://blog.csdn.net/iChangebaobao/article/details/124176936) | ESM vs CJS + Tree Shaking |
+| [腾讯云 - Webpack Tree Shaking](https://cloud.tencent.com/developer/article/2567183) | Tree Shaking 实践 |
+
+### 垃圾回收与内存
+
+| 资源 | 说明 |
+|------|------|
+| [CSDN - V8 GC 分代回收](https://blog.csdn.net/qi_bai_jin/article/details/158261107) | V8 垃圾回收原理 |
+| [CSDN - 垃圾回收详解](https://blog.csdn.net/yjh_OK/article/details/145779677) | V8 垃圾回收 |
+| [MDN - WeakRef](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/WeakRef) | WeakRef API |
+
+### Web Worker
+
+| 资源 | 说明 |
+|------|------|
+| [CSDN - Web Workers 基本概念](https://www.jb51.net/article/2602211.htm) | Web Worker 入门 |
+| [CSDN - Worker + OffscreenCanvas](https://blog.csdn.net/2501_92234528/article/details/148566011) | 多线程渲染 |
+
+### 性能优化
+
+| 资源 | 说明 |
+|------|------|
+| [CSDN - 防抖与节流原理](https://blog.csdn.net/achievek/article/details/119696960) | 防抖节流详解 |
+| [腾讯云 - Throttle 实现](https://cloud.tencent.com/developer/article/2552090) | Throttle 与 Debounce |
