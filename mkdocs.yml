@@ -104,6 +104,9 @@ nav:
     - js/hyper-frequencies.md
     - js/section-13-18.md
     - js/section-19-25.md
+    - js/event-loop-questions.md
+  - 算法篇:
+    - algorithm/index.md
   - TypeScript 篇:
     - TypeScript 核心概念与面试题: typescript/index.md
   - 网络篇:
