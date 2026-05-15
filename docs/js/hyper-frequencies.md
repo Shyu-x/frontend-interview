@@ -114,9 +114,8 @@ console.log(true === 1);    // false
 ```mermaid
 flowchart LR
     subgraph conversion["== 隐式转换规则"]
-        direction TB
         null["null"] -->|"只和 undefined 相等"| und["undefined"]
-        und2["undefined"] -->|"只和 null 相等"| null2["null"]
+        undefined["undefined"] -.->|"也等于 null"| null2["null"]
         str["string"] -->|"和 number 比转数字"| num["number"]
         bool["boolean"] -->|"转数字 true=1 false=0"| num2["数字"]
         obj["object"] -->|"toPrimitive 转原始值"| result["再比较"]
@@ -299,19 +298,18 @@ fn(); // 10
 ```mermaid
 flowchart TB
     subgraph outer["outer() 执行上下文"]
-        direction TB
         x["x = 10"]
-        inner["inner 函数定义"]
-        inner -->|"[[Scope]] →"| outer_ao["outer AO"]
+        inner["inner 函数定义"] -->|"[[Scope]] → outer AO"| scopeRef
     end
     
-    outer -->|"返回 inner"| fn_call
+    outer["outer()"] -->|"返回 inner 函数"| fn_call
     
-    subgraph inner_exec["fn() 执行（inner）"]
-        direction TB
+    subgraph inner_exec["fn() = inner() 执行"]
         fn["fn = outer() 返回的 inner"]
         fn -->|"通过 [[Scope]] 访问"| x_val["访问 outer.x = 10"]
     end
+    
+    scopeRef["[[Scope]] 引用"]
 ```
 
 #### 5.2 为什么能访问外层变量
@@ -425,28 +423,23 @@ f1();
 
 ```mermaid
 flowchart TB
-    subgraph global["Global Scope"]
-        direction TB
+    subgraph global["Global Scope（全局作用域）"]
         a["a = 1"]
         f1["f1 = function"]
-        f1 -->|"f1[[Scope]] = [global]"| global_ref[""]
     end
     
-    global -->|"parent"| f1_scope
+    global -->|"创建 f1 时<br/>f1[[Scope]] = [global]"| f1_scope
     
-    subgraph f1_scope["f1() Scope"]
-        direction TB
+    subgraph f1_scope["f1() 执行作用域"]
         b["b = 2"]
         f2["f2 = function"]
-        f2 -->|"f2[[Scope]] = [f1, global]"| f1_ref[""]
     end
     
-    f1_scope -->|"parent"| f2_scope
+    f1_scope -->|"创建 f2 时<br/>f2[[Scope]] = [f1, global]"| f2_scope
     
-    subgraph f2_scope["f2() Scope（当前）"]
-        direction TB
+    subgraph f2_scope["f2() 执行作用域（当前）"]
         c["c = 3"]
-        lookup["查找：本地 → f1 → global"]
+        lookup["变量查找路径：<br/>f2.local → f1 → global"]
     end
 ```
 
@@ -1559,23 +1552,22 @@ function dfs(node) {
 
 ```mermaid
 flowchart LR
-    subgraph comparison["Map vs Object"]
-        direction TB
+    subgraph map["Map 特性"]
         M1["键类型：任意（函数、对象、NaN都行）"]
         M2["有序性：按插入顺序"]
-        M3["大小：size属性"]
-        M4["迭代：可直接迭代"]
-        M5["原型链：无"]
-        M6["JSON：不能直接"]
+        M3["大小：map.size"]
+        M4["迭代：可直接 forEach/for...of"]
+        M5["原型链：无（干净）"]
+        M6["JSON：不能直接序列化"]
     end
     
-    subgraph comparison2["Object"]
-        O1["键类型：只能是string/symbol"]
-        O2["有序性：基本有序"]
+    subgraph obj["Object 特性"]
+        O1["键类型：只能是 string/symbol"]
+        O2["有序性：基本有序（写入顺序）"]
         O3["大小：Object.keys().length"]
-        O4["迭代：需要Object.keys()"]
-        O5["原型链：有（需hasOwnProperty）"]
-        O6["JSON：可以"]
+        O4["迭代：需要 Object.keys()"]
+        O5["原型链：有（需 hasOwnProperty）"]
+        O6["JSON：可直接序列化"]
     end
 ```
 
