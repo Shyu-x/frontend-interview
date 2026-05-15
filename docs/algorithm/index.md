@@ -21,10 +21,10 @@
 
 | 分类 | 题目数 | 说明 |
 |------|--------|------|
-| [二叉树题型](leetcode-hot100-advanced.md#一二叉树题型) | 6 道 | 遍历、构造、路径 |
-| [动态规划](leetcode-hot100-advanced.md#二动态规划) | 8 道 | 背包、股票、打家劫舍 |
+| [二叉树题型](leetcode-hot100-advanced.md#一二叉树题型) | 5 道 | 遍历、构造、路径 |
+| [动态规划](leetcode-hot100-advanced.md#二动态规划) | 6 道 | 背包、股票、打家劫舍 |
 | [回溯算法](leetcode-hot100-advanced.md#三回溯算法) | 5 道 | 排列组合、N皇后 |
-| [图论算法](leetcode-hot100-advanced.md#四图论算法) | 4 道 | 拓扑排序、岛屿问题 |
+| [图论算法](leetcode-hot100-advanced.md#四图论算法) | 5 道 | 拓扑排序、岛屿问题 |
 
 **进阶题型总计**: 23 道
 

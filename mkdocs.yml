@@ -116,6 +116,7 @@ nav:
     - 前端性能优化全攻略: performance/index.md
   - 手写代码:
     - 手写代码题库: coding/index.md
+    - 高级模式: coding/advanced-patterns.md
   - AI Agent 篇:
     - 概述与入门:
       - agent/index.md
