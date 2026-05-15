@@ -1481,7 +1481,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A["HTML Parser"] -->|"->遇到 <script src>"| B["PAUSE"]
+    A["HTML Parser"] -->|"-&gt;遇到 &lt;script src&gt;"| B["PAUSE"]
     B -->|"下载 JS"| C["下载期间<br/>页面无响应"]
     C -->|"执行 JS"| D["执行"]
     D -->|"恢复解析"| E["渲染树 → 首屏绘制"]
@@ -4951,13 +4951,13 @@ const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 ```mermaid
 flowchart TB
     subgraph explicit["显式关联（for + id）"]
-        L1["<label for=\"username\">"]
-        I1["<input id=\"username\">"]
+        L1["&lt;label for=\"username\">"]
+        I1["&lt;input id=\"username\">"]
         L1 -->|"for"| I1
     end
 
     subgraph implicit["隐式关联（嵌套）"]
-        L2["<label><br/>用户名<input></label>"]
+        L2["&lt;label&gt;&lt;br/&gt;用户名&lt;input&gt;&lt;/label&gt;"]
     end
 
     subgraph aria["ARIA 标注"]

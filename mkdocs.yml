@@ -109,6 +109,10 @@ nav:
     - algorithm/index.md
   - TypeScript 篇:
     - TypeScript 核心概念与面试题: typescript/index.md
+  - 构建工具篇:
+    - 构建工具全景图: build-tools/index.md
+    - Vite 8.x 深度解析: build-tools/vite-deep-dive.md
+    - 打包工具对比: build-tools/bundler-comparison.md
   - 网络篇:
     - network/section-5-12.md
     - network/section-13-20.md
@@ -137,6 +141,11 @@ nav:
       - React 性能优化实战: react/performance-optimization.md
       - React 状态管理方案: react/state-management.md
       - React 组件模式大全: react/component-patterns.md
+  - 运行时篇:
+    - 运行时全景图: runtime/index.md
+    - Node.js 核心原理: runtime/nodejs-core.md
+    - Bun 2.x 使用指南: runtime/bun-guide.md
+    - Deno 2.x 使用指南: runtime/deno-guide.md
   - AI Agent 篇:
     - 概述与入门:
       - agent/index.md
