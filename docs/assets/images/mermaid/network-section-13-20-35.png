@@ -1,4 +1,0 @@
-Parse error on line 15:
-...  A --> F    Note over A: 攻击流程: Resolv
----------------------^
-Expecting 'SEMI', 'NEWLINE', 'EOF', 'AMP', 'START_LINK', 'LINK', 'LINK_ID', got 'NODE_STRING'

@@ -1,4 +1,0 @@
-Parse error on line 18:
-...]    end    Note over O,C: 本质：用密码学承诺（
---------------------^
-Expecting 'SEMI', 'NEWLINE', 'EOF', 'AMP', 'START_LINK', 'LINK', 'LINK_ID', got 'NODE_STRING'

@@ -1,4 +1,0 @@
-Parse error on line 19:
-...]    end    Note over T,R1: Server 进入
---------------------^
-Expecting 'SEMI', 'NEWLINE', 'EOF', 'AMP', 'START_LINK', 'LINK', 'LINK_ID', got 'NODE_STRING'
