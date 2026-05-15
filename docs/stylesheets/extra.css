@@ -120,7 +120,175 @@
   border-right: 1px solid #ddd;
 }
 
+/* ========================================
+ * Mermaid 图表美化样式
+ * ======================================== */
+
+/* Mermaid 容器样式 */
+.mermaid {
+  background: var(--md-color-bg-appshell, #f4f4f4);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin: 1.5rem 0;
+  transition: all 0.3s ease;
+}
+
+/* 浅色模式配色 */
+:root {
+  --mermaid-primaryColor: #e8eaf6;
+  --mermaid-primaryBorderColor: #5c6bc0;
+  --mermaid-primaryTextColor: #333333;
+  --mermaid-secondaryColor: #c5cae9;
+  --mermaid-tertiaryColor: #f5f5f5;
+  --mermaid-lineColor: #7986cb;
+  --mermaid-noteBkgColor: #fff8e1;
+  --mermaid-noteTextColor: #333333;
+  --mermaid-noteBorderColor: #ffb300;
+}
+
+/* 深色模式配色 */
+[data-md-color-scheme="slate"] {
+  --mermaid-primaryColor: #37474f;
+  --mermaid-primaryBorderColor: #7986cb;
+  --mermaid-primaryTextColor: #eceff1;
+  --mermaid-secondaryColor: #455a64;
+  --mermaid-tertiaryColor: #263238;
+  --mermaid-lineColor: #90a4ae;
+  --mermaid-noteBkgColor: #37474f;
+  --mermaid-noteTextColor: #eceff1;
+  --mermaid-noteBorderColor: #ffb300;
+}
+
+/* 节点样式优化 */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node diamond {
+  fill: var(--mermaid-primaryColor) !important;
+  stroke: var(--mermaid-primaryBorderColor) !important;
+  stroke-width: 2px !important;
+  rx: 8px !important;
+  ry: 8px !important;
+}
+
+.mermaid .node rect + rect,
+.mermaid .node circle + circle {
+  fill: var(--mermaid-secondaryColor) !important;
+}
+
+/* 节点文本样式 */
+.mermaid .node span {
+  fill: var(--mermaid-primaryTextColor) !important;
+  font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* 连接线样式 */
+.mermaid .edgePath .path {
+  stroke: var(--mermaid-lineColor) !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .edgePath .arrowhead {
+  fill: var(--mermaid-lineColor) !important;
+}
+
+/* 子图/分组样式 */
+.mermaid .cluster rect {
+  fill: var(--mermaid-tertiaryColor) !important;
+  stroke: var(--mermaid-primaryBorderColor) !important;
+  stroke-width: 1px !important;
+  rx: 12px !important;
+  ry: 12px !important;
+  opacity: 0.8;
+}
+
+.mermaid .cluster span {
+  fill: var(--mermaid-primaryTextColor) !important;
+  font-weight: 600;
+}
+
+/* 标签样式 */
+.mermaid .edgeLabel {
+  background-color: var(--md-color-bg-appshell, #f4f4f4) !important;
+  color: var(--mermaid-primaryTextColor) !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  font-size: 0.85rem !important;
+  border: 1px solid var(--mermaid-secondaryColor) !important;
+}
+
+/* 注释框样式 */
+.mermaid .note {
+  fill: var(--mermaid-noteBkgColor) !important;
+  stroke: var(--mermaid-noteBorderColor) !important;
+  stroke-width: 2px !important;
+  border-radius: 8px !important;
+}
+
+.mermaid .noteText {
+  fill: var(--mermaid-noteTextColor) !important;
+}
+
+/* 子图标题样式 */
+.mermaid .label {
+  color: var(--mermaid-primaryTextColor) !important;
+}
+
+/* 状态图样式 */
+.mermaid .stateGroup rect {
+  fill: var(--mermaid-secondaryColor) !important;
+  stroke: var(--mermaid-primaryBorderColor) !important;
+}
+
+.mermaid .stateGroup circle {
+  fill: var(--mermaid-primaryColor) !important;
+  stroke: var(--mermaid-primaryBorderColor) !important;
+}
+
+/* 序列图样式 */
+.mermaid .actor {
+  fill: var(--mermaid-primaryColor) !important;
+  stroke: var(--mermaid-primaryBorderColor) !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .messageLine {
+  stroke: var(--mermaid-lineColor) !important;
+  stroke-width: 2px !important;
+}
+
+/* 悬停效果 */
+.mermaid .node:hover rect,
+.mermaid .node:hover circle {
+  filter: brightness(0.95);
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .mermaid {
+    background: #263238;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
 /* 响应式优化 */
+@media screen and (max-width: 768px) {
+  .mermaid {
+    padding: 1rem;
+    font-size: 0.85rem;
+  }
+
+  .mermaid .node rect,
+  .mermaid .node circle {
+    font-size: 0.75rem;
+  }
+}
+
+/* ========================================
+ * 响应式优化
+ * ======================================== */
 @media screen and (max-width: 768px) {
   .md-typeset pre {
     font-size: 0.8em;

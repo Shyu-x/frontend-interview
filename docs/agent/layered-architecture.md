@@ -6216,12 +6216,5 @@ AI Agent 的分层架构通过清晰的责任分离，实现了系统的模块�
 
 ### 层级关系
 
-```mermaid
-flowchart LR
-    Perceive[感知层] --> Cognize[认知层] --> Decide[决策层] --> Execute[执行层] --> Comm[通信层]
-    Cognize <--> Extend[扩展层]
-    Decide <--> Extend
-    Execute <--> Extend
-    Comm <--> Extend
-```
+![层级关系](assets/images/mermaid/layered-02.png)
 扩展层横向贯穿所有层级，提供跨层的扩展能力。

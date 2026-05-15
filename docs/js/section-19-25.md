@@ -613,59 +613,50 @@ ESM 的 `import`/`export` 是编译时静态分析，依赖关系在打包阶段
 
 ### 21.1 V8 内存架构与 GC 分代
 
+```mermaid
+flowchart TB
+    subgraph Heap["V8 堆内存（Heap）"]
+        subgraph NewSpace["新生代（New Space）1~8MB"]
+            A["from-space"]:::young
+            B["to-space"]:::young
+        end
+        subgraph OldSpace["老生代（Old Space）几十MB~GB"]
+            C["Old Pointer Space"]:::old
+            D["Old Data Space"]:::old
+            E["Large Object Space"]:::old
+            F["Code Space"]:::old
+            G["Cell/PropertyCell/Map Space"]:::old
+        end
+        subgraph Code["代码区（Code）"]
+            H["机器码存放区"]:::code
+        end
+    end
+    A -->|"Scavenge<br/>Minor GC<br/>存活对象复制到to<br/>to和from互换<br/>速度极快(牺牲50%空间)"| B
+    C & D & E & F & G -->|"Mark-Sweep + Mark-Compact<br/>Major GC / Full GC<br/>速度慢，但频率低"| garbage["垃圾回收"]
+    style garbage fill:#ffcccc
+    classDef young fill:#e3f2fd
+    classDef old fill:#fff3e0
+    classDef code fill:#e8f5e8
 ```
-V8 堆内存架构
 
-┌──────────────────────────────────────────────────────────────────────┐
-│                        V8 堆内存（Heap）                              │
-│                                                                      │
-│  ┌──────────────────────────┐   ┌────────────────────────────────┐  │
-│  │    新生代（New Space）     │   │         老生代（Old Space）      │  │
-│  │    1 ~ 8 MB              │   │         几十 MB ~ GB            │  │
-│  │                          │   │                                 │  │
-│  │  from-space │ to-space  │   │   Old Pointer Space（指向其他对象）│  │
-│  │  ┌────────┐ ┌────────┐ │   │   Old Data Space（纯数据）         │  │
-│  │  │存活对象│ │空闲    │ │   │   Large Object Space（大对象）    │  │
-│  │  └────────┘ └────────┘ │   │   Code Space（编译后的机器码）    │  │
-│  │                          │   │   Cell / PropertyCell / Map Space │  │
-│  │  Scavenge（Minor GC）    │   │                                 │  │
-│  │  存活对象从from复制到to   │   │   Mark-Sweep + Mark-Compact     │  │
-│  │  to和from互换            │   │   （Major GC / Full GC）         │  │
-│  │  速度极快（牺牲50%空间）   │   │   速度慢，但频率低               │  │
-│  └──────────────────────────┘   └────────────────────────────────┘  │
-│                                                                      │
-│  ┌──────────────────────────┐                                       │
-│  │    代码区（Code）          │  机器码存放区                         │
-│  └──────────────────────────┘                                       │
-└──────────────────────────────────────────────────────────────────────┘
-```
 
 ### 21.2 GC 算法详解
 
 #### 标记-清除（Mark-Sweep）
 
+```mermaid
+flowchart LR
+    R[Root] --> A["A"]
+    R --> E["E"]
+    A --> B["B"]
+    B --> C["C"]
+    B --> D["D"]:::dead
+    E --> F["F"]
+    style D fill:#ffcccc,stroke:#ff0000,stroke-width:2px,stroke-dasharray:5
+    note1["可达对象：<br/>A, B, C, E, F"]
+    note2["不可达对象：<br/>D（待回收）"]
 ```
-Mark-Sweep 算法示意
 
-标记阶段（从根节点 DFS/BFS 遍历）：
-
-Root ──┬──→ A ──→ B ──→ C
-        │          │
-        │          └──→ D  ←─ 无引用，可回收
-        │
-        └──→ E ──→ F
-
-可达对象（标记为"存活"）：A, B, C, E, F
-不可达对象（未标记，待回收）：D
-
-清除阶段：
-- 扫描整个堆内存
-- 未标记的对象 → 回收内存
-- 标记的对象 → 清除标记（准备下一轮）
-
-优点：解决了循环引用无法回收的问题
-缺点：清除后产生内存碎片
-```
 
 #### 标记-整理（Mark-Compact）
 
@@ -979,24 +970,21 @@ DedicatedWorker 只能被创建它的页面使用，关闭页面即终止。Shar
 
 ### 24.1 概念定义与对比
 
+```mermaid
+flowchart LR
+    subgraph Debounce["防抖 Debounce"]
+        A1["用户输入: a b c d e f g h"] --> A2["等待500ms"]
+        A2 -->|"无新触发"| A3["执行(f)"]
+        note1["N秒内无新触发才执行"]
+    end
+    subgraph Throttle["节流 Throttle"]
+        B1["用户输入: a b c d e f..."] --> B2["固定200ms间隔"]
+        B2 --> B3["a"]
+        B2 -->|"..."| B4["b"] --> B5["c"]
+        note2["规定时间内只执行一次"]
+    end
 ```
-防抖（Debounce）vs 节流（Throttle）对比
 
-防抖：事件触发后，等待 N 秒后才执行
-      如果 N 秒内再次触发，重新计时
-      适用于：用户停止操作后才执行（如搜索、自动保存）
-
-用户输入: │a││b││c││d││e││f││g││h││  (等待500ms)  │
-防抖执行:                                         │ 执行(f) │
-──────────────────────────────────────────────────────────→ 时间
-
-节流：规定时间内，只执行一次（固定频率）
-      适用于：滚动事件、鼠标移动、按钮防重复点击
-
-用户输入: │a││b││c││d││e││f││g││h││i││j││k││l││  ...
-节流(200ms): │a│                                          │b│    │c│
-──────────────────────────────────────────────────────────→ 时间
-```
 
 | 维度 | 防抖（Debounce） | 节流（Throttle） |
 |------|----------------|----------------|

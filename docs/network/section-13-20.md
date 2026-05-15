@@ -1795,125 +1795,78 @@ CA 证书链是由根证书（浏览器内置）、中间证书（CA 签发）�
 
 ```mermaid
 flowchart TB
-    N0["PKI（公钥基础设施）与证书链"]
-    N1["信任锚（Trust Anchor）"]
-    N2["根证书 (Root CA)"]
-    N3["自签名证书，浏览器/OS 厂商内置"]
-    N4["示例: DigiCert Global Root G2"]
-    N5["GlobalSign Root CA"]
-    N6["ISRG Root X1 (Let's Encrypt)"]
-    N7["数量: 数百个（浏览器维护独立信任库）"]
-    N8["(根 CA 签发中间 CA)"]
-    N9["根 CA 私钥签名"]
-    N10["中间证书 (Intermediate CA)"]
-    N11["运营主体: Let's Encrypt / DigiCert / 阿里云"]
-    N12["用于签发终端实体证书"]
-    N13["通常有 1-2 级中间 CA（交叉签发等）"]
-    N14["(中间 CA 签发站点证书)"]
-    N15["中间 CA 私钥签名"]
-    N16["站点证书 (End-Entity Certificate)"]
-    N17["域名: *.example.com"]
-    N18["公钥: 用于 TLS 握手"]
-    N19["包含: CN/SAN, 公钥, 有效期, 序列号, 签名"]
-    N20["浏览器证书验证流程"]
-    N21["Step 1: 收到服务器证书（example.com）"]
-    N22["Step 2: 构建证书链"]
-    N23["example.com (签发) Intermediate CA (签发)"]
-    N24["浏览器尝试构建链，可能需要 AIA 下载中间证书"]
-    N25["(Authority Information Access 字段包含签发者 UR"]
-    N26["Step 3: 验证每个证书签名"]
-    N27["用 Root CA 公钥验证 Intermediate CA 签名"]
-    N28["用 Intermediate CA 公钥验证站点证书签名"]
-    N29["Step 4: 检查证书有效性"]
-    N30["- 时间有效性: NotBefore ≤ 当前时间 ≤ NotAfter"]
-    N31["- 域名匹配: CN/SAN 包含请求的域名"]
-    N32["- 使用限制: keyUsage / extendedKeyUsage 正确"]
-    N33["Step 5: 检查证书吊销状态"]
-    N34["- CRL (Certificate Revocation List): 下载吊"]
-    N35["- OCSP (Online Certificate Status Protoc"]
-    N36["- OCSP Stapling: 服务器附带 OCSP 响应（减少查询）"]
-    N37["Step 6: 验证通过 提取公钥 TLS 继续"]
-    N38["验证失败 显示证书错误页面"]
-    N39["HSTS（HTTP Strict Transport Security）"]
-    N40["服务器响应头:"]
-    N41["Strict-Transport-Security: max-age=31536"]
-    N42["参数详解:"]
-    N43["max-age: 浏览器强制 HTTPS 的时间（秒）"]
-    N44["31536000 = 1年（合理值: 至少 6 个月）"]
-    N45["0 = 禁用 HSTS（清除浏览器记录）"]
-    N46["includeSubDomains: 子域名也强制 HTTPS"]
-    N47["如果主域名开启，子域名也受约束"]
-    N48["⚠️ 设置前确保所有子域名都支持 HTTPS"]
-    N49["preload: 申请加入浏览器内置 HSTS 预加载列表"]
-    N50["https://hstspreload.org 提交"]
-    N51["Chrome/Firefox/Safari/Edge 等内置列表"]
-    N52["一旦加入，极难撤销（需要提交移除申请并等待浏览器更新）"]
-    N53["HSTS 效果:"]
-    N54["首次访问（HTTP） 浏览器记录 max-age"]
-    N55["后续访问（HTTP） 浏览器内部重定向为 HTTPS（不发 HTTP 请求）"]
-    N56["防止的攻击:"]
-    N57["1. SSL Stripping（MIMT）: 中间人 无法降级为 HTTP"]
-    N58["2. 混合内容警告: HTTPS 页面禁止加载 HTTP 子资源"]
-    N59["3. HTTPS Only 模式（Firefox）: 所有 HTTP 请求强制升"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-    N9 --> N10
-    N10 --> N11
-    N11 --> N12
-    N12 --> N13
-    N13 --> N14
-    N14 --> N15
-    N15 --> N16
-    N16 --> N17
-    N17 --> N18
-    N18 --> N19
-    N19 --> N20
-    N20 --> N21
-    N21 --> N22
-    N22 --> N23
-    N23 --> N24
-    N24 --> N25
-    N25 --> N26
-    N26 --> N27
-    N27 --> N28
-    N28 --> N29
-    N29 --> N30
-    N30 --> N31
-    N31 --> N32
-    N32 --> N33
-    N33 --> N34
-    N34 --> N35
-    N35 --> N36
-    N36 --> N37
-    N37 --> N38
-    N38 --> N39
-    N39 --> N40
-    N40 --> N41
-    N41 --> N42
-    N42 --> N43
-    N43 --> N44
-    N44 --> N45
-    N45 --> N46
-    N46 --> N47
-    N47 --> N48
-    N48 --> N49
-    N49 --> N50
-    N50 --> N51
-    N51 --> N52
-    N52 --> N53
-    N53 --> N54
-    N54 --> N55
-    N55 --> N56
-    N56 --> N57
-    N57 --> N58
-    N58 --> N59
+    TA["信任锚（Trust Anchor）"]
+    TA --> R["根证书 (Root CA)\n自签名证书，浏览器/OS 厂商内置\nDigiCert / GlobalSign / ISRG Root X1\n数量: 数百个"]
+    R -->|"签发"| I["中间证书 (Intermediate CA)\nLet's Encrypt / DigiCert / 阿里云\n用于签发终端实体证书"]
+    I -->|"签发"| E["站点证书 (End-Entity)\n域名: *.example.com\n公钥: 用于 TLS 握手"]
+```
+
+```mermaid
+flowchart TB
+    subgraph S1["Step 1"]
+        S1A["收到服务器证书（example.com）"]
+    end
+
+    subgraph S2["Step 2"]
+        S2A["构建证书链"]
+        S2B["example.com ←签发← Intermediate CA ←签发← Root CA"]
+        S2C["浏览器尝试构建链，可能需要 AIA 下载中间证书"]
+    end
+
+    subgraph S3["Step 3"]
+        S3A["验证每个证书签名"]
+        S3B["用 Root CA 公钥验证 Intermediate CA 签名"]
+        S3C["用 Intermediate CA 公钥验证站点证书签名"]
+    end
+
+    subgraph S4["Step 4"]
+        S4A["检查证书有效性"]
+        S4B["时间有效性: NotBefore ≤ 当前时间 ≤ NotAfter"]
+        S4C["域名匹配: CN/SAN 包含请求的域名"]
+    end
+
+    subgraph S5["Step 5"]
+        S5A["检查证书吊销状态"]
+        S5B["CRL: 下载吊销列表"]
+        S5C["OCSP: 在线查询"]
+        S5D["OCSP Stapling: 服务器附带 OCSP 响应"]
+    end
+
+    subgraph S6["Step 6"]
+        S6A["验证通过 → 提取公钥 → TLS 继续"]
+        S6B["验证失败 → 显示证书错误页面"]
+    end
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6
+```
+
+```mermaid
+flowchart TB
+    H["服务器响应头:\nStrict-Transport-Security: max-age=31536000; includeSubDomains; preload"]
+
+    subgraph M["参数详解"]
+        MA["max-age: 浏览器强制 HTTPS 的时间（秒）"]
+        MA1["31536000 = 1年（合理值: 至少 6 个月）"]
+        MA2["0 = 禁用 HSTS（清除浏览器记录）"]
+
+        MB["includeSubDomains: 子域名也强制 HTTPS"]
+        MB1["⚠️ 设置前确保所有子域名都支持 HTTPS"]
+
+        MC["preload: 申请加入浏览器内置 HSTS 预加载列表"]
+        MC1["https://hstspreload.org 提交"]
+        MC2["⚠️ 一旦加入，极难撤销"]
+    end
+
+    subgraph E["HSTS 效果"]
+        E1["首次访问（HTTP） → 浏览器记录 max-age"]
+        E2["后续访问（HTTP） → 浏览器内部重定向为 HTTPS"]
+    end
+
+    subgraph A["防止的攻击"]
+        A1["SSL Stripping（MIMT）: 中间人无法降级为 HTTP"]
+        A2["混合内容警告: HTTPS 页面禁止加载 HTTP 子资源"]
+        A3["HTTPS Only 模式（Firefox）: 所有 HTTP 请求强制升级"]
+    end
 ```
 
 ### 完整代码示例（TS/JS）
@@ -2100,129 +2053,63 @@ DNS 主要用 UDP 53 端口查询（无握手、低延迟），但当响应超�
 
 ```mermaid
 flowchart TB
-    N0["DNS 查询流程（递归 + UDP）"]
-    N1["用户浏览器"]
-    N2["DNS 查询: example.com"]
-    N3["本地 DNS 解析器（递归 resolver）"]
-    N4["(通常是 ISP 提供 / 8.8.8.8 / 1.1.1.1)"]
-    N5["1. 查缓存 命中 返回"]
-    N6["2. 未命中 迭代查询:"]
-    N7["> 根 DNS (.): 找 .com 的 NS 记录"]
-    N8["◄ .com NS 服务器地址"]
-    N9["> .com NS: 找 example.com 的 NS 记录"]
-    N10["◄ example.com NS 服务器地址"]
-    N11["> example.com NS: 找 A/AAAA 记录"]
-    N12["◄ 93.184.216.34 (IP 地址)"]
-    N13["◄ 返回 IP 给浏览器"]
-    N14["全部使用 UDP 53 端口（轻量快速）"]
-    N15["DNS 使用 TCP 的场景"]
-    N16["场景 1: 响应超过 512 字节"]
-    N17["原始 DNS 协议设计：UDP 响应最大 512 字节"]
-    N18["DNSSEC 签名数据量大 超 512 字节 切换 TCP"]
-    N19["EDNS(0) 扩展: 客户端声明自己支持大包（通常 4096 字节）"]
-    N20["场景 2: 区域传输（AXFR）"]
-    N21["主 DNS 服务器 从 DNS 服务器同步整个 zone 数据"]
-    N22["数据量大 必须用 TCP"]
-    N23["TCP 端口 53（与 UDP 53 同一个端口）"]
-    N24["场景 3: DoT / DoH（DNS over TLS / HTTPS）"]
-    N25["TLS 加密 防止 DNS 污染和中间人"]
-    N26["DoT: 端口 853（RFC 7858）"]
-    N27["DoH: 端口 443，路径 /dns-query（RFC 8484）"]
-    N28["场景 4: 客户端或服务器明确要求 TCP"]
-    N29["响应被截断（Truncated） 客户端用 TCP 重试"]
-    N30["DNS 查询太大 Truncated = 1 TCP 重试"]
-    N31["DNS 污染与防御"]
-    N32["DNS 污染攻击（DNS Spoofing / DNS Poisoning）:"]
-    N33["攻击者在 DNS 响应到达本地解析器之前，注入伪造的 DNS 响应"]
-    N34["原理: DNS 使用无连接 UDP，无握手，源 IP 不验证"]
-    N35["攻击流程:"]
-    N36["正常: Resolver DNS Query > Auth NS"]
-    N37["< Correct Response (IP A)"]
-    N38["浏览器 IP A"]
-    N39["被污染: Resolver DNS Query > Auth NS"]
-    N40["< Correct Response (IP A)"]
-    N41["Attacker Fake Response (IP evil) > Resol"]
-    N42["(先于正确响应到达)"]
-    N43["伪造的响应被缓存"]
-    N44["浏览器 IP evil (错误 IP)"]
-    N45["防御手段:"]
-    N46["1. DNSSEC（DNS Security Extensions）:"]
-    N47["- 用公钥密码学签名 DNS 记录"]
-    N48["- Resolver 验证签名是否由正确的 CA 签发"]
-    N49["- 伪造响应没有正确签名 被拒绝"]
-    N50["- 缺点: 部署不完整（很多 TLD 尚不支持）"]
-    N51["2. DoT（DNS over TLS）:"]
-    N52["- DNS 查询通过 TLS 加密隧道传输"]
-    N53["- 防止网络层监听和注入"]
-    N54["- 端口: 853"]
-    N55["- 公共 DoT: 8.8.8.8, 1.1.1.1"]
-    N56["3. DoH（DNS over HTTPS）:"]
-    N57["- DNS 查询通过 HTTPS（HTTP/2 或 HTTP/3）传输"]
-    N58["- 伪装成普通 HTTPS 流量，更难被识别和阻断"]
-    N59["- 公共 DoH: Cloudflare (1.1.1.1), Google ("]
-    N60["- 浏览器内置（Chrome, Firefox 已支持）"]
-    N61["- 缺点: 企业无法监控员工 DNS 查询（隐私 vs 管控）"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N3 --> N4
-    N4 --> N5
-    N5 --> N6
-    N6 --> N7
-    N7 --> N8
-    N8 --> N9
-    N9 --> N10
-    N10 --> N11
-    N11 --> N12
-    N12 --> N13
-    N13 --> N14
-    N14 --> N15
-    N15 --> N16
-    N16 --> N17
-    N17 --> N18
-    N18 --> N19
-    N19 --> N20
-    N20 --> N21
-    N21 --> N22
-    N22 --> N23
-    N23 --> N24
-    N24 --> N25
-    N25 --> N26
-    N26 --> N27
-    N27 --> N28
-    N28 --> N29
-    N29 --> N30
-    N30 --> N31
-    N31 --> N32
-    N32 --> N33
-    N33 --> N34
-    N34 --> N35
-    N35 --> N36
-    N36 --> N37
-    N37 --> N38
-    N38 --> N39
-    N39 --> N40
-    N40 --> N41
-    N41 --> N42
-    N42 --> N43
-    N43 --> N44
-    N44 --> N45
-    N45 --> N46
-    N46 --> N47
-    N47 --> N48
-    N48 --> N49
-    N49 --> N50
-    N50 --> N51
-    N51 --> N52
-    N52 --> N53
-    N53 --> N54
-    N54 --> N55
-    N55 --> N56
-    N56 --> N57
-    N57 --> N58
-    N58 --> N59
-    N59 --> N60
-    N60 --> N61
+    B["用户浏览器"]
+    B --> D["DNS 查询: example.com"]
+    D --> R["本地 DNS 解析器（递归）\nISP / 8.8.8.8 / 1.1.1.1"]
+    R --> C["查缓存 → 命中则返回"]
+
+    C -->|"未命中"| I["迭代查询"]
+    I --> G["根 DNS (.) → .com NS"]
+    G --> GC[".com NS → example.com NS"]
+    GC --> E["example.com NS → IP: 93.184.216.34"]
+    E --> R
+
+    Note over R: 全部使用 UDP 53 端口（轻量快速）
+```
+
+```mermaid
+flowchart TB
+    subgraph S1["场景 1: 响应超过 512 字节"]
+        S1A["原始 DNS 协议设计：UDP 响应最大 512 字节"]
+        S1B["DNSSEC 签名数据量大 → 超 512 字节 → 切换 TCP"]
+        S1C["EDNS(0) 扩展: 客户端声明自己支持大包（通常 4096 字节）"]
+    end
+
+    subgraph S2["场景 2: 区域传输（AXFR）"]
+        S2A["主 DNS 服务器 → 从 DNS 服务器同步整个 zone 数据"]
+        S2B["数据量大 → 必须用 TCP"]
+        S2C["TCP 端口 53（与 UDP 53 同一个端口）"]
+    end
+
+    subgraph S3["场景 3: DoT / DoH"]
+        S3A["TLS 加密 → 防止 DNS 污染和中间人"]
+        S3B["DoT: 端口 853（RFC 7858）"]
+        S3C["DoH: 端口 443，路径 /dns-query（RFC 8484）"]
+    end
+
+    subgraph S4["场景 4: 客户端或服务器明确要求 TCP"]
+        S4A["响应被截断（Truncated） → 客户端用 TCP 重试"]
+        S4B["DNS 查询太大 → Truncated = 1 → TCP 重试"]
+    end
+```
+
+```mermaid
+flowchart TB
+    subgraph A["DNS 污染攻击（DNS Spoofing / DNS Poisoning）"]
+        A1["攻击者在 DNS 响应到达本地解析器之前，注入伪造的 DNS 响应"]
+        A2["原理: DNS 使用无连接 UDP，无握手，源 IP 不验证"]
+    end
+
+    subgraph F["防御手段"]
+        F1["DNSSEC: 用公钥密码学签名 DNS 记录，验证签名"]
+        F2["DoT: DNS 查询通过 TLS 加密隧道传输"]
+        F3["DoH: DNS 查询通过 HTTPS 传输，伪装成普通 HTTPS 流量"]
+    end
+
+    A --> F
+
+    Note over A: 攻击流程: Resolver → DNS Query → Auth NS → Fake Response 先于正确响应到达
+    Note over F: 公共 DoH: Cloudflare (1.1.1.1), Google (8.8.8.8), 浏览器内置
 ```
 
 ### 完整代码示例（TS/JS）
