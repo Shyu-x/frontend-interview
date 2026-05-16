@@ -35,6 +35,8 @@ main                  # 稳定版本
 - `refactor`: 重构
 - `chore`: 构建/工具
 
+**⚠️ 重要：操作前必读 `GIT-RULES.md`，禁止绕过 Git 流程直接推送到 main**
+
 ---
 
 ## 目录结构
