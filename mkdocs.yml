@@ -121,11 +121,6 @@ nav:
   - 手写代码:
     - 手写代码题库: coding/index.md
     - 高级模式: coding/advanced-patterns.md
-  - AI Agent 篇:
-    - 概述与入门:
-      - agent/index.md
-      - agent/agent-comparison.md
-      - agent/agent-frameworks.md
   - React 篇:
     - 核心基础:
       - React 18 核心概念: react/react-18-core.md
@@ -182,6 +177,18 @@ nav:
       - agent/claude-code-deep-analysis.md
       - agent/opencode-analysis.md
       - agent/research-findings.md
+  - 开源项目赏析:
+    - open-source/index.md
+    - AI Agent 框架:
+      - open-source/ai-agents.md
+    - 前端框架:
+      - open-source/frontend-frameworks.md
+    - 工具链:
+      - open-source/tooling.md
+    - 工程化库:
+      - open-source/engineering.md
+    - 新兴趋势:
+      - open-source/trending.md
 
 extra:
   generator: false
