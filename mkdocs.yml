@@ -98,8 +98,10 @@ nav:
     - html/hyper-frequencies.md
   - CSS 篇:
     - css/hyper-frequencies.md
-    - css/section-1-5.md
-    - css/section-6-10.md
+    - 核心原理:
+      - css/section-1-5.md
+    - 布局进阶:
+      - css/section-6-10.md
   - JavaScript 篇:
     - js/hyper-frequencies.md
     - js/section-13-18.md
