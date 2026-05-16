@@ -2688,7 +2688,7 @@ flowchart TD
     Q5 -->|是| Pinia
     Q5 -->|否| Q6{是否需要响应式?}
     Q6 -->|是| RxJS
-    Q6 -->|否| 自定义 Store
+    Q6 -->|否| CustomStore["自定义 Store"]
 ```
 
 ### 12.2 数据层选型

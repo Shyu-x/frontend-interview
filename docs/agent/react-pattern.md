@@ -4,7 +4,23 @@
 
 ReAct (Synergizing Reasoning and Acting in Language Models) 是一种让大语言模型 (LLM) 能够交替进行**推理**和**行动**的模式。它通过将推理过程中的中间步骤外显化，使模型能够动态地规划、追踪和调整行动策略，从而更好地处理复杂的多步骤任务。
 
-![ReAct 核心思想](assets/images/mermaid/react-pattern-01.png)
+```mermaid
+flowchart LR
+    subgraph Reason["推理阶段"]
+        T1["Thought 思考"]
+        P["Plan 计划"]
+    end
+    
+    subgraph Act["行动阶段"]
+        A["Action 行动"]
+        O["Observation 观察"]
+    end
+    
+    T1 --> P
+    P --> A
+    A --> O
+    O --> T1
+```
 
 ---
 
@@ -44,7 +60,27 @@ H(t) = H(t-1) ∪ {P(t), A(t), O(t)} // 状态更新
 | **多跳推理** | 难以处理链式问题 | 自然处理多跳问题 |
 | **上下文利用** | 可能遗忘关键信息 | 完整保留历史轨迹 |
 
-![传统 Agent vs ReAct 工作流](assets/images/mermaid/react-pattern-02.png)
+### 1.2 工作流对比
+
+```mermaid
+flowchart LR
+    subgraph Traditional["传统 Agent"]
+        T1["输入"] --> T2["隐式推理"]
+        T2 --> T3["直接输出"]
+    end
+    
+    subgraph ReAct["ReAct 模式"]
+        R1["输入"] --> R2["Thought"]
+        R2 --> R3["Action"]
+        R3 --> R4["Observation"]
+        R4 --> R5["Thought"]
+        R5 --> R6["Action"]
+        R6 --> R7["Observation"]
+        R7 --> R8["最终输出"]
+    end
+    
+    Traditional -->|"缺乏透明度"| ReAct
+```
 
 ### 1.3 适用场景分析
 
@@ -80,7 +116,27 @@ H(t) = H(t-1) ∪ {P(t), A(t), O(t)} // 状态更新
 
 ### 2.1 Thought → Action → Observation 循环
 
-![ReAct 执行流程](assets/images/mermaid/react-pattern-03.png)
+```mermaid
+flowchart TB
+    subgraph Loop["ReAct 循环"]
+        T1["Thought\n分析当前状态"]
+        A1["Action\n选择工具执行"]
+        O1["Observation\n获取执行结果"]
+    end
+    
+    T1 --> A1
+    A1 --> O1
+    O1 -->|继续迭代| T1
+    O1 -->|终止条件| E["结束"]
+    
+    subgraph State["状态维护"]
+        H["History 推理历史"]
+        C["Context 上下文"]
+    end
+    
+    State --> T1
+    E --> H
+```
 
 ### 2.2 状态追踪
 
@@ -497,7 +553,41 @@ class ReActExecutor {
 
 ReAct-Syntha 是 ReAct 的扩展，专门用于从多个信息源综合知识：
 
-![ReAct-Syntha 知识综合](assets/images/mermaid/react-pattern-04.png)
+```mermaid
+flowchart TB
+    subgraph Input["输入"]
+        Q["复杂查询"]
+    end
+    
+    subgraph Decompose["分解阶段"]
+        S1["子查询 1"]
+        S2["子查询 2"]
+        S3["子查询 3"]
+    end
+    
+    subgraph Retrieve["检索阶段"]
+        R1["源 1"]
+        R2["源 2"]
+        R3["源 3"]
+    end
+    
+    subgraph Synthesize["综合阶段"]
+        EG["Evidence Graph"]
+        CD["冲突检测"]
+        A["综合答案"]
+    end
+    
+    Q --> Decompose
+    Decompose --> S1 & S2 & S3
+    S1 --> R1
+    S2 --> R2
+    S3 --> R3
+    R1 & R2 & R3 --> EG
+    EG --> CD
+    CD --> A
+```
+
+**关键特点**：
 
 **关键特点**：
 - 自动分解复杂查询为子查询
@@ -645,7 +735,28 @@ async function planReactExecute(task: string): Promise<string> {
 
 Self-Ask 是 ReAct 的简化变体，专注于通过自我提问来分解问题：
 
-![Self-Ask 自我提问](assets/images/mermaid/react-pattern-05.png)
+```mermaid
+flowchart TB
+    subgraph Ask["提问循环"]
+        Q1["主问题"]
+        SQ["子问题"]
+        A1["回答"]
+    end
+    
+    subgraph Process["处理"]
+        D{"是否有子问题?"}
+        R["整合结果"]
+    end
+    
+    Q1 --> D
+    D -->|是| SQ
+    SQ --> A1
+    A1 --> D
+    D -->|否| R
+    R --> F["最终答案"]
+```
+
+**与 ReAct 的对比**：
 
 **与 ReAct 的对比**：
 

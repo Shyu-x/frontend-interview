@@ -8,7 +8,15 @@
 
 React 状态管理经历了从简单到复杂的演进过程，每个阶段都解决了特定场景下的问题：
 
-![state-management diagram](assets/images/mermaid/react-state-management-5.png)
+```mermaid
+flowchart LR
+    A[useState] --> B[状态提升<br/>Props Drilling]
+    B --> C[Context]
+    C --> D[状态管理库<br/>Zustand/Jotai/Redux]
+
+    style A fill:#69db7c
+    style D fill:#9775fa
+```
 
 | 阶段 | 工具 | 适用场景 | 局限性 |
 |------|------|----------|--------|
@@ -80,7 +88,15 @@ function reducer(state, action) {
 
 Context 本质上是一个 Provider-Consumer 模式。当 Provider 的 value 变化时，**所有消费该 Context 的组件都会重新渲染**：
 
-![state-management diagram](assets/images/mermaid/react-state-management-4.png)
+```mermaid
+flowchart TD
+    A[Provider] --> B[value 变化]
+    B --> C[所有消费者]
+    C --> D[重新渲染]
+    C --> E[不必要的渲染]
+
+    style E fill:#ff6b6b
+```
 
 ### 3.2 分离 Context 模式
 
@@ -183,7 +199,16 @@ const create = (createState) => {
 
 ### 4.2 状态流图
 
-![state-management diagram](assets/images/mermaid/react-state-management-3.png)
+```mermaid
+flowchart TD
+    A[组件] --> B[setState]
+    B --> C[更新 store]
+    C --> D[通知订阅者]
+    D --> E[触发 re-render]
+
+    style B fill:#74c0fc
+    style E fill:#69db7c
+```
 
 ### 4.3 实际使用示例
 
@@ -243,7 +268,17 @@ Jotai 采用了与 Zustand 不同的原子（Atom）模型，借鉴了 Recoil �
 
 ### 5.1 基本概念
 
-![state-management diagram](assets/images/mermaid/react-state-management-2.png)
+```mermaid
+flowchart TD
+    A[Atom 原子] --> B[原始 Atom]
+    A --> C[派生 Atom<br/>基于其他 Atom]
+    B --> D[countAtom]
+    B --> E[prefixAtom]
+    C --> F[displayAtom]
+
+    style A fill:#9775fa
+    style D fill:#69db7c
+```
 
 ### 5.2 核心 API
 
@@ -480,7 +515,19 @@ export const {
 
 ## 8. 状态管理选择决策树
 
-![state-management diagram](assets/images/mermaid/react-state-management-1.png)
+```mermaid
+flowchart TD
+    A[需要共享状态?] --> B{复杂程度}
+    B -->|简单| C[useState]
+    B -->|中等| D{需要派生?}
+    D -->|是| E[Jotai/Zustand]
+    D -->|否| F[Context]
+    B -->|大型| G[Redux Toolkit]
+
+    style C fill:#69db7c
+    style E fill:#74c0fc
+    style G fill:#9775fa
+```
 
 ### 选择指南
 

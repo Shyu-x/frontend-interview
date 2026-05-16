@@ -10,7 +10,12 @@ React 18 是 React 架构演进的重要里程碑，引入了并发渲染（Conc
 
 在 React 18 之前，渲染过程是**阻塞式**的。一旦 React 开始处理一次更新，它必须一次性完成所有工作，中途无法让出主线程。这种模式在大型应用中会导致严重的卡顿问题。
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-8.png)
+```mermaid
+flowchart TD
+    A[React 17 渲染] --> B[开始后必须完成]
+    B --> C[无法中断]
+    C --> D[主线程阻塞<br/>可能导致掉帧]
+```
 
 ### 1.2 React 18 之前的同步渲染问题
 
@@ -50,7 +55,20 @@ function App() {
 
 React 18 使用 **Lane 模型**（也称 `lanes` 或 `fiberLanes`）来实现精确的优先级调度。Lane 是一种位掩码（Bitmask）数据结构，允许高效地表示和操作多个优先级。
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-7.png)
+```mermaid
+flowchart TD
+    A[Lane 优先级] --> B[SyncLane<br/>用户点击/输入]
+    A --> C[InputContinuousLane<br/>拖拽/滚动]
+    A --> D[DefaultLane<br/>数据获取]
+    A --> E[TransitionLane<br/>useTransition]
+    A --> F[IdleLane<br/>后台预渲染]
+
+    style B fill:#ff6b6b
+    style C fill:#ffa94d
+    style D fill:#ffd93d
+    style E fill:#69db7c
+    style F fill:#74c0fc
+```
 
 **Lane 优先级映射表：**
 
@@ -79,7 +97,17 @@ const remainingLanes = lanes & ~DefaultLane;
 
 ### 1.5 并发调度流程
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-6.png)
+```mermaid
+flowchart LR
+    A[更新触发] --> B{优先级判断}
+    B -->|高| C[立即执行]
+    B -->|低| D[加入队列]
+    D --> E{有高优先级任务?}
+    E -->|是| F[让出主线程]
+    E -->|否| G[继续执行低优先级]
+    F --> H[高优先级完成]
+    H --> G
+```
 
 ---
 
@@ -166,7 +194,17 @@ element.addEventListener('click', () => {
 
 ### 2.4 批处理对比总结
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-5.png)
+```mermaid
+flowchart LR
+    subgraph React 17
+        A1[setTimeout] --> A2[触发渲染 1]
+        A2 --> A3[触发渲染 2]
+    end
+    subgraph React 18
+        B1[setTimeout] --> B2[合并更新]
+        B2 --> B3[触发渲染 1 次]
+    end
+```
 
 ### 2.5 禁用批处理 (flushSync)
 
@@ -259,7 +297,22 @@ function SlowResults({ query }) {
 
 ### 3.3 使用场景对比
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-1.png)
+```mermaid
+flowchart TD
+    A[场景选择] --> B{在组件内包装更新?}
+    B -->|是| C[useTransition]
+    B -->|否| D{需要加载状态?}
+    D -->|是| C
+    D -->|否| E{只是延迟子组件?}
+    E -->|是| F[useDeferredValue]
+    E -->|否| C
+
+    C --> G[返回 isPending<br/>startTransition]
+    F --> H[返回延迟值]
+
+    style C fill:#69db7c
+    style F fill:#74c0fc
+```
 
 **选择指南：**
 
@@ -341,7 +394,15 @@ function App() {
 
 **工作流程：**
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-4.png)
+```mermaid
+flowchart TD
+    A[组件挂载] --> B{Suspense 检测}
+    B -->|加载中| C[显示 fallback]
+    B -->|完成| D[渲染子组件]
+    C --> E{加载完成?}
+    E -->|是| D
+    E -->|否| C
+```
 
 ### 4.2 Streaming SSR
 
@@ -417,7 +478,15 @@ document.getElementById('comments').addEventListener('click', () => {
 
 **流程图：**
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-2.png)
+```mermaid
+flowchart LR
+    A[页面加载] --> B[HTML 流开始]
+    B --> C{Hydration}
+    C -->|用户点击| D[优先水合该区域]
+    D --> E[交互就绪]
+    C -->|等待全部| F[全部水合完成]
+    F --> E
+```
 
 ---
 
@@ -607,7 +676,21 @@ function Form() {
 
 ### 5.4 新增 Hooks 总览
 
-![react-18-core diagram](assets/images/mermaid/react-react-18-core-3.png)
+```mermaid
+flowchart TD
+    A[React 18 新 Hooks] --> B[useSyncExternalStore<br/>订阅外部数据源]
+    A --> C[useInsertionEffect<br/>CSS-in-JS 注入]
+    A --> D[useId<br/>生成稳定唯一 ID]
+
+    B --> E[跨 React 版本兼容]
+    C --> F[DOM 更新前执行]
+    D --> G[SSR 兼容]
+
+    style A fill:#9775fa
+    style B fill:#69db7c
+    style C fill:#74c0fc
+    style D fill:#ffa94d
+```
 
 ---
 

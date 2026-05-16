@@ -366,7 +366,24 @@ llm = ChatOpenAI(callbacks=[handler])
 
 **Dify 工作流事件驱动**:
 
-![Agent 工作流程](assets/images/mermaid/agent-workflow.png)
+```mermaid
+flowchart TD
+    A[用户输入] --> B[意图识别]
+    B --> C{意图类型}
+    C -->|查询| D[知识库检索]
+    C -->|[任务]| E[任务分解]
+    C -->|[对话]| F[对话管理]
+    D --> G[结果整合]
+    E --> H[子任务执行]
+    F --> I[上下文更新]
+    G --> J[响应生成]
+    H --> J
+    I --> J
+    J --> K[输出响应]
+    K --> L{是否完成?}
+    L -->|否| B
+    L -->|是| M[结束]
+```
 
 ---
 
@@ -602,7 +619,24 @@ print(result)
 
 ### 5.3 框架选型决策树
 
-![框架选型决策](assets/images/mermaid/framework-selection.png)
+```mermaid
+flowchart TD
+    A[开始] --> B{需要多Agent协作?}
+    B -->|否| C{需要RAG?}
+    B -->|是| D{复杂度高?}
+    D -->|低| E[CrewAI]
+    D -->|高| F{AutoGen/LangGraph}
+    C -->|是| G{LlamaIndex优先?}
+    C -->|否| H{需要可视化?}
+    G -->|是| I[LlamaIndex]
+    G -->|否| J{LangChain优先?}
+    J -->|是| K[LangChain]
+    J -->|否| L[Dify/Coze]
+    H -->|是| M[Dify]
+    H -->|否| N{Low-code?}
+    N -->|是| L
+    N -->|否| K
+```
 
 
 ---
@@ -622,7 +656,19 @@ print(result)
 
 ### 6.2 学习曲线对比
 
-![框架学习曲线](assets/images/mermaid/learning-curve.png)
+```mermaid
+linechart
+    title 框架学习曲线对比
+    x-axis 学习阶段: [入门, 基础, 中级, 高级, 专家]
+    y-axis 学习难度 (1-10): [0, 10]
+    LangChain: [2, 5, 7, 8, 9]
+    LangGraph: [3, 6, 8, 9, 10]
+    AutoGen: [2, 4, 6, 8, 9]
+    CrewAI: [1, 3, 5, 7, 8]
+    LlamaIndex: [2, 5, 7, 8, 9]
+    Dify: [1, 2, 3, 5, 6]
+    Coze: [1, 2, 3, 4, 5]
+```
 
 
 | 框架 | 上手难度 | 文档质量 | 社区活跃度 | 教程资源 |
@@ -663,7 +709,24 @@ print(result)
 
 在实际项目中，框架可以组合使用以发挥各自优势：
 
-![Promise 状态转换图](assets/images/mermaid/promise-state.png)
+```mermaid
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Fulfilled: resolve()
+    Pending --> Rejected: reject()
+    Fulfilled --> [*]
+    Rejected --> [*]
+    
+    state Fulfilled {
+        [*] --> Value
+        Value --> [*]: .then()
+    }
+    
+    state Rejected {
+        [*] --> Error
+        Error --> [*]: .catch()
+    }
+```
 
 
 ---

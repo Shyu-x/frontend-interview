@@ -20,8 +20,22 @@
 
 ### 1.1 为什么 Agent 需要记忆
 
-![有无记忆对比](assets/images/mermaid/memory-system-1.png)
-
+```mermaid
+flowchart LR
+    subgraph Without["无记忆 Agent"]
+        A1["用户输入"] --> LLM1["LLM"]
+        LLM1 --> O1["输出"]
+    end
+    
+    subgraph With["有记忆 Agent"]
+        A2["用户输入"] --> MEM["记忆系统"]
+        MEM --> LLM2["LLM"]
+        LLM2 --> O2["输出"]
+        LLM2 --> MEM
+    end
+    
+    Without -->|"上下文丢失"| With
+```
 
 ### 1.2 记忆类型分类
 
@@ -36,8 +50,21 @@
 
 ### 1.3 记忆层次结构
 
-![Agent 工作流程](assets/images/mermaid/agent-workflow.png)
-
+```mermaid
+flowchart TB
+    subgraph Layers["记忆层次"]
+        WM["工作记忆\nWorking Memory"]
+        CM["对话记忆\nConversation Memory"]
+        LM["长期记忆\nLong-term Memory"]
+        VM["向量记忆\nVector Memory"]
+        KG["知识图谱\nKnowledge Graph"]
+    end
+    
+    WM --> CM
+    CM --> LM
+    LM --> VM
+    LM --> KG
+```
 
 ---
 

@@ -306,7 +306,7 @@ flowchart LR
         BN[Bun]
         ND[Node.js]
         VL[Vercel Edge]
-        LN[Lambda@Edge]
+        LN["Lambda@Edge"]
     end
 
     subgraph 响应["HTTP 响应"]

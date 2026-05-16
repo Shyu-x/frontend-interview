@@ -10,7 +10,13 @@ React 18 于 2022 年 3 月正式发布，带来了革命性的并发渲染（Co
 
 批处理是 React 的一种优化机制，将多个状态更新合并为一次渲染，以减少不必要的 DOM 操作次数。
 
-![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-2.png)
+```mermaid
+flowchart TD
+    A[多个 setState] --> B[React 批处理]
+    B --> C[合并为一次渲染]
+    C --> D[减少 DOM 操作]
+    style D fill:#69db7c
+```
 
 ### React 17 vs React 18 批处理差异表
 
@@ -41,7 +47,18 @@ setTimeout(() => {
 
 ### 执行流程对比图
 
-![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-5.png)
+```mermaid
+flowchart LR
+    subgraph React 17
+        A1[setCount] --> A2[渲染 1]
+        A2 --> A3[setName] --> A4[渲染 2]
+    end
+    subgraph React 18
+        B1[setCount] --> B2[批处理]
+        B2 --> B3[setName]
+        B3 --> B4[渲染 1 次]
+    end
+```
 
 ### 性能收益
 
@@ -160,7 +177,16 @@ function SearchComponent() {
 
 ### 并发调度流程图
 
-![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-4.png)
+```mermaid
+flowchart TD
+    A[startTransition] --> B[标记为低优先级]
+    B --> C[React 调度器]
+    C --> D{高优先级任务?}
+    D -->|是| E[中断低优先级]
+    D -->|否| F[继续执行]
+    E --> G[高优先级完成]
+    G --> F
+```
 
 ---
 
@@ -271,7 +297,14 @@ function BlogPost() {
 
 ### Suspense 并发状态图
 
-![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-3.png)
+```mermaid
+flowchart TD
+    A[Suspense 组件] --> B{加载状态?}
+    B -->|加载中| C[显示 fallback]
+    B -->|完成| D[渲染 children]
+    C --> E[数据加载完成]
+    E --> D
+```
 
 ---
 
@@ -469,7 +502,13 @@ async function handler(request) {
 
 ### Progressive Hydration 渐进式水合
 
-![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-6.png)
+```mermaid
+flowchart LR
+    A[HTML 流] --> B[流式 SSR]
+    B --> C[首屏 HTML]
+    C --> D[Selective Hydration]
+    D --> E[交互区域优先水合]
+```
 
 ### 实现示例
 
@@ -573,7 +612,14 @@ function NavLink({ to, children }) {
 
 ### 技术原理图
 
-![react-18-new-features diagram](assets/images/mermaid/react-react-18-new-features-1.png)
+```mermaid
+flowchart TD
+    A[Offscreen 组件] --> B{mode}
+    B -->|hidden| C[预渲染内容]
+    B -->|visible| D[显示内容]
+    C --> E[准备就绪]
+    E --> D
+```
 
 ---
 

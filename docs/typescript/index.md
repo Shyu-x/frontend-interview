@@ -36,7 +36,23 @@ addTS("1", 2); // 编译错误：Argument of type 'string' is not assignable to 
 
 #### 1.2 TS 编译流程
 
-![TypeScript 编译流程](assets/images/mermaid/ts-compile-flow.png)
+```mermaid
+flowchart LR
+    ts["TS 源码<br/>.ts 文件"]
+    parse["解析 Parsing"]
+    checker["类型检查<br/>Type Checker"]
+    emit["发射 Emit"]
+    js["JS 代码<br/>.js 文件"]
+    dts["声明文件<br/>.d.ts"]
+    
+    ts --> parse --> checker --> emit
+    emit --> js
+    emit -.->|"declaration: true"| dts
+    
+    style ts fill:#e3f2fd
+    style checker fill:#fff9c4
+    style js fill:#e8f5e9
+```
 
 
 // tsc --noEmit：只做类型检查，不输出文件
@@ -162,7 +178,34 @@ type A = IsString<"hello">; // true
 type B = IsString<123>;    // false
 
 // 总结：
-![any/unknown/never 类型对比](assets/images/mermaid/any-unknown-never.png)
+
+```mermaid
+flowchart TB
+    subgraph any["any 类型"]
+        a1["任意类型"]
+        a2["无类型检查"]
+        a3["⚠️ 不安全"]
+    end
+    
+    subgraph unknown["unknown 类型"]
+        u1["安全版 any"]
+        u2["需先缩小类型"]
+        u3["✅ 更安全"]
+    end
+    
+    subgraph never["never 类型"]
+        n1["永不存在的值"]
+        n2["用于穷举检查"]
+        n3["底部类型"]
+    end
+    
+    any -->|"类型安全"| unknown
+    unknown -->|"更严格"| never
+    
+    style any fill:#ffcdd2
+    style unknown fill:#fff9c4
+    style never fill:#e8f5e9
+```
 
 ```
 
@@ -215,7 +258,30 @@ type UserType = {
 };
 
 // 两者都能描述对象结构，区别如下：
-![interface vs type 对比](assets/images/mermaid/interface-vs-type.png)
+
+```mermaid
+flowchart LR
+    subgraph interface["interface"]
+        i1["声明合并 ✅"]
+        i2["更适合描述API"]
+        i3["可被 extends 扩展"]
+        i4["支持 class implements"]
+    end
+    
+    subgraph type["type"]
+        t1["联合/交叉类型 ✅"]
+        t2["更灵活"]
+        t3["工具类型"]
+        t4["映射类型"]
+    end
+    
+    i1 -.->|interface独有| t1
+    t2 -->|两者都行| i3
+    t3 -->|两者都行| i4
+    
+    style interface fill:#e8f5e9
+    style type fill:#e3f2fd
+```
 
 
 // interface 声明合并（最独特的能力）：

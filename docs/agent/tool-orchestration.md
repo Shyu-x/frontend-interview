@@ -10,7 +10,39 @@
 
 在 AI Agent 系统中，单一工具往往无法完成复杂任务。编排（Orchestration）解决的核心问题是**如何协调多个工具有序、有效地完成目标**。
 
-![Tool Orchestration Diagram 1](../assets/images/mermaid/tool-orchestration-1.png)
+```mermaid
+flowchart LR
+    subgraph Input["输入"]
+        task["任务"]
+    end
+    
+    subgraph Orchestrator["编排器"]
+        decision["决策引擎"]
+        planner["规划器"]
+        executor["执行器"]
+    end
+    
+    subgraph Tools["工具"]
+        T1["工具 A"]
+        T2["工具 B"]
+        T3["工具 C"]
+    end
+    
+    subgraph Output["输出"]
+        result["结果"]
+    end
+    
+    task --> Orchestrator
+    Orchestrator --> decision
+    decision --> planner
+    planner --> executor
+    executor --> T1
+    executor --> T2
+    executor --> T3
+    T1 --> result
+    T2 --> result
+    T3 --> result
+```
 
 **核心挑战**：
 
@@ -49,7 +81,34 @@ class Orchestrator:
 
 ### 1.3 编排目标
 
-![Tool Orchestration Diagram 2](../assets/images/mermaid/tool-orchestration-2.png)
+```mermaid
+flowchart TB
+    subgraph Goals["编排目标"]
+        direction["方向控制"]
+        efficiency["效率优化"]
+        reliability["可靠性保证"]
+        observability["可观测性"]
+    end
+    
+    subgraph Process["处理流程"]
+        parse["任务解析"]
+        plan["执行计划"]
+        execute["协调执行"]
+        monitor["状态监控"]
+    end
+    
+    subgraph Metrics["关键指标"]
+        time["执行时间"]
+        cost["资源消耗"]
+        quality["结果质量"]
+    end
+    
+    parse --> plan
+    plan --> execute
+    execute --> monitor
+    Goals --> Process
+    Process --> Metrics
+```
 
 ---
 

@@ -241,7 +241,15 @@ function VirtualList({ items }) {
 
 **虚拟化效果示意图**：
 
-![performance-optimization diagram](assets/images/mermaid/react-performance-optimization-4.png)
+```mermaid
+flowchart TD
+    A[1000 条数据] --> B[虚拟列表]
+    B --> C[只渲染可见区域]
+    C --> D[约 10-20 条 DOM 节点]
+    D --> E[大幅减少 DOM 操作]
+
+    style D fill:#69db7c
+```
 
 ---
 
@@ -314,7 +322,16 @@ const PrefetchDashboard = () => {
 
 **资源加载策略**：
 
-![performance-optimization diagram](assets/images/mermaid/react-performance-optimization-3.png)
+```mermaid
+flowchart LR
+    A[路由入口] --> B[鼠标悬停]
+    B --> C[preload]
+    C --> D[下载资源]
+    A --> E[点击导航]
+    E --> F[立即使用<br/>已缓存资源]
+
+    style F fill:#69db7c
+```
 
 ---
 
@@ -583,7 +600,19 @@ const { count, increment } = useStore(counterStore);
 
 **并发模式渲染流程**：
 
-![performance-optimization diagram](assets/images/mermaid/react-performance-optimization-2.png)
+```mermaid
+flowchart TD
+    A[状态更新] --> B{紧急更新?}
+    B -->|是| C[立即渲染]
+    B -->|否| D[startTransition]
+    D --> E[标记为非紧急]
+    E --> F[可被中断]
+    F --> G[高优先级完成]
+    G --> H[继续低优先级]
+
+    style C fill:#ff6b6b
+    style H fill:#69db7c
+```
 
 ---
 
@@ -683,7 +712,21 @@ npx lighthouse http://localhost:3000 \
 
 ### 渲染优化决策树
 
-![performance-optimization diagram](assets/images/mermaid/react-performance-optimization-1.png)
+```mermaid
+flowchart TD
+    A[组件渲染] --> B{props 变化?}
+    B -->|否| C[React.memo 跳过]
+    B -->|是| D{状态变化?}
+    D -->|否| E[memo 比较通过?]
+    E -->|是| C
+    E -->|否| F[重新渲染]
+    D -->|是| G[计算是否昂贵?]
+    G -->|是| H[useMemo 缓存]
+    G -->|否| F
+
+    style C fill:#69db7c
+    style F fill:#ffa94d
+```
 
 ### 性能优化检查清单
 

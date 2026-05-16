@@ -24,7 +24,23 @@ Hooks 的引入解决了以下核心问题：
 
 ### 1.2 Hooks vs Class Components
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-10.png)
+```mermaid
+flowchart LR
+    subgraph Class Components
+        A1[this.state]
+        A2[生命周期方法]
+        A3[this 绑定]
+    end
+    subgraph Function + Hooks
+        B1[useState/useReducer]
+        B2[useEffect]
+        B3[无需 this]
+    end
+
+    style B1 fill:#69db7c
+    style B2 fill:#74c0fc
+    style B3 fill:#ffa94d
+```
 
 **核心差异对比：**
 
@@ -101,7 +117,15 @@ useEffect(() => {
 
 函数组件的状态存储在 Fiber 节点的 `memoizedState` 属性中：
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-9.png)
+```mermaid
+flowchart TD
+    A[Fiber 节点] --> B[memoizedState]
+    B --> C[Hook 对象链表]
+    C --> D[memoizedState<br/>当前状态值]
+    C --> E[baseState<br/>基础状态]
+    C --> F[queue<br/>更新队列]
+    C --> G[next<br/>下一个 Hook]
+```
 
 **Hook 对象的结构：**
 
@@ -117,7 +141,15 @@ interface Hook {
 
 **状态更新的调用链路：**
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-8.png)
+```mermaid
+flowchart LR
+    A[setState] --> B[加入 queue]
+    B --> C[标记需要更新]
+    C --> D[调度协调]
+    D --> E[beginWork]
+    E --> F[处理 update]
+    F --> G[渲染组件]
+```
 
 ### 2.2 批量更新机制
 
@@ -142,7 +174,16 @@ function Counter() {
 
 **批量更新的原理：**
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-7.png)
+```mermaid
+flowchart TD
+    A[setCount + 1] --> B[加入 queue]
+    A --> C[setFlag toggle]
+    B --> D{React 18}
+    C --> D
+    D --> E[批处理]
+    E --> F[触发 1 次渲染]
+    style F fill:#69db7c
+```
 
 ### 2.3 函数式更新 vs 普通更新
 
@@ -255,7 +296,15 @@ React 的渲染过程分为三个阶段：
 2. **Commit 阶段** — 将变化应用到 DOM
 3. **Commit 阶段后** — 执行 useEffect 和 useLayoutEffect
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-6.png)
+```mermaid
+flowchart TD
+    A[Render Phase] --> B[计算差异]
+    B --> C[准备更新]
+    C --> D[Commit Phase]
+    D --> E[应用 DOM]
+    D --> F[useLayoutEffect]
+    E --> G[useEffect<br/>异步执行]
+```
 
 ### 3.2 依赖检测：Object.is 比较
 
@@ -303,7 +352,13 @@ useEffect(() => {
 
 **清理函数的执行时机：**
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-5.png)
+```mermaid
+flowchart TD
+    A[组件重新渲染] --> B[执行清理函数]
+    A --> C[运行新的 effect]
+    B --> D[取消订阅/清理]
+    C --> E[重新订阅/初始化]
+```
 
 ### 3.4 依赖数组为空的特殊情况
 
@@ -380,7 +435,17 @@ const Container = () => {
 
 ### 4.2 ref 与 render 的关系
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-4.png)
+```mermaid
+flowchart LR
+    A[ref.current 修改] --> B[不触发重新渲染]
+    A --> C[可用于存储<br/>跨渲染持久值]
+
+    D[useState 修改] --> E[触发重新渲染]
+    E --> F[状态更新]
+
+    style B fill:#69db7c
+    style C fill:#74c0fc
+```
 
 ### 4.3 ref 回调函数
 
@@ -456,7 +521,17 @@ const CustomInput = forwardRef(({ value, onChange }, ref) => {
 
 ### 5.1 缓存策略
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-3.png)
+```mermaid
+flowchart TD
+    A[组件渲染] --> B{依赖变化?}
+    B -->|否| C[返回缓存值<br/>跳过计算]
+    B -->|是| D[重新计算]
+    D --> E[缓存结果]
+    E --> C
+
+    style C fill:#69db7c
+    style D fill:#ffa94d
+```
 
 ### 5.2 依赖数组的作用
 
@@ -565,7 +640,21 @@ function ProfilePage({ userId }) {
 
 自定义 Hook 可以组合使用，实现更复杂的功能：
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-2.png)
+```mermaid
+flowchart TD
+    A[自定义 Hook] --> B[useLocalStorage]
+    A --> C[useDebounce]
+    A --> D[useFetch]
+
+    B --> E[基础 Hook]
+    C --> E
+    D --> E
+
+    B --> F[useExpirableStorage]
+    F --> E
+
+    style E fill:#69db7c
+```
 
 **组合示例：**
 
@@ -719,7 +808,18 @@ function useAsync(asyncCallback, immediate = true) {
 
 ## 附录：Hooks 调用链路总览
 
-![react-hooks-deep diagram](assets/images/mermaid/react-react-hooks-deep-1.png)
+```mermaid
+flowchart TD
+    A[组件调用] --> B[dispatchAction]
+    B --> C[创建 update]
+    C --> D[加入 Hook queue]
+    D --> E[schedule Update]
+    E --> F[beginWork]
+    F --> G[updateFunctionComponent]
+    G --> H[renderWithHooks]
+    H --> I[读取 memoizedState]
+    I --> J[渲染完成]
+```
 
 ---
 

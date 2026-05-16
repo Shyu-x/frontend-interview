@@ -45,11 +45,67 @@ OpenCode 是一个开源的 AI 编程代理（AI Coding Agent），帮助开发�
 
 ### 2.1 整体架构图
 
-![整体架构图](../assets/images/mermaid/opencode-1.png)
+```mermaid
+flowchart LR
+    subgraph Core["核心层"]
+        LLM["LLM Provider"]
+        TOOL["Tool System"]
+        SESSION["Session Manager"]
+    end
+    subgraph Interface["接口层"]
+        TUI["Bubble Tea TUI"]
+        CLI["Cobra CLI"]
+    end
+    subgraph Data["数据层"]
+        DB["SQLite DB"]
+        CACHE["Context Cache"]
+    end
+    subgraph Extension["扩展层"]
+        MCP["MCP Servers"]
+        LSP["LSP Clients"]
+    end
+    
+    Interface --> Core
+    Core --> TOOL
+    Core --> SESSION
+    SESSION --> DB
+    SESSION --> CACHE
+    TOOL --> MCP
+    TOOL --> LSP
+```
 
 ### 2.2 核心模块划分
 
-![核心模块划分](../assets/images/mermaid/opencode-2.png)
+```mermaid
+flowchart TB
+    subgraph cmd["cmd/ 命令行入口"]
+        root["root.go"]
+        interactive["interactive.go"]
+    end
+    subgraph internal/app["internal/app 应用核心"]
+        app["app.go"]
+        session["session.go"]
+    end
+    subgraph internal/llm["internal/llm 模型交互"]
+        provider["provider.go"]
+        openai["openai/"]
+        anthropic["anthropic/"]
+    end
+    subgraph internal/tools["internal/tools 工具实现"]
+        glob["glob.go"]
+        bash["bash.go"]
+        fetch["fetch.go"]
+    end
+    subgraph internal/tui["internal/tui 终端界面"]
+        model["model.go"]
+        view["view.go"]
+    end
+    
+    cmd --> internal/app
+    internal/app --> internal/llm
+    internal/app --> internal/tools
+    internal/app --> internal/tui
+```
 
 ### 2.3 技术栈
 
@@ -128,7 +184,26 @@ type Request struct {
 
 #### 工具调用流程
 
-![工具调用流程](../assets/images/mermaid/opencode-3.png)
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant TUI as Bubble Tea TUI
+    participant LLM as LLM Provider
+    participant TOOL as Tool System
+    participant MCP as MCP Servers
+    participant FS as File System
+
+    User->>TUI: 输入命令
+    TUI->>LLM: 发送消息
+    LLM->>TOOL: 请求工具调用
+    TOOL->>MCP: 转发 MCP 请求
+    MCP->>FS: 执行文件系统操作
+    FS-->>MCP: 返回结果
+    MCP-->>TOOL: 工具结果
+    TOOL-->>LLM: 返回结果
+    LLM-->>TUI: 生成回复
+    TUI-->>User: 显示结果
+```
 
 ### 3.3 状态管理
 
@@ -173,7 +248,30 @@ CREATE TABLE sessions (
 
 ### 4.1 目录树
 
-![目录树](../assets/images/mermaid/opencode-4.png)
+```mermaid
+graph TD
+    opencode["opencode/"]
+    opencode --> cmd["cmd/"]
+    cmd --> root["root.go"]
+    cmd --> interactive["interactive.go"]
+    opencode --> internal["internal/"]
+    internal --> app["app/"]
+    app --> app_go["app.go"]
+    app --> session["session.go"]
+    internal --> llm["llm/"]
+    llm --> provider["provider.go"]
+    llm --> openai["openai/"]
+    llm --> anthropic["anthropic/"]
+    internal --> tools["tools/"]
+    tools --> glob["glob.go"]
+    tools --> bash["bash.go"]
+    tools --> fetch["fetch.go"]
+    internal --> tui["tui/"]
+    tui --> tui_go["tui.go"]
+    tui --> model["model.go"]
+    opencode --> pkg["pkg/"]
+    opencode --> main["main.go"]
+```
 
 ### 4.2 各模块职责
 
@@ -220,7 +318,25 @@ type Tool interface {
 
 基于 Bubble Tea 的组件化 UI：
 
-![TUI 界面](../assets/images/mermaid/opencode-5.png)
+```mermaid
+flowchart LR
+    subgraph TUI["Bubble Tea TUI"]
+        subgraph View["视图层"]
+            header["Header"]
+            messages["Messages"]
+            input["Input Field"]
+            status["Status Bar"]
+        end
+        subgraph Model["模型层"]
+            state["App State"]
+            session["Session"]
+            messages_state["Messages"]
+        end
+    end
+    
+    View --> Model
+    Model --> View
+```
 
 ---
 
@@ -478,7 +594,36 @@ OpenCode ← MCP Client ← Tool Result
 
 #### 工具执行权限
 
-![工具执行权限](../assets/images/mermaid/opencode-6.png)
+```mermaid
+flowchart TB
+    subgraph User["用户权限"]
+        high["高权限用户"]
+        medium["中权限用户"]
+        low["低权限用户"]
+    end
+    subgraph Tools["工具权限"]
+        subgraph Read["只读工具"]
+            glob["glob"]
+            view["view"]
+            ls["ls"]
+        end
+        subgraph Write["写入工具"]
+            write["write"]
+            edit["edit"]
+        end
+        subgraph Execute["执行工具"]
+            bash["bash"]
+            patch["patch"]
+        end
+    end
+    
+    high --> Read
+    high --> Write
+    high --> Execute
+    medium --> Read
+    medium --> Write
+    low --> Read
+```
 
 ### 6.3 LSP 集成
 

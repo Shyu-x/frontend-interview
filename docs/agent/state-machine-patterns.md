@@ -173,7 +173,21 @@ enum AgentEvent {
 
 ### 2.2 状态转换图
 
-![Agent State Transition](../assets/images/mermaid/state-machine-1.png)
+```mermaid
+stateDiagram-v2
+    [*] --> idle: start
+    idle --> thinking: think
+    thinking --> executing: execute
+    executing --> waiting: wait
+    executing --> completed: complete
+    executing --> error: fail
+    waiting --> executing: resume
+    waiting --> completed: complete
+    error --> thinking: retry
+    error --> idle: reset
+    error --> [*]: abort
+    completed --> [*]
+```
 
 ### 2.3 Agent 状态机实现
 
@@ -1720,7 +1734,34 @@ class AgentOrchestrator {
 
 ## 状态图汇总
 
-![Agent and Task Queue States](../assets/images/mermaid/state-machine-2.png)
+```mermaid
+flowchart TB
+    subgraph AgentStates["Agent 状态"]
+        idle["idle"]
+        thinking["thinking"]
+        executing["executing"]
+        waiting["waiting"]
+        completed["completed"]
+        error["error"]
+        terminated["terminated"]
+    end
+    
+    subgraph TaskQueue["任务队列"]
+        pending["pending"]
+        running["running"]
+        done["done"]
+        failed["failed"]
+    end
+    
+    idle --> thinking
+    thinking --> executing
+    executing --> waiting
+    executing --> completed
+    executing --> error
+    waiting --> executing
+    error --> thinking
+    error --> idle
+```
 
 ---
 

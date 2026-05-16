@@ -10,7 +10,16 @@ Promise 是 ES6 引入的异步编程解决方案，是一个对象，用于获�
 
 #### 三种状态
 
-![Promise 三种状态](assets/images/mermaid/section-13-18-01.png)
+#### 三种状态
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> fulfilled : resolve
+    pending --> rejected : reject
+    fulfilled --> [*]
+    rejected --> [*]
+```
 
 | 状态 | 说明 | 能否继续改变 |
 |------|------|------------|
@@ -340,7 +349,28 @@ const comments = await fetch('/api/comments').then(r => r.json());
 
 JavaScript 是单线程语言，所有同步任务在主线程（调用栈）中执行，形成执行栈。任务队列分为**宏任务队列（macrotask）**和**微任务队列（microtask）**。
 
-![事件循环队列](assets/images/mermaid/section-13-18-02.png)
+#### 微任务 vs 宏任务 完整对比
+
+```mermaid
+flowchart TB
+    subgraph 执行栈["执行栈（同步代码）"]
+        S1["同步代码 1"]
+        S2["同步代码 2"]
+    end
+    subgraph 微任务["微任务队列"]
+        M1["Promise.then"]
+        M2["queueMicrotask"]
+        M3["MutationObserver"]
+    end
+    subgraph 宏任务["宏任务队列"]
+        T1["setTimeout/setInterval"]
+        T2["I/O 回调"]
+        T3["UI Rendering"]
+        T4["requestAnimationFrame"]
+    end
+    S1 --> M1 --> M2 --> M3
+    S2 --> T1 --> T2 --> T3 --> T4
+```
 
 #### 微任务 vs 宏任务 完整对比
 
@@ -402,7 +432,26 @@ console.log('D');                 // 同步
 
 Node.js 使用 libuv 实现事件循环，包含多个阶段：
 
-![Node.js 事件循环阶段](assets/images/mermaid/section-13-18-03.png)
+```mermaid
+flowchart TB
+    subgraph phases["Node.js 事件循环阶段"]
+        direction LR
+        P1[" timers "]
+        P2[" pending callbacks "]
+        P3[" idle, prepare "]
+        P4[" poll "]
+        P5[" check "]
+        P6[" close callbacks "]
+    end
+    subgraph tasks["任务队列"]
+        direction TB
+        M1["微任务队列<br/>Promise.then"]
+        MT["nextTick<br/>process.nextTick"]
+        macro["宏任务队列<br/>setTimeout/I/O"]
+    end
+    P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P1
+    MT --> M1
+```
 
 **关键区别：**
 
@@ -539,7 +588,23 @@ Node.js 有多个阶段（timers → poll → check），且 `process.nextTick` 
 
 ### 16.1 概念定义
 
-![浅拷贝与深拷贝对比](assets/images/mermaid/section-13-18-04.png)
+```mermaid
+flowchart TB
+    subgraph 浅拷贝["浅拷贝（shallow copy）"]
+        direction LR
+        O1["{a: 1, b: {c: 2}}"]
+        O2["{a: 1, b: {c: 2}}"]
+        O1 --- |同引用| B1["b: {c: 2}"]
+        O2 --- |同引用| B1
+    end
+    subgraph 深拷贝["深拷贝（deep copy）"]
+        direction LR
+        D1["{a: 1, b: {c: 2}}"]
+        D2["{a: 1, b: {c: 2}}"]
+        D1 --- |副本| B2["b: {c: 3}"]
+        D2 --- |副本| B3["b: {c: 2}}"]
+    end
+```
 
 ### 16.2 主流深拷贝方法对比
 
@@ -748,7 +813,23 @@ const clone = structuredClone(obj);
 
 ### 17.1 概念与内存模型
 
-![Map vs Object](assets/images/mermaid/section-13-18-05.png)
+```mermaid
+flowchart TB
+    subgraph Map["Map"]
+        MK1["键：任意类型"]
+        MK2["有序遍历"]
+        MK3["size 属性"]
+        MK4["直接迭代"]
+    end
+    subgraph Object["Object"]
+        OK1["键：string/symbol"]
+        OK2["基本有序"]
+        OK3["Object.keys()"]
+        OK4["需转换"]
+    end
+    MK1 --- MK2 --- MK3 --- MK4
+    OK1 --- OK2 --- OK3 --- OK4
+```
 
 ### 17.2 Map vs Object
 
@@ -813,7 +894,19 @@ largeArr.includes(99999); // O(n)，慢
 
 这是 Map/Set 最重要的区别：**弱引用**。当唯一剩余的引用是 WeakMap/WeakSet 对键的弱引用时，键对象可以被垃圾回收。
 
-![WeakMap 垃圾回收机制](assets/images/mermaid/section-13-18-06.png)
+```mermaid
+flowchart TB
+    subgraph 强引用["Map（强引用）"]
+        M1["Map"]
+        M2["Object Key"]
+        M3["永不 GC"]
+    end
+    subgraph 弱引用["WeakMap（弱引用）"]
+        W1["WeakMap"]
+        W2["Object Key"]
+        W3["无引用时 GC"]
+    end
+```
 
 #### WeakMap vs Map
 
@@ -911,7 +1004,18 @@ V8 中，对象属性的读写经过 Hidden Class + 内联缓存优化，理论�
 
 ### 18.1 迭代器协议与可迭代协议
 
-![迭代器与可迭代协议](assets/images/mermaid/section-13-18-07.png)
+```mermaid
+flowchart TB
+    subgraph 可迭代对象["可迭代对象"]
+        I1["[Symbol.iterator]"]
+        I2["返回迭代器"]
+    end
+    subgraph 迭代器["迭代器"]
+        IT1["next()"]
+        IT2["{value, done}"]
+    end
+    I1 --> I2 --> IT1 --> IT2
+```
 
 #### for...of vs for...in
 

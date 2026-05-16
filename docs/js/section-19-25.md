@@ -8,7 +8,39 @@
 
 `Proxy` 是 ES6 引入的元编程能力，用于拦截和自定义对象的基本操作（get、set、delete 等）。每个拦截行为称为一个 **trap**（陷阱），与 `Reflect` API 一一对应。
 
-![Proxy 拦截方法](assets/images/mermaid/proxy-traps.png)
+```mermaid
+flowchart LR
+    subgraph proxy["Proxy 拦截方法"]
+        get["get 读取属性"]
+        set["set 设置属性"]
+        has["has in操作符"]
+        delete["deleteProperty 删除属性"]
+        ownKeys["ownKeys 枚举"]
+        apply["apply 函数调用"]
+        construct["construct new构造"]
+    end
+    
+    subgraph reflect["Reflect API"]
+        reflect1["Reflect.get"]
+        reflect2["Reflect.set"]
+        reflect3["Reflect.has"]
+        reflect4["Reflect.deleteProperty"]
+        reflect5["Reflect.ownKeys"]
+        reflect6["Reflect.apply"]
+        reflect7["Reflect.construct"]
+    end
+    
+    get --> reflect1
+    set --> reflect2
+    has --> reflect3
+    delete --> reflect4
+    ownKeys --> reflect5
+    apply --> reflect6
+    construct --> reflect7
+    
+    style proxy fill:#e8f5e9
+    style reflect fill:#e3f2fd
+```
 
 
 #### 完整 Proxy Handler 示例
@@ -379,7 +411,29 @@ revoke(); // 一旦调用，proxy 的所有操作都抛出 TypeError
 
 ### 20.1 核心区别与对比
 
-![ESM 与 CJS 对比](assets/images/mermaid/esm-vs-cjs.png)
+```mermaid
+flowchart TB
+    subgraph esm["ESM (ES Module)"]
+        direction TB
+        e1["编译时解析<br/>静态 import/export"]
+        e2["import 必须顶层"]
+        e3["绑定只读"]
+        e4["支持 Tree Shaking"]
+        e5["默认导出/命名导出"]
+    end
+    
+    subgraph cjs["CJS (CommonJS)"]
+        direction TB
+        c1["运行时解析<br/>动态 require()"]
+        c2["require 任意位置"]
+        c3["导出对象可写"]
+        c4["无法 Tree Shaking"]
+        c5["module.exports"]
+    end
+    
+    style esm fill:#e8f5e9
+    style cjs fill:#fff3e0
+```
 
 
 ### 20.2 编译时 vs 运行时
@@ -470,7 +524,38 @@ console.log(count); // 1（因为 increment 修改了）
 
 Tree Shaking 是打包工具（Rollup、Webpack 4+）通过静态分析 ESM 依赖图，消除未使用的导出代码（dead code elimination）。
 
-![Tree Shaking 原理](assets/images/mermaid/tree-shaking-process.png)
+```mermaid
+flowchart LR
+    subgraph input["源代码"]
+        a["export func1()"]
+        b["export func2()"]
+        c["export func3()"]
+    end
+    
+    subgraph analyze["静态分析"]
+        analyze1["分析 import/export"]
+        analyze2["标记使用的导出"]
+        analyze3["标记未使用的导出"]
+    end
+    
+    subgraph output["打包结果"]
+        out1["只打包 func1()"]
+        out2["删除 func2() func3()"]
+    end
+    
+    a --> analyze1
+    b --> analyze1
+    c --> analyze1
+    analyze1 --> analyze2
+    analyze1 --> analyze3
+    
+    analyze2 --> out1
+    analyze3 -.->|"消除"| out2
+    
+    style input fill:#e3f2fd
+    style analyze fill:#fff9c4
+    style output fill:#e8f5e9
+```
 
 ### 20.5 Tree Shaking 条件
 
@@ -559,7 +644,29 @@ ESM 的 `import`/`export` 是编译时静态分析，依赖关系在打包阶段
 
 ### 21.1 V8 内存架构与 GC 分代
 
-![Map 与 Object 对比](assets/images/mermaid/map-vs-object.png)
+```mermaid
+flowchart TB
+    subgraph v8["V8 内存"]
+        direction TB
+        new["新生代 New Space<br/>1-8MB Scavenge"]
+        old["老生代 Old Space<br/>几十MB~GB Mark-Sweep"]
+        large["大对象区 Large Object Space"]
+    end
+    
+    subgraph new_space["新生代"]
+        from["From Space"]
+        to["To Space"]
+    end
+    
+    new --> from
+    new --> to
+    new --> old
+    old --> large
+    
+    style new fill:#e8f5e9
+    style old fill:#ffccbc
+    style large fill:#d1c4e9
+```
 
 
 
@@ -567,7 +674,32 @@ ESM 的 `import`/`export` 是编译时静态分析，依赖关系在打包阶段
 
 #### 标记-清除（Mark-Sweep）
 
-![标记-清除算法](assets/images/mermaid/mark-sweep.png)
+```mermaid
+flowchart LR
+    subgraph mark["标记阶段"]
+        m1["从根节点开始"]
+        m2["遍历对象图"]
+        m3["标记可达对象"]
+    end
+    
+    subgraph sweep["清除阶段"]
+        s1["遍历堆内存"]
+        s2["回收未标记对象"]
+    end
+    
+    subgraph compact["整理阶段（可选）"]
+        c1["移动存活对象"]
+        c2["消除内存碎片"]
+    end
+    
+    m1 --> m2 --> m3
+    m3 --> s1 --> s2
+    s2 -.-> c1 --> c2
+    
+    style mark fill:#e8f5e9
+    style sweep fill:#fff3e0
+    style compact fill:#e3f2fd
+```
 
 
 #### 标记-整理（Mark-Compact）
@@ -702,7 +834,28 @@ Chrome DevTools → Memory 面板：1. 使用 **Allocation Timeline** 记录一�
 
 ### 22.1 为什么需要 Web Worker
 
-![浏览器事件循环流程](assets/images/mermaid/event-loop.png)
+```mermaid
+flowchart LR
+    subgraph main["主线程"]
+        js["JavaScript"]
+        dom["DOM"]
+        render["渲染"]
+    end
+    
+    subgraph worker["Web Worker"]
+        w1["独立线程"]
+        w2["无法操作DOM"]
+        w3["通过postMessage通信"]
+    end
+    
+    js --> dom
+    js --> render
+    
+    worker -.->|"消息传递"| js
+    
+    style main fill:#e3f2fd
+    style worker fill:#e8f5e9
+```
 
 
 
@@ -861,7 +1014,34 @@ DedicatedWorker 只能被创建它的页面使用，关闭页面即终止。Shar
 
 ### 24.1 概念定义与对比
 
-![防抖与节流对比](assets/images/mermaid/debounce-vs-throttle.png)
+```mermaid
+flowchart TB
+    subgraph debounce["防抖 Debounce"]
+        direction TB
+        d1["触发事件"]
+        d2["重置计时器"]
+        d3["计时器归零"]
+        d4["执行函数"]
+        d5["N秒无新触发才执行"]
+    end
+    
+    subgraph throttle["节流 Throttle"]
+        direction TB
+        t1["触发事件"]
+        t2["检查时间间隔"]
+        t3["间隔是否达标"]
+        t4["执行函数并重置时间"]
+        t5["固定时间间隔执行"]
+    end
+    
+    d1 --> d2 --> d3 --> d4
+    d3 -.->|"重置"| d1
+    t1 --> t2 --> t3 --> t4
+    t3 -.->|"不达标，等待"| t1
+    
+    style debounce fill:#e8f5e9
+    style throttle fill:#ffccbc
+```
 
 
 

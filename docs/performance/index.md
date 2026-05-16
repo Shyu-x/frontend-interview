@@ -115,7 +115,23 @@ document.head.appendChild(link);
 
 **缓存判断流程：**
 
-![HTTP 缓存判断流程](assets/images/mermaid/performance-01.png)
+```mermaid
+flowchart TD
+    Start{用户请求} --> Cache{Cache-Control}
+    Cache -->|max-age| Valid{有效?}
+    Valid -->|是| Hit["返回缓存 (200)"]
+    Valid -->|否| Fresh["验证资源"]
+    Fresh --> ETag{"ETag"}
+    ETag -->|有| ServerCheck["服务器检查"]
+    ETag -->|无| LastModified["Last-Modified"]
+    ServerCheck -->|未修改| NotModified["304 Not Modified"]
+    ServerCheck -->|已修改| New["200 新资源"]
+    LastModified -->|未修改| NotModified
+    LastModified -->|已修改| New
+    Cache -->|no-cache| Fresh
+    Cache -->|no-store| New
+    Cache -->|private| Fresh
+```
 
 **Cache-Control 常见值：**
 
@@ -572,7 +588,41 @@ function Page() {
 
 **Lighthouse 评分体系：**
 
-![Lighthouse 性能评分体系](assets/images/mermaid/performance-02.png)
+```mermaid
+mindmap
+  root((Lighthouse))
+    性能评分
+      90-100 绿
+      50-89 黄
+      0-49 红
+    核心指标
+      LCP 最大内容绘制
+      CLS 累积布局偏移
+      INP 交互延迟
+    优化方向
+      移除阻塞资源
+      减少主线程工作
+```
+
+**Lighthouse 评分体系：**
+
+**Lighthouse 评分体系：**
+
+```mermaid
+mindmap
+  root((Lighthouse))
+    性能评分
+      90-100 绿
+      50-89 黄
+      0-49 红
+    核心指标
+      LCP 最大内容绘制
+      CLS 累积布局偏移
+      INP 交互延迟
+    优化方向
+      移除阻塞资源
+      减少主线程工作
+```
 
 | 评分 | 等级 | 说明 |
 |------|------|------|
@@ -1043,7 +1093,40 @@ window.cancelIdleCallback = window.cancelIdleCallback || clearTimeout;
 
 **前端监控体系：**
 
-![前端监控体系](assets/images/mermaid/performance-03.png)
+```mermaid
+flowchart TB
+    subgraph collect["数据采集"]
+        c1["JS 错误监控"]
+        c2["性能指标 Web Vitals"]
+        c3["API 性能监控"]
+        c4["用户行为埋点"]
+    end
+    
+    subgraph transmit["数据传输"]
+        t1["sendBeacon"]
+        t2["批量发送"]
+        t3["压缩"]
+    end
+    
+    subgraph storage["存储与分析"]
+        s1["ES / ClickHouse"]
+        s2["Kibana / Grafana"]
+        s3["实时告警"]
+    end
+    
+    subgraph view["可视化"]
+        v1["Dashboard"]
+        v2["趋势图"]
+        v3["告警通知"]
+    end
+    
+    collect --> transmit --> storage --> view
+    
+    style collect fill:#e3f2fd
+    style transmit fill:#fff9c4
+    style storage fill:#ffccbc
+    style view fill:#e8f5e9
+```
 
 **错误监控：**
 
@@ -1137,7 +1220,39 @@ navigator.sendBeacon('/track', JSON.stringify({ event: 'page_view' }));
 
 **日志系统设计：**
 
-![前端监控流程](assets/images/mermaid/performance-04.png)
+```mermaid
+flowchart LR
+    subgraph frontend["前端"]
+        js["JS 错误"]
+        perf["性能数据"]
+        api["API 监控"]
+        custom["自定义事件"]
+    end
+    
+    subgraph sdk["SDK 采集"]
+        auto["自动采集"]
+        manual["手动埋点"]
+    end
+    
+    subgraph send["数据发送"]
+        beacon["navigator.sendBeacon"]
+        batch["批量聚合"]
+        retry["失败重试"]
+    end
+    
+    subgraph backend["后端处理"]
+        collect["采集服务"]
+        queue["消息队列"]
+        storage["存储"]
+    end
+    
+    frontend --> sdk --> send --> backend
+    
+    style frontend fill:#e3f2fd
+    style sdk fill:#fff9c4
+    style send fill:#ffccbc
+    style backend fill:#e8f5e9
+```
 
 | 环节 | 技术选型 |
 |------|---------|

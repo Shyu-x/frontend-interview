@@ -160,7 +160,15 @@ function TodoList() {
 
 ### 2.2 乐观更新的生命周期
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-1.png)
+```mermaid
+flowchart TD
+    A[用户点击] --> B[addLike 调用]
+    B --> C[立即更新 UI<br/>optimisticLikes + 1]
+    C --> D[后台发送请求]
+    D --> E{请求成功?}
+    E -->|是| F[用实际结果替换<br/>回滚乐观更新]
+    E -->|否| G[显示错误<br/>回滚到原状态]
+```
 
 ### 2.3 表单乐观更新
 
@@ -336,7 +344,13 @@ function Layout({ children }) {
 
 ### 4.2 元数据渲染流程
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-2.png)
+```mermaid
+flowchart LR
+    A[组件内 title/meta] --> B[React 19]
+    B --> C[自动提升到 head]
+    D[嵌套组件内的标签] --> B
+    C --> E[Document Head]
+```
 
 ### 4.3 样式表支持
 
@@ -429,7 +443,20 @@ function InteractiveComponent() {
 
 ### 5.2 资源预加载时序图
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-3.png)
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant React
+    participant Server
+
+    Browser->>React: 组件挂载
+    React->>React: prefetchDNS/preconnect
+    Note right of React: 建立连接
+    React->>Browser: preload 资源
+    Note right of React: 下载资源
+    Browser->>React: 资源就绪
+    React->>Browser: 渲染组件
+```
 
 ### 5.3 资源加载状态追踪
 
@@ -535,11 +562,18 @@ class RecoverableErrorBoundary extends Component {
 
 ### 6.3 错误边界架构
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-4.png)
+```mermaid
+flowchart TD
+    A[错误发生] --> B{是否有 ErrorBoundary?}
+    B -->|有| C[捕获错误]
+    C --> D[显示 fallback]
+    C --> E[调用 reset]
+    E --> F[重试渲染]
+    B -->|无| G[向上传播]
+    G --> B
+```
 
----
-
-## 7. 自定义元素 (Web Components)
+### 6.3 错误边界架构（续）
 
 React 19 改进了对 Web Components 的支持。
 
@@ -667,7 +701,16 @@ function getData(key) {
 
 ### 8.4 React 18 vs React 19 重渲染对比
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-5.png)
+```mermaid
+flowchart LR
+    subgraph React 18
+        A1[状态更新] --> B1[重新渲染整个子树]
+    end
+    subgraph React 19
+        A2[状态更新] --> B2[自动识别稳定子树]
+        B2 --> C2[仅更新变化部分]
+    end
+```
 
 ---
 
@@ -675,11 +718,36 @@ function getData(key) {
 
 ### 9.1 新特性全景图
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-6.png)
+```mermaid
+mindmap
+  root((React 19))
+    Actions
+      useActionState
+      乐观更新
+    Hooks
+      use()
+      useOptimistic
+    资源预加载
+      prefetchDNS
+      preconnect
+      preload
+    编译器
+      自动 memo
+      自动 useCallback
+```
 
 ### 9.2 渲染架构变化
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-7.png)
+```mermaid
+flowchart TD
+    subgraph React 18
+        A1[render] --> A2[hydrate]
+    end
+    subgraph React 19
+        B1[createRoot] --> B2[hydrateRoot]
+        B1 --> B3[Streaming SSR]
+    end
+```
 
 ### 9.3 并发特性演进
 
@@ -722,7 +790,13 @@ const value = useRef(initialValue);
 
 ### 10.4 推荐的迁移路径
 
-![react-19-preview diagram](assets/images/mermaid/react-react-19-preview-8.png)
+```mermaid
+flowchart LR
+    A[升级依赖] --> B[测试基础功能]
+    B --> C[采用 Actions API]
+    C --> D[使用 useOptimistic]
+    D --> E[启用编译器]
+```
 
 ---
 

@@ -212,7 +212,29 @@ class ToolRegistry {
 
 ### 2.1 完整生命周期流程
 
-![工具执行生命周期](../assets/images/mermaid/tool-patterns-1.png)
+```mermaid
+flowchart TD
+    subgraph Init["初始化阶段"]
+        A[获取工具定义] --> B[Schema 验证]
+        B --> C[参数默认值填充]
+    end
+    
+    subgraph Execute["执行阶段"]
+        C --> D[获取处理器]
+        D --> E[沙箱执行]
+        E --> F[结果转换]
+    end
+    
+    subgraph Result["结果处理"]
+        F --> G{成功?}
+        G -->|是| H[返回成功结果]
+        G -->|否| I[错误处理]
+        I --> J[返回错误结果]
+    end
+    
+    Init --> Execute
+    Execute --> Result
+```
 
 ### 2.2 生命周期实现
 
@@ -1296,7 +1318,38 @@ class ContextPropagator {
 
 ### 6.1 沙箱架构
 
-![沙箱架构](../assets/images/mermaid/tool-patterns-2.png)
+```mermaid
+flowchart TB
+    subgraph Input["输入层"]
+        request["工具请求"]
+        params["参数"]
+    end
+    
+    subgraph Sandbox["沙箱层"]
+        validator["输入验证"]
+        executor["执行器"]
+        limiter["资源限制"]
+        monitor["监控"]
+    end
+    
+    subgraph Output["输出层"]
+        result["结果"]
+        error["错误"]
+        logs["日志"]
+    end
+    
+    subgraph Isolation["隔离机制"]
+        process["进程隔离"]
+        memory["内存限制"]
+        network["网络限制"]
+        filesystem["文件系统限制"]
+    end
+    
+    Input --> validator
+    validator --> Sandbox
+    Sandbox --> Isolation
+    Sandbox --> Output
+```
 
 ### 6.2 进程级沙箱
 

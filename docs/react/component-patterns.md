@@ -73,7 +73,16 @@ function withAuthentication(WrappedComponent) {
 
 多个 HOC 可链式组合，形成功能管道。
 
-![component-patterns diagram](assets/images/mermaid/react-component-patterns-2.png)
+```mermaid
+flowchart LR
+    A[BaseComponent] --> B[withLogger]
+    B --> C[withAuth]
+    C --> D[withTheme]
+    D --> E[EnhancedComponent]
+
+    style A fill:#e9ecef
+    style E fill:#69db7c
+```
 
 ```javascript
 // 链式调用示例
@@ -912,7 +921,27 @@ function Card({ title, description }) {
 
 ## 组件模式关系图
 
-![component-patterns diagram](assets/images/mermaid/react-component-patterns-1.png)
+```mermaid
+flowchart TD
+    A[组件模式] --> B[HOC]
+    A --> C[Render Props]
+    A --> D[Compound]
+    A --> E[Context]
+    A --> F[Custom Hooks]
+
+    B --> G[逻辑复用]
+    C --> H[逻辑复用]
+    D --> I[UI 组合]
+    E --> J[状态共享]
+    F --> K[逻辑复用]
+
+    style A fill:#9775fa
+    style G fill:#69db7c
+    style H fill:#69db7c
+    style I fill:#74c0fc
+    style J fill:#ffa94d
+    style K fill:#69db7c
+```
 
 ---
 

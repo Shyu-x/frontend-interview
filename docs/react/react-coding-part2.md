@@ -169,7 +169,18 @@ function App() {
 
 ### 设计原理图
 
-![react-coding-part2 diagram](assets/images/mermaid/react-react-coding-part2-3.png)
+```mermaid
+flowchart TD
+    A[组件] --> B[subscribe]
+    B --> C[Store]
+    C --> D{状态变化?}
+    D -->|是| E[getSnapshot]
+    E --> F[setState]
+    F --> G[重新渲染]
+
+    style B fill:#74c0fc
+    style C fill:#9775fa
+```
 
 ---
 
@@ -421,7 +432,24 @@ function SubmitButton() {
 
 ### 防抖 vs 节流 对比
 
-![react-coding-part2 diagram](assets/images/mermaid/react-react-coding-part2-2.png)
+```mermaid
+flowchart LR
+    subgraph 防抖
+        A1[触发] --> A2[等待 delay]
+        A2 --> A3{期间再次触发?}
+        A3 -->|是| A4[重置定时器]
+        A3 -->|否| A5[执行]
+    end
+    subgraph 节流
+        B1[触发] --> B2{在 interval 内?}
+        B2 -->|是| B3[忽略]
+        B2 -->|否| B4[执行]
+        B4 --> B5[重置时间]
+    end
+
+    style A5 fill:#69db7c
+    style B4 fill:#69db7c
+```
 
 ---
 
@@ -1348,7 +1376,20 @@ function ConditionalListener() {
 
 ## 常见自定义 Hooks 模式总结
 
-![react-coding-part2 diagram](assets/images/mermaid/react-react-coding-part2-1.png)
+```mermaid
+flowchart TD
+    A[自定义 Hooks] --> B[订阅型<br/>useSyncExternalStore]
+    A --> C[定时型<br/>useDebounce/useThrottle]
+    A --> D[存储型<br/>useLocalStorage]
+    A --> E[Refs 型<br/>usePrevious/useInterval]
+
+    B --> F[外部数据同步]
+    C --> G[频率控制]
+    D --> H[持久化]
+    E --> I[历史值追踪]
+
+    style A fill:#9775fa
+```
 
 ---
 

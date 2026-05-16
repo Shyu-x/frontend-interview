@@ -19,9 +19,39 @@
 
 ### 1.1 长时运行的 Agent 问题
 
-![无检查点的 Agent 执行](assets/images/mermaid/langgraph-01.png)
+```mermaid
+flowchart TD
+    A[开始执行] --> B[Step 1]
+    B --> C[Step 2]
+    C --> D[Step 3]
+    D --> E[Step 4]
+    E --> F[Step 5]
+    F --> G[网络中断!]
+    G --> H[重新开始]
+    H --> A
+    style H fill:#ff6b6b
+    style G fill:#ff6b6b
+```
 
-![有检查点的 Agent 执行](assets/images/mermaid/langgraph-02.png)
+```mermaid
+flowchart LR
+    A[开始] --> B[Step 1]
+    B --> C[Step 2]
+    C --> D[Step 3]
+    D --> E[保存检查点 A]
+    E --> F[Step 4]
+    F --> G[Step 5]
+    G --> H[保存检查点 B]
+    H --> I[Step 6]
+    I --> J[网络中断]
+    J --> K[从检查点B恢复]
+    K --> L[Step 6]
+    L --> M[Step 7]
+    M --> N[完成]
+    style E fill:#90EE90
+    style H fill:#90EE90
+    style K fill:#87CEEB
+```
 
 ### 1.2 检查点核心价值
 
@@ -76,7 +106,36 @@ async def conversational_agent(user_id: str, message: str):
 
 ### 2.1 检查点架构
 
-![检查点架构](assets/images/mermaid/langgraph-03.png)
+```mermaid
+flowchart TB
+    subgraph AppLayer["应用层"]
+        A[StateGraph]
+        B[Agent节点]
+        C[条件边]
+    end
+    
+    subgraph CheckpointLayer["检查点层"]
+        D[CheckpointSaver]
+        E[状态快照]
+        F[元数据]
+    end
+    
+    subgraph StorageLayer["存储层"]
+        G[Memory]
+        H[SQLite]
+        I[PostgreSQL]
+        J[Redis]
+    end
+    
+    A --> D
+    B --> E
+    C --> F
+    D --> G
+    D --> H
+    D --> I
+    D --> J
+    style CheckpointLayer fill:#f9f,stroke:#333,stroke-width:2px
+```
 
 ### 2.2 核心原语
 
@@ -149,11 +208,49 @@ thread_id = "user_123_session_abc"  # 格式: userId_sessionId
 
 ### 2.3 检查点生命周期
 
-![检查点生命周期](assets/images/mermaid/langgraph-04.png)
+```mermaid
+stateDiagram-v2
+    [*] --> 创建: invoke()
+    创建 --> 保存: step完成
+    保存 --> 就绪: 写入成功
+    就绪 --> 读取: get_state()
+    读取 --> 就绪
+    就绪 --> 历史: get_state_history()
+    历史 --> 就绪
+    就绪 --> 更新: update_state()
+    更新 --> 就绪
+    就绪 --> 删除: delete()
+    删除 --> [*]
+    就绪 --> 挂起: 中断请求
+    挂起 --> 就绪: 恢复
+```
 
 ### 2.4 并发与隔离模型
 
-![并发与隔离模型](assets/images/mermaid/langgraph-05.png)
+```mermaid
+flowchart TB
+    subgraph Thread1["Thread-1"]
+        T1C1[Checkpoint A]
+        T1C2[Checkpoint B]
+        T1C1 --> T1C2
+    end
+    
+    subgraph Thread2["Thread-2"]
+        T2C1[Checkpoint X]
+        T2C2[Checkpoint Y]
+        T2C1 --> T2C2
+    end
+    
+    subgraph Thread3["Thread-3"]
+        T3C1[Checkpoint P]
+    end
+    
+    T1C2 -.->|隔离| T2C1
+    T2C2 -.->|隔离| T3C1
+    style Thread1 fill:#e1f5fe
+    style Thread2 fill:#fff3e0
+    style Thread3 fill:#f3e5f5
+```
 
 ---
 
@@ -509,7 +606,24 @@ redis_saver = RedisSaver(
 
 ### 3.6 选择指南
 
-![检查点存储选择指南](assets/images/mermaid/langgraph-06.png)
+```mermaid
+flowchart TD
+    A{数据规模?} -->|小型| B{并发需求?}
+    A -->|中型| C{SQLite}
+    A -->|大型| D{需要集群?}
+    B -->|低| E[Memory]
+    B -->|高| F[SQLite/PostgreSQL]
+    D -->|是| G[PostgreSQL]
+    D -->|否| H{Redis可用?}
+    H -->|是| I[Redis]
+    H -->|否| G
+    E -.->|开发测试| F
+    C -.->|单节点| F
+    G -.->|生产环境| I
+    style E fill:#90EE90
+    style I fill:#87CEEB
+    style G fill:#FFB74D
+```
 
 | 存储 | 适用场景 | 优点 | 缺点 |
 |------|---------|------|------|

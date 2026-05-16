@@ -24,19 +24,40 @@
 
 **覆盖的环境**：
 
-![AgentBench 评测环境](assets/images/mermaid/agentbench-env.png)
-
-
-| 任务 | 领域 | 描述 |
-|------|------|------|
-| OS | 操作系统 | 文件操作、命令执行 |
-| DB | 数据库 | SQL 查询、数据检索 |
-| KG | 知识图谱 | SPARQL 查询、图遍历 |
-| DCG | 数字卡牌游戏 | 策略游戏 |
-| LTP | 横向思维 | 谜题解决 |
-| HH | 家务管理 (ALFWorld) | 家庭任务完成 |
-| WS | 网络购物 (WebShop) | 电商交互 |
-| WB | 网页浏览 (Mind2Web) | 多步骤网页导航 |
+```mermaid
+mindmap
+  root((AgentBench))
+    OS
+      操作系统
+      文件操作
+      命令执行
+    DB
+      数据库
+      SQL查询
+      数据检索
+    KG
+      知识图谱
+      SPARQL查询
+      图遍历
+    DCG
+      数字卡牌游戏
+      策略游戏
+    LTP
+      横向思维
+      谜题解决
+    HH
+      家务管理
+      ALFWorld
+      家庭任务
+    WS
+      网络购物
+      WebShop
+      电商交互
+    WB
+      网页浏览
+      Mind2Web
+      多步骤导航
+```
 
 **快速开始**：
 
@@ -117,14 +138,25 @@ python -m swebench.harness.run_evaluation \
 - 基于地图的导航，实现真实的多页面工作流
 - 5 大类评测：
 
-![WebArena 评测分类](assets/images/mermaid/webarena-categories.png)
-
-
-- 社交论坛
-- 业务管理系统
-- 游戏开发平台
-- 信息检索
-- 技术文档
+```mermaid
+mindmap
+  root((WebArena))
+    社交论坛
+      社区交互
+      帖子管理
+    业务管理系统
+      CMS内容管理
+      协作工作流
+    游戏开发平台
+      开发工具
+      部署管理
+    信息检索
+      搜索功能
+      数据查询
+    技术文档
+      API文档
+      知识库导航
+```
 
 **资源**：
 
@@ -195,32 +227,32 @@ python -m swebench.harness.run_evaluation \
 
 ### 2.3 基准测试分类
 
-![AgentBench 评测环境](assets/images/mermaid/agentbench-env.png)
-
-
-#### 软件工程
-
-- **SWE-bench**：真实 GitHub issues
-- **HumanEval**：Python 代码生成
-- **MBPP**：基础 Python 问题
-
-#### 网页交互
-
-- **WebArena**：多站点网页导航
-- **WebShop**：电商交互
-- **MiniWob++**：网页自动化任务
-
-#### 通用推理
-
-- **AgentBench**：多领域 Agent 评测
-- **τ-bench**：基于任务的客服
-- **MINT**：多跳推理
-
-#### 安全与对齐
-
-- **HarmBench**：安全评测
-- **红队测试框架**：对抗性测试
-- **宪法 AI**：价值观对齐
+```mermaid
+flowchart LR
+    subgraph 软件工程["软件工程"]
+        SWE[SWE-bench]
+        HE[HumanEval]
+        MB[MBPP]
+    end
+    
+    subgraph 网页交互["网页交互"]
+        WA[WebArena]
+        WS[WebShop]
+        MW[MiniWob++]
+    end
+    
+    subgraph 通用推理["通用推理"]
+        AB[AgentBench]
+        TB[τ-bench]
+        MN[MINT]
+    end
+    
+    subgraph 安全对齐["安全与对齐"]
+        HB[HarmBench]
+        RT[红队测试]
+        CA[宪法AI]
+    end
+```
 
 ---
 

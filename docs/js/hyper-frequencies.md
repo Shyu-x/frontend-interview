@@ -8,12 +8,48 @@
 
 JavaScript 共9种数据类型，分为两大类：
 
-![数据类型分类图](assets/images/mermaid/data-types.png)
-
+```mermaid
+flowchart TB
+    subgraph primitive["基本类型（Primitive）"]
+        direction TB
+        p1["number"]
+        p2["string"]
+        p3["boolean"]
+        p4["undefined"]
+        p5["null"]
+        p6["symbol"]
+        p7["bigint"]
+    end
+    
+    subgraph reference["引用类型（Reference）"]
+        direction TB
+        r1["object"]
+        r2["array"]
+        r3["function"]
+        r4["date"]
+        r5["regexp"]
+    end
+    
+    style primitive fill:#e3f2fd
+    style reference fill:#fff3e0
+```
 
 **typeof 判断方法：**
 
-![typeof 判断结果对照表](assets/images/mermaid/typeof-results.png)
+```mermaid
+table title Typeof 判断结果对照表
+    ["值", "typeof 结果"]
+    ["123", "number"]
+    ["\"hello\"", "string"]
+    ["true", "boolean"]
+    ["undefined", "undefined"]
+    ["null", "object"]
+    ["Symbol('id')", "symbol"]
+    ["123n", "bigint"]
+    ["{}", "object"]
+    ["[]", "object"]
+    ["function(){}", "function"]
+```
 
 
 存储方式区别：
@@ -579,7 +615,26 @@ function Timer2() {
 }
 ```
 
-![箭头函数与普通函数对比](assets/images/mermaid/arrow-vs-normal.png)
+```mermaid
+flowchart TB
+    subgraph normal["普通函数"]
+        n1["有自己的 this"]
+        n2["可作为构造函数"]
+        n3["有 arguments"]
+        n4["可使用 new"]
+    end
+    
+    subgraph arrow["箭头函数"]
+        a1["没有自己的 this"]
+        a2["继承外层 this"]
+        a3["没有 arguments"]
+        a4["不能作为构造函数"]
+        a5["不能使用 new"]
+    end
+    
+    style normal fill:#e3f2fd
+    style arrow fill:#e8f5e9
+```
 
 
 ---
@@ -992,9 +1047,6 @@ stateDiagram-v2
     rejected --> [*]
 ```
 
-![Promise 状态转换图](assets/images/mermaid/promise-state.png)
-
-
 #### 13.2 async / await 原理
 
 ```javascript
@@ -1229,9 +1281,6 @@ console.log('D');
 // 微任务：打印B
 ```
 
-![Promise 状态转换图](assets/images/mermaid/promise-state.png)
-
-
 #### 14.3 浏览器 vs Node Event Loop
 
 ```javascript
@@ -1266,9 +1315,6 @@ Promise.resolve().then(() => console.log('microtask'));
 // Node中多个阶段的微任务：
 // 每个阶段之间都会执行微任务队列（类似浏览器每轮宏任务后清微任务）
 ```
-
-![浏览器事件循环流程](assets/images/mermaid/event-loop.png)
-
 
 #### 14.4 MutationObserver 为什么是微任务
 
@@ -1571,9 +1617,6 @@ flowchart LR
     end
 ```
 
-![Set 特性说明](assets/images/mermaid/set-features.png)
-
-
 ---
 
 ### 18. 迭代器与生成器
@@ -1772,11 +1815,9 @@ const { proxy, revoke } = Proxy.revocable(target, handler);
 // import
 ```
 
-![ESM 与 CJS 对比](assets/images/mermaid/esm-vs-cjs.png)
+---
 
-
-```javascript
-// ESM的import为什么必须顶层（静态性）：
+### 22. JS 单线程与 Web Worker
 // 1. 可以在编译时确定导出依赖关系（静态分析）
 // 2. 打包工具（如rollup/webpack）可以实现tree shaking
 // 3. 可以在不执行模块的情况下分析依赖关系
@@ -1945,9 +1986,6 @@ b.prop = a; // a引用+1
 // 手动触发GC（调试用）：
 // % gc() // 在Node启动时加--expose-gc，或浏览器debug时用
 ```
-
-![V8 GC 架构](assets/images/mermaid/v8-gc-architecture.png)
-
 
 ---
 

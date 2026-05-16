@@ -20,7 +20,35 @@
 
 ### 1.1 生态系统架构
 
-![MCP 服务器生态系统架构](assets/images/mermaid/mcp-01.png)
+```mermaid
+flowchart TB
+    subgraph Client["MCP Client"]
+        Claude["Claude Code"]
+        App["Application"]
+    end
+    
+    subgraph Protocol["MCP Protocol"]
+        JSONRPC["JSON-RPC 2.0"]
+        Transport["Transport Layer"]
+    end
+    
+    subgraph Servers["MCP Servers"]
+        Official["Official Servers"]
+        Community["Community Servers"]
+        Custom["Custom Servers"]
+    end
+    
+    subgraph Resources["External Resources"]
+        API["APIs"]
+        DB["Databases"]
+        Files["File System"]
+    end
+    
+    Client --> Transport
+    Transport --> Protocol
+    Protocol --> Servers
+    Servers --> Resources
+```
 
 ### 1.2 服务器分类
 
@@ -1107,7 +1135,34 @@ export class McpService {
 
 ### 6.1 权限模型概述
 
-![MCP 安全层次](assets/images/mermaid/mcp-02.png)
+```mermaid
+flowchart TB
+    subgraph Security["MCP 安全层次"]
+        subgraph L1["层级 1: 网络安全"]
+            TLS["TLS 加密"]
+            Auth["认证"]
+        end
+        
+        subgraph L2["层级 2: 协议安全"]
+            Validate["输入验证"]
+            Rate["速率限制"]
+        end
+        
+        subgraph L3["层级 3: 访问控制"]
+            RBAC["RBAC 权限"]
+            Resources["资源限制"]
+        end
+        
+        subgraph L4["层级 4: 数据安全"]
+            Audit["审计日志"]
+            Encrypt["数据加密"]
+        end
+    end
+    
+    TLS --> Validate
+    Validate --> RBAC
+    RBAC --> Audit
+```
 
 ### 6.2 输入验证
 

@@ -142,7 +142,18 @@ const WorkTags = {
 
 Fiber 采用双缓冲（Double Buffering）技术，同时维护两棵 Fiber 树：
 
-![fiber-architecture diagram](assets/images/mermaid/react-fiber-architecture-7.png)
+```mermaid
+flowchart LR
+    subgraph 双缓冲
+        A[current<br/>已提交树] <--> B[workInProgress<br/>正在构建]
+    end
+
+    A --> C[用户可见]
+    B --> D[渲染中]
+
+    style A fill:#69db7c
+    style B fill:#74c0fc
+```
 
 ### alternate 指针切换
 
@@ -220,7 +231,23 @@ function createWorkInProgressLane(current, pendingProps) {
 
 ### 遍历流程
 
-![fiber-architecture diagram](assets/images/mermaid/react-fiber-architecture-6.png)
+```mermaid
+flowchart TD
+    A[beginWork] --> B{遍历 Fiber}
+    B --> C[向下 child]
+    C --> D{完成?}
+    D -->|否| B
+    D -->|是| E[completeWork]
+    E --> F[向上 return]
+    F --> G{还有 sibling?}
+    G -->|是| C
+    G -->|否| H[继续向上]
+    H --> I{到 root?}
+    I -->|否| E
+    I -->|是| J[渲染完成]
+
+    style J fill:#69db7c
+```
 
 ### beginWork 阶段
 
@@ -338,7 +365,18 @@ React 的调和算法遵循以下规则：
 1. **不同类型的元素产生不同的树**：如果元素类型改变，React 会销毁旧树并重建新树
 2. **通过 key 优化列表渲染**：同层级同类型的元素通过 key 判断是否可复用
 
-![fiber-architecture diagram](assets/images/mermaid/react-fiber-architecture-5.png)
+```mermaid
+flowchart TD
+    A[Reconciliation] --> B[比较 key]
+    B --> C{key 匹配?}
+    C -->|是| D[复用 Fiber]
+    C -->|否| E[销毁重建]
+    D --> F[更新 props]
+    E --> G[创建新 Fiber]
+
+    style D fill:#69db7c
+    style E fill:#ffa94d
+```
 
 ---
 
@@ -348,7 +386,19 @@ React 的调和算法遵循以下规则：
 
 ### 三个子阶段
 
-![fiber-architecture diagram](assets/images/mermaid/react-fiber-architecture-4.png)
+```mermaid
+flowchart TD
+    A[Commit Phase] --> B[before mutation<br/>DOM 更新前]
+    A --> C[mutation<br/>实际 DOM 操作]
+    A --> D[layout<br/>DOM 更新后]
+
+    B --> E[prepareWork]
+    C --> F[placement/update/deletion]
+    D --> G[componentDidMount<br/>useEffect 执行]
+
+    style A fill:#9775fa
+    style F fill:#ff6b6b
+```
 
 ### before mutation 阶段
 
@@ -459,7 +509,17 @@ function commitLayoutMount(root, finishedWork) {
 
 ### 副作用链表执行顺序
 
-![fiber-architecture diagram](assets/images/mermaid/react-fiber-architecture-3.png)
+```mermaid
+flowchart TD
+    A[Render Phase 完成] --> B[收集 effect list]
+    B --> C[firstEffect]
+    C --> D[执行副作用 1]
+    D --> E[执行副作用 2]
+    E --> F[...]
+    F --> G[完成提交]
+
+    style G fill:#69db7c
+```
 
 ---
 
@@ -514,7 +574,16 @@ function computeExpirationTime(
 
 Scheduler 使用 **scheduler.unstable_runWithPriority** 包装任务，确保高优先级任务能够插队：
 
-![fiber-architecture diagram](assets/images/mermaid/react-fiber-architecture-2.png)
+```mermaid
+flowchart TD
+    A[任务队列] --> B{优先级判断}
+    B --> C[立即执行<br/>Immediate]
+    B --> D[插入队列<br/>UserBlocking]
+    B --> E[空闲时执行<br/>Normal/Low/Idle]
+
+    style C fill:#ff6b6b
+    style E fill:#69db7c
+```
 
 ### Lane 模型（React 18+）
 
@@ -533,7 +602,18 @@ const lanes = {
 
 ### 调度流程示意
 
-![fiber-architecture diagram](assets/images/mermaid/react-fiber-architecture-1.png)
+```mermaid
+flowchart LR
+    A[更新触发] --> B[计算优先级]
+    B --> C{Lane 分配}
+    C --> D[SyncLane<br/>立即]
+    C --> E[DefaultLane<br/>正常]
+    C --> F[TransitionLane<br/>低优先级]
+    F --> G[可被中断]
+
+    style D fill:#ff6b6b
+    style G fill:#69db7c
+```
 
 ---
 
