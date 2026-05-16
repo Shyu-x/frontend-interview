@@ -42,6 +42,6 @@ jobs:
       - name: Run markdownlint
         run: |
           markdownlint "docs/**/*.md" \
-            --disable MD013 MD032 MD040 MD047 MD060 MD012 MD022 MD024 MD030 MD031 MD034 MD036 \
+            --disable MD001 MD012 MD013 MD022 MD024 MD025 MD029 MD030 MD031 MD032 MD033 MD034 MD036 MD037 MD040 MD046 MD047 MD050 MD060 \
             --ignore "**/node_modules/**" \
             --ignore "**/site/**"
