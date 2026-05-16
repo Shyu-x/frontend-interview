@@ -79,6 +79,27 @@
   border-left-color: #1976d2;
 }
 
+/* 增强 note 样式可读性 */
+.md-typeset .note p {
+  color: #0d47a1;
+}
+
+.md-typeset .note p:first-child {
+  font-weight: 600;
+}
+
+.md-typeset .note ol {
+  color: #1565c0;
+}
+
+.md-typeset .note ol li {
+  color: #1565c0;
+}
+
+.md-typeset .note strong {
+  color: #0d47a1;
+}
+
 .md-typeset .tip {
   background-color: #e8f5e9;
   border-left-color: #388e3c;
