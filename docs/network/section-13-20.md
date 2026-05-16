@@ -2584,129 +2584,36 @@ WebSocket 是基于 TCP 的全双工通信协议，通过 HTTP Upgrade 握手建
 
 ```mermaid
 flowchart TB
-    N0["HTTP vs WebSocket 建立连接对比"]
-    N1["HTTP/1.1 (无状态，请求-响应):"]
-    N2["Client GET / > Server"]
-    N3["Client < 200 OK < Server (响应后连接关闭)"]
-    N4["WebSocket (全双工，持久连接):"]
-    N5["Client HTTP Upgrade 请求 > Server"]
-    N6["Client < 101 Switching Protocols < Serve"]
-    N7["Client <═══════ 双向帧交换 ═══════> Server"]
-    N8["(服务器随时推送，客户端随时发送，无需 HTTP 请求)"]
-    N9["WebSocket 握手过程"]
-    N10["Step 1: HTTP Upgrade 请求（浏览器自动完成）"]
-    N11["GET /ws HTTP/1.1"]
-    N12["Host: api.example.com"]
-    N13["Upgrade: websocket 告诉服务器我想升级协议"]
-    N14["Connection: Upgrade 连接升级"]
-    N15["Sec-WebSocket-Version: 13 协议版本"]
-    N16["Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZ"]
-    N17["Origin: https://example.com 浏览器自动添加"]
-    N18["Step 2: 服务器验证并响应"]
-    N19["HTTP/1.1 101 Switching Protocols"]
-    N20["Upgrade: websocket"]
-    N21["Connection: Upgrade"]
-    N22["Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzz"]
-    N23["服务器对 Key 做 SHA1 + Base64，验证握手合法性"]
-    N24["Step 3: 连接升级完成"]
-    N25["后续所有数据通过 WebSocket 帧传输"]
-    N26["不再使用 HTTP"]
-    N27["Key 验证原理:"]
-    N28["Client Key = 'dGhlIHNhbXBsZSBub25jZQ=='"]
-    N29["Server 拼接固定字符串 '258EAFA5-E914-47DA-95CA-"]
-    N30["SHA1(Combined) Base64 = Sec-WebSocket-"]
-    N31["防止非浏览器客户端错误地建立 WebSocket 连接"]
-    N32["WebSocket 帧结构（RFC 6455）"]
-    N33["0 1 2 3"]
-    N34["0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9"]
-    N35["+-+-+-+-+-------+-+---------------+-----"]
-    N36["|F|R|R|R| opcode|M| mask | payload lengt"]
-    N37["|I|S|S|S| (4) |A| (1) | (7/16/64) |"]
-    N38["|N|V|V|V| |S|K| | |"]
-    N39["+-+-+-+-+-------+-+---------------+-----"]
-    N40["| payload len (7 bits) | extended payloa"]
-    N41["+---------------------------------+-----"]
-    N42["| Masking-Key (if mask bit is 1)"]
-    N43["+---------------------------------+-----"]
-    N44["| Payload Data"]
-    N45["+---------------------------------------"]
-    N46["字段详解:"]
-    N47["FIN (1 bit): 1=消息结束, 0=消息未完（分片消息）"]
-    N48["opcode (4 bits):"]
-    N49["0x1 = 文本帧, 0x2 = 二进制帧"]
-    N50["0x8 = Close, 0x9 = Ping, 0xA = Pong"]
-    N51["0x0 = 继续帧（接上条分片消息）"]
-    N52["MASK (1 bit): 1=客户端帧（必须掩码）, 0=服务端帧"]
-    N53["Masking-Key: 0-4 字节（如果 MASK=1）"]
-    N54["payload length: 7/16/64 位可变长度编码"]
-    N55["WebSocket 分片（消息分帧）"]
-    N56["大消息分片传输:"]
-    N57["Client FIN=0, opcode=0x1, 'Hello ' 分"]
-    N58["Client FIN=0, opcode=0x0, 'World' 继续"]
-    N59["Client FIN=1, opcode=0x0, '!' 最后一个分片"]
-    N60["服务器重组: 'Hello World!'"]
-    N61["注意: 只有第一个分片有 opcode，后续都用 opcode=0x0"]
+    N0["HTTP vs WebSocket 对比"]
+    N1["HTTP/1.1: Client -> Server -> 关闭"]
+    N2["WebSocket: Client <==> Server (双向)"]
+    N3["WebSocket 握手"]
+    N4["Step 1: HTTP Upgrade 请求"]
+    N5["GET /ws HTTP/1.1"]
+    N6["Upgrade: websocket"]
+    N7["Step 2: 服务器响应"]
+    N8["HTTP/1.1 101 Switching"]
+    N9["Sec-WebSocket-Accept"]
+    N10["Step 3: 双向通信开始"]
+    N11["WebSocket 帧结构"]
+    N12["FIN + opcode + MASK"]
+    N13["opcode: 0x1=文本 0x2=二进制"]
+    N14["0x8=Close 0x9=Ping 0xA=Pong"]
+
     N0 --> N1
-    N1 --> N2
+    N0 --> N2
     N2 --> N3
     N3 --> N4
     N4 --> N5
     N5 --> N6
-    N6 --> N7
+    N3 --> N7
     N7 --> N8
     N8 --> N9
-    N9 --> N10
+    N2 --> N10
     N10 --> N11
     N11 --> N12
-    N12 --> N13
-    N13 --> N14
-    N14 --> N15
-    N15 --> N16
-    N16 --> N17
-    N17 --> N18
-    N18 --> N19
-    N19 --> N20
-    N20 --> N21
-    N21 --> N22
-    N22 --> N23
-    N23 --> N24
-    N24 --> N25
-    N25 --> N26
-    N26 --> N27
-    N27 --> N28
-    N28 --> N29
-    N29 --> N30
-    N30 --> N31
-    N31 --> N32
-    N32 --> N33
-    N33 --> N34
-    N34 --> N35
-    N35 --> N36
-    N36 --> N37
-    N37 --> N38
-    N38 --> N39
-    N39 --> N40
-    N40 --> N41
-    N41 --> N42
-    N42 --> N43
-    N43 --> N44
-    N44 --> N45
-    N45 --> N46
-    N46 --> N47
-    N47 --> N48
-    N48 --> N49
-    N49 --> N50
-    N50 --> N51
-    N51 --> N52
-    N52 --> N53
-    N53 --> N54
-    N54 --> N55
-    N55 --> N56
-    N56 --> N57
-    N57 --> N58
-    N58 --> N59
-    N59 --> N60
-    N60 --> N61
+    N11 --> N13
+    N11 --> N14
 ```
 
 ### 完整代码示例（TS/JS）
@@ -2993,7 +2900,7 @@ flowchart TB
     N5["Client < event: close\n\n < Server (完成)"]
     N6["WebSocket（全双工）:"]
     N7["Client HTTP Upgrade > Server"]
-    N8["Client <═══ 双向帧交换 ═══> Server"]
+    N8["Client <--> 双向帧交换 --> Server"]
     N9["(服务器随时推送，客户端随时发送，真正对等通信)"]
     N10["长轮询:"]
     N11["Client HTTP GET /poll > Server (服务器挂起)"]
@@ -3023,7 +2930,7 @@ flowchart TB
     N35["需要兼容 IE / 旧浏览器？ 长轮询（兼容但低效）"]
     N36["需要 AI/LLM 流式输出？ SSE（ReadableStream 原生）"]
     N37["普通推送（通知、行情） SSE（最简单，推荐）"]
-    N38["需要双向通信（浏览器 ↔ 服务器）？"]
+    N38["需要双向通信（浏览器 <--> 服务器）？"]
     N39["延迟 < 100ms（游戏、实时协作）？ WebSocket"]
     N40["消息可靠性要求极高？ WebSocket + 应用层 ACK"]
     N41["低频交互 + 高并发推送？ SSE + fetch POST"]
