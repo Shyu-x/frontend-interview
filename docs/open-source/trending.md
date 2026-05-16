@@ -73,18 +73,18 @@
 5. [React 全栈框架](#5-react-全栈框架)
 6. [Node.js 后端框架](#6-nodejs-后端框架)
 7. [Signal 响应式框架](#7-signal-响应式框架)
-8. [React 状态管理](#8-react-状态管理)
-9. [构建工具革新](#9-构建工具革新)
-10. [CSS 新特性](#10-css-新特性)
-11. [格式化工具](#11-格式化工具)
-12. [React 表单与动画](#12-react-表单与动画)
-13. [HTTP 客户端](#13-http-客户端)
-14. [微前端架构](#14-微前端架构)
-15. [Monorepo 工具链](#15-monorepo-工具链)
-16. [测试框架](#16-测试框架)
-17. [前端工具链](#17-前端工具链)
-18. [组件库与 UI](#18-组件库与-ui)
-19. [类型与验证](#19-类型与验证)
+8. [构建工具革新](#7-构建工具革新)
+9. [CSS 新特性](#8-css-新特性)
+10. [格式化工具](#9-格式化工具)
+11. [React 状态管理](#10-react-状态管理)
+12. [React 表单与动画](#11-react-表单与动画)
+13. [HTTP 客户端](#12-http-客户端)
+14. [微前端架构](#13-微前端架构)
+15. [Monorepo 工具链](#14-monorepo-工具链)
+16. [测试框架](#15-测试框架)
+17. [前端工具链](#16-前端工具链)
+18. [组件库与 UI](#17-组件库与-ui)
+19. [类型与验证](#18-类型与验证)
 20. [后端即服务 (BaaS)](#20-后端即服务-baas)
 
 ---
@@ -2130,7 +2130,7 @@ const infiniteTodos = useInfiniteQuery({
 
 ---
 
-## 6. 构建工具革新
+## 7. 构建工具革新
 
 ### 6.1 Bun
 
@@ -2307,7 +2307,7 @@ Turbopack 是 Rust 编写的 Webpack 继任者：
 
 ---
 
-## 7. CSS 新特性
+## 8. CSS 新特性
 
 ### 7.1 Container Queries
 
@@ -2534,7 +2534,7 @@ document.querySelectorAll('.card').forEach(card => {
 
 ---
 
-## 8. 格式化工具
+## 9. 格式化工具
 
 ### 8.1 Prettier
 
@@ -2811,7 +2811,7 @@ mv .eslintrc.js eslint.config.js
 
 ---
 
-## 9. React 状态管理
+## 10. React 状态管理
 
 ### 9.1 Zustand
 
@@ -2994,7 +2994,7 @@ const { data } = useSWR(userId ? `/api/user/${userId}` : null, fetcher)
 
 ---
 
-## 10. React 表单与动画
+## 11. React 表单与动画
 
 ### 10.1 React Hook Form
 
@@ -3190,7 +3190,7 @@ function TodoList() {
 
 ---
 
-## 11. HTTP 客户端
+## 12. HTTP 客户端
 
 ### 11.1 Axios
 
