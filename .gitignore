@@ -27,4 +27,4 @@ Thumbs.db
 
 # Temporary
 tmp/
-temp/
+temp/.cache/

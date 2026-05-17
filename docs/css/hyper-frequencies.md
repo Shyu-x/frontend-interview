@@ -1,6 +1,3 @@
-
----
-
 ---
 title: 高频 CSS 面试题
 description: 涵盖 CSS 盒模型、BFC、IFC/GFC/FFC、Position、Flex 等高频面试知识点。

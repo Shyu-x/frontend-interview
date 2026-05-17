@@ -1,7 +1,7 @@
 site_name: 前端面试全家桶
 site_description: 前端面试高频知识点配套代码示例与图解，助你系统复习、斩获 Offer
 site_author: Frontend Interview Study
-site_url: https://example.com/frontend-interview
+site_url: https://shyu-x.github.io/frontend-interview
 
 repo_name: frontend-interview
 repo_url: https://github.com/example/frontend-interview
@@ -50,7 +50,10 @@ theme:
     - header.autohide
 
 plugins:
-  - search:
+  - search
+  - social:
+      cards_layout_options:
+        font_family: Noto Sans SC
 
 markdown_extensions:
   - abbr

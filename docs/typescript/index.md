@@ -1,4 +1,3 @@
-
 ---
 title: TypeScript 核心概念
 description: TypeScript 核心概念与高频面试题详解，涵盖类型基础、泛型、接口 vs 类型、keyof/infer、条件类型、映射类型、协变与逆变等核心知识点。

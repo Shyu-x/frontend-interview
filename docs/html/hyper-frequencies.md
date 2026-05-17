@@ -1,6 +1,3 @@
-
----
-
 ---
 title: 高频 HTML 面试题
 description: 涵盖 HTML5 新特性、语义化标签、meta 标签、viewport 原理等高频面试知识点。
