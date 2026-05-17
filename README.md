@@ -32,11 +32,11 @@
 
 > 高质量开源项目深度技术指南，52 个项目，17K+ 行内容
 
-[![🤖 AI Agent](https://img.shields.io/badge/🤖-AI_Agent框架-11个-blue?style=for-the-badge&logo=robot)](docs/open-source/ai-agents.md)
-[![⚛️ 前端框架](https://img.shields.io/badge/⚛️-前端框架-8个-green?style=for-the-badge&logo=react)](docs/open-source/frontend-frameworks.md)
-[![🛠️ 工具链](https://img.shields.io/badge/🛠️-构建工具-11个-orange?style=for-the-badge&logo=gears)](docs/open-source/tooling.md)
-[![📦 工程化](https://img.shields.io/badge/📦-工程化库-10个-purple?style=for-the-badge&logo=npm)](docs/open-source/engineering.md)
-[![🚀 新兴趋势](https://img.shields.io/badge/🚀-新兴趋势-12个-red?style=for-the-badge&logo=rocket)](docs/open-source/trending.md)
+[![AI Agent](https://img.shields.io/badge/AI_Agent-11%E4%B8%AA-blue?style=for-the-badge&logo=robot)](docs/open-source/ai-agents.md)
+[![前端框架](https://img.shields.io/badge/%E5%89%8D%E7%AB%AF%E6%A1%86%E6%9E%B6-8%E4%B8%AA-green?style=for-the-badge&logo=react)](docs/open-source/frontend-frameworks.md)
+[![构建工具](https://img.shields.io/badge/%E6%9E%84%E5%BB%BA%E5%B7%A5%E5%85%B7-11%E4%B8%AA-orange?style=for-the-badge&logo=gears)](docs/open-source/tooling.md)
+[![工程化](https://img.shields.io/badge/%E5%B7%A5%E7%A8%8B%E5%8C%96-10%E4%B8%AA-purple?style=for-the-badge&logo=npm)](docs/open-source/engineering.md)
+[![新兴趋势](https://img.shields.io/badge/%E6%96%B0%E5%8D%87%E8%B6%8A%E5%8A%BF-12%E4%B8%AA-red?style=for-the-badge&logo=rocket)](docs/open-source/trending.md)
 
 ### 项目总览
 
@@ -150,4 +150,4 @@ python split_chapters.py
 
 ## License
 
-MIT License
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
