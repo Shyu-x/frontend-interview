@@ -283,7 +283,7 @@ sequenceDiagram
     Server-->>Client: ② HTTP 101 Switching Protocols
     Note over Client,Server: Sec-WebSocket-Accept
 
-    Client<->Server: ③ WebSocket 全双工通信开始
+    Client<=>Server: ③ WebSocket 全双工通信开始
     Note over Client,Server: 双向帧传输，无 HTTP 头开销
 ```
 
