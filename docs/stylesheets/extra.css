@@ -69,6 +69,33 @@
   border-radius: 20px;
 }
 
+/* 星星 emoji 在深色主题下可见性优化 */
+[data-md-color-scheme="slate"] .md-typeset em:has(⭐),
+[data-md-color-scheme="slate"] .md-typeset strong:has(⭐),
+[data-md-color-scheme="slate"] .md-typeset p:has(⭐),
+[data-md-color-scheme="slate"] .md-typeset li:has(⭐),
+[data-md-color-scheme="slate"] .md-typeset td:has(⭐),
+[data-md-color-scheme="slate"] .md-typeset th:has(⭐),
+[data-md-color-scheme="slate"] .md-typeset .highlight:has(⭐) {
+  color: #b0bec5 !important;
+}
+
+/* 通用星星文字在深色模式下的样式 */
+[data-md-color-scheme="slate"] .md-typeset em:contains("⭐"),
+[data-md-color-scheme="slate"] .md-typeset strong:contains("⭐"),
+[data-md-color-scheme="slate"] .md-typeset td:contains("⭐"),
+[data-md-color-scheme="slate"] .md-typeset th:contains("⭐") {
+  text-shadow: 0 0 3px rgba(255, 193, 7, 0.5);
+}
+
+/* 难度等级颜色在深色模式下更易读 */
+[data-md-color-scheme="slate"] .md-typeset .⭐,
+[data-md-color-scheme="slate"] .md-typeset .⭐⭐,
+[data-md-color-scheme="slate"] .md-typeset .⭐⭐⭐ {
+  color: #ffcc02 !important;
+  text-shadow: 0 0 4px rgba(255, 193, 7, 0.4);
+}
+
 /* Admonition 样式增强 */
 .md-typeset .admonition {
   border-radius: 8px;
