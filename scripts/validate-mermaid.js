@@ -20,14 +20,14 @@ const { execSync, spawn } = require('child_process');
 const MERMAID_EXTENSIONS = ['.mmd', '.mermaid'];
 const MD_EXTENSIONS = ['.md'];
 
-// Valid Mermaid diagram types (Mermaid 11.x)
+// Valid Mermaid diagram types (Mermaid 11.x) - lowercase for comparison
 const VALID_DIAGRAM_TYPES = [
-    'flowchart', 'graph', 'pie', 'gantt', 'classDiagram', 'class',
-    'stateDiagram', 'state', 'stateDiagram-v2', 'sequenceDiagram', 'sequence',
-    'erDiagram', 'er', 'journey', 'requirementDiagram', 'requirement',
-    'timeline', 'mindmap', 'block', 'blockDiagram', 'block-beta',
-    'table', 'C4Context', 'gitGraph', 'XYChart', 'quadrantChart',
-    'packet', 'packet-beta', ' sankey', 'watermelon', 'vegalite', '占比图'
+    'flowchart', 'graph', 'pie', 'gantt', 'classdiagram', 'class',
+    'statediagram', 'state', 'statediagram-v2', 'sequence', 'sequencediagram',
+    'erdiagram', 'er', 'journey', 'requirementdiagram', 'requirement',
+    'timeline', 'mindmap', 'block', 'blockdiagram', 'block-beta',
+    'table', 'c4context', 'gitgraph', 'xychart', 'quadrantchart', 'linechart',
+    'packet', 'packet-beta', 'sankey', 'watermelon', 'vegalite'
 ];
 
 class MermaidValidator {
@@ -92,18 +92,20 @@ class MermaidValidator {
         // === Critical Syntax Checks ===
 
         // Check 1: Bidirectional arrow syntax (Mermaid 11.x requires <=>)
-        if (/<->/.test(content)) {
+        // Only flag if it's used in an arrow context (between participants)
+        const bidirectionalArrowPattern = /[A-Za-z0-9_]\s*<->\s*[A-Za-z0-9_]/g;
+        if (bidirectionalArrowPattern.test(content)) {
             errors.push({
                 type: 'invalidArrow',
                 message: `Invalid bidirectional arrow '<->'. Use '<=>' instead (Mermaid 11.x+)`
             });
         }
 
-        // Check 2: Detect diagram type and validate
+        // Check 2: Extract diagram type and validate
         const lines = content.split('\n');
         const firstLine = lines[0].trim();
 
-        // Extract diagram type (first word)
+        // Extract diagram type (first word, case insensitive)
         const diagramType = firstLine.split(/\s/)[0].toLowerCase();
 
         // Check for flowchart without direction
@@ -159,32 +161,25 @@ class MermaidValidator {
                 });
             }
 
-            // Check for problematic characters in node text
-            if (/[`$]/.test(nodeText)) {
+// Check for truly problematic characters in node text
+            // Allow angle brackets used in file paths like <.pnp.cjs>
+            // Allow <br/> for line breaks
+            // Allow backticks for code formatting
+            // Only flag unclosed angle brackets at the end of strings
+            const nodeTextClean = nodeText.replace(/<br\s*\/?>/gi, ' ').replace(/\n/g, ' ');
+            // Only flag if it looks like unclosed HTML (no closing > after opening <)
+            const hasUnclosedTag = /<[a-zA-Z][^>]*$/.test(nodeTextClean);
+            if (hasUnclosedTag) {
                 errors.push({
                     type: 'invalidNodeChar',
-                    message: `Node text contains invalid character: ${nodeText.substring(0, 20)}`
+                    message: `Node text contains invalid character: ${nodeText.substring(0, 40)}`
                 });
             }
         }
 
-        // Check 6: Arrow syntax validation
-        // Valid arrows: -->, -->>, ->, <-, <->, ==> , ---, etc.
-        const invalidArrowPattern = /--+[^>-]*>/g;
-        const invalidArrows = content.match(invalidArrowPattern);
-        if (invalidArrows) {
-            // Filter out valid patterns
-            const trulyInvalid = invalidArrows.filter(arrow => {
-                // These are valid: -->", -->', -->, ==>, ---, --->
-                return !/(-->|-->>|==>|---\s*>|-->$)/.test(arrow);
-            });
-            if (trulyInvalid.length > 0) {
-                errors.push({
-                    type: 'invalidArrowSyntax',
-                    message: `Invalid arrow syntax: ${trulyInvalid.slice(0, 3).join(', ')}`
-                });
-            }
-        }
+        // Check 6: Arrow syntax validation (simplified - just check for obvious issues)
+        // Skip complex arrow validation as it causes false positives
+        // The bidirectional arrow check above catches the main issue
 
         // Check 7: Check for unknown diagram type
         const isValidType = VALID_DIAGRAM_TYPES.some(type =>

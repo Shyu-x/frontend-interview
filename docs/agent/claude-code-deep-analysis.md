@@ -73,7 +73,7 @@ graph TD
 ### 1.2 文件分类统计
 
 ```mermaid
-table[]
+table
 | Directory | Files | Share | Main Responsibility |
 |---|---|---|---|
 | src/utils/ | 564 | 29.7% | Utility functions, string processing |
