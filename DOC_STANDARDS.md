@@ -201,35 +201,84 @@ MkDocs 配置了 `pymdownx.superfences`，Mermaid 图表会自动渲染。
 
 ## 6. 交叉引用规范
 
-### 6.1 内部链接
+### 6.1 环境要求
+
+> ⚠️ **严格规范**：所有 Python 命令必须使用 `uv run` 执行，禁止裸启动
+
+| 场景 | 命令 |
+|------|------|
+| 安装依赖 | `uv sync` |
+| 开发预览 | `uv run mkdocs serve --dev-addr 127.0.0.1:8000` |
+| 生产构建 | `uv run mkdocs build --clean` |
+| 添加依赖 | `uv add mkdocs mkdocs-material` |
+
+项目根目录提供以下环境配置文件：
+- `pyproject.toml` - Python 依赖定义
+- `.python-version` - Python 版本约束 (≥3.10)
+- `uv.lock` - 依赖版本锁定
+- `Makefile` - 规范化命令 (`make dev`, `make build` 等)
+
+### 6.2 内部链接
 
 ```markdown
 [文字](相对路径/文件名.md)
 [文字](../js/hyper-frequencies.md)
 ```
 
-### 6.2 锚点链接
+### 6.3 锚点链接
 
-| 场景 | 格式 | 示例 |
-|------|------|------|
-| 同一文件 | `#锚点` | `[跳转](#两数之和)` |
-| 不同文件 | `file.md#锚点` | `[跳转](./algorithm/index.md#两数之和)` |
-
-### 6.3 锚点命名规则
+#### 锚点命名规则
 
 | 规则 | 说明 | 示例 |
 |------|------|------|
-| GFM 兼容 | GitHub Flavored Markdown 处理锚点 | `## 1.1 两数之和` → `#1.1-两数之和` |
+| GFM 兼容 | GitHub Flavored Markdown 处理锚点 | `## 1. 两数之和` → `#1-两数之和` |
 | 禁止重复 | 同一文件中不能有重复锚点 | - |
 | 编号连续 | 章节编号必须连续 | `#7` 后必须是 `#8`，不能跳过 |
+| 显式 ID | 复杂标题使用显式锚点 ID | `## 对比矩阵 {#对比矩阵}` |
 
 **GFM 锚点转换规则**：
 - 空格 → 连字符 `-`
 - 点号（`.`）→ 保留
 - 大写 → 小写
+- 特殊字符 → 移除或转换
 
-正确：`## 1.1 两数之和` → 锚点 `#1.1-两数之和`
+正确：`## 1. 两数之和` → 锚点 `#1-两数之和`
 错误：`## 两数之和` → 锚点 `#两数之和`
+
+#### TOC 链接修复模式
+
+MkDocs 生成的锚点与 TOC 链接匹配规则复杂，常见问题：
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 链接 `#1-mcp-概述`，实际 `#1-mcp` | TOC 链接包含冗余后缀 | 删除多余后缀 |
+| 中文标题无锚点 | MkDocs 不支持中文自动生成 | 使用显式 ID `{#中文}` |
+| `.1`, `.2` 子章节无锚点 | 只有顶级章节有锚点 | 删除子章节 TOC 条目 |
+
+**修复命令**：
+```bash
+# 检查实际锚点
+grep -o 'id="[^"]*"' site/xxx/index.html | grep -E '^id="[0-9]' | head -10
+
+# 构建并检查警告
+uv run mkdocs build 2>&1 | grep "contains a link"
+```
+
+#### 常见错误修复
+
+```markdown
+# 错误：链接到中文锚点
+[跳转](#一数组题型)
+
+# 正确：使用实际存在的锚点
+[跳转](#_2)  或  [跳转](#数组题型)
+
+# 错误：链接到子章节（不存在）
+[1.1 两数之和](#1.1-两数之和)
+
+# 正确：只链接到顶级章节
+[数组题型](#一数组题型)
+```
 
 ### 6.4 外部链接
 
@@ -284,15 +333,35 @@ MkDocs 配置了 `pymdownx.superfences`，Mermaid 图表会自动渲染。
 
 ---
 
-## 9. 自动化工具（待开发）
+## 9. 自动化检查工具
 
-| 工具 | 功能 | 优先级 |
-|------|------|--------|
-| `check_frontmatter.py` | 检查 frontmatter 完整性 | P1 |
-| `check_links.py` | 检查内部链接有效性 | P1 |
-| `check_anchors.py` | 检查锚点格式 | P1 |
-| `fix_headings.py` | 自动修复标题层级 | P2 |
-| `add_language.py` | 自动添加代码块语言 | P2 |
+### 9.1 锚点链接检查
+
+```bash
+# 构建并统计警告数量
+uv run mkdocs build 2>&1 | grep "contains a link" | wc -l
+
+# 查看具体警告
+uv run mkdocs build 2>&1 | grep "contains a link"
+
+# 获取所有有警告的文件
+uv run mkdocs build 2>&1 | grep "contains a link" | sed "s/INFO.*Doc file '//;s/' contains.*//" | sort -u
+```
+
+### 9.2 锚点 ID 检查
+
+```bash
+# 查看实际生成的锚点 ID（构建后）
+grep -o 'id="[^"]*"' site/xxx/index.html | grep -E '^id="[0-9]' | head -10
+```
+
+### 9.3 前置检查清单
+
+创建 PR 前必须执行：
+
+- [ ] `make build` 构建成功
+- [ ] `make lint` 无 WARNING/ERROR
+- [ ] 检查 nav 完整性（`mkdocs.yml` 中所有页面已配置）
 
 ---
 

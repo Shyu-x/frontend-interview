@@ -144,18 +144,33 @@ mkdocs build --clean
 
 ## 依赖管理
 
+### 环境配置
+
+> ⚠️ **严格规范**：所有 Python 命令必须使用 `uv run` 执行，禁止裸启动
+
+```bash
+# 安装 uv (如未安装)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 同步依赖
+uv sync
+
+# 添加依赖
+uv add mkdocs mkdocs-material
+```
+
 ### Python 依赖
 
 ```bash
-# 固定版本
-mkdocs==1.6.1
-mkdocs-material==9.5.*
-
 # 检查更新
-pip list --outdated
+uv pip list
 
 # 安全检查
-pip check
+uv pip check
+
+# 版本约束 (在 pyproject.toml 中)
+mkdocs>=1.6.0
+mkdocs-material>=9.7.0
 ```
 
 ### GitHub Actions 版本
@@ -206,17 +221,19 @@ pip check
 ### 常用命令速查
 
 ```bash
-# 开发
-mkdocs serve --dev-addr 127.0.0.1:8000
+# 环境配置
+uv sync                 # 安装依赖
+make dev                # 开发预览 (uv run mkdocs serve)
+make build              # 生产构建 (uv run mkdocs build --clean)
+make lint               # 检查警告
 
-# 构建
-mkdocs build --clean
+# 手动命令
+uv run mkdocs serve --dev-addr 127.0.0.1:8000
+uv run mkdocs build --clean
+uv run mkdocs build 2>&1 | grep "contains a link"  # 检查锚点警告
 
 # 检查
-pip check && markdownlint docs/
-
-# 部署（手动）
-git push && gh run watch
+uv pip check
 ```
 
 ### 文档版本记录
