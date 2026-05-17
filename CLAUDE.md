@@ -86,10 +86,26 @@ someText/
 
 ## 常用命令
 
+> ⚠️ **环境要求**：所有 Python 命令必须使用 `uv run` 执行，禁止裸启动
+
+### 环境配置
+```bash
+# 安装 uv (如未安装)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 同步依赖
+uv sync
+
+# 添加依赖
+uv add mkdocs mkdocs-material
+```
+
 ### 文档开发
 ```bash
-mkdocs serve --dev-addr 127.0.0.1:8000
-mkdocs build --clean
+make dev        # 启动开发服务器 (mkdocs serve --dev-addr 127.0.0.1:8000)
+make build      # 构建生产版本
+make clean      # 清理构建产物
+make lint       # 检查文档警告
 ```
 
 ### 前端开发

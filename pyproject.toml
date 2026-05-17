@@ -1,0 +1,12 @@
+[project]
+name = "frontend-interview"
+version = "1.0.0"
+description = "前端面试全家桶 - 多模块项目，包含文档站点和 Agent 系统"
+requires-python = ">=3.10"
+dependencies = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.7.0",
+]
+
+[tool.uv]
+dev-dependencies = []
