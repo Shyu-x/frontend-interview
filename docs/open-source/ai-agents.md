@@ -26,7 +26,7 @@ date: 2026-05-17
 9. [AutoGPT](#9-autogpt)
 10. [Model Context Protocol (MCP)](#10-model-context-protocol-mcp)
 11. [LiteLLM](#11-litellm)
-12. [框架选型指南](#12-框架选型指南)
+12. [框架选型指南](#12)
 
 ---
 

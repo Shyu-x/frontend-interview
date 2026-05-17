@@ -15,11 +15,11 @@ date: 2026-05-17
 
 ## 目录
 
-1. [盒模型（Box Model）](#1-盒模型box-model)
-2. [margin 塌陷与 BFC](#2-margin-塌陷与-bfc)
-3. [IFC / GFC / FFC](#3-ifcgfcffc-格式化上下文)
-4. [position 属性](#4-position-属性)
-5. [Flex 布局](#5-flex-布局)
+1. [盒模型（Box Model）](#1-box-model)
+2. [margin 塌陷与 BFC](#2-margin-bfc)
+3. [IFC / GFC / FFC](#3-ifc-gfc-ffc)
+4. [position 属性](#4-position)
+5. [Flex 布局](#5-flex)
 
 ---
 

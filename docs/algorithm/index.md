@@ -30,10 +30,10 @@ date: 2026-05-17
 
 | 分类 | 题目数 | 说明 |
 |------|--------|------|
-| [二叉树题型](leetcode-hot100-advanced.md#_2) | 5 道 | 遍历、构造、路径 |
-| [动态规划](leetcode-hot100-advanced.md#_3) | 6 道 | 背包、股票、打家劫舍 |
-| [回溯算法](leetcode-hot100-advanced.md#_4) | 5 道 | 排列组合、N皇后 |
-| [图论算法](leetcode-hot100-advanced.md#_5) | 5 道 | 拓扑排序、岛屿问题 |
+| [二叉树题型](leetcode-hot100-advanced.md#binary-tree) | 5 道 | 遍历、构造、路径 |
+| [动态规划](leetcode-hot100-advanced.md#dynamic-programming) | 6 道 | 背包、股票、打家劫舍 |
+| [回溯算法](leetcode-hot100-advanced.md#backtracking) | 5 道 | 排列组合、N皇后 |
+| [图论算法](leetcode-hot100-advanced.md#graph-theory) | 5 道 | 拓扑排序、岛屿问题 |
 
 **进阶题型总计**: 23 道
 

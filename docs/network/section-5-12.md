@@ -13,14 +13,14 @@ date: 2026-05-17
 
 ## 目录
 
-- [5.1 浏览器多进程架构](#51-浏览器多进程架构)
-- [5.5 输入 URL 到页面展示：完整 14 步](#55-输入-url-到页面展示完整-14-步)
-- [5.6 DNS 解析全过程与 DNS 缓存](#56-dns-解析全过程与-dns-缓存)
-- [5.7 浏览器缓存机制：强缓存 vs 协商缓存](#57-浏览器缓存机制强缓存-vs-协商缓存)
-- [5.13 跨 Tab 通信](#513-跨-tab-通信)
-- [5.14 Cookie：大小限制与跨域限制](#514-cookie大小限制与跨域限制)
-- [5.15 同源策略、CSP、iframe sandbox 及 CORB/CORP/COEP/COOP](#515-同源策略cspiframe-sandbox-及-corbcorpcoepcoop)
-- [5.16 HTTPS 与 TLS 1.3 握手详解](#516-https-与-tls-13-握手详解)
+- [5.1 浏览器多进程架构](#51)
+- [5.5 输入 URL 到页面展示：完整 14 步](#55-url-14)
+- [5.6 DNS 解析全过程与 DNS 缓存](#56-dns-dns)
+- [5.7 浏览器缓存机制：强缓存 vs 协商缓存](#57-vs)
+- [5.13 跨 Tab 通信](#513-tab)
+- [5.14 Cookie：大小限制与跨域限制](#514-cookie)
+- [5.15 同源策略、CSP、iframe sandbox 及 CORB/CORB/COEP/COOP](#515-cspiframe-sandbox-corbcorpcoepcoop)
+- [5.16 HTTPS 与 TLS 1.3 握手详解](#516-https-tls-13)
 
 ---
 

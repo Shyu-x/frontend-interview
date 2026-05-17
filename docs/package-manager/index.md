@@ -122,25 +122,25 @@ yarn dlx <package>   # 临时运行包
 | 题目 | 答案位置 |
 |------|----------|
 | pnpm 如何实现节省磁盘？ | [pnpm-deep-dive.md - Content-addressable Store](pnpm-deep-dive.md#content-addressable-store) |
-| Hard Link vs Symlink 区别？ | [pnpm-deep-dive.md - 链接机制](pnpm-deep-dive.md#hard-link--symlink) |
-| 什么是幽灵依赖？pnpm 如何解决？ | [pnpm-deep-dive.md - 幽灵依赖](pnpm-deep-dive.md#幽灵依赖问题) |
-| pnpm workspace 如何配置？ | [pnpm-deep-dive.md - workspace](pnpm-deep-dive.md#workspace-配置) |
+| Hard Link vs Symlink 区别？ | [pnpm-deep-dive.md - 链接机制](pnpm-deep-dive.md#hard-link-vs-symlink) |
+| 什么是幽灵依赖？pnpm 如何解决？ | [pnpm-deep-dive.md - 幽灵依赖](pnpm-deep-dive.md#_2) |
+| pnpm workspace 如何配置？ | [pnpm-deep-dive.md - workspace](pnpm-deep-dive.md#workspace) |
 
 ### 4.2 Yarn Berry 相关
 
 | 题目 | 答案位置 |
 |------|----------|
-| Yarn PnP 原理是什么？ | [yarn-berry.md - PnP 机制](yarn-berry.md#pnp-机制) |
-| Zero-install 如何实现？ | [yarn-berry.md - Zero-install](yarn-berry.md#zero-install-原理) |
+| Yarn PnP 原理是什么？ | [yarn-berry.md - PnP 机制](yarn-berry.md#yarn-pnp) |
+| Zero-install 如何实现？ | [yarn-berry.md - Zero-install](yarn-berry.md#zero-install) |
 | Yarn Berry 与 1.x 核心区别？ | [yarn-berry.md - 版本对比](yarn-berry.md#yarn-1x-vs-berry) |
-| PnP 模式下 TypeScript 如何配置？ | [yarn-berry.md - TS 配置](yarn-berry.md#typescript-配置) |
+| PnP 模式下 TypeScript 如何配置？ | [yarn-berry.md - TS 配置](yarn-berry.md#typescript) |
 
 ### 4.3 通用场景
 
 | 题目 | 答案位置 |
 |------|----------|
-| monorepo 选型建议？ | [pnpm-deep-dive.md - monorepo 最佳实践](pnpm-deep-dive.md#monorepo-最佳实践) |
-| 依赖管理最佳实践？ | [pnpm-deep-dive.md - 最佳实践](pnpm-deep-dive.md#最佳实践) |
+| monorepo 选型建议？ | [pnpm-deep-dive.md - monorepo 最佳实践](pnpm-deep-dive.md#monorepo) |
+| 依赖管理最佳实践？ | [pnpm-deep-dive.md - 最佳实践](pnpm-deep-dive.md#_3) |
 
 ---
 
