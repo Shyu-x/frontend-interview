@@ -1,3 +1,12 @@
+---
+title: 浏览器原理与网络协议（Chapter 5 & 12 深度版）
+description: 深入讲解浏览器多进程架构、URL 输入到页面展示流程、DNS 解析、浏览器缓存、跨 Tab 通信、Cookie、同源策略与 CSP 等核心知识点。
+tags:
+  - network
+  - http
+date: 2026-05-17
+---
+
 # 浏览器原理与网络协议（Chapter 5 & 12 深度版）
 
 ---
@@ -1386,7 +1395,7 @@ TLS 1.3 的 1-RTT 握手已大幅减少性能损耗，ECDHE 的 CPU 开销比 RS
 > - https://developer.mozilla.org/zh-CN/docs/Web/API/Window/postMessage（postMessage）
 > - https://developer.mozilla.org/zh-CN/docs/Web/API/BroadcastChannel（BroadcastChannel）
 > - https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Workers_API/Using_web_workers（Web Worker）
-> - https://blog.chromium.org/2018/07/mitigating-spectre-with-site-isolation.html（Site Isolation）
+> - https://www.chromium.org/Home/chromium-security/site-isolation（Site Isolation）
 > - https://www.chromium.org/Home/chromium-security/site-isolation（Chrome Site Isolation）
 > - https://web.dev/articles/same-site-same-origin（同源 vs 同站）
 > - https://blog.cloudflare.com/road-to-0-rtt（TLS 1.3 0-RTT）

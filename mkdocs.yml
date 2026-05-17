@@ -115,6 +115,10 @@ nav:
     - 构建工具全景图: build-tools/index.md
     - Vite 8.x 深度解析: build-tools/vite-deep-dive.md
     - 打包工具对比: build-tools/bundler-comparison.md
+  - 包管理器篇:
+    - 包管理器总览: package-manager/index.md
+    - pnpm 深度解析: package-manager/pnpm-deep-dive.md
+    - Yarn Berry: package-manager/yarn-berry.md
   - 网络篇:
     - network/section-5-12.md
     - network/section-13-20.md

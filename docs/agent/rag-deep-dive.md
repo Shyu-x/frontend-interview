@@ -1,3 +1,12 @@
+---
+title: RAG 深入解析
+description: 全面解析 RAG 的核心原理、系统架构、实践方法和前沿进展，适用于构建知识增强型 AI Agent。
+tags:
+  - ai-agent
+  - rag
+date: 2026-05-17
+---
+
 # RAG 深入解析：检索增强生成在 AI Agent 中的应用
 
 > 本文档全面解析 RAG（Retrieval Augmented Generation）的核心原理、系统架构、实践方法和前沿进展，适用于希望构建知识增强型 AI Agent 的开发者。

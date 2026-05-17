@@ -1,6 +1,15 @@
 
 ---
 
+---
+title: 高频 CSS 面试题
+description: 涵盖 CSS 盒模型、BFC、IFC/GFC/FFC、Position、Flex 等高频面试知识点。
+tags:
+  - css
+  - flexbox
+date: 2026-05-17
+---
+
 ### 1. CSS 盒模型
 
 #### 1.1 标准盒模型（W3C Box Model）

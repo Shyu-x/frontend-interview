@@ -1,3 +1,12 @@
+---
+title: JavaScript 核心技术详解（第19-25节）
+description: 深入讲解 Proxy 与 Reflect、ESModule vs CommonJS、垃圾回收、Web Worker、防抖与节流等核心技术。
+tags:
+  - javascript
+  - es6
+date: 2026-05-17
+---
+
 # JavaScript 核心技术详解（第19-25节）
 
 ---

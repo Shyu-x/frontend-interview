@@ -1,3 +1,12 @@
+---
+title: React 手写代码题（下）
+description: 深入探讨 React 高级自定义 Hooks 的手写实现，涵盖 useSyncExternalStore、useDebounce、useLocalStorage、useInterval 等核心模式。
+tags:
+  - react
+  - hooks
+date: 2026-05-17
+---
+
 # React 手写代码题 (下)
 
 > 本章节继续深入探讨 React 高级自定义 Hooks 的手写实现，涵盖状态同步、定时器、外部事件处理等核心模式。

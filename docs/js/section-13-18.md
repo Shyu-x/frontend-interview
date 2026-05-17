@@ -1,3 +1,12 @@
+---
+title: JavaScript 核心技术详解（第13-18节）
+description: 深入讲解 Promise、async/await、事件循环、深拷贝与浅拷贝、Map/Set、迭代器与生成器等核心技术。
+tags:
+  - javascript
+  - async
+date: 2026-05-17
+---
+
 # JavaScript 核心技术详解（第13-18节）
 
 ---
@@ -1286,5 +1295,5 @@ const nums = take(infiniteSequence(1), 5);
 > - https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Symbol/asyncIterator
 > - https://blog.csdn.net/qi_bai_jin/article/details/158261107（V8 垃圾回收原理）
 > - https://cloud.tencent.com/developer/news/2263970（Vue3 Proxy + Reflect 响应式）
-> - https://blog.csdn.net/duqg/article/details/145037577（2025 Map/Set/WeakMap/WeakSet）
+> - [Map/Set/WeakMap/WeakSet 详解](https://www.jb51.net/article/282533.htm)（2025 Map/Set/WeakMap/WeakSet）
 > - https://www.jb51.net/article/282533.htm（Map/Set/WeakMap/WeakSet 详解）

@@ -1,3 +1,12 @@
+---
+title: AI Agent 框架综合对比文档
+description: 深入对比主流 AI Agent 框架，帮助开发者根据具体场景选择最适合的工具。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # AI Agent 框架综合对比文档
 
 > 本文档深入对比主流 AI Agent 框架，帮助开发者根据具体场景选择最适合的工具。

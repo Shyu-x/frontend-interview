@@ -1,3 +1,12 @@
+---
+title: JavaScript 微任务 vs 宏任务：经典事件循环面试题
+description: 通过 10 道经典事件循环面试题，深入理解 JavaScript 宏任务、微任务及 Event Loop 执行顺序。
+tags:
+  - javascript
+  - event-loop
+date: 2026-05-17
+---
+
 # JavaScript 微任务 vs 宏任务：经典事件循环面试题
 
 ## 核心概念速查表

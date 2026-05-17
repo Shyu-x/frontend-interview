@@ -1,3 +1,12 @@
+---
+title: LangGraph 状态持久化与检查点机制
+description: 详细介绍 LangGraph 的状态持久化（Checkpointing）机制、实现方式和最佳实践。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # LangGraph 状态持久化与检查点机制
 
 > 本文档详细介绍 LangGraph 的状态持久化（Checkpointing）机制、实现方式和最佳实践。

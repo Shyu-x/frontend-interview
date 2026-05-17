@@ -1,3 +1,12 @@
+---
+title: AI Agent 工具调用模式与实现
+description: 详细介绍 AI Agent 系统中工具调用的设计模式、架构实现和最佳实践。
+tags:
+  - ai-agent
+  - tools
+date: 2026-05-17
+---
+
 # AI Agent 工具调用模式与实现
 
 > 本文档详细介绍 AI Agent 系统中工具调用的设计模式、架构实现和最佳实践。

@@ -1,3 +1,12 @@
+---
+title: Node.js 核心原理
+description: 深入剖析 Node.js 架构与核心原理，包括事件循环机制、libuv 工作原理、CommonJS vs ESM 模块系统、异步 I/O 与 Promise、Stream 与 Buffer 等。
+tags:
+  - runtime
+  - nodejs
+date: 2026-05-17
+---
+
 # Node.js 核心原理
 
 > Node.js 是基于 Chrome V8 引擎的 JavaScript 运行时，采用事件驱动、非阻塞 I/O 模型。
@@ -702,6 +711,6 @@ setInterval(() => {
 
 - [Node.js 官方文档](https://nodejs.org/docs/)
 - [libuv 设计文档](http://docs.libuv.org/)
-- [Node.js 事件循环详解](https://nodejs.org/zh-cn/guides/event-loop-timers-and-nexttick)
+- [Node.js 事件循环详解](https://nodejs.org/zh-cn/docs/guides/event-loop/)
 - [Stream 官方指南](https://nodejs.org/api/stream.html)
 - [Buffer 文档](https://nodejs.org/api/buffer.html)

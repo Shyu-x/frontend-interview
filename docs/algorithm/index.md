@@ -1,3 +1,12 @@
+---
+title: 算法篇
+description: 涵盖 LeetCode Hot 100 基础题型（数组、字符串、链表、栈队列）和进阶题型（二叉树、动态规划、回溯、图论）的完整总结。
+tags:
+  - algorithm
+  - leetcode
+date: 2026-05-17
+---
+
 # 算法篇
 
 > 本章涵盖 LeetCode Hot 100 中的经典题型，分为基础和进阶两部分。

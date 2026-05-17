@@ -1,3 +1,12 @@
+---
+title: LeetCode Hot 100 基础题型总结
+description: 整理 LeetCode Hot 100 中的基础题型，包括数组、字符串、链表、栈队列的典型题目、核心思路及 JavaScript/TypeScript 实现。
+tags:
+  - algorithm
+  - leetcode
+date: 2026-05-17
+---
+
 # LeetCode Hot 100 基础题型总结
 
 > 本文档整理了 LeetCode Hot 100 中的基础题型（数组、字符串、链表、栈队列），包含题号、名称、核心思路、JavaScript/TypeScript 实现及复杂度分析。

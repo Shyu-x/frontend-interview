@@ -1,3 +1,12 @@
+---
+title: Yarn Berry 解析
+description: 详解 Yarn 4.x 的 Plug'n'Play (PnP) 机制、Zero-install 原理、插件系统及 TypeScript 配置。
+tags:
+  - package-manager
+  - yarn
+date: 2026-05-17
+---
+
 # Yarn Berry 解析
 
 > Yarn 4.x: 重新定义 JavaScript 包管理

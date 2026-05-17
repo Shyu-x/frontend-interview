@@ -1,3 +1,12 @@
+---
+title: React 18 新特性完全指南
+description: 全面解析 React 18 的核心新特性，包括 Automatic Batching、Concurrent Features、Suspense 进阶、New Root API 等革命性更新。
+tags:
+  - react
+  - hooks
+date: 2026-05-17
+---
+
 # React 18 新特性完全指南
 
 React 18 于 2022 年 3 月正式发布，带来了革命性的并发渲染（Concurrent Rendering）能力。本文深入解析所有核心新特性。

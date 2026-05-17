@@ -1,3 +1,12 @@
+---
+title: Multi-Agent System Patterns
+description: 多智能体系统架构设计模式，涵盖 Hub-and-Spoke 模式、分层模式和关键编排策略。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # Multi-Agent System Patterns
 
 ## Overview

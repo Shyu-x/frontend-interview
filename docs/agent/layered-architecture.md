@@ -1,3 +1,12 @@
+---
+title: AI Agent 分层架构详解
+description: 详细介绍 AI Agent 的分层架构设计，将智能行为分解为多个层次实现可维护性和可扩展性。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # AI Agent 分层架构详解
 
 ## 概述

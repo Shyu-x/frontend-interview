@@ -1,3 +1,12 @@
+---
+title: LeetCode Hot 100 进阶题型整理
+description: 涵盖树、图、动态规划、递归回溯四大类型，包含核心思路、TypeScript/JavaScript 实现及复杂度分析。
+tags:
+  - algorithm
+  - leetcode
+date: 2026-05-17
+---
+
 # LeetCode Hot 100 进阶题型整理
 
 > 涵盖树、图、动态规划、递归回溯四大类型，每道题包含核心思路、TypeScript/JavaScript 实现及复杂度分析。

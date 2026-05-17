@@ -1,3 +1,12 @@
+---
+title: pnpm 深度解析
+description: 详解 pnpm 的 Hard Link、Symlink 机制、Content-addressable Store、幽灵依赖问题解决和 workspace 配置。
+tags:
+  - package-manager
+  - pnpm
+date: 2026-05-17
+---
+
 # pnpm 深度解析
 
 > Performance, Disk Space, and Monorepos — pnpm 的核心承诺

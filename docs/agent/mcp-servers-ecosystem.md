@@ -1,3 +1,12 @@
+---
+title: MCP 服务器生态系统与配置
+description: 全面介绍 MCP 服务器生态系统、官方与第三方服务器、配置方法以及自定义服务器开发指南。
+tags:
+  - ai-agent
+  - mcp
+date: 2026-05-17
+---
+
 # MCP 服务器生态系统与配置
 
 > 本文档全面介绍 MCP (Model Context Protocol) 服务器生态系统、官方与第三方服务器、配置方法以及自定义服务器开发指南。

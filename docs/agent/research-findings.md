@@ -1,3 +1,12 @@
+---
+title: AI Agent 教程资源研究报告
+description: 汇总 AI Agent 领域的最佳教程和资源，并分析与现有文档的差距。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # AI Agent 教程资源研究报告
 
 > 本文档汇总 AI Agent 领域的最佳教程和资源，并分析与现有文档的差距。

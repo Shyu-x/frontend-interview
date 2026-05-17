@@ -1,3 +1,12 @@
+---
+title: 包管理器全景图
+description: npm / pnpm / Yarn 三足鼎立，面试必考核心差异，详解三大包管理器的核心机制与选型建议。
+tags:
+  - package-manager
+  - npm
+date: 2026-05-17
+---
+
 # 包管理器全景图
 
 > npm / pnpm / Yarn 三足鼎立，面试必考核心差异

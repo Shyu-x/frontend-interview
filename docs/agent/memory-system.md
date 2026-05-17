@@ -1,3 +1,12 @@
+---
+title: AI Agent 记忆系统深度剖析
+description: 详细介绍 AI Agent 的记忆系统架构、实现模式和最佳实践，涵盖短期记忆和长期记忆。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # AI Agent 记忆系统深度剖析
 
 > 本文档详细介绍 AI Agent 的记忆系统架构、实现模式和最佳实践。

@@ -2,6 +2,15 @@
 
 ---
 
+---
+title: 高频 JavaScript 面试题
+description: 涵盖 JavaScript 数据类型、闭包、作用域、this 指向、异步编程等高频面试知识点。
+tags:
+  - javascript
+  - es6
+date: 2026-05-17
+---
+
 ### 1. 数据类型
 
 #### 1.1 七种基本类型 vs 引用类型

@@ -1,3 +1,12 @@
+---
+title: React Fiber 架构
+description: 深入剖析 React 16 引入的 Fiber 架构，详解双缓冲机制、渲染阶段与提交阶段、Lane 优先级调度等核心原理。
+tags:
+  - react
+  - fiber
+date: 2026-05-17
+---
+
 # React Fiber 架构
 
 React Fiber 是 React 16 引入的核心架构重构，它解决了 React 15 同步渲染模型固有的局限性，为 React 带来了异步渲染和精确优先级调度能力。

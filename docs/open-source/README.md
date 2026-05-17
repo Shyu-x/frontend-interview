@@ -1,3 +1,12 @@
+---
+title: 开源项目赏析
+description: 前端/AI 领域高质量开源项目深度技术指南，涵盖 AI Agent、前端框架、工具链、工程化库等。
+tags:
+  - open-source
+  - framework
+date: 2026-05-17
+---
+
 # 🏆 开源项目赏析
 
 > 前端/AI 领域高质量开源项目深度技术指南

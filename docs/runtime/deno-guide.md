@@ -1,3 +1,12 @@
+---
+title: Deno 2.x 使用指南
+description: 现代 JavaScript 和 TypeScript 安全运行完全指南，涵盖安全沙箱模型、HTTP 服务、内置工具链、Node.js 兼容性、Deno KV 内置存储等核心功能。
+tags:
+  - runtime
+  - deno
+date: 2026-05-17
+---
+
 # Deno 2.x 使用指南
 
 > Deno 是现代 JavaScript 和 TypeScript 的安全运行时，默认启用沙箱，提供开箱即用的工具链。

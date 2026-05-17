@@ -1,3 +1,12 @@
+---
+title: LangChain 深度指南
+description: 深入探讨 LangChain 的核心概念、架构和使用方法，包括工具系统、Agent 架构、内存系统。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # LangChain 深度指南
 
 LangChain 是一个用于构建 LLM 应用的强大框架，提供了组件化、可组合的抽象，使开发者能够快速构建复杂的 AI 应用。本文深入探讨 LangChain 的核心概念、架构和使用方法。

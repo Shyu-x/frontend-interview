@@ -1,3 +1,12 @@
+---
+title: AI Coding Agent 对比分析文档
+description: 全面对比主流 AI 编程助手，涵盖架构设计、技术特性、扩展机制和使用场景。
+tags:
+  - ai-agent
+  - evaluation
+date: 2026-05-17
+---
+
 # AI Coding Agent 对比分析文档
 
 > 本文档全面对比当前主流 AI 编程助手，涵盖架构设计、技术特性、扩展机制和使用场景，为技术选型提供参考依据。

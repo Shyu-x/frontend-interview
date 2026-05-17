@@ -1,3 +1,12 @@
+---
+title: Chapter 6: 网络协议超完整题库（深度扩充版）
+description: 深入讲解 HTTP 各版本对比、TCP/UDP/QUIC、TCP 拥塞控制、SYN Flood 防御等网络协议核心知识点。
+tags:
+  - network
+  - http
+date: 2026-05-17
+---
+
 # Chapter 6: 网络协议超完整题库（深度扩充版）
 
 > 本文件为前端面试网络协议章节的深度扩充版本，涵盖 HTTP、DNS、CDN、WebSocket、SSE、RESTful、OAuth2、CORS、nginx 等核心主题。每个子节包含：定义/背景、ASCII 原理图、完整代码示例、对比表、常见陷阱与最佳实践、3 道面试追问 + 参考答案要点、参考来源。

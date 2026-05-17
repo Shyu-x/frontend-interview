@@ -1,3 +1,12 @@
+---
+title: JavaScript 构建工具生态调研
+description: 调研 2025-2026 年主流 JavaScript/TypeScript 构建工具，覆盖 Vite、Rolldown、esbuild、SWC、Turbopack 等。
+tags:
+  - open-source
+  - tooling
+date: 2026-05-17
+---
+
 # JavaScript 构建工具生态调研
 
 > 本文档调研 2025-2026 年主流 JavaScript/TypeScript 构建工具，覆盖核心项目特性、技术栈、使用场景和快速开始指南。

@@ -1,6 +1,15 @@
 
 ---
 
+---
+title: 高频 HTML 面试题
+description: 涵盖 HTML5 新特性、语义化标签、meta 标签、viewport 原理等高频面试知识点。
+tags:
+  - html
+  - semantic
+date: 2026-05-17
+---
+
 ### 1. HTML5 新特性
 
 HTML5 是 HTML 的第五次重大修改，引入了大量新特性和 API，大幅提升了 Web 应用的能力。
@@ -3870,7 +3879,6 @@ el.getAttribute('data-user-id'); // 直接访问原始属性
 > 📚 参考：
 > - https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/dataset
 > - https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/data-*
-> - https://blog.csdn.net/weixin_44387024/article/details/126296426
 
 ---
 
@@ -5420,7 +5428,6 @@ input, textarea, select {
 > - https://necolas.github.io/normalize.css/ （normalize.css 官方）
 > - https://github.com/csstools/sanitize.css （sanitize.css）
 > - https://github.com/sindresorhus/modern-normalize （modern-normalize）
-> - https://blog.csdn.net/weixin_43964169/article/details/126296426 （CSS Reset）
 
 ---
 
@@ -5988,7 +5995,6 @@ const doc = parser.parseFromString(xmlString, 'text/xml');
 > - https://www.w3.org/TR/html52/ （HTML5.2 规范）
 > - https://developer.mozilla.org/en-US/docs/Web/XML/XML_reference
 > - https://www.json.org/json-zh.html （JSON 官方）
-> - https://blog.csdn.net/weixin_45736650/article/details/126296426
 
 ---
 

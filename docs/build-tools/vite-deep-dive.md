@@ -1,3 +1,12 @@
+---
+title: Vite 8.x 深度解析
+description: 深入剖析 Vite 8.x 的核心架构、Dev Server 原理、HMR 机制与构建流程。
+tags:
+  - build-tools
+  - vite
+date: 2026-05-17
+---
+
 # Vite 8.x 深度解析
 
 > 本文档深入剖析 Vite 8.x 的核心架构、Dev Server 原理、HMR 机制与构建流程。

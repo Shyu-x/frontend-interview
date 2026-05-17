@@ -1,4 +1,13 @@
 
+---
+title: TypeScript 核心概念
+description: TypeScript 核心概念与高频面试题详解，涵盖类型基础、泛型、接口 vs 类型、keyof/infer、条件类型、映射类型、协变与逆变等核心知识点。
+tags:
+  - typescript
+  - type-system
+date: 2026-05-17
+---
+
 > TypeScript 是 JavaScript 的超集，为大型项目提供类型安全。本章覆盖 TypeScript 核心概念与高频面试题。
 
 ---

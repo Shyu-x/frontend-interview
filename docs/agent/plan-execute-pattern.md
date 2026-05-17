@@ -1,3 +1,12 @@
+---
+title: Plan-and-Execute Agent 模式深度解析
+description: 深度解析规划-执行分离模式，将任务分解为规划阶段和执行阶段以处理复杂多步骤任务。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # Plan-and-Execute Agent 模式深度解析
 
 ## 概述

@@ -1,3 +1,12 @@
+---
+title: 前端面试全家桶
+description: 涵盖前端面试高频知识点，配套代码示例与图解，助你系统复习、斩获 Offer。覆盖 HTML/CSS/JavaScript/TypeScript/网络/React/AI Agent 等模块。
+tags:
+  - docs
+  - index
+date: 2026-05-17
+---
+
 # 前端面试全家桶
 
 > 本文档涵盖前端面试中的高频知识点，配套代码示例与图解，助你系统复习、斩获 Offer。

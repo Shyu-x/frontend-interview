@@ -1,3 +1,12 @@
+---
+title: AI Agent 功能设计
+description: 本文档定义 Agent 系统的技术架构和实现细节，涵盖前端交互、后端服务、状态管理和工具系统。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # AI Agent 功能设计
 
 > 本文档定义 Agent 系统的技术架构和实现细节。

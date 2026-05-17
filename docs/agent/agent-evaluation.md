@@ -1,3 +1,12 @@
+---
+title: AI Agent 评测与基准测试指南
+description: 全面指导 AI Agent 的评测、基准测试和优化，涵盖评测框架、指标、测试策略。
+tags:
+  - ai-agent
+  - evaluation
+date: 2026-05-17
+---
+
 # AI Agent 评测与基准测试指南
 
 全面指导 AI Agent 的评测、基准测试和优化。本文档涵盖评测框架、指标、测试策略以及构建生产级 AI Agent 的最佳实践。

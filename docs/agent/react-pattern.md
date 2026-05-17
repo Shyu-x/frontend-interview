@@ -1,3 +1,12 @@
+---
+title: ReAct 模式详解
+description: 详解 Reason + Acting 驱动的大模型智能代理，通过推理和行动的交替处理复杂多步骤任务。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # ReAct 模式详解：Reasoning + Acting 驱动的大模型智能代理
 
 ## 概述

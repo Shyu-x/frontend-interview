@@ -1,3 +1,12 @@
+---
+title: Tool Orchestration Patterns
+description: 深度解析 AI Agent 工具编排的设计哲学与工程实践。
+tags:
+  - ai-agent
+  - tools
+date: 2026-05-17
+---
+
 # Tool Orchestration Patterns
 
 > 深度解析 AI Agent 工具编排的设计哲学与工程实践

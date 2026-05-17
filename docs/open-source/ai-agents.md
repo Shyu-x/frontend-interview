@@ -1,3 +1,12 @@
+---
+title: AI Agent 框架生态调研报告
+description: 系统调研 2025-2026 年主流 AI Agent 开源框架，涵盖技术栈、适用场景、快速开始示例。
+tags:
+  - open-source
+  - ai-agents
+date: 2026-05-17
+---
+
 # AI Agent 框架生态调研报告
 
 > 本文档系统调研 2025-2026 年主流 AI Agent 开源框架，涵盖技术栈、适用场景、快速开始示例。每个项目均标注 GitHub 数据（Star/Fork）和官方文档链接。

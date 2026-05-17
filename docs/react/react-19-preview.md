@@ -1,3 +1,12 @@
+---
+title: React 19 新特性预览
+description: 预览 React 19 核心新特性，包括 Actions、useOptimistic、use() Hook、文档元数据、资源预加载 API 与 React 编译器优化。
+tags:
+  - react
+  - hooks
+date: 2026-05-17
+---
+
 # React 19 新特性预览
 
 > 本文档涵盖 React 19 的核心新特性，包括 Actions、新的 Hooks、资源预加载、错误边界改进等内容。

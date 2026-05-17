@@ -1,3 +1,12 @@
+---
+title: React 18 核心概念
+description: 深入剖析 React 18 的核心机制，包括并发渲染 Automatic Batching、useTransition、Suspense 与 Streaming SSR 等架构设计。
+tags:
+  - react
+  - hooks
+date: 2026-05-17
+---
+
 # React 18 核心概念
 
 React 18 是 React 架构演进的重要里程碑，引入了并发渲染（Concurrent Rendering）这一核心能力，重新定义了 React 应用的工作模式。本文档深入剖析 React 18 的核心机制，帮助读者从原理层面理解这一代 React 的设计哲学。

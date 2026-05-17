@@ -1,3 +1,12 @@
+---
+title: React 性能优化实战
+description: 从渲染机制到并发模式，深入探讨 React 应用性能优化的核心策略，包括 React.memo、useMemo、Code Splitting 等实战技巧。
+tags:
+  - react
+  - performance
+date: 2026-05-17
+---
+
 # React 性能优化实战
 
 本文档深入探讨 React 应用性能优化的核心策略，从渲染机制到并发模式，帮助开发者构建高性能的 React 应用。

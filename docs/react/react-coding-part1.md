@@ -1,3 +1,12 @@
+---
+title: React 手写代码题（上）
+description: 深入讲解 React 面试高频手写题，包括实现 useState、useEffect、useMemo、useCallback、useRef、useReducer 等 Hooks 原理。
+tags:
+  - react
+  - hooks
+date: 2026-05-17
+---
+
 # React 手写代码题（上）
 
 > 本专题深入讲解 React 面试高频手写题：Hooks 实现原理。手写题不仅考察对 React 内部原理的理解，更是区分中级与高级工程师的重要标准。

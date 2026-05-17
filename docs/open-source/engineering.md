@@ -1,3 +1,12 @@
+---
+title: 工程化开源项目全景图
+description: 梳理 TypeScript/前端工程化领域的核心开源项目，涵盖 API 框架、ORM、状态管理、函数式编程等方向。
+tags:
+  - open-source
+  - tooling
+date: 2026-05-17
+---
+
 # 工程化开源项目全景图
 
 > 本文档梳理 TypeScript/前端工程化领域的核心开源项目，涵盖 API 框架、ORM、状态管理、函数式编程等方向。

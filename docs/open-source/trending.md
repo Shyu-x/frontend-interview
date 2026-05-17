@@ -1,3 +1,12 @@
+---
+title: 新兴开源项目趋势 (2025-2026)
+description: 调研 2025-2026 年值得关注的新兴/趋势类开源项目，涵盖 AI 开发工具、React 全栈框架、Node.js 后端框架等。
+tags:
+  - open-source
+  - tooling
+date: 2026-05-17
+---
+
 # 新兴开源项目趋势 (2025-2026)
 
 > 本文档调研 2025-2026 年值得关注的新兴/趋势类开源项目，涵盖 AI 开发工具、React 全栈框架、Node.js 后端框架、响应式框架、构建工具、测试平台、CSS 新特性等领域。
@@ -73,18 +82,18 @@
 5. [React 全栈框架](#5-react-全栈框架)
 6. [Node.js 后端框架](#6-nodejs-后端框架)
 7. [Signal 响应式框架](#7-signal-响应式框架)
-8. [构建工具革新](#7-构建工具革新)
-9. [CSS 新特性](#8-css-新特性)
-10. [格式化工具](#9-格式化工具)
-11. [React 状态管理](#10-react-状态管理)
-12. [React 表单与动画](#11-react-表单与动画)
-13. [HTTP 客户端](#12-http-客户端)
-14. [微前端架构](#13-微前端架构)
-15. [Monorepo 工具链](#14-monorepo-工具链)
-16. [测试框架](#15-测试框架)
-17. [前端工具链](#16-前端工具链)
-18. [组件库与 UI](#17-组件库与-ui)
-19. [类型与验证](#18-类型与验证)
+8. [构建工具革新](#8-构建工具革新)
+9. [CSS 新特性](#9-css-新特性)
+10. [格式化工具](#10-格式化工具)
+11. [React 状态管理](#11-react-状态管理)
+12. [React 表单与动画](#12-react-表单与动画)
+13. [HTTP 客户端](#13-http-客户端)
+14. [微前端架构](#14-微前端架构)
+15. [Monorepo 工具链](#15-monorepo-工具链)
+16. [测试框架](#16-测试框架)
+17. [前端工具链](#17-前端工具链)
+18. [组件库与 UI](#18-组件库与-ui)
+19. [类型与验证](#19-类型与验证)
 20. [后端即服务 (BaaS)](#20-后端即服务-baas)
 
 ---
@@ -1758,7 +1767,7 @@ start()
 
 ## 7. Signal 响应式框架
 
-### 5.1 Solid.js
+### 7.1 Solid.js
 
 **核心创新点**:
 
@@ -1862,7 +1871,7 @@ setState('name', 'SolidJS') // 嵌套更新
 
 ---
 
-### 5.2 Qwik
+### 7.2 Qwik
 
 **核心创新点**:
 
@@ -1946,7 +1955,7 @@ export const Counter = component$(() => {
 
 ---
 
-### 5.3 Svelte 5
+### 7.3 Svelte 5
 
 **核心创新点**:
 
@@ -2025,7 +2034,7 @@ export const MyComponent = (props) => {
 
 ---
 
-### 5.4 TanStack Query
+### 7.4 TanStack Query
 
 **核心创新点**:
 
@@ -2130,9 +2139,9 @@ const infiniteTodos = useInfiniteQuery({
 
 ---
 
-## 7. 构建工具革新
+## 8. 构建工具革新
 
-### 6.1 Bun
+### 8.1 Bun
 
 **核心创新点**:
 
@@ -2244,7 +2253,7 @@ const server = Bun.serve({
 
 ---
 
-### 6.2 Vite 6
+### 8.2 Vite 6
 
 **核心创新点**:
 
@@ -2285,7 +2294,7 @@ export default defineConfig({
 
 ---
 
-### 6.3 Turbopack
+### 8.3 Turbopack
 
 **核心创新点**:
 
@@ -2307,9 +2316,9 @@ Turbopack 是 Rust 编写的 Webpack 继任者：
 
 ---
 
-## 8. CSS 新特性
+## 9. CSS 新特性
 
-### 7.1 Container Queries
+### 9.1 Container Queries
 
 **核心创新点**:
 
@@ -2397,7 +2406,7 @@ flowchart TB
 
 ---
 
-### 7.2 Cascade Layers (@layer)
+### 9.2 Cascade Layers (@layer)
 
 **核心创新点**:
 
@@ -2455,7 +2464,7 @@ flowchart TB
 
 ---
 
-### 7.3 :has() 选择器
+### 9.3 :has() 选择器
 
 **核心创新点**:
 
@@ -2523,7 +2532,7 @@ document.querySelectorAll('.card').forEach(card => {
 
 ---
 
-### 7.4 CSS 特性浏览器支持 (2026)
+### 9.4 CSS 特性浏览器支持 (2026)
 
 | 特性 | Chrome | Firefox | Safari | 全球支持 |
 |------|--------|---------|--------|----------|
@@ -2534,9 +2543,9 @@ document.querySelectorAll('.card').forEach(card => {
 
 ---
 
-## 9. 格式化工具
+## 10. 格式化工具
 
-### 8.1 Prettier
+### 10.1 Prettier
 
 **核心创新点**:
 
@@ -2627,7 +2636,7 @@ build
 
 ---
 
-### 8.2 Biome
+### 10.2 Biome
 
 **核心创新点**:
 
@@ -2725,7 +2734,7 @@ npx @biomejs/biome check --write ./src  # 格式化 + Lint
 
 ---
 
-### 8.3 dprint
+### 10.3 dprint
 
 **核心创新点**:
 
@@ -2759,7 +2768,7 @@ dprint 是高度可配置的 Rust 格式化工具：
 
 ---
 
-### 8.4 ESLint 9.x Flat Config
+### 10.4 ESLint 9.x Flat Config
 
 **核心创新点**:
 
@@ -2811,9 +2820,9 @@ mv .eslintrc.js eslint.config.js
 
 ---
 
-## 10. React 状态管理
+## 11. React 状态管理
 
-### 9.1 Zustand
+### 11.1 Zustand
 
 **核心创新点**:
 
@@ -2914,7 +2923,7 @@ const useStore = create(
 
 ---
 
-### 9.2 SWR
+### 11.2 SWR
 
 **核心创新点**:
 
@@ -2994,9 +3003,9 @@ const { data } = useSWR(userId ? `/api/user/${userId}` : null, fetcher)
 
 ---
 
-## 11. React 表单与动画
+## 12. React 表单与动画
 
-### 10.1 React Hook Form
+### 12.1 React Hook Form
 
 **核心创新点**:
 
@@ -3073,7 +3082,7 @@ function App() {
 
 ---
 
-### 10.2 Framer Motion
+### 12.2 Framer Motion
 
 **核心创新点**:
 
@@ -3190,9 +3199,9 @@ function TodoList() {
 
 ---
 
-## 12. HTTP 客户端
+## 13. HTTP 客户端
 
-### 11.1 Axios
+### 13.1 Axios
 
 **核心创新点**:
 
@@ -3264,7 +3273,7 @@ axios.interceptors.response.use(
 
 ---
 
-### 11.2 Ky
+### 13.2 Ky
 
 **核心创新点**:
 
@@ -3324,7 +3333,7 @@ const data = await api.get('users').json()
 
 ---
 
-### 11.3 ofetch
+### 13.3 ofetch
 
 **核心创新点**:
 
@@ -3366,9 +3375,9 @@ try {
 
 ---
 
-## 13. 微前端架构
+## 14. 微前端架构
 
-### 13.1 Module Federation 2.0
+### 14.1 Module Federation 2.0
 
 **核心创新点**:
 
@@ -3478,7 +3487,7 @@ const RemoteButton = React.lazy(() => import('remoteApp/Button'))
 
 ---
 
-### 9.2 Qiankun
+### 14.2 Qiankun
 
 **核心创新点**:
 
@@ -3586,9 +3595,9 @@ export async function unmount() {
 
 ---
 
-## 14. Monorepo 工具链
+## 15. Monorepo 工具链
 
-### 10.1 pnpm + Turborepo
+### 15.1 pnpm + Turborepo
 
 **核心创新点**:
 
@@ -3687,7 +3696,7 @@ npx turbo link
 
 ---
 
-### 10.2 Nx
+### 15.2 Nx
 
 **核心创新点**:
 
@@ -3708,9 +3717,9 @@ npx nx serve myapp
 
 ---
 
-## 15. 测试框架
+## 16. 测试框架
 
-### 11.1 Playwright
+### 16.1 Playwright
 
 **核心创新点**:
 
@@ -3850,7 +3859,7 @@ export default defineConfig({
 
 ---
 
-### 11.2 Testing Library
+### 16.2 Testing Library
 
 **核心创新点**:
 
@@ -3904,9 +3913,9 @@ test('登录表单', async ({ page }) => {
 
 ---
 
-## 16. 前端工具链
+## 17. 前端工具链
 
-### 12.1 Hono
+### 17.1 Hono
 
 **核心创新点**:
 
@@ -3998,17 +4007,17 @@ export default app
 
 ---
 
-### 12.2 Vite (已在第6节介绍)
+### 17.2 Vite (已在第6节介绍)
 
 ---
 
-### 12.3 Bun (已在第6节介绍)
+### 17.3 Bun (已在第6节介绍)
 
 ---
 
-## 17. 组件库与 UI
+## 18. 组件库与 UI
 
-### 13.1 shadcn/ui
+### 18.1 shadcn/ui
 
 **核心创新点**:
 
@@ -4067,9 +4076,9 @@ function ExampleDialog() {
 
 ---
 
-## 18. 类型与验证
+## 19. 类型与验证
 
-### 14.1 Zod
+### 19.1 Zod
 
 **核心创新点**:
 
@@ -4145,7 +4154,7 @@ const pick = UserSchema.pick({ name: true, email: true })
 
 ---
 
-### 14.2 Effect
+### 19.2 Effect
 
 **核心创新点**:
 

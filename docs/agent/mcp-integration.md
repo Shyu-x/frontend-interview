@@ -1,3 +1,12 @@
+---
+title: MCP (Model Context Protocol) 集成指南
+description: 介绍 MCP 协议的概念、实现以及与 AI Agent 的集成方式。
+tags:
+  - ai-agent
+  - mcp
+date: 2026-05-17
+---
+
 # MCP (Model Context Protocol) 集成指南
 
 > 本文档介绍 MCP 协议的概念、实现以及与 AI Agent 的集成方式。

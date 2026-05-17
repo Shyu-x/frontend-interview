@@ -1,3 +1,12 @@
+---
+title: 构建工具全景图
+description: 梳理前端构建工具的分类、定位对比与面试常考点，涵盖 Vite 8.x 新特性、Dev Server 原理与 HMR 机制。
+tags:
+  - build-tools
+  - vite
+date: 2026-05-17
+---
+
 # 构建工具全景图
 
 > 本文档梳理前端构建工具的分类、定位对比与面试常考点。

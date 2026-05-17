@@ -1,3 +1,12 @@
+---
+title: AutoGen Group Chat 与多智能体协作
+description: 介绍 Microsoft AutoGen 框架中的 Group Chat 架构、协作模式及实战代码。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # AutoGen Group Chat 与多智能体协作
 
 本文档介绍 Microsoft AutoGen 框架中的 Group Chat 架构、协作模式及实战代码。

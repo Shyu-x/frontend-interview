@@ -1,3 +1,12 @@
+---
+title: CrewAI Flows 高级编排指南
+description: 介绍 CrewAI Flows 的高级编排功能，涵盖从基础装饰器到复杂状态管理和错误恢复策略。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # CrewAI Flows 高级编排指南
 
 本文档介绍 CrewAI Flows 的高级编排功能，涵盖从基础装饰器到复杂状态管理和错误恢复策略的全部核心概念。

@@ -1,3 +1,12 @@
+---
+title: Multi-Model LLM Integration
+description: 介绍如何在 AI Agent 中集成多个 LLM 提供商，实现模型抽象层、成本优化和降级策略。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # Multi-Model LLM Integration
 
 > 本文档介绍如何在 AI Agent 中集成多个 LLM 提供商，实现模型抽象层、成本优化和降级策略。

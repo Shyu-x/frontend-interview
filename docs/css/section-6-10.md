@@ -1,3 +1,12 @@
+---
+title: CSS 深入掌握（二）：Grid / 响应式 / 浮动 / 选择器优先级 / 动画
+description: 深入掌握 CSS Grid 布局、响应式设计、浮动原理、选择器优先级、Transition 与 Animation 等核心知识点。
+tags:
+  - css
+  - grid
+date: 2026-05-17
+---
+
 # CSS 深入掌握（二）：Grid / 响应式 / 浮动 / 选择器优先级 / 动画
 
 > 本文档为前端面试 CSS 系列扩展文档，涵盖 Grid 布局、响应式布局、浮动原理、选择器优先级、Transition vs Animation 共 5 个核心主题，每个主题含定义、原理图、代码示例、对比表、避坑指南及面试题。

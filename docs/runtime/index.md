@@ -1,3 +1,12 @@
+---
+title: 运行时全景图
+description: JavaScript 运行时生态三足鼎立：Node.js 稳坐江山、Bun 异军突起、Deno 另辟蹊径，解析三大运行时定位与选型指南。
+tags:
+  - runtime
+  - nodejs
+date: 2026-05-17
+---
+
 # 运行时全景图
 
 > JavaScript 运行时生态三足鼎立：Node.js 稳坐江山，Bun 异军突起，Deno 另辟蹊径。
@@ -160,4 +169,4 @@ Deno.serve({ port: 3000 }, (req) => {
 - [Bun 官方文档](https://bun.sh/docs)
 - [Deno 官方文档](https://docs.deno.com/)
 - [libuv 文档](http://docs.libuv.org/)
-- [Node.js Event Loop 可视化](https://nodejs.org/zh-cn/guides/event-loop-timers-and-nexttick)
+- [Node.js Event Loop 可视化](https://nodejs.org/zh-cn/docs/guides/event-loop/)

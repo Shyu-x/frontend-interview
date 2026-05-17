@@ -1,3 +1,12 @@
+---
+title: 前端框架类开源项目调研
+description: 调研主流前端框架/运行时，涵盖 Next.js、Remix、Astro、Svelte 5、SolidJS、Qwik、Nuxt、Bun 等。
+tags:
+  - open-source
+  - framework
+date: 2026-05-17
+---
+
 # 前端框架类开源项目调研
 
 > 调研日期：2026-05-16

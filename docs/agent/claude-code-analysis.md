@@ -1,3 +1,12 @@
+---
+title: Claude Code 源码剖析与架构分析
+description: 详细分析 Claude Code 的项目结构、核心模块、请求处理流程、工具系统实现和状态管理机制。
+tags:
+  - ai-agent
+  - evaluation
+date: 2026-05-17
+---
+
 # Claude Code 源码剖析与架构分析
 
 本文档详细分析 Claude Code 的项目结构、核心模块、请求处理流程、工具系统实现和状态管理机制。

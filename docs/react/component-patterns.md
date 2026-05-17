@@ -1,3 +1,12 @@
+---
+title: React 组件模式大全
+description: 全面介绍 React 九大组件模式，包括 HOC、Render Props、复合组件、受控/非受控组件等核心概念与代码示例。
+tags:
+  - react
+  - component-patterns
+date: 2026-05-17
+---
+
 # React 组件模式大全
 
 React 组件模式是构建可复用、可维护 UI 的核心手段。本文全面介绍九大组件模式，辅以图表和代码示例，帮助你构建健壮的 React 应用。

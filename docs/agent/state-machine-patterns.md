@@ -1,3 +1,12 @@
+---
+title: Agent 状态机与编排模式
+description: 涵盖 Agent 状态机设计、任务编排系统、并行执行模式及错误恢复策略。
+tags:
+  - ai-agent
+  - langchain
+date: 2026-05-17
+---
+
 # Agent 状态机与编排模式
 
 本文档涵盖 Agent 状态机设计、任务编排系统、并行执行模式及错误恢复策略。

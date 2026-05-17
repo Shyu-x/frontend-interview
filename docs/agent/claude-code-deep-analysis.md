@@ -1,3 +1,12 @@
+---
+title: Claude Code 架构深度解析
+description: 对 Claude Code 的源码架构、核心系统、算法实现进行深度剖析，基于 1902 个源文件分类整理。
+tags:
+  - ai-agent
+  - evaluation
+date: 2026-05-17
+---
+
 # Claude Code 架构深度解析
 
 > 本文档对 Claude Code 的源码架构、核心系统、算法实现进行深度剖析。

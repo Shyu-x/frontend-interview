@@ -1,3 +1,12 @@
+---
+title: React Hooks 深入原理
+description: 深入剖析 React Hooks 的内部实现原理，包括 useState/useReducer 状态管理、useEffect 执行时机、useRef 引用机制、useCallback 与 useMemo 缓存策略。
+tags:
+  - react
+  - hooks
+date: 2026-05-17
+---
+
 # React Hooks 深入原理
 
 Hooks 是 React 16.8 引入的核心特性，它让我们在函数组件中使用状态和其他 React 特性成为可能。本文档深入剖析 Hooks 的内部实现原理，帮助你理解其工作机制，从而编写更高效的代码。

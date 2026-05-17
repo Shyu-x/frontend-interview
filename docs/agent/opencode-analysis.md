@@ -1,3 +1,12 @@
+---
+title: OpenCode 源码架构分析
+description: 基于 GitHub 仓库分析 OpenCode 的项目架构、核心功能和技术实现。
+tags:
+  - ai-agent
+  - evaluation
+date: 2026-05-17
+---
+
 # OpenCode 源码架构分析
 
 > 本文档基于 [opencode-ai/opencode](https://github.com/opencode-ai/opencode) GitHub 仓库分析编写，仓库已迁移至 [Crush](https://github.com/charmbracelet/crush)。

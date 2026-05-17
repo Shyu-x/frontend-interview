@@ -1,3 +1,12 @@
+---
+title: 打包工具对比
+description: 对比主流打包工具 Webpack、Rollup、Parcel、esbuild 的核心特性、Tree-shaking 原理与代码分割策略。
+tags:
+  - build-tools
+  - webpack
+date: 2026-05-17
+---
+
 # 打包工具对比
 
 > 本文档对比主流打包工具（Webpack / Rollup / Parcel / esbuild）的核心特性、Tree-shaking 原理与代码分割策略。

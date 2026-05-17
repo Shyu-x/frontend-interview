@@ -1,3 +1,12 @@
+---
+title: Bun 2.x 使用指南
+description: all-in-one JavaScript 运行时完全指南，涵盖原生 HTTP 服务、内置 SQLite/PostgreSQL/Redis 支持、测试框架、Node.js 迁移策略等核心功能。
+tags:
+  - runtime
+  - bun
+date: 2026-05-17
+---
+
 # Bun 2.x 使用指南
 
 > Bun 是一个 all-in-one 的 JavaScript 运行时、打包器、测试框架和包管理器，比 Node.js 更快更简单。

@@ -1,3 +1,12 @@
+---
+title: CSS 深入掌握（一）：盒模型 / BFC / IFC·GFC·FFC / Position / Flexbox
+description: 深入掌握 CSS 盒模型、BFC、格式化上下文、Position、Flexbox 等核心知识点。
+tags:
+  - css
+  - layout
+date: 2026-05-17
+---
+
 # CSS 深入掌握（一）：盒模型 / BFC / IFC·GFC·FFC / Position / Flexbox
 
 > 本文档为前端面试 CSS 系列扩展文档，涵盖盒模型、BFC、格式化上下文、Position、Flexbox 共 5 个核心主题，每个主题含定义、原理图、代码示例、对比表、避坑指南及面试题。

@@ -1,3 +1,12 @@
+---
+title: Advanced SSE Streaming Patterns for AI Applications
+description: 介绍高级 SSE 流式传输模式，包括协议对比、实现细节和最佳实践。
+tags:
+  - ai-agent
+  - streaming
+date: 2026-05-17
+---
+
 # Advanced SSE Streaming Patterns for AI Applications
 
 > 本文档介绍高级 SSE 流式传输模式，包括协议对比、实现细节和最佳实践。

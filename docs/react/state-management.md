@@ -1,3 +1,12 @@
+---
+title: React 状态管理方案
+description: 系统梳理 React 状态管理从 useState 到 Redux Toolkit 的演进路径，提供决策框架帮助在实际项目中做出合理选择。
+tags:
+  - react
+  - state-management
+date: 2026-05-17
+---
+
 # React 状态管理方案
 
 > 状态管理是 React 应用架构的核心议题。本文系统梳理从 useState 到 Redux Toolkit 的演进路径，并提供决策框架帮助在实际项目中做出合理选择。
