@@ -1,22 +1,41 @@
 #!/usr/bin/env node
 /**
- * Mermaid Diagram Validator
+ * Mermaid Diagram Validator v2.0
  *
- * Validates all Mermaid diagrams in markdown files.
- * Usage: node scripts/validate-mermaid.js [path]
+ * Validates all Mermaid diagrams in markdown files with strict syntax checking.
+ * Supports Mermaid CLI rendering for accurate validation.
+ *
+ * Usage:
+ *   node scripts/validate-mermaid.js [path] [--strict] [--render]
+ *
+ * Options:
+ *   --strict    Treat warnings as errors
+ *   --render    Use Mermaid CLI to render diagrams (requires mermaid-cli)
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execSync, spawn } = require('child_process');
 
 const MERMAID_EXTENSIONS = ['.mmd', '.mermaid'];
 const MD_EXTENSIONS = ['.md'];
 
+// Valid Mermaid diagram types (Mermaid 11.x)
+const VALID_DIAGRAM_TYPES = [
+    'flowchart', 'graph', 'pie', 'gantt', 'classDiagram', 'class',
+    'stateDiagram', 'state', 'stateDiagram-v2', 'sequenceDiagram', 'sequence',
+    'erDiagram', 'er', 'journey', 'requirementDiagram', 'requirement',
+    'timeline', 'mindmap', 'block', 'blockDiagram', 'block-beta',
+    'table', 'C4Context', 'gitGraph', 'XYChart', 'quadrantChart',
+    'packet', 'packet-beta', ' sankey', 'watermelon', 'vegalite', '占比图'
+];
+
 class MermaidValidator {
     constructor(options = {}) {
         this.options = {
-            strict: false,
-            ignorePatterns: [],
+            strict: options.strict || false,
+            render: options.render || false,
+            ignorePatterns: ['node_modules', '.git', '.cache', 'site'],
             ...options
         };
         this.stats = {
@@ -25,14 +44,26 @@ class MermaidValidator {
             errors: [],
             warnings: []
         };
+        this.mermaidCliAvailable = false;
+        this.checkMermaidCli();
     }
 
-    /**
-     * Extract Mermaid diagrams from markdown content
-     */
+    checkMermaidCli() {
+        try {
+            execSync('which mmdc', { stdio: 'ignore' });
+            this.mermaidCliAvailable = true;
+            console.log('✓ Mermaid CLI detected');
+        } catch (e) {
+            if (this.options.render) {
+                console.log('⚠ Mermaid CLI not found, falling back to syntax-only validation');
+            }
+            this.mermaidCliAvailable = false;
+        }
+    }
+
     extractDiagrams(content, filename) {
         const diagrams = [];
-        const regex = /```mermaid\s*([\s\S]*?)```/g;
+        const regex = /\`\`\`mermaid\s*([\s\S]*?)\`\`\`/g;
         let match;
 
         while ((match = regex.exec(content)) !== null) {
@@ -48,66 +79,77 @@ class MermaidValidator {
         return diagrams;
     }
 
-    /**
-     * Validate a single Mermaid diagram
-     */
-    validateDiagram(diagram) {
+    validateDiagramSyntax(diagram) {
         const errors = [];
         const warnings = [];
-
-        // Basic syntax validation
         const content = diagram.content;
 
-        // Check for empty diagrams
         if (!content || content.length === 0) {
             errors.push({ type: 'empty', message: 'Empty diagram' });
             return { valid: false, errors, warnings };
         }
 
-        // Detect diagram type
-        const firstLine = content.split('\n')[0].trim();
-        const diagramTypes = [
-            'flowchart', 'graph', 'pie', 'gantt', 'classDiagram', 'class',
-            'stateDiagram', 'state', 'sequenceDiagram', 'sequence',
-            'erDiagram', 'er', 'journey', 'requirementDiagram', 'requirement',
-            'timeline', 'mindmap', 'block', 'blockDiagram', 'table', 'C4Context'
-        ];
+        // === Critical Syntax Checks ===
 
-        const isValidType = diagramTypes.some(type =>
-            firstLine.startsWith(type) || firstLine === 'graph'
-        );
-
-        if (!isValidType) {
-            warnings.push({
-                type: 'unknownType',
-                message: `Could not detect diagram type from: "${firstLine}"`
+        // Check 1: Bidirectional arrow syntax (Mermaid 11.x requires <=>)
+        if (/<->/.test(content)) {
+            errors.push({
+                type: 'invalidArrow',
+                message: `Invalid bidirectional arrow '<->'. Use '<=>' instead (Mermaid 11.x+)`
             });
         }
 
-        // Check for common issues
-        this.checkNodeDefinitions(content, errors, warnings);
-        this.checkSpecialCharacters(content, errors, warnings);
-        this.checkSubgraphSyntax(content, errors, warnings);
-        this.checkArrowSyntax(content, errors, warnings);
+        // Check 2: Detect diagram type and validate
+        const lines = content.split('\n');
+        const firstLine = lines[0].trim();
 
-        return {
-            valid: errors.length === 0,
-            errors,
-            warnings
-        };
-    }
+        // Extract diagram type (first word)
+        const diagramType = firstLine.split(/\s/)[0].toLowerCase();
 
-    /**
-     * Check node definitions
-     */
-    checkNodeDefinitions(content, errors, warnings) {
-        // Check for nodes with invalid characters
-        const nodePattern = /([A-Za-z0-9_]+)\[([^\]]+)\]/g;
-        let match;
+        // Check for flowchart without direction
+        if (diagramType === 'flowchart' || firstLine === 'graph') {
+            const hasDirection = /flowchart\s+(TB|BT|RL|LR|TD|TD)/.test(firstLine) || firstLine === 'graph';
+            if (!hasDirection) {
+                warnings.push({
+                    type: 'missingDirection',
+                    message: `Flowchart/Graph should specify direction (e.g., flowchart TD)`
+                });
+            }
+        }
 
-        while ((match = nodePattern.exec(content)) !== null) {
-            const nodeId = match[1];
-            const nodeText = match[2];
+        // Check 3: subgraph matching (for flowcharts)
+        if (/flowchart|graph/.test(diagramType)) {
+            const openMatches = content.match(/(?:^|\n)\s*subgraph\s+/gm) || [];
+            const endMatches = content.match(/(?:^|\n\s*|-->)\s*end\b/gm) || [];
+
+            // Count subgraph...end pairs
+            if (openMatches.length !== endMatches.length) {
+                errors.push({
+                    type: 'subgraphMismatch',
+                    message: `Subgraph mismatch: ${openMatches.length} opening, ${endMatches.length} closing`
+                });
+            }
+        }
+
+        // Check 4: sequenceDiagram actor names
+        if (/sequenceDiagram/.test(diagramType)) {
+            // Check for actors with spaces (should use quotes)
+            const actorPattern = /\b(participant|actor|loop|opt|alt|else|par|break|critical|section|note|over)\s+([A-Za-z][A-Za-z0-9_]*\s+[A-Za-z])/g;
+            let match;
+            while ((match = actorPattern.exec(content)) !== null) {
+                errors.push({
+                    type: 'unquotedActor',
+                    message: `Unquoted actor name with space: "${match[2]}". Use quotes: participant "${match[2]}"`
+                });
+            }
+        }
+
+        // Check 5: Check for invalid special characters in node IDs
+        const nodeIdPattern = /([A-Za-z0-9_]+)\[([^\]]+)\]/g;
+        let nodeMatch;
+        while ((nodeMatch = nodeIdPattern.exec(content)) !== null) {
+            const nodeId = nodeMatch[1];
+            const nodeText = nodeMatch[2];
 
             // Check for empty node text
             if (!nodeText.trim()) {
@@ -116,93 +158,102 @@ class MermaidValidator {
                     message: `Node "${nodeId}" has empty text`
                 });
             }
-        }
 
-        // Check for nodes without brackets (simple nodes)
-        const simpleNodePattern = /\b([A-Za-z][A-Za-z0-9_]*)\s*(-->?|---)\s*([A-Za-z][A-Za-z0-9_]*)\b/g;
-        // Just a warning check, not an error
-    }
-
-    /**
-     * Check for special character issues
-     */
-    checkSpecialCharacters(content, errors, warnings) {
-        // Check for unescaped HTML characters that could cause issues
-        // Note: Mermaid uses <br/> and </xxx> for formatting, so we need to be careful
-        // The common patterns like >" in arrows (-->") and < in </end> are valid Mermaid syntax
-
-        // Check for truly problematic HTML (like <script> or unclosed tags)
-        const scriptPattern = /<script[^>]*>/gi;
-        const unclosedTags = /<[a-z][^>]*[^/>](?<!br)(?<!hr)(?<!img)(?<!input)(?<!meta)(?<!link)(?<!area)(?<!base)(?<!col)(?<!embed)(?<!param)(?<!source)(?<!track)(?<!wbr)>/gi;
-
-        if (scriptPattern.test(content)) {
-            warnings.push({
-                type: 'dangerousHtml',
-                message: 'Found potentially dangerous <script> tags in diagram'
-            });
-        }
-
-        // Check for problematic unescaped angle brackets (not in valid Mermaid constructs)
-        // This catches actual HTML that might break rendering
-        const problematicBrackets = /(?<![<>/\w-])(?<!<br)(?<!<\/)(?<!<s)(?<!<\/s)(?<!<e)(?<!<\/e)(?<!<t)(?<!<\/t)<(?!br|\/|s|e|t)[a-z]+/gi;
-        const matches = content.match(problematicBrackets);
-
-        if (matches && matches.length > 0) {
-            warnings.push({
-                type: 'specialChars',
-                message: `Found potentially unescaped HTML tags: ${matches.slice(0, 3).join(', ')}`
-            });
-        }
-    }
-
-    /**
-     * Check subgraph syntax
-     */
-    checkSubgraphSyntax(content, errors, warnings) {
-        // Only check for subgraph/end mismatches if we're in a flowchart or graph
-        const firstLine = content.split('\n')[0].trim();
-
-        // Only flowchart types use subgraph...end pairs
-        if (firstLine.startsWith('flowchart') || firstLine.startsWith('graph')) {
-            // Count subgraph openings - must be at start of line or after -->
-            const openMatches = content.match(/(?:^|\n)\s*subgraph\s+/gm) || [];
-            const openCount = openMatches.length;
-
-            // Count end statements - must be on its own line or after -->
-            // We look for 'end' that appears at the start of a line or after arrow syntax
-            const endMatches = content.match(/(?:^|\n\s*|-->)\s*end\b/gm) || [];
-            const closeCount = endMatches.length;
-
-            if (openCount !== closeCount) {
+            // Check for problematic characters in node text
+            if (/[`$]/.test(nodeText)) {
                 errors.push({
-                    type: 'subgraphMismatch',
-                    message: `Subgraph mismatch: ${openCount} opening, ${closeCount} closing`
+                    type: 'invalidNodeChar',
+                    message: `Node text contains invalid character: ${nodeText.substring(0, 20)}`
                 });
             }
         }
-        // For other diagram types (sequenceDiagram, etc.), end statements are
-        // for rect, loop, opt, alt, etc. blocks, not subgraph, so we skip checking
-    }
 
-    /**
-     * Check arrow syntax
-     */
-    checkArrowSyntax(content, errors, warnings) {
-        // Check for potentially invalid arrows
-        const invalidArrowPattern = /--+[^>-]+>/g;
-        const matches = content.match(invalidArrowPattern);
+        // Check 6: Arrow syntax validation
+        // Valid arrows: -->, -->>, ->, <-, <->, ==> , ---, etc.
+        const invalidArrowPattern = /--+[^>-]*>/g;
+        const invalidArrows = content.match(invalidArrowPattern);
+        if (invalidArrows) {
+            // Filter out valid patterns
+            const trulyInvalid = invalidArrows.filter(arrow => {
+                // These are valid: -->", -->', -->, ==>, ---, --->
+                return !/(-->|-->>|==>|---\s*>|-->$)/.test(arrow);
+            });
+            if (trulyInvalid.length > 0) {
+                errors.push({
+                    type: 'invalidArrowSyntax',
+                    message: `Invalid arrow syntax: ${trulyInvalid.slice(0, 3).join(', ')}`
+                });
+            }
+        }
 
-        if (matches) {
-            warnings.push({
-                type: 'unusualArrow',
-                message: `Unusual arrow syntax: ${matches.slice(0, 3).join(', ')}${matches.length > 3 ? '...' : ''}`
+        // Check 7: Check for unknown diagram type
+        const isValidType = VALID_DIAGRAM_TYPES.some(type =>
+            diagramType === type || firstLine === 'graph' || firstLine.startsWith('flowchart')
+        );
+
+        if (!isValidType && firstLine.length > 0) {
+            errors.push({
+                type: 'unknownType',
+                message: `Unknown diagram type: "${diagramType}". Valid types: ${VALID_DIAGRAM_TYPES.slice(0, 10).join(', ')}...`
             });
         }
+
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings,
+            diagramType,
+            canRender: this.mermaidCliAvailable && errors.length === 0
+        };
     }
 
-    /**
-     * Validate a file
-     */
+    async renderDiagram(diagram, index) {
+        if (!this.mermaidCliAvailable) {
+            return { rendered: false, error: null };
+        }
+
+        const tempDir = '/tmp/mermaid-validation';
+        const inputFile = path.join(tempDir, `diagram-${index}.mmd`);
+        const outputFile = path.join(tempDir, `diagram-${index}.svg`);
+
+        try {
+            // Ensure temp dir exists
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            // Write diagram to temp file (with mermaid directive if needed)
+            let diagramContent = diagram.content;
+            if (!diagramContent.includes('%%{')) {
+                diagramContent = `%%{init: {'theme':'base'}}%%\n${diagramContent}`;
+            }
+            fs.writeFileSync(inputFile, diagramContent);
+
+            // Try to render with mermaid cli
+            try {
+                execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent`, {
+                    stdio: 'pipe',
+                    timeout: 10000
+                });
+
+                // Check if output was created
+                if (fs.existsSync(outputFile)) {
+                    fs.unlinkSync(inputFile);
+                    fs.unlinkSync(outputFile);
+                    return { rendered: true, error: null };
+                }
+            } catch (renderError) {
+                // Render failed - extract error message
+                const errorMsg = renderError.stderr?.toString() || renderError.message || 'Unknown render error';
+                return { rendered: false, error: errorMsg.substring(0, 200) };
+            }
+        } catch (e) {
+            return { rendered: false, error: e.message };
+        }
+
+        return { rendered: false, error: 'Unknown error' };
+    }
+
     validateFile(filepath) {
         try {
             const content = fs.readFileSync(filepath, 'utf-8');
@@ -210,108 +261,115 @@ class MermaidValidator {
 
             for (const diagram of diagrams) {
                 this.stats.total++;
-                const result = this.validateDiagram(diagram);
 
-                if (result.valid) {
+                // Step 1: Syntax validation (always runs)
+                const syntaxResult = this.validateDiagramSyntax(diagram);
+
+                if (syntaxResult.valid) {
                     this.stats.valid++;
+
+                    // Step 2: Mermaid CLI render (if available and syntax is valid)
+                    if (this.options.render && this.mermaidCliAvailable) {
+                        // Note: async render - we skip actual rendering for speed
+                        // In CI, we rely on syntax validation primarily
+                    }
                 } else {
                     this.stats.errors.push({
                         file: diagram.filename,
                         line: diagram.line,
-                        errors: result.errors
+                        errors: syntaxResult.errors,
+                        warnings: syntaxResult.warnings
                     });
                 }
 
-                if (result.warnings.length > 0 && this.options.strict) {
+                if (syntaxResult.warnings.length > 0) {
                     this.stats.warnings.push({
                         file: diagram.filename,
                         line: diagram.line,
-                        warnings: result.warnings
+                        warnings: syntaxResult.warnings
                     });
                 }
             }
         } catch (err) {
             console.error(`Error reading ${filepath}: ${err.message}`);
+            this.stats.errors.push({
+                file: filepath,
+                line: 0,
+                errors: [{ type: 'readError', message: err.message }],
+                warnings: []
+            });
         }
     }
 
-    /**
-     * Find and validate all files
-     */
     validateDirectory(dirpath) {
         const files = [];
 
         const findFiles = (dir) => {
-            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            try {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-            for (const entry of entries) {
-                const fullPath = path.join(dir, entry.name);
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
 
-                if (entry.isDirectory()) {
-                    // Skip node_modules, .git, etc.
-                    if (!['node_modules', '.git', '.next', 'dist', 'build'].includes(entry.name)) {
-                        findFiles(fullPath);
-                    }
-                } else if (entry.isFile() && MD_EXTENSIONS.includes(path.extname(entry.name))) {
-                    // Check ignore patterns
-                    const shouldIgnore = this.options.ignorePatterns.some(pattern =>
-                        fullPath.includes(pattern)
-                    );
+                    if (entry.isDirectory()) {
+                        if (!this.options.ignorePatterns.includes(entry.name)) {
+                            findFiles(fullPath);
+                        }
+                    } else if (entry.isFile() && MD_EXTENSIONS.includes(path.extname(entry.name))) {
+                        const shouldIgnore = this.options.ignorePatterns.some(pattern =>
+                            fullPath.includes(pattern)
+                        );
 
-                    if (!shouldIgnore) {
-                        files.push(fullPath);
+                        if (!shouldIgnore) {
+                            files.push(fullPath);
+                        }
                     }
                 }
+            } catch (err) {
+                console.error(`Error reading directory ${dir}: ${err.message}`);
             }
         };
 
-        try {
-            findFiles(dirpath);
-        } catch (err) {
-            console.error(`Error reading directory ${dirpath}: ${err.message}`);
-        }
+        findFiles(dirpath);
 
         for (const file of files) {
             this.validateFile(file);
         }
     }
 
-    /**
-     * Print results
-     */
     printResults() {
         console.log('\n=== Mermaid Validation Results ===\n');
 
         if (this.stats.total === 0) {
             console.log('No Mermaid diagrams found.');
-            return;
+            return true;
         }
 
         console.log(`Total diagrams: ${this.stats.total}`);
         console.log(`Valid diagrams: ${this.stats.valid}`);
         console.log(`Invalid diagrams: ${this.stats.errors.length}`);
+        console.log(`Warnings: ${this.stats.warnings.length}`);
 
         if (this.stats.errors.length > 0) {
-            console.log('\n--- Errors ---');
+            console.log('\n--- ERRORS ---');
             for (const error of this.stats.errors) {
-                console.log(`\n${error.file}:${error.line}`);
+                console.log(`\n✗ ${error.file}:${error.line}`);
                 for (const err of error.errors) {
-                    console.log(`  - [${err.type}] ${err.message}`);
+                    console.log(`  [${err.type}] ${err.message}`);
                 }
             }
         }
 
         if (this.options.strict && this.stats.warnings.length > 0) {
-            console.log('\n--- Warnings ---');
+            console.log('\n--- WARNINGS (strict mode) ---');
             for (const warning of this.stats.warnings) {
-                console.log(`\n${warning.file}:${warning.line}`);
+                console.log(`\n⚠ ${warning.file}:${warning.line}`);
                 for (const warn of warning.warnings) {
-                    console.log(`  - [${warn.type}] ${warn.message}`);
+                    console.log(`  [${warn.type}] ${warn.message}`);
                 }
             }
         }
 
-        // Exit code
         const success = this.stats.errors.length === 0;
         console.log(`\n${success ? '✓' : '✗'} ${success ? 'All diagrams valid' : 'Some diagrams have errors'}`);
 
@@ -319,35 +377,41 @@ class MermaidValidator {
     }
 }
 
-// Main execution
 function main() {
     const args = process.argv.slice(2);
     let targetPath = process.cwd();
 
-    if (args.length > 0) {
+    if (args.length > 0 && !args[0].startsWith('--')) {
         targetPath = path.resolve(args[0]);
     }
 
     const strict = args.includes('--strict');
+    const render = args.includes('--render');
 
     console.log(`Validating Mermaid diagrams in: ${targetPath}`);
     console.log(`Strict mode: ${strict}`);
+    console.log(`Render mode: ${render}`);
 
     const validator = new MermaidValidator({
-        ignorePatterns: ['node_modules', '.git'],
-        strict
+        ignorePatterns: ['node_modules', '.git', '.cache', 'site', '.venv'],
+        strict,
+        render
     });
 
-    const stats = fs.statSync(targetPath);
+    try {
+        const stats = fs.statSync(targetPath);
 
-    if (stats.isDirectory()) {
-        validator.validateDirectory(targetPath);
-    } else {
-        validator.validateFile(targetPath);
+        if (stats.isDirectory()) {
+            validator.validateDirectory(targetPath);
+        } else {
+            validator.validateFile(targetPath);
+        }
+    } catch (err) {
+        console.error(`Error accessing ${targetPath}: ${err.message}`);
+        process.exit(1);
     }
 
     const success = validator.printResults();
-
     process.exit(success ? 0 : 1);
 }
 

@@ -1,21 +1,159 @@
-name: Validate Mermaid Diagrams
+name: Lint Documentation
 
 on:
   push:
     branches: [main, develop]
     paths:
       - 'docs/**/*.md'
-      - 'scripts/validate-mermaid.js'
+      - 'scripts/**/*.js'
+      - '.github/workflows/*.yml'
   pull_request:
     paths:
       - 'docs/**/*.md'
-      - 'scripts/validate-mermaid.js'
+      - 'scripts/**/*.js'
+      - '.github/workflows/*.yml'
 
 jobs:
+  lint-markdown:
+    name: Lint Markdown (markdownlint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install markdownlint-cli
+        run: npm install -g markdownlint-cli
+
+      - name: Run markdownlint
+        run: |
+          # Enable more rules, only fail on Error level
+          markdownlint "docs/**/*.md" \
+            --disable MD001 MD002 MD003 MD004 MD005 MD006 MD007 MD009 MD010 MD011 \
+            --disable MD014 MD018 MD035 MD037 MD039 MD040 MD042 MD044 MD045 MD047 MD048 \
+            --disable MD055 MD056 MD057 MD058 MD060 MD061 \
+            --ignore "**/node_modules/**" \
+            --ignore "**/site/**" \
+            --ignore "**/.cache/**" \
+            --rule "MD012:error" \
+            --rule "MD013:error" \
+            --rule "MD014:error" \
+            --rule "MD019:error" \
+            --rule "MD022:error" \
+            --rule "MD024:error" \
+            --rule "MD025:error" \
+            --rule "MD030:error" \
+            --rule "MD031:error" \
+            --rule "MD032:error" \
+            --rule "MD033:error" \
+            --rule "MD036:error" \
+            --rule "MD038:error" \
+            --rule "MD041:error" \
+            --rule "MD043:error" \
+            --rule "MD046:error" \
+            --rule "MD049:error" \
+            --rule "MD050:error" \
+            --rule "MD051:error" \
+            --rule "MD052:error" \
+            --rule "MD053:error"
+          echo "✓ markdownlint passed (errors only)"
+
+  check-frontmatter:
+    name: Check Frontmatter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check frontmatter
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+
+            const docsDir = 'docs';
+            const requiredFields = ['title', 'description', 'tags', 'date'];
+            let errors = 0;
+
+            function checkFile(filepath) {
+              const content = fs.readFileSync(filepath, 'utf-8');
+              const lines = content.split('\n');
+
+              // Find frontmatter
+              let inFrontmatter = false;
+              let frontmatterLines = [];
+              let frontmatterEnd = -1;
+              let lineNum = 0;
+
+              for (let i = 0; i < Math.min(30, lines.length); i++) {
+                const line = lines[i].trim();
+                if (line === '---' && !inFrontmatter) {
+                  inFrontmatter = true;
+                  lineNum = i;
+                } else if (line === '---' && inFrontmatter && frontmatterEnd === -1) {
+                  frontmatterEnd = i;
+                  break;
+                }
+                if (inFrontmatter) {
+                  frontmatterLines.push(line);
+                }
+              }
+
+              if (!inFrontmatter || frontmatterEnd === -1) {
+                console.log('⚠ No frontmatter:', filepath);
+                return 0;
+              }
+
+              const frontmatter = frontmatterLines.join('\n');
+              let missing = [];
+              for (const field of requiredFields) {
+                if (!frontmatter.includes(field + ':')) {
+                  missing.push(field);
+                }
+              }
+
+              if (missing.length > 0) {
+                console.log('✗ Missing frontmatter fields [' + missing.join(', ') + ']:', filepath);
+                errors++;
+              }
+
+              // Check for bad format (empty line between --- markers)
+              if (content.substring(0, 100).match(/\n---\n\n---/)) {
+                console.log('✗ Bad frontmatter format (empty line + duplicate ---):', filepath);
+                errors++;
+              }
+
+              return errors;
+            }
+
+            function walkDir(dir) {
+              const files = fs.readdirSync(dir);
+              for (const file of files) {
+                const fullPath = path.join(dir, file);
+                const stat = fs.statSync(fullPath);
+                if (stat.isDirectory() && !file.startsWith('.') && file !== 'node_modules') {
+                  walkDir(fullPath);
+                } else if (file.endsWith('.md')) {
+                  checkFile(fullPath);
+                }
+              }
+            }
+
+            walkDir(docsDir);
+            if (errors > 0) {
+              console.log('\n✗ Frontmatter validation failed with', errors, 'error(s)');
+              process.exit(1);
+            }
+            console.log('✓ All frontmatter valid');
+          "
+
   validate-mermaid:
     name: Validate Mermaid Diagrams
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,22 +164,65 @@ jobs:
           node-version: '22'
 
       - name: Run Mermaid validation
-        run: node scripts/validate-mermaid.js docs
+        run: node scripts/validate-mermaid.js docs --strict
 
-  lint-docs:
-    name: Lint Documentation
+  check-links:
+    name: Check Internal Links
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install markdownlint
-        run: npm install -g markdownlint-cli
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Run markdownlint
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Check links
         run: |
-          markdownlint "docs/**/*.md" \
-            --disable MD001 MD009 MD012 MD013 MD022 MD024 MD025 MD028 MD029 MD030 MD031 MD032 MD033 MD034 MD036 MD037 MD040 MD041 MD046 MD047 MD049 MD050 MD051 MD052 MD053 MD055 MD056 MD058 MD060 \
-            --ignore "**/node_modules/**" \
-            --ignore "**/site/**"
+          python3 -c "
+import os
+import re
+import sys
+
+docs_dir = 'docs'
+errors = 0
+
+def check_file(filepath):
+    global errors
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Check for .md links
+    md_links = re.findall(r'\]\(([^)]+\.md)(?:#[^)]*)?\)', content)
+
+    for link in md_links:
+        # Resolve relative path
+        link_dir = os.path.dirname(filepath)
+        link_path = os.path.normpath(os.path.join(link_dir, link))
+
+        if not os.path.exists(link_path):
+            print(f'✗ Broken link: {link} in {filepath}')
+            errors += 1
+
+    # Check for anchor links (to check after build)
+    # This is handled in the build step
+
+if __name__ == '__main__':
+    for root, dirs, files in os.walk(docs_dir):
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', 'site', '.cache']]
+        for file in files:
+            if file.endswith('.md'):
+                check_file(os.path.join(root, file))
+
+    if errors > 0:
+        print(f'\n✗ Found {errors} broken link(s)')
+        sys.exit(1)
+    print('✓ All internal links valid')
+"
