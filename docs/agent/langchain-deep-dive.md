@@ -16,12 +16,12 @@ LangChain 是一个用于构建 LLM 应用的强大框架，提供了组件化�
 ## 目录
 
 <!--toc-->
-1. [LangChain 核心概念](#1-langchain-核心概念)
-2. [工具系统 (Tools)](#2-工具系统-tools)
-3. [Agent 架构](#3-agent-架构)
-4. [内存系统 (Memory)](#4-内存系统-memory)
-5. [向量存储和 RAG](#5-向量存储和-rag)
-6. [Callbacks 和监控](#6-callbacks-和监控)
+1. [LangChain 核心概念](#1-langchain)
+2. [工具系统 (Tools)](#2-工具系统)
+3. [Agent 架构](#3-agent)
+4. [内存系统 (Memory)](#4-内存系统)
+5. [向量存储和 RAG](#5-向量存储和)
+6. [Callbacks 和监控](#6-callbacks)
 <!--toc-->
 
 ---
