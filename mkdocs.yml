@@ -533,11 +533,90 @@ nav:
 - AI 与开源:
   - AI Agent 篇:
     - 概览: agent/index.md
-    - 基础入门:
+    - 第 1 部分 · 先建立全局观:
+      - Agent 工程体系总览：从 20 行循环到企业级应用: agent/system/agent-engineering-map.md
+      - 从最简到企业级：Agent 工程成熟度阶梯: agent/system/maturity-ladder-minimal-to-enterprise.md
       - Agent 框架对比: agent/foundations/agent-frameworks.md
       - Coding Agent 对比: agent/foundations/coding-agent-comparison.md
-      - 流式对话应用设计: agent/foundations/streaming-chat-app.md
-    - 核心架构:
+    - 第 2 部分 · 最简内核：从 pi 开始:
+      - Agent Harness 全景：模型之外的一切: agent/harness/harness-overview.md
+      - 最简 Harness 架构：五个概念就够: agent/harness/minimal-harness-architecture.md
+      - Agent Loop 解剖：一次对话到底发生了什么: agent/harness/agent-loop-anatomy.md
+      - 手写 Harness：200 行跑通 Agent Loop: agent/harness/build-mini-harness.md
+      - 工具调用协议：模型是怎么'用工具'的: agent/harness/tool-calling-protocol.md
+      - 会话持久化：把对话存成一棵树: agent/harness/sessions-branching-persistence.md
+      - 运行中打断：steering、follow-up 与 abort: agent/harness/steering-queues-abort.md
+      - 可扩展性：Extensions、Skills 与 Hooks: agent/harness/extensions-skills-hooks.md
+    - 第 3 部分 · 另一种设计：DeepSeek Harness:
+      - DeepSeek Harness 架构：一切皆插件: agent/harness/deepseek-harness-architecture.md
+      - DeepSeek Harness 的 Agent Loop 源码精读: agent/harness/deepseek-harness-agent-loop.md
+      - DeepSeek Harness 核心包：agent、tools、session、system-prompt: agent/harness/deepseek-harness-core-packages.md
+      - DeepSeek Harness 的能力接缝与事件: agent/harness/deepseek-harness-seams-events.md
+      - Harness 横向对比：pi、DeepSeek Harness 与最简实现: agent/harness/harness-comparison-pi-deepseek.md
+    - 第 4 部分 · 上下文工程与压缩:
+      - 上下文膨胀：为什么越长越笨: agent/context/context-bloat-and-rot.md
+      - 压缩策略全景对比：截断、窗口、摘要、观察掩码与工具结果清理: agent/context/compaction-strategies-compared.md
+      - 上下文工程：窗口有限时怎么办: agent/harness/context-engineering-compaction.md
+      - 用小模型处理上下文：不阻塞主模型的架构: agent/context/small-model-context-offload.md
+      - 提示缓存与 KV 缓存：让长上下文变便宜: agent/context/prompt-caching-kv-cache.md
+      - 上下文工程手册：给 agent 的信息该放哪、怎么放: agent/context/context-engineering-playbook.md
+    - 第 5 部分 · 记忆系统:
+      - Agent 记忆全景：工作记忆、情景、语义与程序性记忆: agent/memory/memory-taxonomy.md
+      - 记忆的写入与读取流水线：抽取、去重、更新与遗忘: agent/memory/memory-write-read-pipeline.md
+      - 手写文件式记忆：最简单也最稳的长期记忆: agent/memory/file-based-memory-handwritten.md
+      - 记忆系统对比：MemGPT/Letta、Mem0、Zep 与文件式记忆: agent/memory/memory-systems-compared.md
+      - 记忆的安全与评测：记忆投毒、隐私与基准: agent/memory/memory-security-evaluation.md
+      - 记忆系统: agent/architecture/memory-system.md
+    - 第 6 部分 · RAG 与向量检索:
+      - pgvector 从零开始：在 PostgreSQL 里做向量检索: agent/rag/pgvector-from-zero.md
+      - pgvector 索引：HNSW 与 IVFFlat 的原理、参数与调优: agent/rag/pgvector-indexes-hnsw-ivfflat.md
+      - 切块与嵌入：RAG 质量的根基: agent/rag/chunking-and-embeddings.md
+      - 混合检索与重排：BM25、向量、RRF 与交叉编码器: agent/rag/hybrid-search-and-rerank.md
+      - 向量数据库对比：pgvector、Qdrant、Milvus、Weaviate、Pinecone 与 sqlite-vec: agent/rag/vector-databases-compared.md
+      - Agentic RAG 与 grep 式检索：编码 agent 为什么不爱向量库: agent/rag/agentic-rag-vs-grep-search.md
+      - RAG 评测与失败模式: agent/rag/rag-evaluation-failure-modes.md
+      - RAG 旧版专题（原理、知识库、集成、实现）:
+        - RAG：原理与检索系统: agent/applications/rag-principles-retrieval.md
+        - RAG：知识库构建: agent/applications/rag-knowledge-base.md
+        - RAG：Agent 集成与高级 RAG: agent/applications/rag-agent-advanced.md
+        - RAG：代码实现与展望: agent/applications/rag-implementation.md
+    - 第 7 部分 · 权限、沙箱与安全:
+      - 权限模型光谱：从 pi 的零权限到企业级策略引擎: agent/security/permission-models-spectrum.md
+      - Harness 安全：权限、沙箱与提示注入: agent/harness/harness-security-permissions.md
+      - 手写权限闸门：规则引擎、审批与审计: agent/security/permission-gate-handwritten.md
+      - 沙箱技术：从 seatbelt、bubblewrap 到 microVM: agent/security/sandboxing-technologies.md
+      - 提示注入与致命三要素：从威胁模型到防御设计: agent/security/prompt-injection-defense.md
+      - 企业级 agent 治理：多租户、密钥、审计与合规: agent/security/enterprise-agent-governance.md
+      - MCP 安全与配置示例: agent/mcp/mcp-security-config.md
+    - 第 8 部分 · 推理、规划与工具:
+      - 推理与规划:
+        - ReAct 模式: agent/reasoning/react-pattern.md
+        - 规划-执行：原理与规划器: agent/reasoning/plan-execute-planner.md
+        - 规划-执行：执行器与完整实现: agent/reasoning/plan-execute-executor.md
+        - 规划-执行：混合模式与优化: agent/reasoning/plan-execute-hybrid.md
+      - 工具系统:
+        - 工具调用模式: agent/tools/tool-patterns.md
+        - 工具编排：并行与串行: agent/tools/tool-orchestration-basics.md
+        - 工具编排：混合与选择策略: agent/tools/tool-orchestration-hybrid.md
+        - 工具编排：实现与高级话题: agent/tools/tool-orchestration-implementation.md
+      - MCP:
+        - MCP 协议集成: agent/mcp/mcp-integration.md
+        - MCP 服务器生态与开发: agent/mcp/mcp-servers-ecosystem.md
+    - 第 9 部分 · 多 Agent：收益、缺陷与取舍:
+      - 单 Agent 还是多 Agent：证据与决策: agent/multi/single-vs-multi-agent.md
+      - 多 Agent 的缺陷：MAST 失败分类与工程对策: agent/multi/multi-agent-failure-modes.md
+      - 编排模式：链、路由、并行、编排者-工作者与评估-优化: agent/multi/orchestration-patterns.md
+      - 子 Agent 作为上下文隔离：怎么交接、怎么回传: agent/multi/subagents-context-isolation.md
+      - 子 Agent 与编排: agent/harness/subagents-orchestration.md
+      - 多 Agent 协作模式: agent/applications/multi-agent-patterns.md
+    - 第 10 部分 · 评测、成本与运维:
+      - Agent 评测从零搭建：任务集、轨迹与回归: agent/ops/agent-evals-from-scratch.md
+      - Harness 评测与可观测性: agent/harness/harness-evals-observability.md
+      - 成本与延迟：token 账本、预算与模型路由: agent/ops/cost-latency-budgeting.md
+      - Agent 可观测：trace、会话回放与线上事故排查: agent/ops/agent-observability-tracing.md
+      - 生产部署: agent/production/production-deployment.md
+      - Agent 评测与基准: agent/production/agent-evaluation.md
+    - 第 11 部分 · 架构与框架参考:
       - 分层架构:
         - 分层架构总览: agent/architecture/layered-architecture.md
         - 感知层: agent/architecture/layer-perception.md
@@ -546,61 +625,23 @@ nav:
         - 执行层: agent/architecture/layer-execution.md
         - 通信层: agent/architecture/layer-communication.md
         - 扩展层: agent/architecture/layer-extension.md
-      - 状态机与编排: agent/architecture/state-machine-patterns.md
-      - 记忆系统: agent/architecture/memory-system.md
-    - 推理与规划:
-      - ReAct 模式: agent/reasoning/react-pattern.md
-      - 规划-执行：原理与规划器: agent/reasoning/plan-execute-planner.md
-      - 规划-执行：执行器与完整实现: agent/reasoning/plan-execute-executor.md
-      - 规划-执行：混合模式与优化: agent/reasoning/plan-execute-hybrid.md
-    - 工具系统与 MCP:
-      - 工具调用模式: agent/tools/tool-patterns.md
-      - 工具编排：并行与串行: agent/tools/tool-orchestration-basics.md
-      - 工具编排：混合与选择策略: agent/tools/tool-orchestration-hybrid.md
-      - 工具编排：实现与高级话题: agent/tools/tool-orchestration-implementation.md
-      - MCP 协议集成: agent/mcp/mcp-integration.md
-      - MCP 服务器生态与开发: agent/mcp/mcp-servers-ecosystem.md
-      - MCP 安全与配置示例: agent/mcp/mcp-security-config.md
-    - 框架深度:
-      - LangChain 深度指南: agent/frameworks/langchain-deep-dive.md
-      - LangGraph 检查点机制: agent/frameworks/langgraph-checkpointing.md
-      - CrewAI Flows 编排: agent/frameworks/crewai-flows.md
-      - AutoGen 群聊协作: agent/frameworks/autogen-groupchat.md
-    - 高级应用:
-      - RAG：原理与检索系统: agent/applications/rag-principles-retrieval.md
-      - RAG：知识库构建: agent/applications/rag-knowledge-base.md
-      - RAG：Agent 集成与高级 RAG: agent/applications/rag-agent-advanced.md
-      - RAG：代码实现与展望: agent/applications/rag-implementation.md
-      - 多模型集成: agent/applications/multi-model-integration.md
-      - 多 Agent 协作模式: agent/applications/multi-agent-patterns.md
-      - 流式传输模式: agent/applications/streaming-patterns.md
-    - 生产与实战:
-      - Agent 评测与基准: agent/production/agent-evaluation.md
-      - 生产部署: agent/production/production-deployment.md
+      - 状态机与编排:
+        - 状态机与编排: agent/architecture/state-machine-patterns.md
+      - 框架深度:
+        - LangChain 深度指南: agent/frameworks/langchain-deep-dive.md
+        - LangGraph 检查点机制: agent/frameworks/langgraph-checkpointing.md
+        - CrewAI Flows 编排: agent/frameworks/crewai-flows.md
+        - AutoGen 群聊协作: agent/frameworks/autogen-groupchat.md
+      - 流式与多模型:
+        - 流式对话应用设计: agent/foundations/streaming-chat-app.md
+        - 流式传输模式: agent/applications/streaming-patterns.md
+        - LLM 流式输出与工具调用：SSE 解析与增量 JSON: agent/foundations/llm-streaming-tool-use-parsing.md
+        - 多模型集成: agent/applications/multi-model-integration.md
+    - 第 12 部分 · 案例研究:
       - Claude Code 源码剖析: agent/case-studies/claude-code-analysis.md
       - Claude Code 架构深度解析: agent/case-studies/claude-code-deep-analysis.md
       - OpenCode 架构分析: agent/case-studies/opencode-analysis.md
       - 教程资源研究报告: agent/case-studies/research-findings.md
-    - Harness 与 Agent Loop:
-      - Agent Loop 解剖：一次对话到底发生了什么: agent/harness/agent-loop-anatomy.md
-      - 手写 Harness：200 行跑通 Agent Loop: agent/harness/build-mini-harness.md
-      - 上下文工程：窗口有限时怎么办: agent/harness/context-engineering-compaction.md
-      - DeepSeek Harness 的 Agent Loop 源码精读: agent/harness/deepseek-harness-agent-loop.md
-      - DeepSeek Harness 架构：一切皆插件: agent/harness/deepseek-harness-architecture.md
-      - DeepSeek Harness 核心包：agent、tools、session、system-prompt: agent/harness/deepseek-harness-core-packages.md
-      - DeepSeek Harness 的能力接缝与事件: agent/harness/deepseek-harness-seams-events.md
-      - 可扩展性：Extensions、Skills 与 Hooks: agent/harness/extensions-skills-hooks.md
-      - Harness 横向对比：pi、DeepSeek Harness 与最简实现: agent/harness/harness-comparison-pi-deepseek.md
-      - Harness 评测与可观测性: agent/harness/harness-evals-observability.md
-      - Agent Harness 全景：模型之外的一切: agent/harness/harness-overview.md
-      - Harness 安全：权限、沙箱与提示注入: agent/harness/harness-security-permissions.md
-      - 最简 Harness 架构：五个概念就够: agent/harness/minimal-harness-architecture.md
-      - 会话持久化：把对话存成一棵树: agent/harness/sessions-branching-persistence.md
-      - 运行中打断：steering、follow-up 与 abort: agent/harness/steering-queues-abort.md
-      - 子 Agent 与编排: agent/harness/subagents-orchestration.md
-      - 工具调用协议：模型是怎么'用工具'的: agent/harness/tool-calling-protocol.md
-    - 流式与工具调用:
-      - LLM 流式输出与工具调用：SSE 解析与增量 JSON: agent/foundations/llm-streaming-tool-use-parsing.md
   - 开源项目赏析:
     - 概览: open-source/index.md
     - 前端框架:

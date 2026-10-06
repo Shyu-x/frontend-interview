@@ -1,114 +1,85 @@
 ---
 title: AI Agent 概览
-description: AI Agent 篇的学习地图：从框架选型与基础概念，到分层架构、推理模式、工具与 MCP、主流框架、RAG 与多 Agent，再到评测部署和源码剖析。
+description: 从 pi 式最小内核到企业级应用的 AI Agent 工程课程：agent loop、上下文压缩、记忆系统、RAG 与 pgvector、权限与沙箱、多 Agent 的取舍、评测与运维，附手写实现与行业实践。
 tags:
   - ai-agent
-date: 2026-05-17
 ---
 
 # AI Agent 概览
 
-本篇面向有前端或全栈背景、希望系统掌握 LLM Agent 工程实践的读者，覆盖从概念到生产的完整链路：Agent 框架与选型、分层架构与状态管理、ReAct 与规划-执行等推理模式、工具系统与 MCP 协议、LangChain/LangGraph/CrewAI/AutoGen 等框架、RAG 与多 Agent 协作、评测与部署，以及 Claude Code、OpenCode 的源码剖析。内容均配有可运行的 TypeScript/Python 示例。
+这一篇把 Agent 当成一个**工程系统**来讲，而不是一组提示词技巧。主线只有一条：从 pi 那样只有几百行的最小内核出发，逐级补上生产环境真正会遇到的能力，直到企业级应用。
 
-## 1. 学习路径
+!!! abstract "学完这一篇你能"
+    - 画出一个 agent 系统的七个层次，并说出自己的项目目前处在哪一级、下一级要补什么。
+    - 手写一个能跑通工具调用的最小 harness，并解释它和 pi、DeepSeek Harness 的差异。
+    - 解释上下文为什么会膨胀、几种压缩方案各自的代价，以及什么时候该让小模型来做这件事。
+    - 在“文件记忆、向量检索、知识图”之间做选型，并用 pgvector 搭出一个可评测的检索系统。
+    - 设计一套从“零权限”到“沙箱加审批加审计”的权限体系，并说明提示注入为什么没有银弹。
+    - 判断一个任务该用单 Agent 还是多 Agent，并说出多 Agent 最常见的失败方式。
 
-建议按以下阶段顺序阅读，每个阶段内的页面可按需跳读。
+## 0. 学习路径图
 
-1. **基础入门**：先了解生态全景，再通过一个流式对话应用建立整体印象。
-    - [Agent 框架对比](foundations/agent-frameworks.md)
-    - [Coding Agent 对比](foundations/coding-agent-comparison.md)
-    - [流式对话应用设计](foundations/streaming-chat-app.md)
-2. **核心架构**：理解 Agent 的分层结构、状态机与记忆。
-    - [分层架构总览](architecture/layered-architecture.md)，再依次阅读 [感知层](architecture/layer-perception.md)、[认知层](architecture/layer-cognition.md)、[决策层](architecture/layer-decision.md)、[执行层](architecture/layer-execution.md)、[通信层](architecture/layer-communication.md)、[扩展层](architecture/layer-extension.md)
-    - [状态机与编排](architecture/state-machine-patterns.md)
-    - [记忆系统](architecture/memory-system.md)
-3. **推理与规划**：掌握 Agent 如何思考与分解任务。
-    - [ReAct 模式](reasoning/react-pattern.md)
-    - 规划-执行系列：[原理与规划器](reasoning/plan-execute-planner.md)、[执行器与完整实现](reasoning/plan-execute-executor.md)、[混合模式与优化](reasoning/plan-execute-hybrid.md)
-4. **工具系统与 MCP**：让 Agent 连接外部世界。
-    - [工具调用模式](tools/tool-patterns.md)
-    - 工具编排系列：[并行与串行](tools/tool-orchestration-basics.md)、[混合与选择策略](tools/tool-orchestration-hybrid.md)、[实现与高级话题](tools/tool-orchestration-implementation.md)
-    - [MCP 协议集成](mcp/mcp-integration.md)、[MCP 服务器生态与开发](mcp/mcp-servers-ecosystem.md)、[MCP 安全与配置示例](mcp/mcp-security-config.md)
-5. **框架深度**：[LangChain](frameworks/langchain-deep-dive.md)、[LangGraph](frameworks/langgraph-checkpointing.md)、[CrewAI](frameworks/crewai-flows.md)、[AutoGen](frameworks/autogen-groupchat.md)。
-6. **高级应用**：RAG 系列（[原理与检索](applications/rag-principles-retrieval.md)、[知识库构建](applications/rag-knowledge-base.md)、[Agent 集成与高级 RAG](applications/rag-agent-advanced.md)、[代码实现](applications/rag-implementation.md)），以及[多模型集成](applications/multi-model-integration.md)、[多 Agent 协作](applications/multi-agent-patterns.md)、[流式传输](applications/streaming-patterns.md)。
-7. **生产与实战**：[评测与基准](production/agent-evaluation.md)、[生产部署](production/production-deployment.md)，并通过 [Claude Code 源码剖析](case-studies/claude-code-analysis.md) 等案例印证前面的概念。
+```mermaid
+flowchart TD
+  A["第 1 部分 全局观"] --> B["第 2 部分 最简内核 pi"]
+  B --> C["第 3 部分 另一种设计 DeepSeek Harness"]
+  B --> D["第 4 部分 上下文与压缩"]
+  D --> E["第 5 部分 记忆系统"]
+  E --> F["第 6 部分 RAG 与向量检索"]
+  B --> G["第 7 部分 权限 沙箱 安全"]
+  B --> H["第 8 部分 推理 规划 工具"]
+  D --> I["第 9 部分 多 Agent"]
+  G --> I
+  I --> J["第 10 部分 评测 成本 运维"]
+  H --> K["第 11 部分 架构与框架参考"]
+  J --> L["第 12 部分 案例研究"]
+```
 
-## 2. 页面速览
+**怎么读这张图**：
 
-### 2.1 基础入门
+- 先走最左边一条：第 1、2、4、7 部分，是所有 agent 系统都绕不开的主干。
+- 第 5、6 部分（记忆与 RAG）在你的 agent 需要“记住很多东西”时再读。
+- 第 9 部分（多 Agent）放在后面，是因为它依赖前面所有内容，而且很多场景根本不需要它。
+- 第 11、12 部分是参考资料，需要时查阅。
 
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [Agent 框架对比](foundations/agent-frameworks.md) | 主流 Agent 框架的能力、架构与适用场景，以及选型建议 | 基础 |
-| [Coding Agent 对比](foundations/coding-agent-comparison.md) | Claude Code、Cursor、OpenCode 等 AI 编程助手的架构与扩展机制对比 | 基础 |
-| [流式对话应用设计](foundations/streaming-chat-app.md) | 基于 React + NestJS + SSE 的 Agent 对话应用整体设计 | 基础 |
+## 1. 十二个部分分别解决什么问题
 
-### 2.2 核心架构
+| 部分 | 解决的问题 | 起点页面 |
+|---|---|---|
+| 1. 先建立全局观 | agent 系统由哪些层组成，成熟度怎么分级 | [Agent 工程体系总览](system/agent-engineering-map.md) |
+| 2. 最简内核：从 pi 开始 | 一个 agent loop 最少需要什么，怎么手写 | [Agent Harness 全景](harness/harness-overview.md) |
+| 3. 另一种设计：DeepSeek Harness | 同样的问题，插件化的设计怎么做 | [DeepSeek Harness 架构](harness/deepseek-harness-architecture.md) |
+| 4. 上下文工程与压缩 | 窗口有限、越长越笨，怎么办 | [上下文膨胀](context/context-bloat-and-rot.md) |
+| 5. 记忆系统 | 跨会话怎么记住该记住的 | [Agent 记忆全景](memory/memory-taxonomy.md) |
+| 6. RAG 与向量检索 | 知识太多放不进上下文，怎么检索 | [pgvector 从零开始](rag/pgvector-from-zero.md) |
+| 7. 权限、沙箱与安全 | agent 能做事，就能做坏事 | [权限模型光谱](security/permission-models-spectrum.md) |
+| 8. 推理、规划与工具 | 怎么让 agent 想得清楚、用得对工具 | [ReAct 模式](reasoning/react-pattern.md) |
+| 9. 多 Agent | 什么时候值得拆，拆了会出什么问题 | [单 Agent 还是多 Agent](multi/single-vs-multi-agent.md) |
+| 10. 评测、成本与运维 | 怎么知道它变好了，花了多少钱 | [Agent 评测从零搭建](ops/agent-evals-from-scratch.md) |
+| 11. 架构与框架参考 | 分层架构、LangChain、LangGraph 等怎么选 | [分层架构总览](architecture/layered-architecture.md) |
+| 12. 案例研究 | 真实产品的架构怎么做的 | [Claude Code 源码剖析](case-studies/claude-code-analysis.md) |
 
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [分层架构总览](architecture/layered-architecture.md) | 感知、认知、决策、执行、通信、扩展六层的职责与数据流 | 进阶 |
-| [感知层](architecture/layer-perception.md) | 输入解析、多模态感知与上下文采集 | 进阶 |
-| [认知层](architecture/layer-cognition.md) | 推理引擎、规划器、记忆与知识图谱 | 进阶 |
-| [决策层](architecture/layer-decision.md) | 策略选择、行动决策与风险控制 | 进阶 |
-| [执行层](architecture/layer-execution.md) | 工具执行、沙箱与结果反馈 | 进阶 |
-| [通信层](architecture/layer-communication.md) | Agent 间消息协议与协作通信 | 进阶 |
-| [扩展层](architecture/layer-extension.md) | 插件、技能与生态扩展机制 | 进阶 |
-| [状态机与编排](architecture/state-machine-patterns.md) | 状态机设计、任务编排、并行执行与错误恢复 | 进阶 |
-| [记忆系统](architecture/memory-system.md) | 短期与长期记忆、上下文管理与高级记忆模式 | 进阶 |
+## 2. 每一页的固定结构
 
-### 2.3 推理与规划
+每个新页面都按同样的顺序组织，读起来不会迷路：
 
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [ReAct 模式](reasoning/react-pattern.md) | 推理与行动交替的 Agent 循环、变体与实现 | 进阶 |
-| [规划-执行：原理与规划器](reasoning/plan-execute-planner.md) | 规划与执行分离的思想，计划表示与重规划 | 进阶 |
-| [规划-执行：执行器与完整实现](reasoning/plan-execute-executor.md) | 执行器设计与端到端实现 | 高级 |
-| [规划-执行：混合模式与优化](reasoning/plan-execute-hybrid.md) | 与 ReAct 的混合模式及成本、延迟优化 | 高级 |
+1. **学完能做什么**：4 条可检验的能力。
+2. **知识地图**：一张图说明本页概念之间的关系。
+3. **每一节**：先想一个问题，再给心智模型、图解、分步讲解、可运行的完整脚本与验证用例、常见坑。
+4. **用在哪里**与**行业实践**：真实场景、怎么度量收益、什么时候不该用，以及公开可查的做法。
+5. **应用地图与动手作业**，**自测题**，以及**深入阅读与参考**。
 
-### 2.4 工具系统与 MCP
+## 3. 关于数据与来源的说明
 
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [工具调用模式](tools/tool-patterns.md) | 工具 Schema、执行生命周期、错误处理与沙箱安全 | 进阶 |
-| [工具编排：并行与串行](tools/tool-orchestration-basics.md) | 并行与串行两种基础编排模式 | 进阶 |
-| [工具编排：混合与选择策略](tools/tool-orchestration-hybrid.md) | 混合编排与工具选择策略 | 高级 |
-| [工具编排：实现与高级话题](tools/tool-orchestration-implementation.md) | 编排引擎实现与高级话题 | 高级 |
-| [MCP 协议集成](mcp/mcp-integration.md) | MCP 协议架构与服务器、客户端实现 | 进阶 |
-| [MCP 服务器生态与开发](mcp/mcp-servers-ecosystem.md) | 官方与第三方服务器、安装配置与自定义开发 | 进阶 |
-| [MCP 安全与配置示例](mcp/mcp-security-config.md) | 权限模型、安全实践与完整配置示例 | 高级 |
+!!! warning "数字请以原文为准"
+    调研类页面引用了公开文章、论文和官方文档里的数字（例如压缩阈值、成本倍数、失败模式占比）。
+    每个数字旁都标明了来源名称，并注明“以原文为准”。
+    凡是没能在一手来源核对到的说法，会写成“有说法认为，需核对”，不会当作事实陈述。
+    产品行为会随版本变化，落地前请对照对应官方文档。
 
-### 2.5 框架深度
+## 4. 页面一览
 
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [LangChain 深度指南](frameworks/langchain-deep-dive.md) | 核心概念、工具、Agent、记忆、RAG 与监控 | 进阶 |
-| [LangGraph 检查点机制](frameworks/langgraph-checkpointing.md) | 状态持久化、线程化检查点与跨会话状态 | 高级 |
-| [CrewAI Flows 编排](frameworks/crewai-flows.md) | Flow 装饰器、条件与并行执行、状态与错误恢复 | 进阶 |
-| [AutoGen 群聊协作](frameworks/autogen-groupchat.md) | GroupChat 模式、嵌套聊天与 Human-in-the-Loop | 进阶 |
-
-### 2.6 高级应用
-
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [RAG：原理与检索系统](applications/rag-principles-retrieval.md) | RAG 原理、向量检索、混合检索与重排序 | 进阶 |
-| [RAG：知识库构建](applications/rag-knowledge-base.md) | 文档解析、分块、嵌入与索引管理 | 进阶 |
-| [RAG：Agent 集成与高级 RAG](applications/rag-agent-advanced.md) | Agentic RAG、GraphRAG 等高级技术 | 高级 |
-| [RAG：代码实现与展望](applications/rag-implementation.md) | 完整 RAG 系统实现与前沿展望 | 高级 |
-| [多模型集成](applications/multi-model-integration.md) | LLM 适配层、模型选择、降级重试与成本控制 | 进阶 |
-| [多 Agent 协作模式](applications/multi-agent-patterns.md) | Hub-and-Spoke、分层等多 Agent 架构与委派策略 | 进阶 |
-| [流式传输模式](applications/streaming-patterns.md) | SSE 实现、背压、重连与性能优化 | 进阶 |
-
-### 2.7 生产与实战
-
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [Agent 评测与基准](production/agent-evaluation.md) | 评测框架、指标、测试策略与优化技术 | 进阶 |
-| [生产部署](production/production-deployment.md) | 部署架构、扩展、监控、安全与成本管理 | 高级 |
-| [Claude Code 源码剖析](case-studies/claude-code-analysis.md) | 项目结构、核心模块与请求处理流程 | 进阶 |
-| [Claude Code 架构深度解析](case-studies/claude-code-deep-analysis.md) | Query Engine、工具系统与关键算法 | 高级 |
-| [OpenCode 架构分析](case-studies/opencode-analysis.md) | OpenCode 的架构、Agent 实现与扩展机制 | 进阶 |
-| [教程资源研究报告](case-studies/research-findings.md) | 优质教程资源汇总与现有文档的差距分析 | 基础 |
+按上面的 12 个部分，左侧导航里的分组与之一一对应。每个部分里的页面顺序就是推荐的阅读顺序。
 
 ## 深入阅读与参考
 
