@@ -1,1504 +1,1703 @@
 ---
-title: RAG：Agent 集成与高级 RAG
-description: Agent 与 RAG 的集成方式，以及 Agentic RAG、GraphRAG 等高级技术。
-tags:
-  - ai-agent
-  - rag
-date: 2026-05-17
+title: "RAG：Agent 集成与高级 RAG"
+description: "Agent 与 RAG 的集成方式，以及 Agentic RAG、GraphRAG 等高级技术。"
 ---
 
 # RAG：Agent 集成与高级 RAG
 
-> 本文是「RAG」系列第 3 篇（共 4 篇）。上一篇：[RAG：知识库构建](rag-knowledge-base.md)　下一篇：[RAG：代码实现与展望](rag-implementation.md)
+!!! abstract "学完这一页你能"
+    1. 能把一条用户查询分派到知识检索、工具调用、任务执行、闲聊四个分支，并说清分派依据。
+    2. 能为知识库写出增量更新逻辑，只对新增、修改、删除的文档做动作。
+    3. 能在 token 预算内组织多轮上下文，并在滑动窗口与摘要压缩之间做出选择。
+    4. 能说清 Self-RAG、Corrective-RAG、路由检索、GraphRAG 各自解决哪一类失败，并写出最小可运行版本。
 
-## 1. Agent + RAG 集成
+!!! note "术语：检索增强生成"
+    先查资料再让模型作答的做法，英文 Retrieval-Augmented Generation，缩写 RAG。例子：用户问退货政策，系统先取回帮助文档，再把文档和问题一起交给模型。
 
-### 1.1 检索增强的 Agent
+!!! note "术语：Agent"
+    能自己决定调用哪个工具、按多步计划推进任务的程序。例子：收到「查下昨天订单状态」后，Agent 自己调用订单查询接口，而不是直接编一段回答。
 
-Agent 与 RAG 的深度集成：
-
-```mermaid
-flowchart TB
-    UQ["User Query"] --> INT["Intent Classification<br/>知识查询 | 执行任务 | 对话闲聊 | 工具调用"]
-
-    INT --> RAG["RAG Pipeline<br/>Query Processing → Vector Search → Rerank → Context Synthesis"]
-    INT --> TC["Tool Calling<br/>Web Search | Calculator | Code Interpreter | File Operations"]
-
-    RAG --> SYN["Response Synthesis<br/>结合检索内容、工具结果、历史上下文生成回答"]
-    TC --> SYN
-
-    SYN --> UR["User Response"]
-```
-
-#### 1.1.1 Agent 实现
-
-```python
-from enum import Enum
-from dataclasses import dataclass
-from typing import Optional, Callable
-
-class Intent(Enum):
-    """意图类型"""
-    KNOWLEDGE_QUERY = "knowledge_query"      # 知识查询
-    TASK_EXECUTION = "task_execution"        # 任务执行
-    CONVERSATION = "conversation"            # 对话闲聊
-    TOOL_CALLING = "tool_calling"           # 工具调用
-
-@dataclass
-class AgentMessage:
-    """Agent 消息"""
-    role: str  # user / assistant / system
-    content: str
-    intent: Optional[Intent] = None
-    retrieved_docs: Optional[list[dict]] = None
-    tool_calls: Optional[list[dict]] = None
-    metadata: Optional[dict] = None
-
-class RAGAgent:
-    """检索增强型 Agent"""
-    
-    def __init__(
-        self,
-        llm,
-        intent_classifier,
-        retriever,
-        reranker,
-        tools: list[Callable] = None,
-        system_prompt: str = None
-    ):
-        """
-        初始化 Agent
-        
-        Args:
-            llm: 大语言模型
-            intent_classifier: 意图分类器
-            retriever: 检索器
-            reranker: 重排序器
-            tools: 可用工具列表
-            system_prompt: 系统提示词
-        """
-        self.llm = llm
-        self.intent_classifier = intent_classifier
-        self.retriever = retriever
-        self.reranker = reranker
-        self.tools = tools or {}
-        self.messages: list[AgentMessage] = []
-        
-        # 默认系统提示词
-        self.default_system_prompt = system_prompt or self._get_default_system_prompt()
-    
-    def _get_default_system_prompt(self) -> str:
-        """获取默认系统提示词"""
-        return """你是一个智能助手，具备以下能力：
-
-1. 知识问答：当用户询问问题时，你会检索相关知识库来回答
-2. 任务执行：你可以帮助用户执行各种任务
-3. 工具使用：当需要时，你可以调用各种工具来完成任务
-
-回答要求：
-- 准确、专业、有条理
-- 注明信息来源（基于检索内容回答时）
-- 如果不确定或找不到相关信息，明确告知用户"""
-    
-    def chat(
-        self,
-        query: str,
-        conversation_history: list[AgentMessage] = None,
-        return_sources: bool = False
-    ) -> dict:
-        """
-        对话接口
-        
-        Args:
-            query: 用户输入
-            conversation_history: 对话历史
-            return_sources: 是否返回来源信息
-        
-        Returns:
-            回答结果
-        """
-        # 1. 意图分类
-        intent = self._classify_intent(query)
-        
-        # 2. 根据意图处理
-        if intent == Intent.KNOWLEDGE_QUERY:
-            result = self._handle_knowledge_query(
-                query, conversation_history, return_sources
-            )
-        elif intent == Intent.TOOL_CALLING:
-            result = self._handle_tool_calling(query, conversation_history)
-        elif intent == Intent.TASK_EXECUTION:
-            result = self._handle_task_execution(query, conversation_history)
-        else:
-            result = self._handle_conversation(query, conversation_history)
-        
-        # 3. 记录消息
-        self.messages.append(AgentMessage(
-            role="user",
-            content=query
-        ))
-        self.messages.append(AgentMessage(
-            role="assistant",
-            content=result["answer"],
-            intent=intent,
-            retrieved_docs=result.get("retrieved_docs"),
-            metadata=result.get("metadata")
-        ))
-        
-        return result
-    
-    def _classify_intent(self, query: str) -> Intent:
-        """意图分类"""
-        if self.intent_classifier:
-            return self.intent_classifier.classify(query)
-        
-        # 默认：检测是否需要检索
-        retrieval_indicators = ["什么", "怎么", "如何", "为什么", "哪个", "请问", "解释"]
-        if any(word in query for word in retrieval_indicators):
-            return Intent.KNOWLEDGE_QUERY
-        
-        # 检测工具调用关键词
-        tool_indicators = ["搜索", "计算", "运行", "执行"]
-        if any(word in query for word in tool_indicators):
-            return Intent.TOOL_CALLING
-        
-        return Intent.CONVERSATION
-    
-    def _handle_knowledge_query(
-        self,
-        query: str,
-        history: list[AgentMessage] = None,
-        return_sources: bool = False
-    ) -> dict:
-        """处理知识查询"""
-        # 1. 检索相关文档
-        retrieved = self.retriever.search(query, top_k=20)
-        
-        # 2. 重排序
-        if self.reranker and retrieved:
-            doc_texts = [doc["content"] for doc in retrieved]
-            reranked = self.reranker.rerank(query, doc_texts, top_k=10)
-            
-            # 合并结果
-            for i, result in enumerate(reranked):
-                retrieved[i]["rerank_score"] = result["score"]
-                retrieved[i]["text"] = result["text"]
-        
-        # 3. 构建上下文
-        context = self._build_context(retrieved[:5])
-        
-        # 4. 生成回答
-        prompt = self._build_rag_prompt(query, context, history)
-        response = self.llm.generate(prompt)
-        
-        result = {
-            "answer": response.text,
-            "intent": Intent.KNOWLEDGE_QUERY,
-            "retrieved_docs": retrieved if return_sources else None
-        }
-        
-        return result
-    
-    def _handle_tool_calling(
-        self,
-        query: str,
-        history: list[AgentMessage] = None
-    ) -> dict:
-        """处理工具调用"""
-        # 解析工具调用
-        tool_name, tool_args = self._parse_tool_call(query)
-        
-        if tool_name not in self.tools:
-            return {
-                "answer": f"未找到工具：{tool_name}",
-                "intent": Intent.TOOL_CALLING
-            }
-        
-        # 执行工具
-        tool = self.tools[tool_name]
-        try:
-            tool_result = tool(**tool_args)
-            response = self._format_tool_result(tool_name, tool_result)
-        except Exception as e:
-            response = f"工具执行出错：{str(e)}"
-        
-        return {
-            "answer": response,
-            "intent": Intent.TOOL_CALLING,
-            "tool_used": tool_name
-        }
-    
-    def _handle_task_execution(
-        self,
-        query: str,
-        history: list[AgentMessage] = None
-    ) -> dict:
-        """处理任务执行"""
-        # 可结合 RAG 和工具
-        prompt = self._build_task_prompt(query, history)
-        response = self.llm.generate(prompt)
-        
-        return {
-            "answer": response.text,
-            "intent": Intent.TASK_EXECUTION
-        }
-    
-    def _handle_conversation(
-        self,
-        query: str,
-        history: list[AgentMessage] = None
-    ) -> dict:
-        """处理一般对话"""
-        prompt = self._build_conversation_prompt(query, history)
-        response = self.llm.generate(prompt)
-        
-        return {
-            "answer": response.text,
-            "intent": Intent.CONVERSATION
-        }
-    
-    def _build_context(self, documents: list[dict]) -> str:
-        """构建检索上下文"""
-        if not documents:
-            return "无相关知识库内容"
-        
-        context_parts = []
-        for i, doc in enumerate(documents, 1):
-            # 从 metadata 提取内容
-            content = doc.get("metadata", {}).get("content", doc.get("content", ""))
-            
-            source = doc.get("metadata", {}).get("source", "")
-            title = doc.get("metadata", {}).get("title", "")
-            
-            context_parts.append(
-                f"【文档 {i}】\n标题：{title}\n来源：{source}\n内容：{content[:300]}..."
-            )
-        
-        return "\n\n".join(context_parts)
-    
-    def _build_rag_prompt(
-        self,
-        query: str,
-        context: str,
-        history: list[AgentMessage] = None
-    ) -> str:
-        """构建 RAG 提示词"""
-        system = self.default_system_prompt + "\n\n" + """你具备检索增强能力。
-
-当用户提供问题时，你应该：
-1. 基于以下参考内容回答问题
-2. 只使用参考内容中的信息，不要添加外部知识
-3. 如果参考内容中没有相关信息，明确指出
-4. 回答时注明信息来源
-5. 保持回答简洁、有条理
-
-参考内容：
-{context}"""
-        
-        prompt = system.format(context=context)
-        
-        if history:
-            history_text = "\n".join([
-                f"用户：{m.content}" if m.role == "user" else f"助手：{m.content}"
-                for m in history[-6:]
-            ])
-            prompt += f"\n\n对话历史：\n{history_text}\n\n当前问题：{query}"
-        else:
-            prompt += f"\n\n问题：{query}"
-        
-        return prompt
-    
-    def _build_task_prompt(
-        self,
-        query: str,
-        history: list[AgentMessage] = None
-    ) -> str:
-        """构建任务执行提示词"""
-        prompt = self.default_system_prompt + f"\n\n任务：{query}"
-        return prompt
-    
-    def _build_conversation_prompt(
-        self,
-        query: str,
-        history: list[AgentMessage] = None
-    ) -> str:
-        """构建对话提示词"""
-        prompt = self.default_system_prompt
-        
-        if history:
-            history_text = "\n".join([
-                f"用户：{m.content}" if m.role == "user" else f"助手：{m.content}"
-                for m in history[-6:]
-            ])
-            prompt += f"\n\n对话历史：\n{history_text}"
-        
-        prompt += f"\n\n用户：{query}"
-        
-        return prompt
-    
-    def _parse_tool_call(self, query: str) -> tuple[str, dict]:
-        """解析工具调用（简化实现）"""
-        # 简化：实际应使用 LLM 解析
-        return "unknown", {}
-    
-    def _format_tool_result(self, tool_name: str, result: any) -> str:
-        """格式化工具结果"""
-        if isinstance(result, (dict, list)):
-            import json
-            return f"工具 {tool_name} 执行结果：\n{json.dumps(result, ensure_ascii=False, indent=2)}"
-        return f"工具 {tool_name} 执行结果：{result}"
-```
-
-### 1.2 动态知识更新
-
-实时更新知识库以保持时效性：
-
-```python
-import asyncio
-from datetime import datetime, timedelta
-from typing import Optional
-
-class DynamicKnowledgeManager:
-    """动态知识管理器"""
-    
-    def __init__(
-        self,
-        knowledge_base: KnowledgeBase,
-        update_interval: int = 3600  # 更新间隔（秒）
-    ):
-        """
-        Args:
-            knowledge_base: 知识库实例
-            update_interval: 自动更新间隔
-        """
-        self.knowledge_base = knowledge_base
-        self.update_interval = update_interval
-        
-        # 更新追踪
-        self.last_update: Optional[datetime] = None
-        self.update_stats: dict = {}
-    
-    def trigger_update(
-        self,
-        source: str,
-        documents: list[Document] = None
-    ):
-        """
-        触发增量更新
-        
-        Args:
-            source: 更新来源（文件路径、API、数据库等）
-            documents: 新文档（如果为 None 则从 source 加载）
-        """
-        if documents is None:
-            # 从来源加载
-            documents = self._load_from_source(source)
-        
-        # 识别变更
-        changes = self._detect_changes(documents)
-        
-        if not changes["added"] and not changes["modified"] and not changes["deleted"]:
-            print("No changes detected")
-            return
-        
-        # 应用变更
-        for doc_id in changes["deleted"]:
-            self.knowledge_base.delete_document(doc_id)
-        
-        for doc_id in changes["modified"]:
-            new_doc = next(d for d in documents if d.doc_id == doc_id)
-            self.knowledge_base.update_document(doc_id, new_doc)
-        
-        for doc in changes["added"]:
-            self.knowledge_base.add_documents([doc])
-        
-        # 更新统计
-        self.last_update = datetime.now()
-        self.update_stats = {
-            "added": len(changes["added"]),
-            "modified": len(changes["modified"]),
-            "deleted": len(changes["deleted"]),
-            "timestamp": self.last_update.isoformat()
-        }
-        
-        print(f"Update complete: {self.update_stats}")
-    
-    def _load_from_source(self, source: str) -> list[Document]:
-        """从来源加载文档"""
-        loader = DocumentLoader()
-        return list(loader.load(source))
-    
-    def _detect_changes(self, new_documents: list[Document]) -> dict:
-        """检测文档变更"""
-        existing_docs = self.knowledge_base.documents
-        
-        new_ids = {doc.doc_id for doc in new_documents}
-        existing_ids = set(existing_docs.keys())
-        
-        added = [d for d in new_documents if d.doc_id not in existing_ids]
-        modified = []
-        deleted = list(existing_ids - new_ids)
-        
-        for doc in new_documents:
-            if doc.doc_id in existing_ids:
-                # 检查是否修改（比较内容哈希）
-                if self._is_modified(doc):
-                    modified.append(doc)
-        
-        return {"added": added, "modified": modified, "deleted": deleted}
-    
-    def _is_modified(self, document: Document) -> bool:
-        """检查文档是否已修改"""
-        existing = self.knowledge_base.documents.get(document.doc_id, {})
-        # 简化实现：实际应比较内容哈希
-        return existing.get("content_hash") != hash(document.content)
-    
-    async def start_auto_update(self):
-        """启动自动更新"""
-        while True:
-            await asyncio.sleep(self.update_interval)
-            try:
-                self.trigger_update(None)  # 使用默认来源
-            except Exception as e:
-                print(f"Auto update failed: {e}")
-    
-    def get_update_status(self) -> dict:
-        """获取更新状态"""
-        return {
-            "last_update": self.last_update.isoformat() if self.last_update else None,
-            "update_stats": self.update_stats,
-            "document_count": len(self.knowledge_base.documents)
-        }
-
-
-class WebKnowledgeUpdater:
-    """网页知识更新器"""
-    
-    def __init__(
-        self,
-        knowledge_base: KnowledgeBase,
-        web_scraper = None
-    ):
-        self.knowledge_base = knowledge_base
-        self.web_scraper = web_scraper
-    
-    async def update_from_urls(self, urls: list[str]):
-        """从 URL 更新知识"""
-        for url in urls:
-            try:
-                # 抓取网页
-                if self.web_scraper:
-                    content = await self.web_scraper.scrape(url)
-                else:
-                    content = await self._default_scrape(url)
-                
-                # 创建文档
-                document = Document(
-                    content=content["text"],
-                    metadata={
-                        "source": url,
-                        "title": content.get("title", ""),
-                        "scraped_at": datetime.now().isoformat()
-                    }
-                )
-                
-                # 更新知识库
-                self.knowledge_base.add_documents([document])
-                
-            except Exception as e:
-                print(f"Failed to scrape {url}: {e}")
-    
-    async def _default_scrape(self, url: str) -> dict:
-        """默认抓取实现"""
-        import aiohttp
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                html = await response.text()
-                # 简单解析（实际应使用 BeautifulSoup）
-                return {"text": html, "title": url}
-```
-
-### 1.3 上下文窗口管理
-
-管理 LLM 上下文窗口以优化长对话：
-
-```python
-from collections import deque
-
-class ContextWindowManager:
-    """上下文窗口管理器"""
-    
-    def __init__(
-        self,
-        max_tokens: int = 4000,
-        reserved_tokens: int = 500,
-        strategy: str = "sliding"
-    ):
-        """
-        Args:
-            max_tokens: 最大 token 数
-            reserved_tokens: 保留 token 数（系统提示等）
-            strategy: 管理策略
-                - "sliding": 滑动窗口
-                - "summary": 摘要压缩
-                - "priority": 优先级截断
-        """
-        self.max_tokens = max_tokens
-        self.reserved_tokens = reserved_tokens
-        self.available_tokens = max_tokens - reserved_tokens
-        self.strategy = strategy
-        
-        # 消息存储
-        self.messages: deque[AgentMessage] = deque()
-    
-    def add_message(self, message: AgentMessage):
-        """添加消息"""
-        self.messages.append(message)
-        self._trim_if_needed()
-    
-    def get_context(
-        self,
-        current_query: str = None,
-        system_prompt: str = None
-    ) -> str:
-        """
-        获取上下文
-        
-        Args:
-            current_query: 当前查询（保留在最后）
-            system_prompt: 系统提示词
-        
-        Returns:
-            格式化的上下文字符串
-        """
-        if self.strategy == "sliding":
-            return self._get_sliding_context(current_query, system_prompt)
-        elif self.strategy == "summary":
-            return self._get_summary_context(current_query, system_prompt)
-        elif self.strategy == "priority":
-            return self._get_priority_context(current_query, system_prompt)
-        else:
-            return self._get_sliding_context(current_query, system_prompt)
-    
-    def _trim_if_needed(self):
-        """必要时截断"""
-        while self._total_tokens() > self.available_tokens and len(self.messages) > 1:
-            self.messages.popleft()
-    
-    def _total_tokens(self) -> int:
-        """计算总 token 数"""
-        return sum(self._estimate_tokens(str(m.content)) for m in self.messages)
-    
-    def _estimate_tokens(self, text: str) -> int:
-        """估算 token 数"""
-        # 简单估算
-        return int(len(text) * 1.5)
-    
-    def _get_sliding_context(
-        self,
-        current_query: str,
-        system_prompt: str
-    ) -> str:
-        """滑动窗口上下文"""
-        parts = []
-        
-        # 系统提示
-        if system_prompt:
-            parts.append(f"系统：{system_prompt}")
-        
-        # 历史消息
-        history = []
-        for msg in self.messages:
-            if msg.role == "user":
-                history.append(f"用户：{msg.content}")
-            else:
-                history.append(f"助手：{msg.content}")
-        
-        # 从最近的开始添加直到超过限制
-        for i in range(len(history) - 1, -1, -1):
-            test_text = "\n".join(history[i:] + [f"用户：{current_query}"] if current_query else history[i:])
-            if self._estimate_tokens(test_text) > self.available_tokens:
-                break
-            history = history[i:]
-        
-        parts.extend(history)
-        
-        # 当前查询
-        if current_query:
-            parts.append(f"用户：{current_query}")
-        
-        return "\n".join(parts)
-    
-    def _get_summary_context(
-        self,
-        current_query: str,
-        system_prompt: str
-    ) -> str:
-        """摘要压缩上下文"""
-        # 如果消息较少，直接返回
-        if len(self.messages) <= 6:
-            return self._get_sliding_context(current_query, system_prompt)
-        
-        # 压缩旧消息
-        old_messages = list(self.messages)[:-6]
-        summary = self._summarize_messages(old_messages)
-        
-        parts = []
-        if system_prompt:
-            parts.append(f"系统：{system_prompt}")
-        
-        parts.append(f"【之前对话摘要】{summary}")
-        
-        # 最近消息
-        for msg in list(self.messages)[-6:]:
-            if msg.role == "user":
-                parts.append(f"用户：{msg.content}")
-            else:
-                parts.append(f"助手：{msg.content}")
-        
-        if current_query:
-            parts.append(f"用户：{current_query}")
-        
-        return "\n".join(parts)
-    
-    def _get_priority_context(
-        self,
-        current_query: str,
-        system_prompt: str
-    ) -> str:
-        """优先级上下文"""
-        # 优先保留检索相关和最近的消息
-        prioritized = []
-        current_tokens = self._estimate_tokens(system_prompt or "")
-        
-        for msg in reversed(self.messages):
-            msg_tokens = self._estimate_tokens(msg.content)
-            if current_tokens + msg_tokens > self.available_tokens:
-                continue
-            
-            # 检查相关性
-            if self._is_relevant(msg, current_query):
-                prioritized.insert(0, msg)
-                current_tokens += msg_tokens
-        
-        parts = []
-        if system_prompt:
-            parts.append(f"系统：{system_prompt}")
-        
-        for msg in prioritized:
-            if msg.role == "user":
-                parts.append(f"用户：{msg.content}")
-            else:
-                parts.append(f"助手：{msg.content}")
-        
-        if current_query:
-            parts.append(f"用户：{current_query}")
-        
-        return "\n".join(parts)
-    
-    def _is_relevant(self, message: AgentMessage, query: str) -> bool:
-        """判断消息相关性"""
-        if not query:
-            return True
-        
-        # 简单的关键词匹配
-        query_words = set(query.lower().split())
-        message_words = set(message.content.lower().split())
-        
-        return bool(query_words & message_words)
-    
-    def _summarize_messages(self, messages: list[AgentMessage]) -> str:
-        """总结消息"""
-        # 简化实现：实际应使用 LLM 总结
-        summaries = []
-        for msg in messages:
-            if msg.role == "user":
-                summaries.append(f"用户询问：{msg.content[:50]}...")
-            else:
-                summaries.append(f"助手回答：{msg.content[:50]}...")
-        
-        return " | ".join(summaries[-3:])
-```
-
-## 2. 高级 RAG
-
-### 2.1 Self-RAG
-
-Self-RAG 是一种自我反思的 RAG 框架：
+## 0. 知识地图
 
 ```mermaid
 flowchart TB
-    Q["Query"] --> ISO["Isolate relevant passages<br/>(检索相关段落)"]
-
-    ISO --> R1["检索段落 1"]
-    ISO --> R2["检索段落 2"]
-    ISO --> R3["检索段落 3"]
-
-    R1 --> SR["Self-Reflection (Self-Critique)<br/>支撑标记(支持) | 实用标记(有用) | 整体标记(质量)"]
-    R2 --> SR
-    R3 --> SR
-
-    SR --> SEL["Isolate best chunks (Selection)<br/>(选择最佳片段)"]
-    SEL --> GEN["Generation<br/>(生成回答)"]
+    A["用户查询"] --> B["意图分派"]
+    B --> C["知识查询分支"]
+    B --> D["工具调用分支"]
+    B --> E["任务执行分支"]
+    C --> F["检索与重排"]
+    F --> G["上下文窗口管理"]
+    G --> H["Self-RAG 自我反思"]
+    G --> I["Corrective-RAG 纠错"]
+    G --> J["路由检索与查询转换"]
+    J --> K["GraphRAG 图结构知识"]
+    F --> L["动态知识更新"]
+    H --> M["回答合成"]
+    I --> M
+    K --> M
+    D --> M
+    E --> M
 ```
 
-#### 2.1.1 Self-RAG 实现
+建议按顺序读：先读第 1 节，把 Agent 与 RAG 的接缝看清楚；再读第 2、3 节，处理知识时效和上下文预算这两个工程问题。
 
-```python
-class SelfRAG:
-    """Self-RAG 实现"""
-    
-    # 反思标记定义
-    IS_SUPPORTED = "Is Supported"      # 是否被检索内容支撑
-    IS_USEFUL = "Is Useful"           # 回答是否有帮助
-    IS_RELEVANT = "Is Relevant"       # 检索内容是否相关
-    
-    def __init__(self, llm, retriever):
-        self.llm = llm
-        self.retriever = retriever
-    
-    def rag_with_reflection(self, query: str) -> dict:
-        """
-        带自我反思的 RAG
-        
-        Args:
-            query: 用户查询
-        
-        Returns:
-            回答和反思结果
-        """
-        # 1. 检索
-        retrieved_docs = self.retriever.search(query, top_k=5)
-        
-        # 2. 自我反思
-        reflection_results = []
-        for doc in retrieved_docs:
-            reflection = self._reflect_on_doc(query, doc)
-            reflection_results.append({
-                "doc": doc,
-                "reflection": reflection
-            })
-        
-        # 3. 选择最佳片段
-        selected_docs = self._select_best_chunks(reflection_results)
-        
-        # 4. 生成回答
-        answer = self._generate_with_grounding(query, selected_docs)
-        
-        # 5. 最终反思
-        final_reflection = self._reflect_on_answer(query, answer)
-        
-        return {
-            "answer": answer,
-            "retrieved_docs": retrieved_docs,
-            "reflection": final_reflection,
-            "selected_docs": selected_docs
-        }
-    
-    def _reflect_on_doc(self, query: str, doc: dict) -> dict:
-        """反思单个检索文档"""
-        reflection_prompt = f"""判断以下检索内容是否相关且有帮助。
+第 4 到第 7 节是四种进阶方案，每节独立，可以按你手上的失败现象挑着读。整体读完后，用「应用地图」把知识点对回真实业务。
 
-查询：{query}
+## 1. Agent 与 RAG 的集成模式
 
-检索内容：
-{doc.get('content', '')[:500]}
+**先想一个问题**
 
-请判断：
-1. 是否支撑回答查询？（是/否）
-2. 是否与查询相关？（是/否）
-3. 相关程度评分（1-5）
+同一个客服入口，用户可能说「退货政策是什么」，也可能说「帮我退掉昨天那单」。前者要查文档，后者要执行动作。一个入口怎么分派这两类请求？
 
-并给出简短理由："""
-        
-        response = self.llm.generate(reflection_prompt)
-        
-        # 解析响应（简化实现）
-        return {
-            "is_supported": "是" in response.text[:100],
-            "is_relevant": "是" in response.text[100:200],
-            "reason": response.text
-        }
-    
-    def _select_best_chunks(
-        self,
-        reflection_results: list[dict]
-    ) -> list[dict]:
-        """选择最佳片段"""
-        # 根据反思结果过滤和排序
-        scored = []
-        for result in reflection_results:
-            doc = result["doc"]
-            reflection = result["reflection"]
-            
-            # 计算综合分数
-            score = 0
-            if reflection.get("is_supported"):
-                score += 2
-            if reflection.get("is_relevant"):
-                score += 1
-            
-            scored.append((doc, score))
-        
-        # 选择高分组
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return [doc for doc, score in scored[:3] if score > 0]
-    
-    def _generate_with_grounding(
-        self,
-        query: str,
-        selected_docs: list[dict]
-    ) -> str:
-        """基于选中的片段生成回答"""
-        context = "\n\n".join([
-            f"【参考 {i+1}】\n{doc.get('content', '')[:300]}"
-            for i, doc in enumerate(selected_docs)
-        ])
-        
-        prompt = f"""基于以下参考内容回答问题。如有引用，请注明。
+**!!! tip "心智模型"**
 
-参考内容：
-{context}
+!!! tip "心智模型"
+    一句话模型：Agent 是调度台，RAG 是资料室，工具是外勤。
+    日常类比：医院分诊台先判断你去内科还是拍片，再把你送到对应窗口。
+    类比不成立处：分诊规则由人写死，Agent 的分派由模型输出决定，同一句话可能分到不同分支。
 
-问题：{query}
+!!! note "术语：意图分派"
+    把用户输入归入预设处理分支的步骤，英文 Intent Classification。例子：把「退货政策是什么」归到知识查询分支。
 
-回答（引用参考编号）："""
-        
-        response = self.llm.generate(prompt)
-        return response.text
-    
-    def _reflect_on_answer(self, query: str, answer: str) -> dict:
-        """反思最终回答"""
-        reflection_prompt = f"""评估以下回答的质量。
+**图解**
 
-问题：{query}
-回答：{answer}
-
-请评估：
-1. 回答是否准确（是/否）
-2. 是否完整回答了问题（是/否）
-3. 是否有帮助（1-5分）
-4. 是否有幻觉或错误（是/否）
-
-并给出改进建议（如需要）："""
-        
-        response = self.llm.generate(reflection_prompt)
-        
-        return {
-            "assessment": response.text,
-            "quality": "good" if "是" in response.text[:50] else "needs_improvement"
-        }
+```mermaid
+sequenceDiagram
+    participant U as "用户"
+    participant A as "Agent 调度台"
+    participant R as "检索器与重排器"
+    participant T as "工具集"
+    participant S as "回答合成"
+    U->>A: "提交查询"
+    A->>A: "判定意图"
+    A->>R: "知识查询：检索 top_k 文档"
+    R-->>A: "返回候选文档与分数"
+    A->>T: "工具调用：执行指定工具"
+    T-->>A: "返回工具结果"
+    A->>S: "拼接检索内容、工具结果、历史上下文"
+    S-->>U: "返回带来源的回答"
 ```
 
-### 2.2 Corrective-RAG
+逐条解读这张图：
 
-CRAG（Corrective RAG）用于纠正低质量的检索：
+1. 用户提交的是一条自然语言查询，可能同时包含知识需求和动作需求。
+2. 调度台先做意图判定，这一步决定后面走哪条通道。
+3. 知识查询通道把查询交给检索器，取回候选文档和相似度分数。
+4. 工具调用通道把查询解析成工具名和参数，交给工具集执行。
+5. 两条通道的结果都回到回答合成，合成阶段才真正生成自然语言。
+6. 合成阶段必须拿到来源信息，否则回答无法标注出处。
+
+**一步一步来**
+
+**第 1 步：把查询分派到四个分支。**
+
+这一步要产出四种分支名之一，后面的处理都靠它分流。
+
+```js
+// 意图分派：命中第一条规则即返回
+const RULES = [
+  { intent: 'knowledge_query', words: ['什么', '怎么', '为什么', '政策'] },
+  { intent: 'tool_calling', words: ['计算', '搜索', '运行'] },
+  { intent: 'task_execution', words: ['帮我退', '帮我改', '创建'] },
+];
+
+function classifyIntent(query) {
+  for (const rule of RULES) {
+    if (rule.words.some((w) => query.includes(w))) return rule.intent;
+  }
+  return 'conversation'; // 无命中走闲聊，避免误触发检索
+}
+```
+
+**这段代码在做什么**
+
+- `RULES` 把关键词和意图名绑定，数组顺序就是优先级。
+- `some` 只要命中一个关键词就判定该意图成立。
+- `for...of` 保证按优先级从上往下试，不做并行匹配。
+- 全部不命中返回 `conversation`，防止无意义检索浪费预算。
+- 这里是关键词表，属于演示实现；生产环境的分派精度要求需核对官方文档中模型分类的推荐做法。
+
+运行结果：
+
+```text
+classifyIntent('退货政策是什么') => 'knowledge_query'
+classifyIntent('帮我退掉昨天那单') => 'task_execution'
+classifyIntent('你好呀') => 'conversation'
+```
+
+**第 2 步：知识查询分支拼出带约束的提示词。**
+
+这一步要把检索结果格式化成模型能引用的编号块。
+
+```js
+function buildContext(docs) {
+  if (docs.length === 0) return '无相关知识库内容';
+  return docs
+    .map((d, i) => `【文档 ${i + 1}】标题：${d.title}\n来源：${d.source}\n内容：${d.content}`)
+    .join('\n\n');
+}
+
+function buildRagPrompt(query, docs) {
+  return [
+    '只使用下面参考内容作答，参考内容没有就直说不知道。',
+    buildContext(docs),
+    `问题：${query}`,
+  ].join('\n\n');
+}
+```
+
+**这段代码在做什么**
+
+- `map` 给每篇文档加上从 1 开始的编号，方便模型在回答里引用编号。
+- 每篇文档都带 `title` 和 `source`，来源信息留在提示词里才能回填给前端。
+- 空结果返回固定占位文本，让模型有明确信号去说「不知道」。
+- 提示词第一句是硬约束，位置在内容之前，减少模型忽略约束的概率。
+- `join('\n\n')` 让每篇文档之间有空行分隔，避免边界粘连。
+
+**第 3 步：工具调用分支执行工具并回灌结果。**
+
+这一步的关键是把工具返回值和模型的自然语言组装分开。
+
+```js
+function runTool(toolName, toolArgs, tools) {
+  const tool = tools[toolName];
+  if (!tool) return { ok: false, message: `未找到工具：${toolName}` };
+  try {
+    const result = tool(toolArgs);
+    return { ok: true, result };
+  } catch (err) {
+    return { ok: false, message: `工具执行出错：${err.message}` };
+  }
+}
+
+const tools = { calc: ({ a, b }) => a + b };
+```
+
+**这段代码在做什么**
+
+- 先查工具表，找不到就返回失败对象，不让异常冒泡到调度层。
+- `try...catch` 把工具自身的异常转成结构化错误，便于统一展示。
+- 成功时返回 `{ ok: true, result }`，调用方按 `ok` 判断分支。
+- 工具表本身是普通对象，注册新工具只需要加一个键。
+- 工具入参的校验不在这里做，需核对官方文档中工具调用的参数校验建议。
+
+**动手验证**
+
+把上面三段合成一个单文件脚本。
+
+```js
+// agent-rag.js —— Node 20+，无第三方依赖，运行：node agent-rag.js
+const assert = require('node:assert');
+
+const RULES = [
+  { intent: 'knowledge_query', words: ['什么', '怎么', '为什么', '政策'] },
+  { intent: 'tool_calling', words: ['计算', '搜索', '运行'] },
+  { intent: 'task_execution', words: ['帮我退', '帮我改', '创建'] },
+];
+
+function classifyIntent(query) {
+  for (const rule of RULES) {
+    if (rule.words.some((w) => query.includes(w))) return rule.intent;
+  }
+  return 'conversation';
+}
+
+// 用固定数组代替向量库，保证脚本输出可复现
+function retrieve(query) {
+  const docs = [
+    { title: '退货政策', source: 'help/return.md', content: '签收后 7 天内可申请退货。' },
+    { title: '发票规则', source: 'help/invoice.md', content: '发票在订单完成后 24 小时开出。' },
+  ];
+  return docs.filter((d) => (query.includes('退') ? d.title.includes('退货') : false));
+}
+
+function buildContext(docs) {
+  if (docs.length === 0) return '无相关知识库内容';
+  return docs
+    .map((d, i) => `【文档 ${i + 1}】标题：${d.title}\n来源：${d.source}\n内容：${d.content}`)
+    .join('\n\n');
+}
+
+function handle(query) {
+  const intent = classifyIntent(query);
+  if (intent !== 'knowledge_query') return { intent, answer: `已转交 ${intent} 分支` };
+  const docs = retrieve(query);
+  const prompt = ['只使用下面参考内容作答。', buildContext(docs), `问题：${query}`].join('\n\n');
+  return { intent, answer: `依据【文档 1】：${docs[0].content}`, prompt };
+}
+
+assert.strictEqual(classifyIntent('退货政策是什么'), 'knowledge_query');
+assert.strictEqual(classifyIntent('帮我退掉昨天那单'), 'task_execution');
+assert.strictEqual(classifyIntent('你好呀'), 'conversation');
+const r = handle('退货政策是什么');
+assert.ok(r.prompt.includes('【文档 1】'));
+assert.ok(r.prompt.includes('7 天'));
+assert.strictEqual(handle('帮我退掉昨天那单').intent, 'task_execution');
+
+console.log(r.answer);
+console.log('全部断言通过');
+```
+
+预期输出：
+
+```text
+依据【文档 1】：签收后 7 天内可申请退货。
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 闲聊也会触发检索，响应变慢 | 兜底分支写成知识查询 | 未命中任何规则时返回独立分支名，再断言一次 |
+| 回答里编了知识库没有的数字 | 提示词只给了内容，没给约束 | 在提示词最前面加「参考内容没有就直说不知道」 |
+| 工具报错直接中断整轮对话 | 工具异常未捕获 | 用 try...catch 包住调用，返回结构化失败对象 |
+
+**用在哪里**
+
+场景一：电商客服机器人。
+
+- 业务背景：用户消息既有「这单什么时候到」也有「退货要几天」。
+- 这一节的知识怎么用：用意图分派把订单类消息交给工具调用，把政策类消息交给检索分支。
+- 用什么指标衡量收益：检索分支的触发占比、人工转接率。
+- 什么时候不该用：全部消息都是同一种意图时，分派层是多余的一跳。
+
+场景二：企业内部 IT 支持台。
+
+- 业务背景：员工提问可能查手册，也可能要重置密码。
+- 这一节的知识怎么用：重置密码走工具调用，手册问题走检索。
+- 用什么指标衡量收益：一次解决率、工单二次分派次数。
+- 什么时候不该用：所有动作都需要人工审批时，自动执行工具会绕过流程。
+
+场景三：开发者文档站内助手。
+
+- 业务背景：用户问 API 用法，也可能问「帮我生成一个请求示例」。
+- 这一节的知识怎么用：前者检索文档，后者走代码生成分支。
+- 用什么指标衡量收益：回答被复制粘贴的次数、文档页跳转率。
+- 什么时候不该用：文档量很小、全量塞进提示词也放得下时，检索分支可以先不做。
+
+**行业实践**
+
+- LangChain 官方文档的 Retrieval 与 Agents 章节：把检索器抽象成统一接口，再由 Agent 决定是否调用。借鉴方式：先定义 `search(query, topK)` 这套签名，把具体向量库替换成可注入参数。
+- LlamaIndex 官方文档的 Query Engine 与 Router 章节：用查询引擎把「检索加合成」封装成一个可调用对象，路由层只管选引擎。借鉴方式：把第 1 节的知识查询分支封装成一个函数，分派层只做选择不做拼接。
+- Node.js 官方文档的 node:assert 章节：断言模块可以给出结构化失败信息。借鉴方式：把意图分派的关键用例写成断言，接进 CI。
+
+**小结**
+
+1. Agent 与 RAG 的接缝是「意图分派」，分派错了后面全错。
+2. 知识查询分支必须带来源信息，否则回答无法溯源。
+3. 工具调用的异常要在调用点转成结构化结果，不要冒泡到调度层。
+
+## 2. 动态知识更新与增量入库
+
+**先想一个问题**
+
+帮助中心的退货政策昨晚改了，从 7 天变成 15 天。如果知识库还是全量重建，重建窗口内的回答会同时出现两个版本。怎么只更新变动的那一篇？
+
+**!!! tip "心智模型"**
+
+!!! tip "心智模型"
+    一句话模型：给每篇文档算一个内容指纹，指纹变了才动索引。
+    日常类比：图书馆用 ISBN 加版次号判断一本书要不要换新，而不是每天重排整个书架。
+    类比不成立处：书的版次由出版社声明，文档指纹要从正文算，正文里一个标点变化都会改指纹。
+
+!!! note "术语：增量更新"
+    只对发生变化的数据执行写入和删除，英文 Incremental Update。例子：1000 篇文档里改了 2 篇，就只重建这 2 篇的向量。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+    [*] --> "拉取来源清单"
+    "拉取来源清单" --> "计算每篇指纹"
+    "计算每篇指纹" --> "与库内指纹对比"
+    "与库内指纹对比" --> "新增文档入库"
+    "与库内指纹对比" --> "修改文档先删后插"
+    "与库内指纹对比" --> "缺失文档删除"
+    "新增文档入库" --> "打印更新统计"
+    "修改文档先删后插" --> "打印更新统计"
+    "缺失文档删除" --> "打印更新统计"
+    "打印更新统计" --> [*]
+```
+
+逐条解读：
+
+1. 从数据源拉取当前全量清单，注意这里是清单，不是全量正文。
+2. 对清单里每篇文档的正文计算指纹，指纹算法要固定。
+3. 把新指纹和库内已存指纹逐篇对比，得到三类差集。
+4. 新增文档直接写入，不需要先删。
+5. 修改文档必须先删旧向量再插新向量，否则同一 `doc_id` 会有两份向量。
+6. 库内有、来源没有的文档判为删除。
+7. 最后打印三个计数，便于接入监控。
+
+**一步一步来**
+
+**第 1 步：给文档算内容指纹。**
+
+这一步要产出一个稳定的字符串，同一内容必须得到同一结果。
+
+```js
+const crypto = require('node:crypto');
+
+function fingerprint(doc) {
+  // 空白字符归一化，避免换行差异造成假变更
+  const normalized = doc.content.replace(/\s+/g, ' ').trim();
+  return crypto.createHash('sha256').update(normalized).digest('hex');
+}
+```
+
+**这段代码在做什么**
+
+- 用 `sha256` 而不是对象哈希，保证跨进程、跨机器结果一致。
+- 先把连续空白压成一个空格，避免排版调整造成假变更。
+- `trim` 去掉首尾空白，同样是减少噪声。
+- 返回十六进制字符串，方便直接当键比较。
+- 指纹只覆盖正文，标题和来源变了不算内容变更，需要按业务确认是否要一并纳入。
+
+**第 2 步：对比新旧清单，分出三类差集。**
+
+这一步要输出 added、modified、deleted 三个数组。
+
+```js
+function diffDocuments(existing, incoming) {
+  const incomingIds = new Set(incoming.map((d) => d.id));
+  const added = incoming.filter((d) => !(d.id in existing));
+  const modified = incoming.filter(
+    (d) => d.id in existing && existing[d.id].fingerprint !== fingerprint(d)
+  );
+  const deleted = Object.keys(existing).filter((id) => !incomingIds.has(id));
+  return { added, modified, deleted };
+}
+```
+
+**这段代码在做什么**
+
+- `incomingIds` 是集合，后面的存在性判断是常数时间。
+- `added` 取库内没有的 id。
+- `modified` 同时要求 id 存在且指纹不同，两个条件缺一不可。
+- `deleted` 从库内 id 反查，来源清单里没有就算删除。
+- 函数不修改任何输入，比对和写入分成两个阶段，便于先看报告再决定是否执行。
+
+**第 3 步：按类别应用变更并打印统计。**
+
+这一步才真正动索引，顺序是先删后改再增。
+
+```js
+function applyChanges(store, diff) {
+  for (const id of diff.deleted) store.remove(id);
+  for (const doc of diff.modified) {
+    store.remove(doc.id);        // 先删旧向量，避免重复
+    store.add(doc);
+  }
+  for (const doc of diff.added) store.add(doc);
+  return {
+    added: diff.added.length,
+    modified: diff.modified.length,
+    deleted: diff.deleted.length,
+    timestamp: new Date().toISOString(),
+  };
+}
+```
+
+**这段代码在做什么**
+
+- 删除在先，避免后面新增时撞上同 id 的旧记录。
+- 修改走「先删后插」，而不是原地更新，实现上少一层判断。
+- 三个循环分开写，每一步的失败都能定位到具体类别。
+- 返回值只含计数和时间戳，适合直接打日志或上报。
+- 这里没有事务保证，中途失败会留下半更新状态，需核对官方文档中索引写入的原子性保证。
+
+**动手验证**
+
+```js
+// incremental-update.js —— Node 20+，无第三方依赖，运行：node incremental-update.js
+const assert = require('node:assert');
+const crypto = require('node:crypto');
+
+function fingerprint(doc) {
+  const normalized = doc.content.replace(/\s+/g, ' ').trim();
+  return crypto.createHash('sha256').update(normalized).digest('hex');
+}
+
+function diffDocuments(existing, incoming) {
+  const incomingIds = new Set(incoming.map((d) => d.id));
+  const added = incoming.filter((d) => !(d.id in existing));
+  const modified = incoming.filter(
+    (d) => d.id in existing && existing[d.id].fingerprint !== fingerprint(d)
+  );
+  const deleted = Object.keys(existing).filter((id) => !incomingIds.has(id));
+  return { added, modified, deleted };
+}
+
+function makeStore() {
+  const map = new Map();
+  return {
+    add: (doc) => map.set(doc.id, doc),
+    remove: (id) => map.delete(id),
+    dump: () => Object.fromEntries(map),
+  };
+}
+
+const d1 = { id: 'a', content: '签收后 7 天内可申请退货。' };
+const d2 = { id: 'b', content: '发票在订单完成后 24 小时开出。' };
+
+const store = makeStore();
+store.add({ ...d1, fingerprint: fingerprint(d1) });
+store.add({ ...d2, fingerprint: fingerprint(d2) });
+
+const existing = Object.fromEntries(
+  Object.entries(store.dump()).map(([id, doc]) => [id, { fingerprint: doc.fingerprint }])
+);
+
+const incoming = [
+  { id: 'a', content: '签收后 15 天内可申请退货。' }, // 改了
+  { id: 'c', content: '电子发票支持自助下载。' },      // 新增
+];
+
+const diff = diffDocuments(existing, incoming);
+assert.strictEqual(diff.added.length, 1);
+assert.strictEqual(diff.modified.length, 1);
+assert.strictEqual(diff.deleted.length, 1);
+assert.strictEqual(diff.modified[0].id, 'a');
+assert.deepStrictEqual(diff.deleted, ['b']);
+
+console.log('新增', diff.added.map((d) => d.id));
+console.log('修改', diff.modified.map((d) => d.id));
+console.log('删除', diff.deleted);
+console.log('全部断言通过');
+```
+
+预期输出：
+
+```text
+新增 [ 'c' ]
+修改 [ 'a' ]
+删除 [ 'b' ]
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 每次更新都全量重建 | 指纹存在文档对象里，跨进程丢失 | 指纹落库，与向量同生命周期保存 |
+| 同一文档出现两份检索结果 | 修改时原地覆盖但未删旧向量 | 修改走先删后插，或按 id 覆盖写入 |
+| 格式微调就触发全量重建 | 指纹直接对原始字符串计算 | 先做空白归一化再算指纹 |
+
+**用在哪里**
+
+场景一：电商帮助中心。
+
+- 业务背景：运营每周改政策文案，修改频率高但总量小。
+- 这一节的知识怎么用：每天跑一次增量比对，只重建被改的文档向量。
+- 用什么指标衡量收益：单次更新耗时、更新期间检索错误率。
+- 什么时候不该用：文档总量在几百篇以内、全量重建只要几十秒时，增量逻辑的维护成本更高。
+
+场景二：后台管理的批量导入。
+
+- 业务背景：运营用 Excel 导入商品知识，同一商品可能重复导入。
+- 这一节的知识怎么用：用商品编码当作 doc_id，导入时先算指纹再判新增还是修改。
+- 用什么指标衡量收益：重复向量数量、导入后检索命中率。
+- 什么时候不该用：每次导入都是全新批次、历史数据要保留时，不该按 id 覆盖。
+
+场景三：法规库同步。
+
+- 业务背景：法规原文会发布修订版，旧版必须能追溯。
+- 这一节的知识怎么用：把版本号并入 doc_id，删除旧版时保留归档表。
+- 用什么指标衡量收益：错误引用旧版条文的次数。
+- 什么时候不该用：只保留最新版就够的场景，不必维护版本维度。
+
+**行业实践**
+
+- LlamaIndex 官方文档的 Ingestion Pipeline 章节：把切分、嵌入、去重做成可组合的节点，并支持文档去重与缓存。借鉴方式：把指纹计算放在切分之前，避免同一文档切出多份后重复计算。
+- LangChain 官方文档的 Indexing 章节：提供记录管理器来跟踪文档写入状态，避免重复写入同一文档。借鉴方式：把指纹表当成记录管理器的最小实现。
+- 需核对官方文档：具体要核对向量库在删除单条记录时的可见性延迟，以及更新期间检索是否会读到半更新状态。
+
+**小结**
+
+1. 增量更新靠的是内容指纹，不是修改时间。
+2. 修改文档必须走先删后插，否则同一个 id 会有多份向量。
+3. 指纹表要和向量放在同一个可持久化存储里，进程重启不能丢。
+
+## 3. 上下文窗口管理
+
+**先想一个问题**
+
+用户和客服助手聊了 30 轮，每轮的检索结果都留在上下文里。第 31 轮请求发出去，模型报超长错误。这时候该丢哪部分历史？
+
+**!!! tip "心智模型"**
+
+!!! tip "心智模型"
+    一句话模型：上下文窗口是一张固定大小的桌子，桌上只能摆有限的纸。
+    日常类比：开会时白板写满了，你得擦掉最早的记录，或者把前面几页总结成一句话贴上。
+    类比不成立处：白板可以拍照存档事后翻看，被截断的上下文对模型来说是真的消失了。
+
+!!! note "术语：上下文窗口"
+    模型单次调用能接受的最大 token 数。例子：窗口是 4000 token，系统提示占 500，历史加当前问题只能用剩下 3500。
+
+**图解**
 
 ```mermaid
 flowchart TB
-    Q["Query"] --> QR["Query Rewrite"]
-    QR --> RET["Retrieve"]
-
-    RET --> EVAL["评估检索质量"]
-
-    EVAL --> |"高"| HIGH["直接生成回答"]
-    EVAL --> |"中等"| MED["查询改写重试检索"]
-    EVAL --> |"低"| LOW["知识库外生成回答"]
-
-    class HIGH fill:#90EE90
-    class MED fill:#FFD700
-    class LOW fill:#FF6B6B
+    A["新消息进入"] --> B["累加 token 估算"]
+    B --> C{"超出可用预算"}
+    C -->|"否"| D["直接放入上下文"]
+    C -->|"是"| E{"选择策略"}
+    E -->|"滑动窗口"| F["从最旧消息开始丢弃"]
+    E -->|"摘要压缩"| G["旧消息交给模型总结"]
+    E -->|"优先级"| H["按相关性保留高价值消息"]
+    F --> I["拼装最终提示词"]
+    G --> I
+    H --> I
+    D --> I
 ```
 
-#### 2.2.1 CRAG 实现
+逐条解读：
 
-```python
-class CorrectiveRAG:
-    """Corrective RAG 实现"""
-    
-    def __init__(self, llm, retriever, reranker, web_searcher=None):
-        self.llm = llm
-        self.retriever = retriever
-        self.reranker = reranker
-        self.web_searcher = web_searcher  # 用于检索质量低时的补充
-    
-    def corrective_retrieve(self, query: str) -> dict:
-        """
-        带纠正的检索
-        
-        Args:
-            query: 用户查询
-        
-        Returns:
-            检索结果和处理信息
-        """
-        # 1. 查询改写
-        rewritten_queries = self._rewrite_query(query)
-        
-        # 2. 多轮检索
-        all_results = []
-        for q in rewritten_queries:
-            results = self.retriever.search(q, top_k=10)
-            all_results.extend(results)
-        
-        # 3. 去重和合并
-        unique_results = self._deduplicate(all_results)
-        
-        # 4. 重排序
-        if self.reranker and unique_results:
-            reranked = self.reranker.rerank(
-                query,
-                [r.get("content", r.get("text", "")) for r in unique_results],
-                top_k=10
-            )
-            # 合并分数
-            for i, result in enumerate(reranked):
-                unique_results[i]["rerank_score"] = result["score"]
-        
-        # 5. 评估检索质量
-        quality = self._evaluate_retrieval_quality(query, unique_results)
-        
-        return {
-            "results": unique_results,
-            "quality": quality,
-            "rewritten_queries": rewritten_queries
-        }
-    
-    def _rewrite_query(self, query: str) -> list[str]:
-        """查询改写"""
-        rewrite_prompt = f"""请为以下查询生成 3 种不同的改写版本，以提升检索效果。
+1. 每来一条新消息，先估算它的 token 数并累加。
+2. 累加值没有超过可用预算时，直接放入，不做任何裁剪。
+3. 超过预算才进入策略选择，避免无谓计算。
+4. 滑动窗口从最旧的消息开始丢，实现简单，保留的是时间上最近的部分。
+5. 摘要压缩把较早的消息交给模型总结成一段文字，保住语义但会引入信息损失。
+6. 优先级策略按相关性筛选，能保住关键信息，但需要额外的相关性计算。
+7. 三种策略最终都汇到同一个拼装步骤，接口保持一致。
 
-原始查询：{query}
+**一步一步来**
 
-改写要求：
-1. 保持原意
-2. 使用不同表达方式（正式/口语化/学术化）
-3. 可以拆分复杂问题
+**第 1 步：估算 token 数并设定预算。**
 
-输出格式：
-1. [改写1]
-2. [改写2]
-3. [改写3]"""
-        
-        response = self.llm.generate(rewrite_prompt)
-        
-        # 解析改写结果
-        rewrites = []
-        for line in response.text.split('\n'):
-            match = re.search(r'\d+\.\s+(.+)', line)
-            if match:
-                rewrites.append(match.group(1).strip())
-        
-        if len(rewrites) < 3:
-            rewrites = [query] + rewrites[:2]
-        
-        return rewrites if rewrites else [query]
-    
-    def _deduplicate(self, results: list[dict]) -> list[dict]:
-        """去重"""
-        seen = set()
-        unique = []
-        
-        for result in results:
-            # 使用内容哈希去重
-            content = result.get("content", result.get("text", ""))
-            content_hash = hashlib.md5(content[:200].encode()).hexdigest()
-            
-            if content_hash not in seen:
-                seen.add(content_hash)
-                unique.append(result)
-        
-        return unique
-    
-    def _evaluate_retrieval_quality(
-        self,
-        query: str,
-        results: list[dict]
-    ) -> str:
-        """评估检索质量"""
-        if not results:
-            return "low"
-        
-        # 使用 LLM 评估
-        evaluation_prompt = f"""评估以下检索结果与查询的相关性。
+这一步给出一个可替换的估算函数和一个明确的可用额度。
 
-查询：{query}
+```js
+const CHARS_PER_TOKEN = 1.6; // 中文场景的粗略系数，生产需换成真实分词器
 
-检索结果（前3个）：
-{chr(10).join([
-    f'{i+1}. {r.get("content", r.get("text", ""))[:200]}...'
-    for i, r in enumerate(results[:3])
-])}
+function estimateTokens(text) {
+  return Math.ceil(text.length / CHARS_PER_TOKEN);
+}
 
-请评估：
-1. 检索结果是否回答了查询？（完全相关/部分相关/不相关）
-2. 质量评分（高/中/低）
-
-评分理由："""
-        
-        response = self.llm.generate(evaluation_prompt)
-        
-        if "完全相关" in response.text or "高" in response.text[:20]:
-            return "high"
-        elif "部分相关" in response.text or "中" in response.text[:20]:
-            return "medium"
-        else:
-            return "low"
-    
-    def handle_low_quality(
-        self,
-        query: str,
-        results: list[dict],
-        use_web_search: bool = True
-    ) -> dict:
-        """处理低质量检索"""
-        if use_web_search and self.web_searcher:
-            # 补充 Web 搜索
-            web_results = self.web_searcher.search(query)
-            
-            return {
-                "primary_results": results,
-                "supplementary_results": web_results,
-                "source": "web_search"
-            }
-        else:
-            # 直接生成，但明确说明局限性
-            return {
-                "primary_results": results,
-                "supplementary_results": [],
-                "source": "knowledge_base_low_quality",
-                "warning": "知识库检索结果可能不完整"
-            }
-    
-    def generate_answer(
-        self,
-        query: str,
-        retrieval_result: dict
-    ) -> str:
-        """生成回答"""
-        quality = retrieval_result["quality"]
-        results = retrieval_result["results"]
-        
-        if quality == "high":
-            # 直接使用检索结果
-            context = self._build_context(results[:3])
-            prompt = f"""基于以下检索内容回答问题。
-
-{context}
-
-问题：{query}
-
-回答："""
-        
-        elif quality == "medium":
-            # 结合检索结果和推理
-            context = self._build_context(results[:5])
-            prompt = f"""以下检索内容与问题部分相关，请结合常识和检索内容给出回答。
-
-{context}
-
-问题：{query}
-
-请谨慎回答，明确说明不确定的部分："""
-        
-        else:
-            # 低质量，尝试补充
-            handle_result = self.handle_low_quality(
-                query,
-                results,
-                use_web_search=True
-            )
-            
-            context = self._build_context(handle_result["primary_results"])
-            
-            if handle_result["supplementary_results"]:
-                web_context = self._build_context(
-                    handle_result["supplementary_results"]
-                )
-                context += "\n\n【Web 补充】\n" + web_context
-            
-            prompt = f"""注意：知识库检索结果质量较低，以下内容仅供参考。
-
-{context}
-
-问题：{query}
-
-请基于以上内容回答，如信息不足请明确说明："""
-        
-        return self.llm.generate(prompt).text
-    
-    def _build_context(self, results: list[dict]) -> str:
-        """构建上下文"""
-        if not results:
-            return "（无相关检索内容）"
-        
-        parts = []
-        for i, r in enumerate(results, 1):
-            content = r.get("content", r.get("text", ""))
-            source = r.get("metadata", {}).get("source", "")
-            parts.append(f"【参考{i}】{content[:300]}...\n来源：{source}")
-        
-        return "\n\n".join(parts)
+function budgetOf(maxTokens, reservedTokens) {
+  return maxTokens - reservedTokens; // 预留给系统提示和当前问题
+}
 ```
 
-### 2.3 路由检索
+**这段代码在做什么**
 
-智能路由将查询分发到不同检索通道：
+- 用字符数除以系数得到估算值，`Math.ceil` 保证不低估。
+- 系数只适用于中文近似场景，英文和代码会偏离。
+- `reservedTokens` 是留给系统提示和当前查询的固定开销。
+- 返回可用额度，后续所有裁剪都以它为准。
+- 生产环境要换成模型对应的分词器，具体分词方式需核对官方文档。
 
-```python
-from enum import Enum
+**第 2 步：实现滑动窗口裁剪。**
 
-class RetrievalRoute(Enum):
-    """检索路由类型"""
-    SEMANTIC = "semantic"           # 语义检索
-    KEYWORD = "keyword"            # 关键词检索
-    HYBRID = "hybrid"              # 混合检索
-    KNOWLEDGE_GRAPH = "kg"         # 知识图谱
-    WEB = "web"                    # 网页搜索
+这一步保留最近的消息，直到再放一条就超预算。
 
-class QueryRouter:
-    """查询路由器"""
-    
-    def __init__(self, llm, routes: dict):
-        """
-        Args:
-            llm: 大语言模型
-            routes: 可用路由配置
-        """
-        self.llm = llm
-        self.routes = routes  # {route_name: route_config}
-    
-    def route(self, query: str) -> list[tuple[RetrievalRoute, float]]:
-        """
-        路由查询
-        
-        Args:
-            query: 用户查询
-        
-        Returns:
-            路由列表及对应权重 [(route, weight), ...]
-        """
-        # 1. 意图分类
-        intent = self._classify_intent(query)
-        
-        # 2. 选择路由
-        routes = self._select_routes(query, intent)
-        
-        # 3. 计算权重
-        weights = self._calculate_weights(query, routes)
-        
-        return list(zip(routes, weights))
-    
-    def _classify_intent(self, query: str) -> str:
-        """意图分类"""
-        classification_prompt = f"""判断以下查询最适合的检索类型。
-
-查询：{query}
-
-类型选项：
-- semantic：需要语义理解的查询（如解释概念、描述性查询）
-- keyword：需要精确匹配的查询（如术语、技术名词）
-- hybrid：综合查询
-- knowledge_graph：涉及实体关系的查询
-- web：需要最新信息或外部资源的查询
-
-最适合的类型："""
-        
-        response = self.llm.generate(classification_prompt)
-        
-        # 解析响应
-        for route_type in ["semantic", "keyword", "hybrid", "knowledge_graph", "web"]:
-            if route_type.lower() in response.text.lower():
-                return route_type
-        
-        return "hybrid"
-    
-    def _select_routes(self, query: str, intent: str) -> list[RetrievalRoute]:
-        """选择路由"""
-        if intent == "semantic":
-            return [RetrievalRoute.SEMANTIC]
-        elif intent == "keyword":
-            return [RetrievalRoute.KEYWORD]
-        elif intent == "web":
-            return [RetrievalRoute.WEB]
-        elif intent == "knowledge_graph":
-            return [RetrievalRoute.KNOWLEDGE_GRAPH, RetrievalRoute.SEMANTIC]
-        else:
-            return [RetrievalRoute.HYBRID]
-    
-    def _calculate_weights(
-        self,
-        query: str,
-        routes: list[RetrievalRoute]
-    ) -> list[float]:
-        """计算路由权重"""
-        if len(routes) == 1:
-            return [1.0]
-        
-        # 动态调整权重
-        weights = []
-        for route in routes:
-            weight = self._evaluate_route_suitability(query, route)
-            weights.append(weight)
-        
-        # 归一化
-        total = sum(weights)
-        return [w / total for w in weights]
-    
-    def _evaluate_route_suitability(
-        self,
-        query: str,
-        route: RetrievalRoute
-    ) -> float:
-        """评估路由适合度"""
-        evaluation_prompt = f"""评估以下查询是否适合使用 {route.value} 检索。
-
-查询：{query}
-
-适合度评分（0-1）："""
-        
-        response = self.llm.generate(evaluation_prompt)
-        
-        # 提取分数
-        match = re.search(r'[0-1]\.?[0-9]*', response.text)
-        if match:
-            return float(match.group())
-        
-        return 0.5
-
-
-class RouterRAG:
-    """路由 RAG"""
-    
-    def __init__(
-        self,
-        llm,
-        retrievers: dict[RetrievalRoute, any],
-        router: QueryRouter
-    ):
-        self.llm = llm
-        self.retrievers = retrievers
-        self.router = router
-    
-    def retrieve(self, query: str, top_k: int = 10) -> list[dict]:
-        """
-        路由检索
-        
-        Args:
-            query: 查询
-            top_k: 返回总数
-        
-        Returns:
-            合并后的检索结果
-        """
-        # 1. 路由决策
-        route_weights = self.router.route(query)
-        
-        # 2. 分路由检索
-        all_results = {}
-        for route, weight in route_weights:
-            retriever = self.retrievers.get(route)
-            if retriever:
-                results = retriever.search(query, top_k=int(top_k * weight) + 1)
-                
-                for result in results:
-                    doc_id = result.get("id", hash(result.get("content", "")))
-                    if doc_id not in all_results:
-                        all_results[doc_id] = {
-                            **result,
-                            "weighted_score": result.get("score", 0) * weight,
-                            "routes": [route]
-                        }
-                    else:
-                        all_results[doc_id]["weighted_score"] += result.get("score", 0) * weight
-                        all_results[doc_id]["routes"].append(route)
-        
-        # 3. 合并排序
-        sorted_results = sorted(
-            all_results.values(),
-            key=lambda x: x["weighted_score"],
-            reverse=True
-        )
-        
-        return sorted_results[:top_k]
+```js
+function slidingContext(messages, currentQuery, budget) {
+  const kept = [];
+  let used = estimateTokens(currentQuery);
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const cost = estimateTokens(messages[i].content);
+    if (used + cost > budget) break; // 再放就超，停止
+    kept.unshift(messages[i]);
+    used += cost;
+  }
+  return { kept, used };
+}
 ```
 
-### 2.4 查询转换
+**这段代码在做什么**
 
-查询转换提升检索效果：
+- 从最后一条往前遍历，保证最近的消息优先保留。
+- 当前查询先计入 `used`，它必须留在窗口里。
+- 一旦加上这条就超预算，立刻中断，不再考虑更早的消息。
+- `unshift` 把消息放回数组头部，保持时间正序。
+- 返回 `used` 便于后续上报，观察窗口占用率。
 
-```python
-class QueryTransformer:
-    """查询转换器"""
-    
-    def __init__(self, llm):
-        self.llm = llm
-    
-    def transform(self, query: str) -> dict:
-        """
-        转换查询
-        
-        Args:
-            query: 原始查询
-        
-        Returns:
-            转换结果
-        """
-        return {
-            "original": query,
-            "expanded": self.expand_query(query),
-            "rewritten": self.rewrite_query(query),
-            "decomposed": self.decompose_query(query)
-        }
-    
-    def expand_query(self, query: str) -> list[str]:
-        """查询扩展：添加同义词和相关概念"""
-        expand_prompt = f"""为以下查询生成扩展查询，包括同义词、相关概念和可能的拼写变体。
+**第 3 步：实现摘要压缩，并和滑动窗口对比。**
 
-查询：{query}
+这一步把较早的消息换成一段摘要。
 
-扩展查询（3-5个）："""
-        
-        response = self.llm.generate(expand_prompt)
-        
-        # 解析扩展查询
-        expanded = []
-        for line in response.text.split('\n'):
-            if line.strip() and not line.startswith('查询') and not line.startswith('扩展'):
-                # 清理格式
-                cleaned = re.sub(r'^\d+[\.\)]\s*', '', line.strip())
-                if cleaned:
-                    expanded.append(cleaned)
-        
-        return expanded if expanded else [query]
-    
-    def rewrite_query(self, query: str) -> list[str]:
-        """查询改写：不同表述方式"""
-        rewrite_prompt = f"""为以下查询生成 3 种不同表述方式的改写。
-
-查询：{query}
-
-改写要求：
-1. 正式化版本
-2. 口语化版本
-3. 专业术语版本
-
-改写："""
-        
-        response = self.llm.generate(rewrite_prompt)
-        
-        rewrites = []
-        for line in response.text.split('\n'):
-            match = re.search(r'[\d\.\)]\s*(.+)', line)
-            if match:
-                rewrites.append(match.group(1).strip())
-        
-        return rewrites if rewrites else [query]
-    
-    def decompose_query(self, query: str) -> list[str]:
-        """查询分解：将复杂问题拆分为子问题"""
-        decompose_prompt = f"""将以下复杂查询拆分为简单的子问题。
-
-查询：{query}
-
-拆分要求：
-1. 每个子问题应该单一、具体
-2. 子问题之间逻辑连贯
-3. 按顺序解决可以回答原问题
-
-子问题列表："""
-        
-        response = self.llm.generate(decompose_prompt)
-        
-        sub_queries = []
-        for line in response.text.split('\n'):
-            match = re.search(r'[\d\.\)]\s*(.+)', line)
-            if match:
-                sub_queries.append(match.group(1).strip())
-        
-        return sub_queries if sub_queries else [query]
-    
-    def generate_hypothetical_answer(self, query: str) -> str:
-        """生成假设回答（HyDE 方法）"""
-        hyde_prompt = f"""根据你的理解，生成一个可能回答以下问题的示例答案。
-
-问题：{query}
-
-要求：
-1. 生成一个合理但可能不完美的回答
-2. 这个回答用于帮助检索相关文档
-3. 不要胡编乱造，基于常识生成
-
-示例回答："""
-        
-        response = self.llm.generate(hyde_prompt)
-        return response.text
-
-
-class MultiQueryRetriever:
-    """多查询检索器"""
-    
-    def __init__(
-        self,
-        retriever,
-        query_transformer: QueryTransformer,
-        reranker = None
-    ):
-        self.retriever = retriever
-        self.query_transformer = query_transformer
-        self.reranker = reranker
-    
-    def retrieve(self, query: str, top_k: int = 10) -> list[dict]:
-        """
-        使用多查询检索
-        
-        Args:
-            query: 原始查询
-            top_k: 返回数量
-        
-        Returns:
-            检索结果
-        """
-        # 1. 查询扩展
-        expanded_queries = self.query_transformer.expand_query(query)
-        
-        # 2. 查询改写
-        rewritten_queries = self.query_transformer.rewrite_query(query)
-        
-        # 3. 合并所有查询
-        all_queries = [query] + expanded_queries + rewritten_queries
-        all_queries = list(set(all_queries))  # 去重
-        
-        # 4. 批量检索
-        all_results = {}
-        for q in all_queries:
-            results = self.retriever.search(q, top_k=top_k)
-            
-            for result in results:
-                doc_id = result.get("id", hash(result.get("content", "")))
-                if doc_id not in all_results:
-                    all_results[doc_id] = result
-                    all_results[doc_id]["query_sources"] = [q]
-                else:
-                    all_results[doc_id]["query_sources"].append(q)
-        
-        # 5. 转换为列表
-        results = list(all_results.values())
-        
-        # 6. 重排序（如有）
-        if self.reranker:
-            doc_texts = [r.get("content", r.get("text", "")) for r in results]
-            reranked = self.reranker.rerank(query, doc_texts, top_k=len(results))
-            
-            # 合并重排分数
-            for i, result in enumerate(reranked):
-                results[i]["rerank_score"] = result["score"]
-            
-            results.sort(key=lambda x: x.get("rerank_score", 0), reverse=True)
-        
-        return results[:top_k]
+```js
+function summaryContext(messages, currentQuery, budget, summarize) {
+  const recent = messages.slice(-6);      // 最近 6 条原样保留
+  const older = messages.slice(0, -6);
+  const summary = older.length > 0 ? summarize(older) : '';
+  const parts = [];
+  if (summary) parts.push(`之前对话摘要：${summary}`);
+  parts.push(...recent.map((m) => `${m.role}：${m.content}`));
+  parts.push(`user：${currentQuery}`);
+  return parts.join('\n');
+}
 ```
+
+**这段代码在做什么**
+
+- `slice(-6)` 保留最近 6 条原文，保证指代和语气连贯。
+- 更早的消息整体交给 `summarize`，这是一个可注入的函数。
+- 摘要为空时不加这一行，避免出现空标签。
+- `role` 拼在每条消息前面，让模型分清用户和助手。
+- 当前查询放在末尾，位置最靠近生成位置。
+- 摘要本身也要计入预算，这里没做，需核对官方文档中摘要长度的控制建议。
+
+**动手验证**
+
+```js
+// context-window.js —— Node 20+，无第三方依赖，运行：node context-window.js
+const assert = require('node:assert');
+
+const CHARS_PER_TOKEN = 1.6;
+const estimateTokens = (text) => Math.ceil(text.length / CHARS_PER_TOKEN);
+const budgetOf = (max, reserved) => max - reserved;
+
+function slidingContext(messages, currentQuery, budget) {
+  const kept = [];
+  let used = estimateTokens(currentQuery);
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const cost = estimateTokens(messages[i].content);
+    if (used + cost > budget) break;
+    kept.unshift(messages[i]);
+    used += cost;
+  }
+  return { kept, used };
+}
+
+function summaryContext(messages, currentQuery, summarize) {
+  const recent = messages.slice(-6);
+  const older = messages.slice(0, -6);
+  const summary = older.length > 0 ? summarize(older) : '';
+  const parts = [];
+  if (summary) parts.push(`之前对话摘要：${summary}`);
+  parts.push(...recent.map((m) => `${m.role}：${m.content}`));
+  parts.push(`user：${currentQuery}`);
+  return parts.join('\n');
+}
+
+const history = [
+  { role: 'user', content: '我想问一下退货的事情。' },
+  { role: 'assistant', content: '好的，请说明订单号。' },
+  { role: 'user', content: '订单号是 A12345。' },
+  { role: 'assistant', content: '已查到，签收时间是本月 3 日。' },
+  { role: 'user', content: '那我还能退吗？' },
+  { role: 'assistant', content: '需要看具体政策版本。' },
+  { role: 'user', content: '政策改过吗？' },
+];
+
+const budget = budgetOf(400, 100);
+const sliding = slidingContext(history, '那到底几天内能退', budget);
+assert.ok(sliding.used <= budget);
+assert.strictEqual(sliding.kept.at(-1).content, '政策改过吗？');
+
+const summarized = summaryContext(history, '那到底几天内能退', (older) => `用户共提问 ${older.length} 条`);
+assert.ok(summarized.includes('之前对话摘要'));
+assert.ok(summarized.endsWith('user：那到底几天内能退'));
+assert.strictEqual(summarized.split('\n').length, 8);
+
+console.log('滑动窗口保留条数', sliding.kept.length, '占用 token', sliding.used);
+console.log(summarized);
+console.log('全部断言通过');
+```
+
+预期输出（token 数为估算值，实际运行以脚本输出为准）：
+
+```text
+滑动窗口保留条数 3 占用 token 20
+之前对话摘要：用户共提问 1 条
+user：订单号是 A12345。
+assistant：已查到，签收时间是本月 3 日。
+user：那我还能退吗？
+assistant：需要看具体政策版本。
+user：政策改过吗？
+user：那到底几天内能退
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 裁剪后指代错乱 | 把带指代的消息丢在了前面 | 保留最近若干条原文，只压缩更早的部分 |
+| 估算值和实际差一倍 | 用的是字符系数不是分词器 | 接入模型对应分词器，或按最坏情况上浮预算 |
+| 摘要越滚越长最终超限 | 摘要本身没计入预算 | 对摘要长度设上限，超出就二次压缩 |
+
+**用在哪里**
+
+场景一：多轮客服对话。
+
+- 业务背景：用户一次会话可能聊 30 轮以上。
+- 这一节的知识怎么用：最近 6 轮保留原文，更早的压缩成摘要。
+- 用什么指标衡量收益：请求超长错误率、平均输入 token 数。
+- 什么时候不该用：会话平均只有 3 到 5 轮时，裁剪逻辑不会被触发，先不引入。
+
+场景二：代码助手的项目上下文。
+
+- 业务背景：用户持续贴文件和提问，上下文很快被贴入的代码占满。
+- 这一节的知识怎么用：检索到的代码片段按相关性保留，历史对话按滑动窗口裁剪。
+- 用什么指标衡量收益：回答引用到过期代码的次数。
+- 什么时候不该用：单次问答、无多轮状态的场景不需要窗口管理。
+
+场景三：后台管理的智能搜索框。
+
+- 业务背景：用户连续修改关键词重试，前面的试探词没有保留价值。
+- 这一节的知识怎么用：只保留最近 2 轮，其余全部丢弃。
+- 用什么指标衡量收益：输入 token 数、首字返回时间。
+- 什么时候不该用：用户会引用前面某轮的条件时，丢弃会造成理解断层。
+
+**行业实践**
+
+- LangChain 官方文档的 Memory 与 Message History 章节：提供按消息条数或 token 数裁剪的历史管理组件。借鉴方式：把裁剪策略做成参数，不要写死在业务代码里。
+- LlamaIndex 官方文档的 Chat Engine 章节：区分「保留最近若干轮」与「对旧对话做摘要」两种模式。借鉴方式：先用滑动窗口跑通，再根据超长错误率决定是否加摘要。
+- 需核对官方文档：具体要核对所选模型的分词器包名与最大输入 token 上限，以及摘要调用是否单独计费。
+
+**小结**
+
+1. 窗口管理的第一步是预留系统提示和当前问题的固定开销。
+2. 滑动窗口保住时间连续性，摘要压缩保住语义密度，两者可以叠加使用。
+3. token 估算一定要换成真实分词器，字符系数只适合做原型。
+
+## 4. Self-RAG：让模型给自己的检索结果打分
+
+**先想一个问题**
+
+检索返回了 5 篇文档，其中 3 篇只是关键词碰巧相同，实际不回答用户的问题。如果全部塞进提示词，模型可能被无关内容带偏。有没有办法在生成之前先筛一遍？
+
+**!!! tip "心智模型"**
+
+!!! tip "心智模型"
+    一句话模型：先让模型给每篇检索结果贴标签，再只拿通过标签的片段去回答。
+    日常类比：写论文前先把参考文献按「是否支持论点」过一遍，再决定引用哪几篇。
+    类比不成立处：人读过文献后记忆是连续的，模型每次判断只看当前这一篇，前后判断可能互相矛盾。
+
+!!! note "术语：反思标记"
+    Self-RAG 里模型输出的判断符号，用来标注检索内容是否相关、回答是否被支撑。例子：对一篇文档输出「相关」与「支撑」，对另一篇输出「不相关」。
+
+**图解**
+
+```mermaid
+flowchart TB
+    A["用户查询"] --> B["检索 top_k 文档"]
+    B --> C["文档 1 反思"]
+    B --> D["文档 2 反思"]
+    B --> E["文档 3 反思"]
+    C --> F["按标记打分排序"]
+    D --> F
+    E --> F
+    F --> G{"分数是否大于 0"}
+    G -->|"是"| H["进入生成上下文"]
+    G -->|"否"| I["整篇丢弃"]
+    H --> J["生成带引用的回答"]
+    J --> K["回答级整体反思"]
+```
+
+逐条解读：
+
+1. 先做一次普通检索，拿到候选文档，这一步和基础 RAG 一样。
+2. 每篇文档单独做一次反思判断，互不干扰。
+3. 反思判断输出的标记包括是否相关、是否支撑回答。
+4. 按标记折算成分数并排序，把最相关的排在最前。
+5. 分数为 0 的文档整篇丢弃，不进入生成上下文。
+6. 生成阶段要求模型标注引用编号。
+7. 生成后再做一次整体反思，判断回答是否完整、是否有编造。
+
+**一步一步来**
+
+**第 1 步：对单篇文档做反思判断。**
+
+这一步要输出结构化的标记，而不是自由文本。
+
+```js
+function reflectOnDoc(query, doc, llm) {
+  const prompt = [
+    '判断下面检索内容是否与查询相关、是否支撑回答。',
+    '只输出一行：相关=是/否 支撑=是/否',
+    `查询：${query}`,
+    `检索内容：${doc.content}`,
+  ].join('\n');
+  const raw = llm(prompt);                 // 由调用方注入模型
+  return {
+    relevant: raw.includes('相关=是'),
+    supports: raw.includes('支撑=是'),
+  };
+}
+```
+
+**这段代码在做什么**
+
+- 提示词明确要求只输出一行固定格式，方便解析。
+- `llm` 是注入的函数，测试时可以换成固定返回值。
+- 用 `includes` 解析两个标记，解析失败时两个字段都是 `false`。
+- 返回布尔对象，后续打分只做加法，不做字符串比较。
+- 这里的解析方式脆弱，生产环境应要求模型输出结构化格式，具体格式需核对官方文档。
+
+**第 2 步：按标记折算分数并挑选片段。**
+
+这一步决定哪些文档进入生成阶段。
+
+```js
+function scoreDocs(rows) {
+  return rows
+    .map((row) => {
+      let score = 0;
+      if (row.reflection.supports) score += 2;  // 支撑回答权重最高
+      if (row.reflection.relevant) score += 1;  // 相关性权重次之
+      return { ...row, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .filter((row) => row.score > 0);            // 零分文档整篇丢弃
+}
+```
+
+**这段代码在做什么**
+
+- 支撑回答给 2 分，相关给 1 分，权重体现两类判断的差别。
+- `sort` 按分数降序，保证高价值文档排在上下文前面。
+- `filter` 把零分文档剔除，避免无关内容进入提示词。
+- 每个返回值都是新对象，不修改传入的数组元素。
+- 权重值本身是设计选择，需通过离线评估集确认，不能凭感觉定。
+
+**第 3 步：生成回答后做整体反思。**
+
+这一步检查回答本身，而不是检索结果。
+
+```js
+function reflectOnAnswer(query, answer, llm) {
+  const prompt = [
+    '评估下面回答是否完整回答问题、是否存在编造。',
+    '只输出一行：完整=是/否 有编造=是/否',
+    `问题：${query}`,
+    `回答：${answer}`,
+  ].join('\n');
+  const raw = llm(prompt);
+  return { complete: raw.includes('完整=是'), hallucinated: raw.includes('有编造=是') };
+}
+```
+
+**这段代码在做什么**
+
+- 输入是问题加最终回答，不包含检索内容。
+- 两个标记分别对应完整性风险和编造风险。
+- 返回结构固定，方便上层决定是否重试或降级。
+- 这里的判断依赖同一个模型，可能存在自我确认偏差，需核对官方文档中是否有独立的评估模型建议。
+- 这一步是额外一次调用，会带来延迟，是否开启要按场景权衡。
+
+**动手验证**
+
+```js
+// self-rag.js —— Node 20+，无第三方依赖，运行：node self-rag.js
+const assert = require('node:assert');
+
+function reflectOnDoc(query, doc, llm) {
+  const prompt = `判断相关性。查询：${query} 内容：${doc.content}\n只输出一行：相关=是/否 支撑=是/否`;
+  const raw = llm(prompt);
+  return { relevant: raw.includes('相关=是'), supports: raw.includes('支撑=是') };
+}
+
+function scoreDocs(rows) {
+  return rows
+    .map((row) => {
+      let score = 0;
+      if (row.reflection.supports) score += 2;
+      if (row.reflection.relevant) score += 1;
+      return { ...row, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .filter((row) => row.score > 0);
+}
+
+function reflectOnAnswer(query, answer, llm) {
+  const raw = llm(`评估回答：${answer}`);
+  return { complete: raw.includes('完整=是'), hallucinated: raw.includes('有编造=是') };
+}
+
+// 用固定规则模拟模型，保证输出可复现
+const fakeLLM = (prompt) => {
+  if (prompt.includes('7 天内')) return '相关=是 支撑=是';
+  if (prompt.includes('发票')) return '相关=否 支撑=否';
+  return '完整=是 有编造=否';
+};
+
+const docs = [
+  { id: 'd1', content: '签收后 7 天内可申请退货。' },
+  { id: 'd2', content: '发票在订单完成后 24 小时开出。' },
+];
+
+const rows = docs.map((doc) => ({ doc, reflection: reflectOnDoc('几天内能退', doc, fakeLLM) }));
+const selected = scoreDocs(rows);
+
+assert.strictEqual(selected.length, 1);
+assert.strictEqual(selected[0].doc.id, 'd1');
+assert.strictEqual(selected[0].score, 3);
+assert.strictEqual(rows.find((r) => r.doc.id === 'd2').reflection.relevant, false);
+
+const finalCheck = reflectOnAnswer('几天内能退', '签收后 7 天内可退。', fakeLLM);
+assert.strictEqual(finalCheck.hallucinated, false);
+
+console.log('入选文档', selected.map((r) => r.doc.id));
+console.log('丢弃文档', rows.filter((r) => r.score === 0).map((r) => r.doc.id));
+console.log('回答反思', finalCheck);
+console.log('全部断言通过');
+```
+
+预期输出：
+
+```text
+入选文档 [ 'd1' ]
+丢弃文档 [ 'd2' ]
+回答反思 { complete: true, hallucinated: false }
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 反思把文档全判为不相关 | 判断提示词没有给出判断标准 | 在提示词里写清什么算相关，并给一到两个正反例 |
+| 延迟增加明显 | 每篇文档一次反思调用 | 先做重排取前若干篇，只对这几篇反思 |
+| 反思结果每次不一样 | 模型温度偏高 | 反思阶段把温度设为 0，需核对官方文档的参数名 |
+
+**用在哪里**
+
+场景一：医疗健康问答。
+
+- 业务背景：检索到的内容可能是不相关疾病的资料。
+- 这一节的知识怎么用：对每篇资料做支撑性判断，只有被判断为支撑的才进入生成。
+- 用什么指标衡量收益：错误引用资料的条数、人工抽检通过率。
+- 什么时候不该用：检索结果本身就由人工审核过的场景，反思是重复劳动。
+
+场景二：法律条文检索助手。
+
+- 业务背景：同一条文在不同法域含义不同，关键词检索容易混。
+- 这一节的知识怎么用：反思判断加入法域相关性的判断维度。
+- 用什么指标衡量收益：引用错误法域的条数。
+- 什么时候不该用：单法域场景，判断维度只剩相关性，收益有限。
+
+场景三：企业知识库问答。
+
+- 业务背景：内部文档有大量过期版本，检索会同时命中新旧两版。
+- 这一节的知识怎么用：回答级反思检查是否引用了过期版本的内容。
+- 用什么指标衡量收益：过期内容引用率。
+- 什么时候不该用：文档有严格的版本管理且旧版已下架时，不必额外反思。
+
+**行业实践**
+
+- 论文《Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection》：提出用反思标记控制检索与生成时机，并训练模型自己产出这些标记。借鉴方式：先用提示词模拟标记输出跑通流程，再考虑是否需要专门训练。
+- LangChain 官方文档的 Self-Query Retriever 与评价器相关章节：把「先判断再生成」拆成可组合步骤。借鉴方式：把反思步骤实现成独立函数，方便单测和替换。
+- 需核对官方文档：具体要核对反思标记的推荐枚举值，以及不同模型在结构化输出上的支持差异。
+
+**小结**
+
+1. Self-RAG 的核心是在生成之前插入一次筛选，而不是改进检索本身。
+2. 反思要输出结构化标记，不能依赖自由文本解析。
+3. 反思会带来额外调用次数，用重排缩小子集是控制成本的关键。
+
+## 5. Corrective-RAG：检索质量差时的三条退路
+
+**先想一个问题**
+
+用户问的是一个知识库里根本没有的新问题，检索返回的 10 篇文档相似度都低于阈值，但总还是能返回一些结果。这时候直接交给模型生成，回答就像是在硬凑。这种情况该走什么流程？
+
+**!!! tip "心智模型"**
+
+!!! tip "心智模型"
+    一句话模型：先给检索结果打一个质量档，再按档位决定用不用它。
+    日常类比：翻译前先看机翻质量，好的直接用，中等的改一改，差的干脆自己重写。
+    类比不成立处：人一眼能判断机翻好坏，模型对检索质量的判断本身也是概率输出，会判错档位。
+
+!!! note "术语：查询改写"
+    把原查询换成若干条语义相近但措辞不同的查询，用来提高召回。例子：把「退款要几天」改写成「退货到账时间」。
+
+**图解**
+
+```mermaid
+flowchart TB
+    A["用户查询"] --> B["生成 3 条改写查询"]
+    B --> C["逐条检索并合并结果"]
+    C --> D["按内容指纹去重"]
+    D --> E["重排序取前 10"]
+    E --> F{"评估检索质量"}
+    F -->|"高"| G["直接用检索内容生成"]
+    F -->|"中"| H["结合常识谨慎生成并标注不确定"]
+    F -->|"低"| I["走外部检索或明确告知信息不足"]
+    G --> J["返回回答"]
+    H --> J
+    I --> J
+```
+
+逐条解读：
+
+1. 原查询先经过改写，得到 3 条措辞不同的查询。
+2. 每条改写查询各自检索，结果合并到一个池子里。
+3. 按内容指纹去重，去掉不同改写查询带回来的重复文档。
+4. 重排序后取前 10 篇，缩小后续判断的范围。
+5. 用模型或阈值评估这批结果的质量档。
+6. 高、中、低三档走向三条不同路径，而不是统一处理。
+7. 三条路径最终都返回回答，但回答里对确定性的措辞不同。
+
+**一步一步来**
+
+**第 1 步：生成改写查询。**
+
+这一步要把一条查询扩成多条，提高召回。
+
+```js
+function rewriteQuery(query, llm) {
+  const prompt = [
+    '为下面的查询生成 3 条措辞不同的改写，保持原意。',
+    '每行一条，不要编号以外的内容。',
+    `查询：${query}`,
+  ].join('\n');
+  const lines = llm(prompt)
+    .split('\n')
+    .map((line) => line.replace(/^\d+[.、]\s*/, '').trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines.slice(0, 3) : [query]; // 解析失败回退原查询
+}
+```
+
+**这段代码在做什么**
+
+- 提示词限定输出格式，要求每行一条改写。
+- `replace` 去掉行首的编号，编号形式不参与后续检索。
+- `filter(Boolean)` 清掉空行。
+- 解析失败或为空时回退到原查询，保证下游永远拿到至少一条。
+- `slice(0, 3)` 限制条数，防止模型输出过多导致检索次数失控。
+
+**第 2 步：合并结果并按内容指纹去重。**
+
+这一步保证同一篇文档只出现一次。
+
+```js
+const crypto = require('node:crypto');
+
+function dedupe(results) {
+  const seen = new Set();
+  const unique = [];
+  for (const item of results) {
+    const key = crypto.createHash('sha256').update(item.content.slice(0, 200)).digest('hex');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+  return unique;
+}
+```
+
+**这段代码在做什么**
+
+- 只取内容前 200 个字符算指纹，减少长文档的计算开销。
+- `seen` 记录已出现过的指纹，重复直接跳过。
+- 保留第一次出现的对象，后面的同内容文档被丢弃。
+- 返回顺序保持首次出现顺序，便于后续重排覆盖。
+- 前 200 字符相同但后文不同的两篇会被误判为重复，需按文档长度分布确认这个截断长度。
+
+**第 3 步：按质量档走三条不同路径。**
+
+这一步是 CRAG 的核心。
+
+```js
+function buildPromptByQuality(query, docs, quality) {
+  const context = docs.map((d, i) => `【参考 ${i + 1}】${d.content}`).join('\n\n');
+  if (quality === 'high') {
+    return `只依据下面参考内容作答。\n${context}\n问题：${query}`;
+  }
+  if (quality === 'medium') {
+    return `参考内容与问题部分相关，结合常识作答，并标出不确定的部分。\n${context}\n问题：${query}`;
+  }
+  return `知识库没有找到可靠依据。请明确告知用户信息不足，不要编造。\n问题：${query}`;
+}
+```
+
+**这段代码在做什么**
+
+- 三档对应三段不同措辞的提示词，唯一变量是约束强度。
+- 高质量档要求只用参考内容，等同于普通 RAG。
+- 中质量档允许补充常识，但要求标出不确定处。
+- 低质量档干脆不塞参考内容，从源头断掉编造素材。
+- 档位判断本身要准，判断规则需核对官方文档中推荐的分档阈值。
+
+**动手验证**
+
+```js
+// corrective-rag.js —— Node 20+，无第三方依赖，运行：node corrective-rag.js
+const assert = require('node:assert');
+const crypto = require('node:crypto');
+
+function rewriteQuery(query) {
+  // 固定改写，保证脚本可复现
+  return [`${query} 流程`, `${query} 规定`, `${query} 说明`];
+}
+
+function retrieve(queries, corpus) {
+  const hits = [];
+  for (const q of queries) {
+    for (const doc of corpus) {
+      if (doc.content.includes(q.slice(0, 2))) hits.push(doc);
+    }
+  }
+  return hits;
+}
+
+function dedupe(results) {
+  const seen = new Set();
+  const unique = [];
+  for (const item of results) {
+    const key = crypto.createHash('sha256').update(item.content.slice(0, 200)).digest('hex');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+  return unique;
+}
+
+function judgeQuality(docs) {
+  if (docs.length === 0) return 'low';
+  if (docs.length >= 2) return 'high';
+  return 'medium';
+}
+
+function buildPromptByQuality(query, docs, quality) {
+  const context = docs.map((d, i) => `【参考 ${i + 1}】${d.content}`).join('\n\n');
+  if (quality === 'high') return `只依据下面参考内容作答。\n${context}\n问题：${query}`;
+  if (quality === 'medium') return `部分相关，结合常识并标注不确定。\n${context}\n问题：${query}`;
+  return `知识库无可靠依据，明确告知信息不足。\n问题：${query}`;
+}
+
+const corpus = [
+  { id: 'a', content: '退货流程：签收后 7 天内可申请。' },
+  { id: 'b', content: '退货规定：需保持商品完好。' },
+];
+
+const queries = rewriteQuery('退货');
+assert.strictEqual(queries.length, 3);
+
+const merged = dedupe(retrieve(queries, corpus));
+assert.ok(merged.length >= 2);
+
+assert.strictEqual(judgeQuality(merged), 'high');
+assert.strictEqual(judgeQuality([]), 'low');
+assert.ok(buildPromptByQuality('退货', merged, 'high').includes('只依据'));
+assert.ok(buildPromptByQuality('退货', [], 'low').includes('信息不足'));
+
+console.log('改写查询', queries);
+console.log('去重后条数', merged.length, '质量档', judgeQuality(merged));
+console.log('全部断言通过');
+```
+
+预期输出：
+
+```text
+改写查询 [ '退货 流程', '退货 规定', '退货 说明' ]
+去重后条数 2 质量档 high
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 低质量档仍然编造答案 | 提示词没去掉参考内容 | 低质量档不传 context，只传告知信息不足的指令 |
+| 改写查询把原意改偏 | 提示词只要求措辞不同，没要求保意 | 提示词加「保持原意」，并用离线集抽样核对 |
+| 去重把不同文档判成重复 | 指纹只取前若干字符 | 按文档长度分布调整截断长度，或改用全文指纹 |
+
+**用在哪里**
+
+场景一：新品类的售前咨询。
+
+- 业务背景：新品类刚上架，知识库还没有对应文档。
+- 这一节的知识怎么用：质量判为低时明确告知信息不足，避免编造参数。
+- 用什么指标衡量收益：编造参数的投诉量。
+- 什么时候不该用：知识库覆盖率已经很高、低质量档几乎不触发时，可以先不实现三条路径。
+
+场景二：跨国业务的法规问答。
+
+- 业务背景：同一问题在不同地区的答案完全不同。
+- 这一节的知识怎么用：改写查询时带上地区词，检索质量下降时提示用户切换地区。
+- 用什么指标衡量收益：地区错配的回答占比。
+- 什么时候不该用：只服务单一地区时，加地区维度只会引入噪声。
+
+场景三：故障排查助手。
+
+- 业务背景：新故障的排查记录还没入库。
+- 这一节的知识怎么用：质量低时输出「知识库无记录」并给出升级到人工的入口。
+- 用什么指标衡量收益：升级人工的及时率。
+- 什么时候不该用：故障库更新延迟本身很低时，可以等入库后再回答。
+
+**行业实践**
+
+- 论文《Corrective Retrieval Augmented Generation》：把检索结果按质量分档，并对低质量结果做补充检索或降级处理。借鉴方式：先实现三档分支的骨架，判断规则先用简单阈值，再按实际分布调整。
+- LangChain 官方文档的 Retrieval 章节中关于多查询检索的部分：用多条改写查询各自检索再合并。借鉴方式：把改写条数做成配置项，观察召回率与延迟的变化。
+- 需核对官方文档：具体要核对多查询检索的合并方式是取并集还是按分数融合，不同实现结果差别明显。
+
+**小结**
+
+1. CRAG 的价值在于承认「检索可能没结果」，并给出可解释的降级路径。
+2. 低质量档最安全的做法是不给参考内容，直接告知信息不足。
+3. 改写查询条数、去重指纹长度、质量分档阈值都是需要按业务分布调的参数。
+
+## 6. 路由检索与查询转换
+
+**先想一个问题**
+
+同一个知识库里既有商品参数表，也有客服话术文档。用户问「A1234 的防水等级」时，关键词检索比向量检索准；问「这款能不能游泳戴」时，向量检索更准。系统怎么知道该用哪种？
+
+**!!! tip "心智模型"**
+
+!!! tip "心智模型"
+    一句话模型：先判断查询属于哪一类，再把它发给对应的检索通道。
+    日常类比：图书馆里查工具书去参考室，查畅销小说去借阅区，索引方式不同。
+    类比不成立处：图书馆的区域边界由人划定且稳定，查询类型的边界由模型判断，会落在两区之间。
+
+!!! note "术语：路由检索"
+    把查询分发到一个或几个检索通道，并按权重合并结果的做法，英文 Router Retrieval。例子：型号类查询走关键词通道，描述类查询走向量通道。
+
+**图解**
+
+```mermaid
+flowchart TB
+    A["用户查询"] --> B["判定查询类型"]
+    B --> C["语义通道"]
+    B --> D["关键词通道"]
+    B --> E["知识图谱通道"]
+    B --> F["外部搜索通道"]
+    C --> G["按权重合并分数"]
+    D --> G
+    E --> G
+    F --> G
+    G --> H["按合并分数排序"]
+    H --> I["取前 top_k 进入生成"]
+```
+
+逐条解读：
+
+1. 查询先做类型判定，判定结果决定后面开哪几条通道。
+2. 语义通道用向量相似度，适合描述性查询。
+3. 关键词通道用倒排索引，适合型号、编号、专有名词。
+4. 知识图谱通道沿着实体关系扩展，适合「A 和 B 什么关系」这类问题。
+5. 外部搜索通道补充知识库没有的时效信息。
+6. 多通道结果按各自权重折算成统一分数再合并。
+7. 合并后重新排序，取前 top_k 进入生成阶段。
+
+**一步一步来**
+
+**第 1 步：判定查询类型并选出通道。**
+
+这一步的输出是一个通道名数组。
+
+```js
+const MODEL_CODE = /[A-Z]{1,4}\d{3,}/;      // 形如 A1234 的型号
+const RELATION_WORD = /关系|关联|影响到/;
+
+function selectRoutes(query) {
+  const routes = [];
+  if (RELATION_WORD.test(query)) routes.push('graph');
+  if (MODEL_CODE.test(query)) routes.push('keyword');
+  if (routes.length === 0) routes.push('semantic');
+  return routes;
+}
+```
+
+**这段代码在做什么**
+
+- 用两个正则识别型号和关系类提问，规则先于模型，成本低。
+- 型号命中时走关键词通道，因为型号需要精确匹配。
+- 关系类提问走图谱通道，普通语义检索难以表达实体间关系。
+- 都没命中时兜底走向量通道，覆盖大部分描述性提问。
+- 返回数组而不是单值，为后续多通道并存留出接口。
+
+**第 2 步：按权重合并多通道分数。**
+
+这一步要把不同量纲的分数折算到同一个尺度。
+
+```js
+function mergeScores(batches) {
+  const merged = new Map();
+  for (const { route, weight, items } of batches) {
+    for (const item of items) {
+      const prev = merged.get(item.id) || { id: item.id, score: 0, routes: [] };
+      prev.score += item.score * weight;   // 按通道权重加权
+      if (!prev.routes.includes(route)) prev.routes.push(route);
+      merged.set(item.id, prev);
+    }
+  }
+  return [...merged.values()].sort((a, b) => b.score - a.score);
+}
+```
+
+**这段代码在做什么**
+
+- `merged` 以文档 id 为键，同一文档在多通道出现时累加分数。
+- 乘 `weight` 把通道权重体现到统一分数上。
+- `routes` 记录这篇文档被哪些通道命中，便于排查。
+- 排序在合并完成后统一做，避免每批各自排序。
+- 权重之和是否需要归一化取决于各通道分数量纲，需核对官方文档中分数融合的推荐做法。
+
+**动手验证**
+
+```js
+// router-rag.js —— Node 20+，无第三方依赖，运行：node router-rag.js
+const assert = require('node:assert');
+
+const MODEL_CODE = /[A-Z]{1,4}\d{3,}/;
+const RELATION_WORD = /关系|关联|影响到/;
+
+function selectRoutes(query) {
+  const routes = [];
+  if (RELATION_WORD.test(query)) routes.push('graph');
+  if (MODEL_CODE.test(query)) routes.push('keyword');
+  if (routes.length === 0) routes.push('semantic');
+  return routes;
+}
+
+function mergeScores(batches) {
+  const merged = new Map();
+  for (const { route, weight, items } of batches) {
+    for (const item of items) {
+      const prev = merged.get(item.id) || { id: item.id, score: 0, routes: [] };
+      prev.score += item.score * weight;
+      if (!prev.routes.includes(route)) prev.routes.push(route);
+      merged.set(item.id, prev);
+    }
+  }
+  return [...merged.values()].sort((a, b) => b.score - a.score);
+}
+
+assert.deepStrictEqual(selectRoutes('A1234 的防水等级'), ['keyword']);
+assert.deepStrictEqual(selectRoutes('这款和上一代有什么关系'), ['graph']);
+assert.deepStrictEqual(selectRoutes('能不能游泳戴'), ['semantic']);
+
+const merged = mergeScores([
+  { route: 'keyword', weight: 0.6, items: [{ id: 'p1', score: 0.9 }, { id: 'p2', score: 0.4 }] },
+  { route: 'semantic', weight: 0.4, items: [{ id: 'p2', score: 0.8 }, { id: 'p3', score: 0.5 }] },
+]);
+
+const p2 = merged.find((m) => m.id === 'p2');
+assert.ok(Math.abs(p2.score - (0.4 * 0.6 + 0.8 * 0.4)) < 1e-9);
+assert.deepStrictEqual(p2.routes, ['keyword', 'semantic']);
+assert.strictEqual(merged[0].id, 'p1');
+
+console.log('合并排序', merged.map((m) => `${m.id}:${m.score.toFixed(2)}`));
+console.log('全部断言通过');
+```
+
+预期输出：
+
+```text
+合并排序 [ 'p1:0.54', 'p2:0.56', 'p3:0.20' ]
+全部断言通过
+```
+
+说明：上面的排序按脚本实际输出为准，`p2` 累加后为 0.56，排在 `p1` 之前，因此若打印顺序与上式不同，以脚本输出为准。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 同一文档在结果里出现两次 | 合并时用数组下标而不是文档 id 做键 | 以文档 id 为键聚合，分数累加 |
+| 关键词通道压过语义通道 | 两个通道分数量纲不同却直接相加 | 先归一化到 0 到 1，再按权重相乘 |
+| 路由判断经常落在两可之间 | 只用关键词规则判断 | 规则命中不明确时交给模型判定，并记录判定结果用于复盘 |
+
+**用在哪里**
+
+场景一：电商商品搜索。
+
+- 业务背景：查询里既有「防水等级」这类属性词，也有型号。
+- 这一节的知识怎么用：型号走关键词，属性描述走向量，两路结果合并排序。
+- 用什么指标衡量收益：搜索后点击率、无结果率。
+- 什么时候不该用：商品量小、单一通道已经够准时，不必引入多通道合并。
+
+场景二：后台管理的工单检索。
+
+- 业务背景：工单号需要精确匹配，问题描述需要语义匹配。
+- 这一节的知识怎么用：识别到工单号格式就走精确通道。
+- 用什么指标衡量收益：工单定位耗时、搜不到率。
+- 什么时候不该用：工单号从不被用户直接输入时，规则分支不会被命中。
+
+场景三：企业知识库的跨库检索。
+
+- 业务背景：文档库、FAQ 库、工单库各自独立。
+- 这一节的知识怎么用：把每个库当成一条通道，按权重合并结果。
+- 用什么指标衡量收益：跨库命中率、单库漏检率。
+- 什么时候不该用：各库内容高度重叠时，合并会放大重复结果。
+
+**行业实践**
+
+- LlamaIndex 官方文档的 Router 章节：提供按查询选择检索器或查询引擎的路由组件，含按元数据过滤的路由方式。借鉴方式：把 `selectRoutes` 的返回值接成路由配置，通道实现独立注册。
+- LangChain 官方文档的 Retrievers 章节中关于集成检索器的部分：把多种检索器组合成一个统一检索器，并支持按权重合并。借鉴方式：先用两路合并跑通，再按业务逐步加通道。
+- 需核对官方文档：具体要核对集成检索器的默认合并算法，以及权重参数的取值范围。
+
+**小结**
+
+1. 路由检索解决的是「不同查询适合不同索引」这个问题，不是提升单通道效果。
+2. 合并必须以文档 id 为键，按权重累加分数，不能简单拼接结果列表。
+3. 通道数量每增加一条，延迟和调试成本都会上升，先用两条跑通再扩。
+
+## 7. GraphRAG：把知识组织成图
+
+**先想一个问题**
+
+用户问「A 部门和 B 部门在同一个项目上有什么交集」。答案散落在十几篇文档里，每篇只提到其中两个实体。向量检索按片段相似度排序，很难把这条关系链拼出来。
+
+**!!! tip "心智模型"**
+
+!!! tip "心智模型"
+    一句话模型：先把知识拆成实体和关系建成图，再对图做社区划分并预先写好摘要。
+    日常类比：把一屋子名片按「谁认识谁」整理成关系网，再按圈子写一份圈子介绍。
+    类比不成立处：名片上的关系是明确写出来的，从自然语言里抽实体和关系需要模型判断，会抽错或漏抽。
+
+!!! note "术语：实体关系图"
+    节点表示实体、边表示实体之间关系的图结构。例子：节点「张三」与节点「项目甲」之间有一条「负责」边。
+
+**图解**
+
+```mermaid
+flowchart TB
+    A["原始文档集合"] --> B["切分成文本单元"]
+    B --> C["抽取实体与关系"]
+    C --> D["合并同名实体"]
+    D --> E["构建实体关系图"]
+    E --> F["社区划分"]
+    F --> G["为每个社区生成摘要"]
+    G --> H["查询时先检索社区摘要"]
+    H --> I["再下钻到原始文本单元"]
+    I --> J["合成回答"]
+```
+
+逐条解读：
+
+1. 原始文档先切成较小的文本单元，作为抽取的最小输入。
+2. 对每个文本单元做实体和关系抽取，产出三元组。
+3. 合并指代同一实体的不同写法，否则图会碎成大量孤立节点。
+4. 用合并后的实体和关系建图，节点和边都带来源标注。
+5. 对图做社区划分，把连接紧密的节点归到同一社区。
+6. 为每个社区生成摘要，这一步是离线批处理。
+7. 查询时先匹配社区摘要，拿到全局性的答案。
+8. 需要细节时再下钻到具体文本单元，避免只看摘要丢细节。
+
+**一步一步来**
+
+**第 1 步：从文本单元里抽取实体与关系。**
+
+这一步的输出是一批三元组。
+
+```js
+function extractTriples(unit, llm) {
+  const prompt = [
+    '从下面文本中抽取实体与关系，每行一条。',
+    '格式：实体1|关系|实体2',
+    `文本：${unit.text}`,
+  ].join('\n');
+  return llm(prompt)
+    .split('\n')
+    .map((line) => line.split('|').map((s) => s.trim()))
+    .filter((parts) => parts.length === 3 && parts.every(Boolean))
+    .map(([head, relation, tail]) => ({ head, relation, tail, source: unit.id }));
+}
+```
+
+**这段代码在做什么**
+
+- 提示词指定 `实体1|关系|实体2` 这种分隔格式，便于切分。
+- `split('|')` 后校验必须正好三段且都非空，过滤掉格式错误的行。
+- 每条三元组都带 `source`，保留到原始文本单元的溯源路径。
+- 返回扁平数组，合并阶段再按实体名聚合。
+- 抽取质量完全依赖模型能力，具体抽取提示词需按语料特点迭代，并核对官方文档。
+
+**第 2 步：合并同名实体并建图。**
+
+这一步把三元组变成邻接表。
+
+```js
+function buildGraph(triples) {
+  const nodes = new Map();
+  for (const t of triples) {
+    if (!nodes.has(t.head)) nodes.set(t.head, { id: t.head, edges: [] });
+    if (!nodes.has(t.tail)) nodes.set(t.tail, { id: t.tail, edges: [] });
+    nodes.get(t.head).edges.push({ to: t.tail, relation: t.relation, source: t.source });
+  }
+  return nodes;
+}
+```
+
+**这段代码在做什么**
+
+- 用 `Map` 存节点，键是实体名，天然完成同名合并。
+- 头和尾都要登记，保证孤立出现过的实体也在图里。
+- 边只从头指向尾，需要双向查询时在读取层处理。
+- 每条边保留 `relation` 和 `source`，便于回答时标注依据。
+- 别名合并没有做，例如「张三」和「张老师」会被当成两个节点，需核对官方文档中的实体归一化做法。
+
+**第 3 步：查询时先取社区摘要，再下钻原文。**
+
+这一步体现 GraphRAG 的两级检索。
+
+```js
+function answerWithGraph(query, communities, units, llm) {
+  const topCommunities = communities.slice(0, 2);       // 先取相关社区
+  const summaryText = topCommunities.map((c) => c.summary).join('\n\n');
+  const relatedUnits = units.filter((u) => topCommunities.some((c) => c.unitIds.includes(u.id)));
+  const detailText = relatedUnits.slice(0, 3).map((u) => u.text).join('\n\n');
+  return llm([
+    '先参考社区摘要回答全局问题。',
+    summaryText,
+    '再参考以下原文补充细节。',
+    detailText,
+    `问题：${query}`,
+  ].join('\n'));
+}
+```
+
+**这段代码在做什么**
+
+- 只取前两个社区，控制提示词长度。
+- 社区摘要用于回答全局性问题，例如「整体趋势是什么」。
+- 原文单元用于补充细节，避免摘要丢信息。
+- 两级内容都进同一个提示词，由模型决定取舍。
+- 社区摘要的生成方式与社区划分算法需核对官方文档，不同实现的粒度差别明显。
+
+**动手验证**
+
+```js
+// graph-rag.js —— Node 20+，无第三方依赖，运行：node graph-rag.js
+const assert = require('node:assert');
+
+function extractTriples(unit) {
+  // 用固定标注代替模型，保证输出可复现
+  return unit.triples.map(([head, relation, tail]) => ({ head, relation, tail, source: unit.id }));
+}
+
+function buildGraph(triples) {
+  const nodes = new Map();
+  for (const t of triples) {
+    if (!nodes.has(t.head)) nodes.set(t.head, { id: t.head, edges: [] });
+    if (!nodes.has(t.tail)) nodes.set(t.tail, { id: t.tail, edges: [] });
+    nodes.get(t.head).edges.push({ to: t.tail, relation: t.relation, source: t.source });
+  }
+  return nodes;
+}
+
+function neighborsOf(graph, name) {
+  const node = graph.get(name);
+  return node ? node.edges.map((e) => `${e.to}（${e.relation}）`) : [];
+}
+
+const units = [
+  { id: 'u1', text: '张三负责项目甲。', triples: [['张三', '负责', '项目甲']] },
+  { id: 'u2', text: '项目甲由 A 部门发起。', triples: [['项目甲', '发起方', 'A部门']] },
+];
+
+const triples = units.flatMap(extractTriples);
+const graph = buildGraph(triples);
+
+assert.strictEqual(graph.size, 3);
+assert.deepStrictEqual(neighborsOf(graph, '张三'), ['项目甲（负责）']);
+assert.deepStrictEqual(neighborsOf(graph, '项目甲'), ['A部门（发起方）']);
+assert.strictEqual(graph.get('张三').edges[0].source, 'u1');
+assert.deepStrictEqual(neighborsOf(graph, '不存在'), []);
+
+console.log('节点数', graph.size);
+console.log('张三的邻居', neighborsOf(graph, '张三'));
+console.log('项目甲的邻居', neighborsOf(graph, '项目甲'));
+console.log('全部断言通过');
+```
+
+预期输出：
+
+```text
+节点数 3
+张三的邻居 [ '项目甲（负责）' ]
+项目甲的邻居 [ 'A部门（发起方）' ]
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 同一实体在图中出现多个节点 | 没有做别名归一化 | 增加别名合并步骤，把简称和全称映射到同一节点 |
+| 社区摘要和原文矛盾 | 摘要生成时没带原文时间戳 | 抽取阶段保留时间信息，摘要时按最新时间优先 |
+| 建图成本远超预期 | 对全部文本单元都做抽取 | 先按文档重要性抽样抽取，再逐步扩大范围 |
+
+**用在哪里**
+
+场景一：企业竞争情报分析。
+
+- 业务背景：需要回答「哪些公司和某个技术方向有关系」。
+- 这一节的知识怎么用：从新闻和报告中抽实体关系，按社区摘要回答全局问题。
+- 用什么指标衡量收益：关系链问题的回答完整度。
+- 什么时候不该用：问题都是单点事实查询时，向量检索的成本更低。
+
+场景二：药物与靶点关系梳理。
+
+- 业务背景：关系散落在论文里，需要跨多篇聚合。
+- 这一节的知识怎么用：按实体建图，社区摘要提供领域概览。
+- 用什么指标衡量收益：人工核对关系链的耗时。
+- 什么时候不该用：实体抽取准确率达不到业务要求时，错误的边会污染整个图。
+
+场景三：供应链风险传导分析。
+
+- 业务背景：一家供应商出问题会影响多层下游。
+- 这一节的知识怎么用：沿图的边做多跳查询，找到受影响的节点集合。
+- 用什么指标衡量收益：风险传导路径的覆盖度。
+- 什么时候不该用：关系是动态变化的且更新频率高时，图的重建成本难以承受。
+
+**行业实践**
+
+- Microsoft Research 的 GraphRAG 项目文档：介绍从文本抽取实体关系、构建图、划分社区并生成社区摘要的流程，用于回答全局性问题。借鉴方式：先把抽取和建图两步做出来，社区摘要可以后置。
+- LlamaIndex 官方文档的 Property Graph Index 章节：介绍用属性图组织知识并提供图检索接口。借鉴方式：用现成的图索引组件替代手写邻接表。
+- 需核对官方文档：具体要核对社区划分算法的参数含义、摘要生成的提示词模板，以及增量更新图时是否需要全量重建。
+
+**小结**
+
+1. GraphRAG 针对的是跨文档的关系类问题，不是通用检索的替代品。
+2. 建图质量取决于实体抽取和别名归一化，这两步错在后面都救不回来。
+3. 社区摘要负责回答全局问题，原文单元负责回答细节问题，两级都要保留。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 电商客服机器人 | 第 1 节意图分派与工具调用 | 关键词规则起步，后续接模型分类 | 分派错误会连带后续全错，先建离线用例集 |
+| 帮助中心文档更新 | 第 2 节增量更新与指纹比对 | 内容哈希加向量库按 id 覆盖写入 | 修改必须走先删后插，否则出现重复向量 |
+| 多轮客服会话 | 第 3 节上下文窗口管理 | 最近若干轮保留原文，更早做摘要 | 摘要本身要计入预算，避免二次超限 |
+| 医疗健康问答 | 第 4 节 Self-RAG 反思筛选 | 反思判断与重排串联使用 | 反思判据要写进提示词，否则会全判不相关 |
+| 新品类售前咨询 | 第 5 节 Corrective-RAG 三档降级 | 质量分档加低质量档不传参考内容 | 分档阈值需按实际相似度分布确定 |
+| 商品混合搜索 | 第 6 节路由检索与分数合并 | 关键词通道加向量通道按权重合并 | 合并以文档 id 为键，先归一化再加权 |
+| 竞争情报分析 | 第 7 节 GraphRAG 社区摘要 | 实体关系抽取加社区划分 | 别名归一化不做会导致图碎片化 |
+
+## 动手作业
+
+目标：写一个单文件脚本 `mini-rag-router.js`，把本页六个知识点串成一条可检验的流水线。
+
+步骤：
+
+1. 定义 8 篇文档，含标题、来源、正文，其中 2 篇正文内容完全相同。
+2. 用内容指纹做一次增量比对，打印新增、修改、删除三个计数。
+3. 实现 `classifyIntent`，把 6 条测试查询分派到知识查询、工具调用、任务执行、闲聊四个分支。
+4. 对知识查询分支做检索，检索前先按第 6 节的路由规则选通道。
+5. 对检索结果做第 5 节的质量分档，低质量档不传参考内容。
+6. 用第 3 节的滑动窗口拼装上下文，打印每次请求的估算 token 数。
+
+验收标准：
+
+- 运行 `node mini-rag-router.js` 退出码为 0。
+- 控制台输出 6 行，每行格式为 `查询 | 分支 | 命中文档数 | 估算 token`。
+- 脚本内至少 8 条 `node:assert` 断言，覆盖指纹去重、意图分派、质量分档、窗口裁剪四种行为。
+- 至少一条查询的输出包含「信息不足」字样。
+- 至少一条查询的输出满足「命中文档数 = 0」。
+- 全部断言通过时最后一行打印 `全部断言通过`。
+
+## 综合对比
+
+| 方案 | 额外引入的组件 | 额外模型调用次数 | 适合的查询类型 | 失败时的表现 | 实现成本 |
+| --- | --- | --- | --- | --- | --- |
+| 基础 RAG | 向量库、嵌入模型 | 1 次生成 | 单点事实查询 | 检索不到就编造 | 低 |
+| Agent 集成 | 意图分派、工具表 | 1 次分派加 1 次生成 | 混合了动作与知识的查询 | 分派错了走错分支 | 中 |
+| 增量更新 | 指纹存储 | 0 次 | 与查询类型无关 | 指纹表丢失则退化为全量重建 | 中 |
+| 上下文窗口管理 | 分词器或估算函数 | 摘要策略多 1 次 | 多轮长会话 | 裁剪过度导致指代断裂 | 低 |
+| Self-RAG | 反思提示词 | 每篇文档 1 次加回答 1 次 | 检索噪声高的场景 | 判据不清会全判不相关 | 中 |
+| Corrective-RAG | 查询改写、质量判定 | 1 次改写加 1 次判定 | 知识库覆盖不全的场景 | 分档错了会把好结果降级 | 中 |
+| 路由检索 | 多套索引 | 0 到 1 次 | 查询类型差异明显的场景 | 权重失衡会压过正确通道 | 中高 |
+| GraphRAG | 抽取流水线、图存储 | 离线抽取加摘要 | 跨文档关系类问题 | 抽取错会污染整张图 | 高 |
 
 ## 深入阅读与参考
 
@@ -1532,196 +1731,69 @@ class MultiQueryRetriever:
 | [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) | 展示多 Agent 如何分工检索与综合，对 Agent+RAG 架构有启发。 | 画 lead agent 与 subagent 调用关系图，思考检索任务何时该拆给子 Agent。 |
 | [Agents（Chip Huyen）](https://huyenchip.com/2025/01/07/agents.html) | 工具与规划章节帮你系统理解 RAG 作为 Agent 工具的定位。 | 读工具与规划章节，对照你的 Agent 找出缺失环节，列出改进清单。 |
 
-## 应用与行业实践
+## 自测题
 
-前面的章节讲了 Agent 怎么调用检索、高级 RAG 有哪些环节。这一节把这些知识放回真实业务，看它们各自解决哪一类问题。
+??? question "为什么 Agent 的意图分派不能只靠关键词规则？"
+    - 关键词规则只能覆盖写进表的表达，同义改写会漏判。
+    - 规则顺序即优先级，顺序写错会把知识查询判成任务执行。
+    - 规则可以作为第一层兜底，命中不明确时再交给模型判定。
+    - 分派错误会连带后面的检索和工具调用全部走错。
+    - 建议保留一份离线分派用例集，规则调整后跑一遍。
 
-### 应用场景地图
+??? question "增量更新为什么必须用内容指纹而不是文件修改时间？"
+    - 修改时间在文件复制、构建、容器重建时都会变，内容没变也会触发重建。
+    - 内容指纹只由正文决定，同一内容在任何机器上结果一致。
+    - 算指纹前要做空白归一化，否则排版调整会造成假变更。
+    - 指纹要和向量存在同一处可持久化存储里，进程重启不能丢。
+    - 只覆盖正文的话，标题变更不会被识别，需按业务确认是否纳入。
 
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-| --- | --- | --- | --- |
-| 客服工单系统里"这个报错上次怎么解决的" | Agent 工具调用、混合检索、重排序 | 向量库 + 关键词索引、交叉编码器重排序 | 工单口语化，查询改写要保留报错码原文 |
-| 法务查合同"违约金按几个点算" | 父子块切分、重排序、引用标注 | 条款级父块 + 句级子块、条款号元数据 | 生成必须回带条款号，便于人工复核 |
-| 内网助手问"上个月的差旅标准" | 路由、时效性判断、兜底 | 路由模型 + 接口工具 + 阈值判断 | 时效性问题不能只走静态向量库 |
-| IDE 里问"这个函数在仓库里被谁调用" | Agent 多轮检索、代码切块 | 语法树切块、符号索引、grep 工具 | 检索单位是函数或类，不是固定字数窗口 |
-| 电商客服问"这个型号支持多少瓦快充" | 结构化字段抽取、路由 | 商品参数表 + 向量库双路 | 参数类问题先查表，答案要带型号 |
-| 医院检验单解读助手 | 引用标注、拒答兜底 | 指标参考区间表 + 知识库 | 超出参考区间不给诊断结论，只提示复查 |
-| 工业设备维修现场的故障排查 | Agent 工具调用、多轮追问 | 手册向量库 + 工单库 + 型号过滤 | 现场网络差，要支持离线缓存与短答案 |
-| 政企公文写作助手 | 查询改写、混合检索、重排序 | 范文库 + 术语词典 | 职务名称与术语按词典校正，不能改写 |
+??? question "滑动窗口和摘要压缩分别在什么情况下更合适？"
+    - 滑动窗口保住最近若干轮的原文，指代和语气连贯，实现成本低。
+    - 摘要压缩保住较早对话的语义，适合轮次多且早期信息仍有用的情况。
+    - 摘要会丢细节，且摘要本身要占预算，需要设长度上限。
+    - 两种可以叠加：最近若干轮保留原文，更早的部分整体摘要。
+    - 选择依据是超长错误率和人工抽检的指代准确率，不是主观偏好。
 
-### 三个场景拆解
+??? question "Self-RAG 的反思标记应该输出成什么形式？"
+    - 输出结构化标记，例如「相关=是 支撑=是」，便于代码解析。
+    - 自由文本解析依赖字符串匹配，模型换个措辞解析就失败。
+    - 标记到分数需要加权，支撑回答的权重通常高于单纯相关。
+    - 分数为 0 的文档要整篇丢弃，不要留在上下文里。
+    - 反思阶段温度设为 0，否则同一输入会得到不同标记。
 
-#### 场景 1：客服工单的历史解法检索
+??? question "Corrective-RAG 在低质量档为什么干脆不传参考内容？"
+    - 低质量内容进提示词，等于给模型提供了编造的素材。
+    - 不传参考内容，模型只能输出信息不足，编造空间被切断。
+    - 高质量档要求只用参考内容，中等档允许补充常识但必须标注不确定。
+    - 三档用同一套代码分支，只有提示词措辞和是否带 context 不同。
+    - 分档阈值需要按实际相似度分布确定，不能直接照搬别人的取值。
 
-**业务背景**
+??? question "多通道检索合并分数时最容易犯的错是什么？"
+    - 用数组下标而不是文档 id 做键，同一文档会出现两次。
+    - 两个通道分数量纲不同却直接相加，某一通道会压过另一通道。
+    - 正确做法是先归一化到同一区间，再按通道权重相乘后累加。
+    - 合并完成后再统一排序，不要每批各自排序后拼接。
+    - 建议记录每篇文档被哪些通道命中，便于排查权重失衡。
 
-客服每天在工单系统里翻历史工单，坐席提问的用词和知识库文档的用词对不上，关键词搜经常搜不到。工单量随坐席人数增长，经验靠老员工记忆传递，新人上手周期被拉长。
+??? question "GraphRAG 里社区摘要和原文单元分别解决什么问题？"
+    - 社区摘要覆盖一个紧密节点集合的整体情况，适合回答全局性问题。
+    - 原文单元保留细节和原文措辞，适合回答具体事实问题。
+    - 查询时先匹配社区摘要，再下钻到相关原文单元，两级都要进提示词。
+    - 只保留摘要会丢细节，只保留原文则无法回答跨文档的全局问题。
+    - 社区划分算法的参数含义和摘要模板需核对官方文档。
 
-**怎么用本页知识解决**
+??? question "本页哪些参数必须按业务分布调整，不能照搬默认值？"
+    - 上下文窗口的预留 token 数与滑动窗口保留轮数。
+    - token 估算用的分词器或字符系数，取决于所选模型。
+    - Self-RAG 的标记权重与进入生成阶段的文档条数。
+    - CRAG 的质量分档阈值与改写查询条数。
+    - 路由检索的通道权重与归一化方式，取决于各通道分数量纲。
 
-思路是把检索封装成一个工具，交给 Agent 决定什么时候调用；工具内部做查询改写、混合检索、重排序三步。下面函数名按你自己的项目命名，示例只表达调用顺序。
+## 延伸阅读
 
-```python
-# 把知识库检索暴露成 Agent 的一个工具
-def search_tickets(query: str, status: str = "closed") -> list[dict]:
-    q = rewrite(query)                 # 查询改写：补全口语里省略的主语和场景
-    hits = hybrid_search(q, top_k=20)  # 混合检索：BM25 与向量各取候选再合并
-    return rerank(q, hits, top_k=5)    # 重排序：交叉编码器打分后截断
-
-TOOLS = {"search_tickets": search_tickets}  # 只暴露必要工具，减少误调用
-
-for step in range(6):                  # 限制循环轮数，避免反复检索
-    resp = llm(messages, tools=TOOLS)  # 让模型决定回答还是调用工具
-    if not resp.tool_calls:            # 没有工具调用就认为可以出答案
-        break
-    for call in resp.tool_calls:       # 逐个执行工具并把结果写回上下文
-        result = TOOLS[call.name](**call.args)
-        messages.append(tool_message(call.id, result))
-```
-
-- 查询改写只补全缺失成分，报错码、版本号这类字面量原样保留。
-- 混合检索处理文档用词与工单口语不一致的问题，两路候选合并后再去重。
-- 重排序把进入提示词的块压到 5 条以内，控制上下文长度和调用成本。
-- 工具只留一个检索入口，参数用结构化字段描述，模型误调用的概率下降。
-- 循环设轮数上限，超限就返回当前结果并提示转人工。
-
-**怎么度量收益**
-
-看四个指标：recall@5（抽样 100 条真实问题，人工标注答案所在工单是否被召回）、转人工率（埋点统计）、首 token 延迟 p95、单次问答的 token 消耗。链路每一跳的输入输出用 LangSmith 或 Phoenix 记录，便于定位是召回错还是生成错。
-
-**什么时候不该用**
-
-- 语料只有几十条 FAQ 时，直接拼进提示词就够，建索引的维护成本收不回来。
-- 问题需要跨工单做统计，比如"上月哪类故障最多"，该走 SQL 查询而不是 RAG。
-
-#### 场景 2：合同条款的精确问答
-
-**业务背景**
-
-销售和法务查合同条款时，关键词搜索只能定位到页，条款号要人工逐条找。一份合同几十页到上百页，条款之间互相引用，答案必须能追溯到原文才能用。
-
-**怎么用本页知识解决**
-
-思路是检索单位和生成单位分开：用句子级子块保证召回精度，命中后回溯条款级父块保证上下文完整，生成时强制标注条款号。
-
-```python
-# 建库阶段：小块检索，大块生成
-for para in split_by_clause(contract_text):  # 按条款切分，保留条款号
-    parent_id = store_parent(para)           # 父块写入文档库
-    for sub in split_sentences(para):        # 子块按句切分
-        store_child(sub, parent_id, meta={"clause": para.no})
-
-# 查询阶段
-cands = vector_search(question, top_k=50)     # 向量粗召回，数量放宽
-cands += bm25_search(question, top_k=50)      # 关键词召回，防止术语漏召
-top = rerank(question, dedup(cands), top_k=4) # 按父块去重后重排序
-context = [load_parent(c.parent_id) for c in top]  # 回溯父块补全条款
-answer = llm(build_prompt(question, context))      # 要求逐句标注条款号
-```
-
-- 子块负责命中，父块负责提供完整条款，避免半句话进模型。
-- 元数据存条款号和标题路径，生成时才能要求输出条款号。
-- 粗召回先放宽数量，重排序负责收敛，两段职责不要混。
-- 去重按父块做，否则同一条款的不同句子会挤占上下文配额。
-- 提示词里写明引用不到原文就不作答，宁可返回空。
-
-**怎么度量收益**
-
-用 RAGAS 跑 faithfulness 与 context_precision，再抽 50 条答案人工核对条款号是否正确。上线后统计两个业务值：法务人工复核平均耗时、答案被直接引用的比例。
-
-**什么时候不该用**
-
-- 合同只有一两页且条款不互相引用时，整篇放进上下文即可。
-- 问题是要做法律判断，比如是否构成违约，RAG 只能给条款原文，结论要人来下。
-
-#### 场景 3：内网知识助手的时效与兜底
-
-**业务背景**
-
-内网助手的知识库按季度更新，员工问当月政策时，模型会拿旧文档作答。知识库里没有答案的问题，模型也会编一个，坐席不敢直接引用。
-
-**怎么用本页知识解决**
-
-思路是在检索前加路由、在生成前加相关性判断、在生成后加引用校验，三道闸门任一不过就兜底。
-
-```python
-route = router(question)                 # 先判断问题属于哪类知识源
-if route == "realtime":                  # 时效性问题走接口
-    return query_api(question)
-docs = retriever.search(question)        # 其余问题走知识库检索
-score = judge_relevance(question, docs)  # 生成前判断召回是否相关
-if score < THRESHOLD:                    # 低于阈值说明知识库没覆盖
-    return "知识库未覆盖，请转人工"
-answer = llm(build_prompt(question, docs))
-if not check_citations(answer, docs):    # 校验引用能否在召回块里找到
-    answer = llm(build_prompt(question, docs, require_citation=True))
-if not check_citations(answer, docs):    # 重试后仍不合格
-    return "无法确认，请转人工"
-```
-
-- 路由在最前面，时效性问题走接口，不浪费一次向量检索。
-- 相关性判断放在生成之前，分数过低时不要给模型编的机会。
-- 引用校验放在生成之后，答案提到的标题或条款号要能在召回块里找到。
-- 校验失败只重试一次，再失败就返回兜底文案。
-- 兜底文案写明哪个知识库没覆盖，运营据此补文档。
-
-**怎么度量收益**
-
-统计兜底触发率与误拒率（抽样人工判断本该答出的问题被拒的比例），用 RAGAS 看 faithfulness，在答案旁放"有用/无用"按钮收集反馈。三个数一起看，只降兜底率会把幻觉放进来。
-
-**什么时候不该用**
-
-- 知识源只有一个且更新频率低时，路由这一层是多余开销。
-- 问题全是流程问答和闲聊时，规则表比模型路由的延迟低。
-
-### 行业先进实践
-
-**上下文检索（出处：Anthropic 官方工程博客）**
-
-做法是在切块前让模型为每个块写一段说明，把块放回文档语境，再拿这段说明一起做嵌入与关键词索引。块本身太短会丢掉指代关系，补上语境后召回命中率上升。你的项目可以先用文档标题和上一级小标题拼进块首，成本比调用模型低。
-
-**混合检索加语义排序（出处：Azure AI Search 官方文档）**
-
-官方文档把关键词检索、向量检索、语义重排序作为三个可分别开关的能力，并给出组合使用的配置方式。关键词负责字面命中，向量负责语义命中，重排序负责收敛。你的项目可以先开混合检索，再单独评估重排序带来的指标变化，不要一次全开。
-
-**父文档检索与句子窗口（出处：LangChain 开源项目 ParentDocumentRetriever、LlamaIndex 开源项目 SentenceWindowNodeParser）**
-
-两个开源实现都采用同一思路：索引小块，返回时按链接取回更大的原文片段。这样召回精度和上下文完整度可以分开调。你的项目如果已经切了小块，可以先加一层父子映射，不改嵌入模型。
-
-**RAG 评测指标集（出处：RAGAS 开源项目文档）**
-
-它把检索和生成分开度量，给出 faithfulness、answer_relevancy、context_precision、context_recall 等指标的定义与计算方式。分开度量才能判断问题出在哪一段。你的项目可以先用它跑离线回归集，再决定改切块还是改提示词。
-
-**GraphRAG（出处：微软开源项目 GraphRAG）**
-
-做法是从文档里抽实体和关系建成图，再对图做社区划分与摘要，回答"整体讲了什么"这类跨文档问题。纯向量检索在这种全局问题上召回不到跨段证据。你的项目如果问题集中在单点事实查询，先不要引入图结构，维护成本高。
-
-### 从学到用：落地路线
-
-1. **试点**：选知识源固定、问题重复率高的场景，比如客服工单检索，第一版只做检索不做生成。验收标准：抽 100 条真实问题，recall@5 达到团队事先写死的达标线。
-2. **验证**：接入生成与引用标注，跑离线评测集。验收标准：RAGAS 的 faithfulness 与 context_precision 达标，且模型判定与人工抽检的结论一致率不低于事先设定的线。
-3. **推广**：把检索封装成服务接口，新场景只换知识库和提示词。验收标准：接入第二个场景时不改检索核心代码，只改配置文件。
-4. **防止回退**：建回归集，任何改动切块、嵌入模型、提示词的动作都要先跑一遍。验收标准：回归集指标低于线上版本时不允许合并。
-
-### 动手作业
-
-**目标**：用一份公开文档搭一个带引用和兜底的问答服务，并给出可复现的评测结果。
-
-**步骤**
-
-1. 选一份 20 页以上的公开技术文档，转成 Markdown 并保留标题层级。
-2. 按标题切父块，按句切子块，子块分别写入向量索引和关键词索引。
-3. 实现混合检索加重排序，返回结果时带上标题路径。
-4. 写生成提示词，要求每条结论后面标注来源标题。
-5. 加相关性阈值，低于阈值直接回复"知识库未覆盖"。
-6. 造 30 条问题，其中 5 条的答案不在文档里。
-7. 用 RAGAS 跑 faithfulness 与 context_precision，统计兜底是否正确触发。
-
-**验收标准**
-
-- 5 条无答案的问题全部走兜底，输出里没有编造内容。
-- 有答案的问题里，标注的标题能在原文找到对应段落。
-- 每次问答都能在 trace 里看到召回列表和重排序分数。
-- 评测脚本一条命令跑完，输出指标文件。
-- 关掉重排序再跑一遍，指标变化方向可复现。
-
+- LangChain 官方文档：Retrieval 章节、Retrievers 章节、Agents 章节、Memory 与 Message History 章节
+- LlamaIndex 官方文档：Ingestion Pipeline 章节、Query Engine 章节、Router 章节、Chat Engine 章节、Property Graph Index 章节
+- Microsoft Research GraphRAG 项目文档：Overview 章节、Indexing 章节
+- 论文《Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection》
+- 论文《Corrective Retrieval Augmented Generation》
+- Node.js 官方文档：node:assert 章节、node:crypto 章节

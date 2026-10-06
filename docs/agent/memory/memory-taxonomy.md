@@ -11,6 +11,10 @@ description: "认知架构视角下的记忆分类与存储选择"
     - 在文件、KV、关系库、向量库、图库之间做有依据的存储选型。
     - 写出一个带提取、对账、检索、断言验证的记忆系统最小实现。
 
+!!! tip "生产实现怎么存？"
+    本页讲的是机制。真实的编码 agent 把会话和记忆存在哪里（例如 Codex 以 JSONL rollout 为事实来源，再用多个 SQLite 数据库做镜像与索引），
+    见 [会话与记忆存储全景](../storage/session-storage-overview.md) 与 [Codex 的存储设计](../storage/codex-storage-deep-dive.md)。
+
 ## 0. 知识地图
 
 ```mermaid

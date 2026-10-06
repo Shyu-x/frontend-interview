@@ -1,1472 +1,1733 @@
 ---
-title: AutoGen 群聊协作
-description: 介绍 Microsoft AutoGen 框架中的 Group Chat 架构、协作模式及实战代码。
-tags:
-  - ai-agent
-  - langchain
-date: 2026-05-17
+title: "AutoGen 群聊协作"
+description: "介绍 Microsoft AutoGen 框架中的 Group Chat 架构、协作模式及实战代码。"
 ---
 
 # AutoGen 群聊协作
 
-本文档介绍 Microsoft AutoGen 框架中的 Group Chat 架构、协作模式及实战代码。
+!!! abstract "学完这一页你能"
+    - 说清 GroupChat、GroupChatManager、AssistantAgent、UserProxyAgent 四个组件各自负责什么，并画出消息流转图。
+    - 写出 round_robin、auto、custom 三种发言者选择策略的代码，并判断当前任务该用哪一种。
+    - 用手工编排搭出嵌套聊天与层级组，让子群聊的结论回传主群聊。
+    - 给代码执行配上 Docker 沙箱与人工审批，并把轮数上限与 token 上限写进配置。
 
-## 1. AutoGen GroupChat 架构
+!!! note "术语：AutoGen"
+    定义：AutoGen 是微软发布的智能体协作框架，让多个角色互相发消息来完成任务。
+    例子：一个角色负责写代码，另一个角色负责执行代码并把报错回传给第一个角色。
 
-### 1.1 核心组件
+!!! note "本页数据来源"
+    本页出现的配置数值，例如 max_round 取 10 到 30、temperature 取 0.7、镜像 python:3.11 与 node:18，全部来自本站该页面的旧版内容，以原文为准。
+    本页示例代码对应旧版内容里的 API 名称；你安装的版本若不同，类名与参数名需核对官方文档。
 
-AutoGen 的多智能体系统由以下核心组件构成：
+## 0. 知识地图
 
+```mermaid
+flowchart TD
+  A["GroupChat 消息列表"] --> B["GroupChatManager 调度器"]
+  B --> C["发言者选择策略"]
+  C --> D["round_robin 按名单轮询"]
+  C --> E["auto 交给 LLM 决定"]
+  C --> F["custom 自定义函数"]
+  B --> G["AssistantAgent 生成发言"]
+  B --> H["UserProxyAgent 执行代码"]
+  H --> I["Docker 沙箱隔离"]
+  H --> J["Human-in-the-Loop 人工审批"]
+  G --> K["嵌套聊天与层级组"]
+  J --> K
+  K --> L["轮数上限与 token 上限"]
 ```
-┌──────────────────────────────────────────────────────┐
-│                    GroupChatManager                   │
-│  (消息路由、发言顺序控制、终止条件判断)                  │
-└──────────────────────────────────────────────────────┘
-           ▲              ▲              ▲
-           │              │              │
-    ┌──────┴──────┐ ┌─────┴─────┐ ┌──────┴──────┐
-    │  Assistant  │ │  UserProxy │ │  Assistant  │
-    │  Agent 1    │ │  Agent     │ │  Agent N    │
-    └─────────────┘ └───────────┘ └─────────────┘
+
+建议按顺序读：先读第 1 节建立组件分工，再读第 2 节看清消息流向。
+第 3 节到第 6 节是四种可独立落地的能力，哪一节对应你当前的问题就先读哪一节。
+第 7 节把前六节合成一个可运行的项目，第 8 节给出配置取值与成本控制。
+
+## 1. 群聊协作要解决什么问题
+
+**先想一个问题**
+
+你接到一个需求：把一份接口文档变成可运行的服务端代码，还要带测试和说明文档。让单个模型从头写到尾，它常漏掉测试这一环。你需要的是分工，于是问题变成：谁来记全部消息，谁来决定下一步谁发言。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：群聊协作 = 一块公共黑板 + 一位点名的主持人 + 若干带人设的与会者。
+    日常类比：像小组作业，组长看着黑板点名，组员各自交出自己那部分，全部发言都写在黑板上。
+    不成立之处：主持人和组员读的是同一块黑板，没有私下交流；模型也没有黑板以外的记忆。
+
+!!! note "术语：Agent"
+    定义：在 AutoGen 里，Agent 是一个能收发消息的对象，它可以调用模型，也可以执行代码。
+    例子：AssistantAgent 收到消息后调用模型生成回复；UserProxyAgent 收到消息后可以运行代码块。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["GroupChatManager 消息路由与终止判断"] --> B["AssistantAgent 1 编码"]
+  A --> C["UserProxyAgent 执行与交互"]
+  A --> D["AssistantAgent N 审查"]
+  B --> E["共享消息列表"]
+  C --> E
+  D --> E
+  E --> A
 ```
 
-| 组件 | 职责 |
-|------|------|
-| `AssistantAgent` | 执行 LLM 调用，可调用工具 |
-| `UserProxyAgent` | 用户交互代理，可自动执行代码 |
-| `GroupChatManager` | 管理群组通信，协调发言顺序 |
+1. GroupChatManager 是调度中心，它读消息列表并决定下一位发言者。
+2. AssistantAgent 只持有模型配置，负责产出自然语言与代码块，自己不执行代码。
+3. UserProxyAgent 代表用户这一侧，可以自动执行代码，并把执行结果写成新消息。
+4. 三个角色写入的都是同一份消息列表，下一轮调度时全员可见。
+5. 箭头回到 Manager，说明这是一个循环，直到命中终止条件或达到轮数上限。
 
-### 1.2 基础设置
+**一步一步来**
+
+**第 1 步：构造两个基础角色**
+① 这一步要做什么：准备一份模型配置，用它构造一个会生成内容的角色和一个会执行代码的角色。
 
 ```python
-from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
+# 依赖：pip install pyautogen；不同大版本的类名与参数名需核对官方文档
+import os
+from autogen import AssistantAgent, UserProxyAgent
 
-# 创建单个智能体
+llm_config = {
+    "model": "gpt-4",                              # 模型名按你的服务商填写
+    "api_key": os.environ.get("OPENAI_API_KEY"),   # 密钥从环境变量读，不写进代码
+    "temperature": 0.7,                            # 旧版内容给出的取值，以原文为准
+}
+
 assistant = AssistantAgent(
-    name="assistant",
-    llm_config={
-        "model": "gpt-4",
-        "api_key": os.environ.get("OPENAI_API_KEY"),
-        "temperature": 0.7
-    }
+    name="assistant",          # 群聊靠名字定位发言者，名字必须唯一
+    llm_config=llm_config,     # 持有模型配置，负责生成内容
 )
 
-# 用户代理（可自动执行代码）
 user_proxy = UserProxyAgent(
     name="user_proxy",
     code_execution_config={
-        "work_dir": "workspace",
-        "use_docker": True  # 使用 Docker 执行代码
-    }
+        "work_dir": os.path.abspath("workspace"),  # 代码在这个目录下执行
+        "use_docker": True,                        # 放进容器执行，隔离宿主机
+    },
 )
 ```
 
-### 1.3 群聊初始化
+**这段代码在做什么**
+- 先定义 llm_config，把模型名、密钥来源、采样温度收在一个字典里，便于按环境替换。
+- AssistantAgent 只接收 llm_config，说明它的职责是生成，不包含执行能力。
+- UserProxyAgent 只接收 code_execution_config，它的职责是执行，是否调用模型由你决定。
+- use_docker 为 True 表示代码在容器内运行，容器隔离是应对不可信代码的边界。
+- work_dir 用绝对路径，避免不同启动目录导致产物落到意想不到的位置。
+
+运行结果：这一段只构造对象，不调用模型，因此控制台没有输出；若本机没有运行 Docker，这一步不报错，发起对话时才报错。
+
+**第 2 步：把角色放进群聊并启动**
+① 这一步要做什么：创建群聊对象、创建调度器，然后用用户代理发起第一轮对话。
 
 ```python
-# 定义群组成员
-group_members = [
-    assistant1,  # 编码专家
-    assistant2,  # 代码审查员
-    assistant3,  # 技术文档撰写员
-]
+from autogen import GroupChat, GroupChatManager
 
-# 创建群聊
 group_chat = GroupChat(
-    agents=group_members,
-    messages=[],  # 初始消息列表
-    max_round=10  # 最大轮次限制
+    agents=[assistant, user_proxy],  # 与会者名单，顺序会影响轮询策略
+    messages=[],                     # 从空历史开始，避免上一个任务串进来
+    max_round=10,                    # 轮数上限，旧版内容取值，以原文为准
 )
 
-# 创建群聊管理器
 manager = GroupChatManager(
     groupchat=group_chat,
-    llm_config=llm_config  # 管理器的 LLM 配置
+    llm_config=llm_config,  # 调度器选下一位发言者时同样要调模型
 )
 
-# 启动群聊
 user_proxy.initiate_chat(
     manager,
-    message="帮我实现一个快速排序算法"
+    message="帮我实现一个快速排序算法",  # 开场白会被写进消息列表
 )
 ```
 
-## 2. GroupChat 模式
+**这段代码在做什么**
+- GroupChat 保存与会者名单与消息列表，它本身不做调度决策。
+- messages 传空列表是让每次任务的起点干净，跨任务复用同一个列表会污染上下文。
+- max_round 是硬性闸门，达到轮数就停止，它同时也是成本上限。
+- GroupChatManager 需要 llm_config，因为选下一位发言者这一步也走模型。
+- initiate_chat 把开场白注入群聊，随后由 Manager 接管轮转。
 
-### 2.1 Round-Robin 轮询模式
+运行结果：需要真实 API Key 与 Docker；控制台会按轮次打印每位发言者的消息，具体文案取决于模型，本页不展示模型返回文本。
 
-智能体按固定顺序轮流发言。
+**动手验证**
+
+下面这个脚本用 Node 复刻第 1 节的消息路由与轮询规则，不调用任何模型，专门验证「消息列表是唯一事实来源」这一点。
+
+```js
+// 依赖：仅 Node 20+ 内置模块，无需 npm install
+// 运行：node groupchat-route.mjs
+import assert from "node:assert/strict";
+
+// 用对象模拟 Agent，只保留名字与类型
+const agents = [
+  { name: "product_manager", kind: "assistant" },
+  { name: "coder", kind: "assistant" },
+  { name: "executor", kind: "user_proxy" },
+];
+
+// 消息列表是群聊的唯一事实来源，每条消息记录发言者与内容
+const messages = [];
+
+// 广播：把一条消息追加进列表，所有人读到的都是这一份
+function broadcast(speaker, content) {
+  const msg = { speaker, content, round: messages.length + 1 };
+  messages.push(msg);
+  return msg;
+}
+
+// 轮询策略：按名单顺序取下一个发言者
+function roundRobin(lastSpeaker) {
+  const i = agents.findIndex((a) => a.name === lastSpeaker);
+  return agents[(i + 1) % agents.length].name;
+}
+
+broadcast("user_proxy", "帮我实现快速排序");
+
+assert.equal(roundRobin("user_proxy"), "product_manager");
+assert.equal(roundRobin("product_manager"), "coder");
+assert.equal(roundRobin("coder"), "executor");
+assert.equal(messages.length, 1);
+assert.equal(messages[0].round, 1);
+
+console.log("消息条数:", messages.length);
+console.log("下一位发言者:", roundRobin("user_proxy"));
+console.log("断言全部通过");
+```
+
+预期输出：
+
+```
+消息条数: 1
+下一位发言者: product_manager
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 发起对话时报 Docker 相关错误 | use_docker 为 True 但本机 Docker 守护进程没启动 | 先启动 Docker，或把 use_docker 改为 False 并接受无隔离风险 |
+| 第二轮就重复第一轮的结论 | messages 里塞了上一次任务的记录 | 每次任务新建 GroupChat，messages 传空列表 |
+| 群聊停在第一步不动 | Manager 没拿到 llm_config，选不出下一位发言者 | 给 GroupChatManager 传入与角色一致的 llm_config |
+
+**用在哪里**
+
+场景一：接口文档转服务端代码。
+业务背景：团队要把内部接口文档变成带测试的脚手架代码。
+这一节的知识怎么用：用 AssistantAgent 做编码角色，UserProxyAgent 做执行角色，组一个两人群聊。
+用什么指标衡量收益：脚手架首次可运行所需的人工改动行数。
+什么时候不该用：接口需要走内部审批才能调用时，不要让执行角色自动跑真实请求。
+
+场景二：数据清洗脚本的自动试跑。
+业务背景：运营每周提交一份脏数据，需要脚本清洗后再入库。
+这一节的知识怎么用：让编码角色产出清洗脚本，执行角色在容器里跑一份样本数据。
+用什么指标衡量收益：脚本一次通过率与人工返工次数。
+什么时候不该用：样本里含真实用户隐私字段时，禁止把数据拷进执行容器。
+
+场景三：新人培训用的任务拆解助手。
+业务背景：培训场景需要把一个大任务拆成若干子任务并给出验收标准。
+这一节的知识怎么用：用三个 AssistantAgent 分别扮演拆解、评审、归档角色。
+用什么指标衡量收益：学员按拆解结果完成任务的完成率。
+什么时候不该用：任务边界本身还没谈清时，先谈需求，不要先搭群聊。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Group Chat 章节列出了 GroupChat 与 GroupChatManager 的职责划分，并给出 speaker_selection_method 的可选值。借鉴方式：先照文档跑通最小群聊，再按本节顺序加角色。
+- AutoGen 官方 GitHub 仓库的 examples 目录提供了 groupchat 场景的示例脚本，包含多角色分工的写法。借鉴方式：把示例的角色名换成你业务里的岗位名，先验证消息流向再改提示词。
+- LangGraph 官方文档的多智能体协作章节描述了把子任务交给专职节点的做法。借鉴方式：把层级组看成一张有向图，先画出节点与边，再决定哪些节点需要模型。
+
+**小结**
+- GroupChat 负责存消息，GroupChatManager 负责选下一位发言者，两者职责不重叠。
+- AssistantAgent 生成内容，UserProxyAgent 执行代码，执行能力与生成能力分开配置。
+- max_round 与 messages 是每次任务都要显式确认的两个参数。
+
+## 2. 消息流转：一轮对话里发生了什么
+
+**先想一个问题**
+
+群聊跑到第 8 轮，你发现模型在重复第 3 轮的结论。要排查，你得知道每一轮到底把哪些消息发给了模型。如果你不知道消息存在哪个结构里，就只能靠猜。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：一轮群聊 = 调度器选人，被选中的人读全量历史并追加一条新消息。
+    日常类比：像会议记录员，每有人发言就在本子上追加一段，主持人只看本子决定下一位。
+    不成立之处：模型看到的不是原话，而是被拼接与截断后的文本，超出上限的历史会被丢掉。
+
+!!! note "术语：speaker_selection_method"
+    定义：决定下一位发言者的规则名，旧版内容给出的取值有 round_robin 与 auto，定制场景用自定义方法。
+    例子：设为 round_robin 时，名单里第一个人说完就轮到第二个人。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant U as "UserProxyAgent"
+  participant M as "GroupChatManager"
+  participant S as "发言者选择"
+  participant A as "AssistantAgent"
+  U->>M: "initiate_chat 开场白"
+  M->>M: "把开场白写入消息列表"
+  M->>S: "请求下一位发言者"
+  S->>M: "返回角色名"
+  M->>A: "发送拼接后的历史"
+  A->>M: "返回新消息"
+  M->>M: "追加进消息列表"
+  M->>U: "本轮结束，判断是否终止"
+```
+
+1. 用户代理发起对话，开场白成为消息列表里的第一条。
+2. 调度器不直接发言，它先把新消息落进列表。
+3. 调度器请选择策略给出下一位发言者的名字。
+4. 调度器把历史拼成提示词，发给被选中的角色。
+5. 角色返回的消息被追加进同一个列表，供下一轮使用。
+6. 调度器判断终止条件与轮数，未命中就回到第 3 步。
+
+**一步一步来**
+
+**第 1 步：看清 chat_messages 的结构**
+① 这一步要做什么：读一次对话历史，确认消息按「对话对方」分组存放，而不是一条平铺列表。
+
+```python
+# 承接上一节构造好的 user_proxy 与 assistant
+user_proxy.initiate_chat(assistant, message="写一个两数相加的函数")
+
+# chat_messages 是字典：键是对话中的另一方，值是按时间排列的消息列表
+history = user_proxy.chat_messages[assistant]
+
+for i, msg in enumerate(history):
+    role = msg.get("role")          # 消息角色，例如 user 或 assistant
+    content = msg.get("content") or ""   # content 可能为 None，先兜底成空串
+    print(i, role, content[:40])    # 只打印前 40 个字符，避免刷屏
+```
+
+**这段代码在做什么**
+- chat_messages 的键是「另一方」，因此同一段对话里只有一个键，取值是消息列表。
+- 每条消息至少含 role 与 content 两个字段，content 为 None 的情况必须兜底。
+- 用 enumerate 带上下标，方便你按轮次定位是哪一步出了问题。
+- 打印时截断内容长度，是为了让终端输出可以一眼扫完。
+
+运行结果：需要真实 API Key；输出形如 `0 user 写一个两数相加的函数` 与 `1 assistant ...`，具体文案取决于模型。
+
+**第 2 步：给历史加一道长度闸门**
+① 这一步要做什么：在发起下一轮之前，先按 token 上限裁掉最老的消息。
+
+```python
+def trim_history(history, keep_last=6):
+    """只保留最近若干条消息，控制提示词长度"""
+    if len(history) <= keep_last:
+        return history          # 条数没超，原样返回
+    head = history[:1]          # 保留第一条，通常是任务描述
+    tail = history[-keep_last:] # 保留最近若干条，保住上下文连贯
+    return head + tail          # 拼接后返回新列表，不改原列表
+
+history = user_proxy.chat_messages[assistant]
+trimmed = trim_history(history)
+print("原始条数:", len(history), "裁剪后条数:", len(trimmed))
+```
+
+**这段代码在做什么**
+- keep_last 表示保留最近多少条，取值要按你的提示词预算来定，不要照搬。
+- 保留第一条是为了让任务描述始终在场，否则模型会忘记原始目标。
+- 返回新列表而不是就地修改，避免后续读取历史时拿到被改过的数据。
+- 函数名与参数没有动 AutoGen 的任何接口，它是你能完全掌控的一层。
+
+运行结果：形如 `原始条数: 9 裁剪后条数: 7`，具体数字取决于本轮实际消息条数。
+
+**动手验证**
+
+下面的脚本用 Node 复刻 chat_messages 的分组结构与裁剪规则。
+
+```js
+// 依赖：仅 Node 20+ 内置模块
+// 运行：node chat-history.mjs
+import assert from "node:assert/strict";
+
+// 模拟 chat_messages：键是对话另一方，值是按时间排列的消息列表
+const chatMessages = {
+  assistant: [
+    { role: "user", content: "写一个两数相加的函数" },
+    { role: "assistant", content: "def add(a, b): return a + b" },
+    { role: "user", content: "加上参数校验" },
+    { role: "assistant", content: "def add(a, b): ..." },
+  ],
+};
+
+function trimHistory(history, keepLast = 2) {
+  if (history.length <= keepLast) return history;
+  return history.slice(0, 1).concat(history.slice(-keepLast));
+}
+
+const raw = chatMessages.assistant;
+const trimmed = trimHistory(raw, 2);
+
+assert.equal(raw.length, 4);
+assert.equal(trimmed.length, 3);
+assert.equal(trimmed[0].content, "写一个两数相加的函数");
+assert.equal(trimmed.at(-1).content, "def add(a, b): ...");
+assert.notEqual(trimmed, raw); // 返回的是新数组，原历史未被改写
+
+console.log("原始条数:", raw.length);
+console.log("裁剪后条数:", trimmed.length);
+console.log("断言全部通过");
+```
+
+预期输出：
+
+```
+原始条数: 4
+裁剪后条数: 3
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么改 |
+| --- | --- | --- |
+| 读取历史时报 KeyError | chat_messages 的键是对话另一方，你写的键不是那个对象 | 用你传给 initiate_chat 的那一侧对象作为键 |
+| 对 content 调 lower 抛异常 | 部分消息的 content 为 None | 先做 `msg.get("content") or ""` 兜底 |
+| 越跑越慢且费用上涨 | 历史全量拼进提示词，每轮都重发一次 | 加裁剪函数或设置发送上限 |
+
+**用在哪里**
+
+场景一：客服工单分诊群聊。
+业务背景：工单进来后要先分类、再检索知识库、最后生成回复草稿。
+这一节的知识怎么用：把每轮消息记下来，出问题时按轮次回放，定位是哪一步跑偏。
+用什么指标衡量收益：分诊错误的工单在总工单里的占比。
+什么时候不该用：工单里含支付凭证时，历史里不要落敏感字段。
+
+场景二：长文档问答的上下文管理。
+业务背景：一份长文档分多次提问，模型需要记住前文的结论。
+这一节的知识怎么用：用裁剪函数保留首条任务描述与最近若干条问答。
+用什么指标衡量收益：同一问题的重复提问率。
+什么时候不该用：问题之间完全独立时，不要共享历史。
+
+场景三：模型替换时的回归对比。
+业务背景：团队要在两个模型之间做灰度，需要看到逐轮差异。
+这一节的知识怎么用：把 chat_messages 落盘成 JSON，逐轮比对两份记录。
+用什么指标衡量收益：同一任务下两个模型的轮数与结论差异条数。
+什么时候不该用：只换采样参数时，不必记录全量历史。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Group Chat 章节说明了消息列表由群聊对象持有，并说明轮数上限参数的作用。借鉴方式：把轮数上限写进配置文件，而不是散落在代码里。
+- AutoGen 官方 GitHub 仓库的 examples 目录包含把对话历史导出供排查的示例写法。借鉴方式：给每个任务生成一个记录文件，按任务编号归档。
+- LangGraph 官方文档的多智能体章节介绍了用状态对象在各节点间传递上下文。借鉴方式：把历史裁剪逻辑抽成一个纯函数，单独写单测。
+
+**小结**
+- 消息列表是唯一事实来源，任何角色的输出都先进列表再被消费。
+- chat_messages 按对话另一方分组，读取前先做 None 兜底。
+- 历史裁剪是一层你自己写的纯函数，不与框架接口耦合。
+
+## 3. 发言者选择：三种策略怎么选
+
+**先想一个问题**
+
+一个群聊里有编码、审查、测试三个角色。如果按名单轮询，审查角色经常在没有代码可审的时候被叫到，它只能回复一句「暂无内容」。你想让发言顺序跟着内容走，该改哪个参数。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：发言者选择策略回答一个问题——下一位谁说话。
+    日常类比：像课堂点名，老师可以按座位轮着点，也可以看着讨论内容点最该发言的那个人。
+    不成立之处：LLM 选人这一步也要花钱也要花时间，轮询策略不花这笔钱，但选得不够准。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["一轮结束，需要下一位发言者"] --> B["speaker_selection_method 取值"]
+  B -->|"round_robin"| C["按名单顺序取下一个"]
+  B -->|"auto"| D["把历史交给 LLM 选人"]
+  B -->|"custom"| E["调用自定义 select_speaker"]
+  C --> F["返回角色名"]
+  D --> F
+  E --> F
+  F --> G["调度器发消息给该角色"]
+```
+
+1. 一轮结束后，调度器先确认发言者选择策略。
+2. 取值是 round_robin 时，按名单顺序取下一个，不额外调用模型。
+3. 取值是 auto 时，把当前历史交给 LLM，由它给出角色名。
+4. 取值指向自定义方法时，调用你写的 select_speaker 函数。
+5. 三条路径都返回角色名，接下来的动作一致：把消息发给这个角色。
+
+**一步一步来**
+
+**第 1 步：先用轮询模式跑通**
+① 这一步要做什么：把 speaker_selection_method 设为 round_robin，并禁止同一角色连续发言。
 
 ```python
 from autogen import GroupChat, GroupChatManager
 
 group_chat = GroupChat(
-    agents=group_members,
+    agents=group_members,                  # 名单顺序就是轮询顺序
     messages=[],
-    max_round=5,
-    speaker_selection_method="round_robin",  # 轮询选择
-    allow_repeat_speaker=False  # 禁止同一智能体连续发言
+    max_round=5,                           # 轮询模式下轮数越少越好排查
+    speaker_selection_method="round_robin",# 按名单顺序发言
+    allow_repeat_speaker=False,            # 禁止同一角色连续发言
 )
 
 manager = GroupChatManager(groupchat=group_chat, llm_config=llm_config)
 ```
 
-**适用场景**：需要均匀分布各智能体贡献的场景。
+**这段代码在做什么**
+- 名单顺序决定发言顺序，因此把谁排在前面是一个需要设计的决定。
+- allow_repeat_speaker 为 False 时，轮到的人不能连着说两轮。
+- round_robin 不额外调用模型选人，这一轮省下一次调用。
+- max_round 设为 5 是为了快速看完一整轮，排查阶段不要设大。
 
-### 2.2 Speaker Selection 动态选择
+运行结果：需要真实 API Key；控制台会按名单顺序输出发言，具体文案取决于模型。
 
-由 LLM 根据上下文动态选择下一个发言者。
+**第 2 步：换成动态选择，并给它一个提示词**
+① 这一步要做什么：把策略换成 auto，让 LLM 依据历史选人。
 
 ```python
-from autogen import GroupChat, GroupChatManager
-
 group_chat = GroupChat(
     agents=group_members,
     messages=[],
-    max_round=10,
-    speaker_selection_method="auto",  # 自动选择
-    allow_repeat_speaker=True  # 允许重复发言
+    max_round=10,                          # 旧版内容取值，以原文为准
+    speaker_selection_method="auto",       # 由 LLM 决定下一位
+    allow_repeat_speaker=True,             # 允许关键角色连续补充
 )
 
-manager = GroupChatManager(groupchat=group_chat, llm_config=llm_config)
-```
-
-**LLM 选择提示示例**：
-
-```
-Given the conversation history, select the next speaker from [agent1, agent2, agent3].
+# 选择提示词示例，来自旧版内容，以原文为准
+SELECT_PROMPT = """
+Given the conversation history, select the next speaker from the agent list.
 Consider:
 1. Who has the most relevant expertise?
 2. Who has been least active recently?
 3. What would be most helpful for the user?
-
 Respond with only the agent name.
+"""
 ```
 
-### 2.3 Custom 定制选择策略
+**这段代码在做什么**
+- auto 让选择本身成为一次模型调用，轮数越多这笔开销越大。
+- allow_repeat_speaker 设为 True 后，同一位专家可以连续补充细节。
+- 提示词要求只返回角色名，避免额外解释文字干扰解析。
+- 提示词里的三条考虑项对应能力匹配、活跃度均衡、对用户的价值。
 
-实现自定义的发言者选择逻辑。
+运行结果：需要真实 API Key；返回的角色名与轮次顺序取决于模型，每次运行可能不同。
+
+**第 3 步：写自定义选择逻辑**
+① 这一步要做什么：继承群聊类，重写选人方法，按消息内容决定找谁。
 
 ```python
-from autogen import GroupChat, GroupChatManager
-from typing import Optional
+from autogen import GroupChat
 
 class CustomGroupChat(GroupChat):
-    def select_speaker(self, last_speaker: Agent, selector: Agent) -> Optional[str]:
-        """
-        自定义选择逻辑
-        
-        Args:
-            last_speaker: 上一个发言的智能体
-            selector: 执行选择的 LLM
-            
-        Returns:
-            下一个发言智能体的名称
-        """
-        # 简单策略：基于消息内容选择
-        messages = self.messages
-        
-        # 检查是否有待审查的代码
-        for msg in reversed(messages):
-            if "```python" in msg.get("content", ""):
-                return "code_reviewer"  # 有代码，选择审查员
-            if "error" in msg.get("content", "").lower():
-                return "debugger"  # 有错误，选择调试专家
-        
-        # 默认：轮询选择
-        current_idx = self.agents.index(last_speaker)
-        next_idx = (current_idx + 1) % len(self.agents)
-        return self.agents[next_idx].name
-
-# 使用自定义群聊
-group_chat = CustomGroupChat(
-    agents=group_members,
-    messages=[],
-    max_round=15
-)
+    def select_speaker(self, last_speaker, selector):
+        # 倒序扫描历史：最近一条消息决定下一步找谁
+        for msg in reversed(self.messages):
+            content = msg.get("content") or ""   # content 可能为 None
+            if "```python" in content:
+                return "code_reviewer"           # 出现代码块，交给审查角色
+            if "error" in content.lower():
+                return "debugger"                # 出现报错，交给调试角色
+        # 兜底：名单内轮询，保证群聊不会停住
+        idx = self.agents.index(last_speaker)
+        return self.agents[(idx + 1) % len(self.agents)].name
 ```
 
-### 2.4 半自动选择模式
+**这段代码在做什么**
+- 倒序遍历表示最近的消息优先，靠后的判断会先命中。
+- content 做 None 兜底，避免对空值调用 lower 抛异常。
+- 两条规则分别对应「有代码要审」与「有报错要修」两种情况。
+- 兜底分支保证任何情况下都返回一个合法名字，群聊不会卡死。
+- 自定义方法的参数名与触发条件需核对官方文档：要核对自定义 select_speaker 是否需要把 speaker_selection_method 设为特定取值。
 
-使用验证器介入的选择模式。
+运行结果：需要真实 API Key；若历史里出现代码块，下一位发言者会是 code_reviewer。
+
+**动手验证**
+
+下面脚本把三种策略写成三个纯函数，用断言验证它们在同一份历史上给出不同结果。
+
+```js
+// 依赖：仅 Node 20+ 内置模块
+// 运行：node speaker-selection.mjs
+import assert from "node:assert/strict";
+
+const agents = ["coder", "code_reviewer", "debugger"];
+const history = [
+  { speaker: "coder", content: "```python\ndef add(a, b): return a + b\n```" },
+];
+
+// 策略一：按名单轮询
+function roundRobin(last, list) {
+  const i = list.indexOf(last);
+  return list[(i + 1) % list.length];
+}
+
+// 策略二：写死的规则，代替 LLM 决策，保证脚本可离线运行
+function ruleBased(last, list, msgs) {
+  const latest = msgs.at(-1).content.toLowerCase();
+  if (latest.includes("```python")) return "code_reviewer";
+  if (latest.includes("error")) return "debugger";
+  return roundRobin(last, list);
+}
+
+assert.equal(roundRobin("coder", agents), "code_reviewer");
+assert.equal(ruleBased("coder", agents, history), "code_reviewer");
+assert.equal(ruleBased("coder", agents, [{ content: "error: 除以零" }]), "debugger");
+assert.equal(ruleBased("coder", agents, [{ content: "谢谢" }]), "code_reviewer");
+
+console.log("轮询结果:", roundRobin("coder", agents));
+console.log("规则结果:", ruleBased("coder", agents, history));
+console.log("断言全部通过");
+```
+
+预期输出：
+
+```
+轮询结果: code_reviewer
+规则结果: code_reviewer
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 群聊里没人发言就结束 | auto 选出的名字不在名单里 | 提示词要求只返回角色名，并在自定义方法里加兜底分支 |
+| 审查角色反复被叫到但无活可干 | 用了 round_robin 且名单顺序固定 | 换成规则或 auto，让顺序跟随内容 |
+| 费用比预期高 | auto 每轮都要额外一次模型调用 | 在内容规则清晰的场景改用自定义方法，减少调用 |
+
+**用在哪里**
+
+场景一：代码审查流水线。
+业务背景：每次提交都要先跑一遍机器审查，再进入人工评审。
+这一节的知识怎么用：用规则选择，出现代码块就找审查角色，出现报错就找调试角色。
+用什么指标衡量收益：人工评审在机器审查之后提出的新问题条数。
+什么时候不该用：改动只有文案时，不要让审查角色参与。
+
+场景二：多角色内容生产。
+业务背景：一个专题要经过选题、撰写、事实核对三道工序。
+这一节的知识怎么用：用 auto 让模型依据进度决定下一步找谁。
+用什么指标衡量收益：成稿返工次数。
+什么时候不该用：工序是固定顺序时，round_robin 足够且更省调用。
+
+场景三：故障排查群聊。
+业务背景：线上告警后需要快速定位是应用层还是依赖层。
+这一节的知识怎么用：按日志关键字选择角色，日志里出现超时就找依赖排查角色。
+用什么指标衡量收益：从告警到定位根因的耗时。
+什么时候不该用：只有一条日志时，直接看就行，不必建群聊。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Group Chat 章节列出了 speaker_selection_method 的取值以及各自的行为差异。借鉴方式：先把策略做成配置项，再用同一批任务对比两种策略的轮数与结论。
+- AutoGen 官方 GitHub 仓库的 examples 目录包含自定义发言者选择的写法。借鉴方式：把选择规则写成可单测的纯函数，输入是消息列表，输出是角色名。
+- LangGraph 官方文档的多智能体章节把「下一位谁执行」表达成图的边。借鉴方式：规则复杂到超过五条时，改用图结构显式表达，而不是继续堆 if 分支。
+
+**小结**
+- round_robin 省钱且可预测，auto 按内容选人但每轮多一次调用。
+- 自定义方法的核心是「规则 + 兜底」，兜底分支保证群聊不会停住。
+- 选择逻辑写成纯函数后可以离线单测，不必每次都调模型。
+
+## 4. 嵌套聊天与层级组
+
+**先想一个问题**
+
+主群聊里有产品、架构、开发三个角色。架构角色在评审时需要三个专家一起讨论十分钟，讨论完只把结论带回主群聊。你不想让专家的全部发言污染主群聊的上下文，这该怎么组织。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：嵌套聊天是把一次子讨论的结果当成一条消息带回来。
+    日常类比：像部门内部先开小会达成结论，再派一个人到大会上汇报结论，大会不记录小会全程。
+    不成立之处：子讨论的 Token 消耗一样计费，省下的只是主群聊的上下文长度，不是成本。
+
+!!! note "术语：嵌套聊天"
+    定义：在一个群聊中由某个角色发起另一个群聊，子群聊跑完后把结果回传。
+    例子：架构角色发起一个两位专家的子群聊，子群聊给出方案，架构角色把方案写进主群聊。
+
+**图解**
+
+```mermaid
+flowchart TD
+  subgraph Main["主群聊"]
+    A["用户代理"] --> B["协调器"]
+    B --> C["执行者 1"]
+    B --> D["执行者 2"]
+  end
+  subgraph Sub["子群聊 由执行者 1 发起"]
+    E["专家 A"] --> F["子群聊管理器"]
+    G["专家 B"] --> F
+  end
+  C -->|"发起并等待结论"| F
+  F -->|"返回一条结论消息"| C
+```
+
+1. 主群聊按正常流程轮转，协调器把任务分给执行者。
+2. 执行者 1 发现自己需要专业意见，于是发起一个子群聊。
+3. 子群聊内部由自己的管理器调度，专家 A 与专家 B 交替发言。
+4. 子群聊达到轮数上限或命中终止条件后停止。
+5. 执行者 1 只把最后结论并入主群聊，专家全程发言不进入主群聊。
+6. 主群聊继续轮转，其他角色只看到这条结论。
+
+**一步一步来**
+
+**第 1 步：先建一个子群聊**
+① 这一步要做什么：用两位专家角色建一个独立群聊，准备一份只属于子讨论的名单。
 
 ```python
-class ValidatorGroupChat(GroupChat):
-    def select_speaker(self, last_speaker: Agent, selector: Agent) -> Optional[str]:
-        """带验证的选择"""
-        # 让 LLM 选择
-        selected = super().select_speaker(last_speaker, selector)
-        
-        # 验证选择是否合理
-        if selected == "code_reviewer" and not self._has_code_to_review():
-            # 没有代码可审查，选择编码专家
-            return "coder"
-        
-        return selected
-    
-    def _has_code_to_review(self) -> bool:
-        """检查是否有待审查的代码"""
-        for msg in reversed(self.messages[-3:]):
-            if "```python" in msg.get("content", ""):
-                return True
-        return False
-```
+from autogen import AssistantAgent, GroupChat, GroupChatManager
 
-## 3. 嵌套聊天与层级组
-
-### 3.1 嵌套聊天概念
-
-智能体可以独立启动子群聊，形成嵌套结构。
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   主群聊                            │
-│  [用户] ↔ [协调器] ↔ [执行者1] ↔ [执行者2]           │
-│                              ↓                      │
-│                    子群聊 (执行者1发起)               │
-│              [专家A] ↔ [专家B] ↔ [专家C]              │
-└─────────────────────────────────────────────────────┘
-```
-
-### 3.2 嵌套聊天实现
-
-```python
-from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
-
-# 创建子群聊专家
 expert_a = AssistantAgent(name="expert_a", llm_config=llm_config)
 expert_b = AssistantAgent(name="expert_b", llm_config=llm_config)
 
-# 创建子群聊
 sub_group = GroupChat(
-    agents=[expert_a, expert_b],
-    messages=[],
-    max_round=5
+    agents=[expert_a, expert_b],  # 子群聊名单，越小越可控
+    messages=[],                  # 子讨论从空历史开始
+    max_round=5,                  # 子讨论轮数上限，旧版内容取值，以原文为准
 )
 sub_manager = GroupChatManager(groupchat=sub_group, llm_config=llm_config)
-
-# 在主智能体中启动嵌套聊天
-coordinator = AssistantAgent(
-    name="coordinator",
-    llm_config=llm_config
-)
-
-def initiate_nested_chat(coordinator_agent, task: str):
-    """
-    在协调器中启动嵌套聊天
-    """
-    response = coordinator_agent.generate_reply(
-        messages=[{"content": task, "role": "user"}]
-    )
-    
-    # 启动子群聊
-    result = expert_a.initiate_chat(
-        sub_manager,
-        message=task,
-        clear_history=False  # 保留历史
-    )
-    
-    return result
-
-# 使用示例
-result = coordinator.initiate_chat(
-    sub_manager,
-    message="分析这个API的性能问题"
-)
 ```
 
-### 3.3 层级群聊架构
+**这段代码在做什么**
+- 子群聊是独立的 GroupChat 对象，有自己的消息列表与轮数上限。
+- 两位专家共用同一份 llm_config，差别只在 system_message 描述的人设。
+- 子群聊的 max_round 设小一些，避免子讨论吞掉预算。
+- 子群聊管理器同样需要 llm_config，它也要选下一位发言者。
+
+运行结果：这一段只构造对象，不调用模型，控制台没有输出。
+
+**第 2 步：从主角色发起子讨论并取回结论**
+① 这一步要做什么：让主群聊里的某个角色调用子群聊，并把子群聊的最后一条消息作为汇报内容。
 
 ```python
-class HierarchicalGroupChat:
-    """
-    层级群聊结构：
-    - Level 0: 用户接口
-    - Level 1: 协调器
-    - Level 2: 领域专家
-    - Level 3: 执行器
-    """
-    
+def ask_experts(task: str) -> str:
+    """发起一次子讨论，只把结论返回给主群聊"""
+    expert_a.initiate_chat(
+        sub_manager,
+        message=task,           # 子讨论的议题
+        clear_history=False,    # 保留历史，便于同一议题多轮追问
+    )
+    return expert_a.last_message()   # 只取最后一条当结论
+
+coordinator = AssistantAgent(name="coordinator", llm_config=llm_config)
+
+# 主群聊里协调器把需要深挖的部分交给子讨论
+summary = ask_experts("分析这个接口的吞吐瓶颈")
+```
+
+**这段代码在做什么**
+- ask_experts 是一个普通函数，它把子群聊的复杂度封在内部。
+- clear_history 为 False 表示保留上一次子讨论的历史，同一议题追问时可以省一次背景说明。
+- last_message 只取最后一条，子讨论的中间过程不会进入主群聊。
+- 返回字符串而不是整个结果对象，主群聊拿到的就是一条可写入的消息。
+
+运行结果：需要真实 API Key；返回的是子群聊最后一条消息的文本，具体文案取决于模型。
+
+**第 3 步：用层级组表达固定分工**
+① 这一步要做什么：把角色按层级摆放，上层只负责转发与汇总，下层负责产出。
+
+```python
+class HierarchicalTeam:
+    """层级协作：用户代理 -> 协调器 -> 领域专家"""
+
     def __init__(self, llm_config):
-        # Level 2: 领域专家
-        self.frontend_expert = AssistantAgent(
-            name="frontend_expert", llm_config=llm_config)
-        self.backend_expert = AssistantAgent(
-            name="backend_expert", llm_config=llm_config)
-        self.devops_expert = AssistantAgent(
-            name="devops_expert", llm_config=llm_config)
-        
-        # Level 1: 协调器
+        self.frontend = AssistantAgent(name="frontend_expert", llm_config=llm_config)
+        self.backend = AssistantAgent(name="backend_expert", llm_config=llm_config)
         self.coordinator = AssistantAgent(
             name="coordinator",
             llm_config=llm_config,
-            human_input_mode="NEVER"
+            system_message="你负责判断问题属于前端还是后端，并转给对应专家。",
         )
-        
-        # Level 0: 用户代理
-        self.user_proxy = UserProxyAgent(
-            name="user_proxy",
-            human_input_mode="TERMINATE"
-        )
-        
-        self._setup_hierarchy()
-    
-    def _setup_hierarchy(self):
-        """设置层级关系"""
-        # 协调器知道各专家
-        self.coordinator.register_reply(
-            "frontend_expert",
-            lambda y, u: self._forward_to_experts(y, u, "frontend")
-        )
-        self.coordinator.register_reply(
-            "backend_expert",
-            lambda y, u: self._forward_to_experts(y, u, "backend")
-        )
-    
-    def _forward_to_experts(self, y, u, domain: str):
-        """转发到对应专家"""
-        expert_map = {
-            "frontend": self.frontend_expert,
-            "backend": self.backend_expert
-        }
-        return expert_map[domain].generate_reply(messages=y)
-    
-    def start(self, task: str):
-        """启动层级协作"""
-        self.user_proxy.initiate_chat(
-            self.coordinator,
-            message=task
-        )
+        self.llm_config = llm_config
+
+    def route(self, question: str) -> str:
+        """最简路由：按关键字把问题交给对应专家"""
+        target = self.frontend if "样式" in question else self.backend
+        return target.generate_reply(messages=[{"role": "user", "content": question}])
 ```
 
-### 3.4 群聊间通信
+**这段代码在做什么**
+- 层级里每一层只做一件事：协调器只做判断与转发，专家只做产出。
+- route 用关键字做路由，这是最可控的版本，不需要额外模型调用。
+- 协调器保留了 system_message，说明它的判断也可以交给模型完成。
+- 把 llm_config 存成实例属性，便于后续构造更多角色时复用同一份配置。
 
-```python
-class InterGroupCommunicator:
-    """跨群聊通信管理"""
-    
-    def __init__(self, llm_config):
-        self.group_a_manager = self._create_group("A")
-        self.group_b_manager = self._create_group("B")
-    
-    def _create_group(self, group_id: str):
-        """创建独立群聊"""
-        agents = [
-            AssistantAgent(name=f"{group_id}_agent_{i}", llm_config=llm_config)
-            for i in range(3)
-        ]
-        group = GroupChat(agents=agents, messages=[], max_round=10)
-        return GroupChatManager(groupchat=group, llm_config=llm_config)
-    
-    def relay_message(self, from_group, to_group, message: str):
-        """跨群聊消息传递"""
-        # 从源群聊收集结果
-        result = from_group.get_latest_message()
-        
-        # 发送到目标群聊
-        to_group.send_message(result, from_group, to_group)
-        
-        return to_group.get_response()
+运行结果：需要真实 API Key；返回字符串为该专家角色的回复文本。
+
+**动手验证**
+
+下面的脚本用 Node 模拟子群聊：子任务在自己的列表里跑完，只把结论合并回主列表。
+
+```js
+// 依赖：仅 Node 20+ 内置模块
+// 运行：node nested-chat.mjs
+import assert from "node:assert/strict";
+
+const mainMessages = [];
+const subMessages = [];
+
+// 子群聊：只在自己的列表里追加消息，不影响主列表
+function runSubChat(topic, rounds) {
+  for (let i = 1; i <= rounds; i += 1) {
+    subMessages.push({ round: i, content: `专家讨论第 ${i} 轮: ${topic}` });
+  }
+  return `结论: ${topic} 的瓶颈在数据库连接池`;
+}
+
+const conclusion = runSubChat("接口吞吐", 3);
+
+// 主群聊只接收一条结论消息
+mainMessages.push({ speaker: "coordinator", content: conclusion });
+
+assert.equal(subMessages.length, 3);      // 子讨论的中间过程留在子列表
+assert.equal(mainMessages.length, 1);     // 主列表只多了一条
+assert.ok(mainMessages[0].content.startsWith("结论:"));
+
+console.log("子讨论消息条数:", subMessages.length);
+console.log("主群聊消息条数:", mainMessages.length);
+console.log("结论:", mainMessages[0].content);
+console.log("断言全部通过");
 ```
 
-## 4. AutoGen 代码执行
+预期输出：
 
-### 4.1 UserProxyAgent 代码执行
-
-```python
-from autogen import UserProxyAgent
-
-# 代码执行代理
-code_executor = UserProxyAgent(
-    name="code_executor",
-    human_input_mode="NEVER",  # 不等待用户输入
-    max_consecutive_auto_reply=10,
-    code_execution_config={
-        "work_dir": "workspace",        # 工作目录
-        "use_docker": "python:latest",  # Docker 环境
-        "timeout": 120,                  # 超时秒数
-    }
-)
-
-# 调用代码执行
-code_executor.initiate_chat(
-    assistant,
-    message="执行以下代码并返回结果：\nprint('Hello, AutoGen!')"
-)
-
-# 直接执行代码片段
-code_executor.execute_code_blocks([
-    ("python", "print([x**2 for x in range(10)])")
-])
+```
+子讨论消息条数: 3
+主群聊消息条数: 1
+结论: 接口吞吐 的瓶颈在数据库连接池
+断言全部通过
 ```
 
-### 4.2 代码执行结果处理
+**常见坑**
 
-```python
-# 第 1 段：导入 AutoGen 的两个核心角色类
-# UserProxyAgent 负责"动手"（真正执行代码），AssistantAgent 负责"动脑"（调 LLM 生成/解释）；
-# 二者组成 AutoGen 最基础的双智能体协作范式：一方产出代码，另一方落地运行并回传结果。
-from autogen import UserProxyAgent, AssistantAgent
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 主群聊上下文突然变长 | 子群聊的历史被并进了主群聊 | 只传 last_message 的文本，不要传整个结果对象 |
+| 子讨论重复问同一件事 | clear_history 为 True，每次都从零开始 | 同一议题追问时把 clear_history 设为 False |
+| 层级组的协调器抢着干活 | 协调器的提示词没有限定只做转发 | 在 system_message 里写清职责边界与转交条件 |
 
-# 第 2 段：构造代码执行器（代表用户/执行方）
-# use_docker=True 是核心安全边界：LLM 产出的代码不可信，放进容器执行，
-# 即使删文件或死循环也只影响容器，不污染宿主机；work_dir 指定执行时的工作目录。
-# 易错点：依赖本机已安装 Docker 且守护进程在运行，否则后续发起对话时会直接抛错。
-code_executor = UserProxyAgent(
-    name="code_executor",
-    code_execution_config={
-        "work_dir": "workspace",
-        "use_docker": True
-    }
-)
+**用在哪里**
 
-# 第 3 段：构造助手智能体
-# AssistantAgent 自身不执行代码，只持有 LLM 配置，收到消息后产出自然语言 + 代码块。
-# 注意 llm_config 定义在本片段之外（通常含 model、api_key、temperature），
-# 此处直接引用，说明"配置"与"角色构造"解耦，便于按环境切换模型。
-assistant = AssistantAgent(
-    name="assistant",
-    llm_config=llm_config
-)
+场景一：大型需求拆解。
+业务背景：一个需求涉及前端、后端、运维三方，需要各自出方案后再合并。
+这一节的知识怎么用：主群聊保留总体进度，三方各自的细节讨论放进子群聊。
+用什么指标衡量收益：合并方案时出现的冲突条数。
+什么时候不该用：需求只涉及一方时，直接单群聊即可。
 
-# 第 4 段：带重试的代码执行入口
-# max_retries 默认 3 提供"失败可自愈"的容错；函数对调用方只暴露字符串返回值，
-# 把重试的复杂度完全封装在内部。
-def execute_with_retry(code: str, max_retries: int = 3):
-    """带重试的代码执行"""
-    # 第 5 段：驱动一轮完整对话
-    # initiate_chat 让 code_executor 作为发起方向 assistant 发消息；assistant 回复的代码块
-    # 会由 code_executor 依据第 2 段配置实际执行，执行结果再作为新消息追加进对话历史，
-    # 从而形成"生成 → 执行 → 反馈"的闭环。复杂度：每轮至少一次 LLM 调用，成本随重试数线性增长。
-    for attempt in range(max_retries):
-        code_executor.initiate_chat(
-            assistant,
-            message=f"执行并解释这段代码:\n{code}"
-        )
-        
-        # 第 6 段：取回本轮结果
-        # chat_messages 是 {agent: [消息, ...]} 字典，键为对话中的另一方，[-1] 即最近一条消息
-        # （通常是最终执行输出）。边界条件：若对话中途异常中断，messages 可能为空，
-        # 此时 messages[-1] 会抛 IndexError，需靠外层重试或上层捕获兜底。
-        # 获取执行结果
-        messages = code_executor.chat_messages[assistant]
-        last_msg = messages[-1]
-        
-        # 第 7 段：成功判定
-        # content 可能为 None（如工具调用类消息），故用 get 给空串兜底，避免对 None 调 lower()。
-        # 隐患：这里仅做子串匹配——正常输出里含 "error" 字样会误判为失败，
-        # 反之未含该词的错误会被误判为成功；生产中应改用结构化状态字段判定。
-        if "error" not in last_msg.get("content", "").lower():
-            return last_msg.get("content")
-        
-        # 第 8 段：失败提示与最终兜底
-        # attempt 从 0 起计数，+1 后打印更符合人类计数直觉，也方便排查是第几轮失败。
-        print(f"尝试 {attempt + 1} 失败，重试...")
-    
-    # 循环耗尽仍未成功，返回固定失败标识，保证函数始终有返回值，调用方无需处理 None 分支。
-    return "执行失败"
+场景二：故障复盘。
+业务背景：一次线上故障要同时看应用日志、数据库慢查询、网络指标。
+这一节的知识怎么用：每个方向一个子群聊，主群聊只收结论与证据清单。
+用什么指标衡量收益：复盘文档从故障结束到定稿的耗时。
+什么时候不该用：故障还在持续时，先止损，不要先开会。
+
+场景三：跨团队接口对齐。
+业务背景：两个团队对同一份接口的定义不一致。
+这一节的知识怎么用：各团队内部先子讨论出结论，再在主群聊里对齐差异项。
+用什么指标衡量收益：接口联调阶段暴露的字段冲突数。
+什么时候不该用：对接口已经有正式规范文档时，直接按文档核对。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Nested Chats 章节描述了让一个角色触发另一个对话的写法，并说明子对话结果如何回传。借鉴方式：把子讨论封装成一个函数，函数只返回字符串。
+- AutoGen 官方 GitHub 仓库的 examples 目录包含嵌套对话与工具调用结合的示例。借鉴方式：把子群聊看成一个函数，先在本地用假数据替换它调试主流程。
+- LangGraph 官方文档的多智能体章节介绍了把子图嵌入主图的做法。借鉴方式：为每层子流程画一张独立的流程图，主图只保留入口与出口。
+
+**小结**
+- 嵌套聊天的收益是主群聊上下文更短，代价是子讨论同样计费。
+- 子讨论的接口设计成「输入议题，输出结论字符串」，主流程才好测。
+- 层级组的每一层只做一件事，转发层的提示词要写清边界。
+
+## 5. 代码执行与沙箱隔离
+
+**先想一个问题**
+
+你让模型生成了一段清理临时文件的脚本，它写出了删除命令。如果这段代码直接在宿主机上跑，一次手滑就是生产事故。你想让代码跑起来，但又要有一道隔离边界。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：代码执行角色是「会动手的那一个」，动手范围由配置决定。
+    日常类比：像把实验放进通风橱里做，试剂再呛人也只影响橱内。
+    不成立之处：容器隔离的是文件与进程，不隔离网络与计费，代码仍然可以往外发请求。
+
+!!! note "术语：Human-in-the-Loop"
+    定义：在自动化流程里插入人工确认的环节，人没点头就不继续。
+    例子：删除文件之前先打印待删清单，等操作人输入确认。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["AssistantAgent 产出代码块"] --> B["UserProxyAgent 收到消息"]
+  B --> C["按 code_execution_config 决定在哪执行"]
+  C -->|"use_docker 为 True"| D["容器内执行"]
+  C -->|"use_docker 为 False"| E["宿主机执行"]
+  D --> F["timeout 到点则中断"]
+  E --> F
+  F --> G["执行输出写回消息列表"]
 ```
-### 4.3 多语言代码执行
+
+1. 生成角色产出的代码块随消息进入执行角色。
+2. 执行角色读取 code_execution_config，决定执行位置。
+3. use_docker 为 True 时进入容器，为 False 时直接在宿主机执行。
+4. 无论哪种位置，timeout 到点都会中断执行。
+5. 执行的标准输出与报错被写成新消息，回到消息列表供下一轮使用。
+
+**一步一步来**
+
+**第 1 步：配置一个带隔离与超时的执行器**
+① 这一步要做什么：给执行角色指定工作目录、镜像与超时时间。
 
 ```python
 from autogen import UserProxyAgent
 
-# 第 1 段：构建三个"语言专用执行器"
-# 为什么：把执行环境按语言拆成独立 Agent，是为了让每种语言都跑在该语言的原生容器里
-# （Python/Node/MySQL），互不污染依赖；同时统一 work_dir 让它们能通过文件交换中间产物。
-# 易错点：UserProxyAgent 默认 human_input_mode="ALWAYS"，会在每轮代码执行前阻塞等待人工确认，
-# 批处理/服务化场景通常要显式设为 "NEVER"；另外不设 llm_config=False 时，执行器自己也会调用
-# LLM 去"补全代码"，会绕过你传入的代码块，属于常见的隐性 bug 来源。
+code_executor = UserProxyAgent(
+    name="code_executor",
+    human_input_mode="NEVER",        # 无人值守；默认值不是 NEVER，需按场景显式设置
+    code_execution_config={
+        "work_dir": "workspace",     # 宿主机挂载进容器的共享目录
+        "use_docker": "python:3.11", # 传镜像名即启用容器隔离
+        "timeout": 60,               # 单次执行上限，单位秒
+    },
+)
+```
 
-# Python 执行器
+**这段代码在做什么**
+- human_input_mode 默认为 ALWAYS，批处理场景必须显式改成 NEVER，否则每轮都等人确认。
+- use_docker 传字符串表示使用指定镜像，传 True 表示使用默认镜像，两者取值需核对官方文档。
+- timeout 是墙钟上限，防止死循环把进程挂住。
+- work_dir 是宿主机与容器共享的位置，产物从这里取回。
+
+运行结果：这一段只构造对象；若本机 Docker 未就绪，发起对话时才会报错。
+
+**第 2 步：把不同语言路由到不同执行器**
+① 这一步要做什么：按语言名查表，把代码块交给对应镜像的执行器。
+
+```python
 python_executor = UserProxyAgent(
     name="python_executor",
-    code_execution_config={
-        "work_dir": "workspace",          # 宿主机挂载进容器的共享目录，跨语言交换数据靠它
-        "use_docker": "python:3.11",      # 传镜像名即启用 Docker 隔离；锁小版本可避免解释器行为漂移
-        "timeout": 60                     # 单次执行墙钟上限（秒），超过即判定失败，防止死循环挂死进程
-    }
+    code_execution_config={"work_dir": "workspace", "use_docker": "python:3.11", "timeout": 60},
 )
-
-# JavaScript 执行器
 js_executor = UserProxyAgent(
     name="js_executor",
-    code_execution_config={
-        "work_dir": "workspace",          # 与 Python 执行器同一目录，便于 Node 读取 Python 产出的文件
-        "use_docker": "node:18",          # LTS 版本，稳定优先；镜像不同则 node_modules 不会串味
-        "timeout": 60
-    }
+    code_execution_config={"work_dir": "workspace", "use_docker": "node:18", "timeout": 60},
 )
 
-# SQL 执行器
-sql_executor = UserProxyAgent(
-    name="sql_executor",
-    code_execution_config={
-        "work_dir": "workspace",
-        "use_docker": "mysql:8",          # 注意：这个镜像默认只带 client，且无库无表，DDL/DML 需自备
-        "timeout": 30                     # SQL 更容易全表扫描，超时给得更短以防长查询拖垮整条流水线
-    }
-)
+EXECUTOR_MAP = {
+    "python": python_executor,      # 键必须与传入的语言字符串完全一致
+    "javascript": js_executor,
+}
 
-# 第 2 段：对外入口函数——把"多语言代码块"翻译成"多轮 Agent 对话"
-# 关键数据流：[(lang, code), ...] → 按 lang 路由到对应执行器 → 每个执行器把代码发给 assistant
-# 生成并执行 → 收集该执行器最后一条消息 → {lang: message}。
-# 代价：循环内 initiate_chat 是同步阻塞的，总耗时 ≈ Σ(LLM 推理 + 代码执行)，属延迟瓶颈所在。
-
-def execute_multi_language(code_blocks: list[tuple[str, str]]):
-    """
-    执行多语言代码块
-    
-    Args:
-        code_blocks: [(language, code), ...]
-    """
-    # 第 3 段：语言名 → 执行器实例的路由表
-    # 为什么用 dict 而不是 if/elif：新增语言只需在这里加一行，路由逻辑零改动（开闭原则）。
-    # 易错点：这里的 key 必须与调用方传入的 lang 字符串"完全一致"（区分大小写、无空格），
-    # 否则下面 .get() 返回 None 导致该代码块被静默跳过——所以第 4 段才需要显式判空。
-    executor_map = {
-        "python": python_executor,
-        "javascript": js_executor,
-        "sql": sql_executor
-    }
-    
-    # 第 4 段：逐块路由执行并汇总结果
-    # 边界条件：未知语言（如 "go"）不会报错，只是被跳过，调用方需自行比对 len(results) 判断是否全跑成功。
-    # 结果语义：只保留"最后一次"消息，若同一语言出现在多个块里，results[lang] 会被后者覆盖。
+def execute_blocks(blocks, assistant):
+    """blocks 形如 [(语言, 代码), ...]"""
     results = {}
-    for lang, code in code_blocks:
-        executor = executor_map.get(lang)
-        if executor:
-            executor.initiate_chat(
-                # 易错点：assistant 未在本函数内定义，来自外层/全局作用域；作用域中缺失会抛 NameError。
-                # 该 assistant 负责"生成/修正"代码，executor 负责"执行"，二者角色必须配对使用。
-                assistant,
-                message=f"执行 {lang} 代码:\n{code}"   # 用自然语言前缀+原始代码，让 assistant 明确当前语言
-            )
-            results[lang] = executor.last_message()  # 取本次会话末条消息，通常含执行输出或报错信息
-    
+    for lang, code in blocks:
+        executor = EXECUTOR_MAP.get(lang)
+        if executor is None:
+            results[lang] = "未配置该语言的执行器"   # 显式记录，避免静默跳过
+            continue
+        executor.initiate_chat(assistant, message=f"执行 {lang} 代码:\n{code}")
+        results[lang] = executor.last_message()
     return results
 ```
-### 4.4 代码执行上下文管理
 
-```python
-class ManagedCodeExecution:
-    """托管代码执行环境"""
-    
-    # 第 1 段：初始化托管执行环境（绑定工作目录并拉起隔离的执行代理）
-    # 设计意图：把「在沙箱里跑代码」这件事封装成一个对象，外部只关心执行与上下文，
-    # 不直接接触 AutoGen 的 UserProxyAgent。use_docker=True 意味着代码在容器内运行，
-    # 带来隔离性的同时也要求宿主机具备 Docker 环境；timeout=300 是硬性上限，超时会中断执行。
-    def __init__(self, work_dir: str):
-        self.work_dir = work_dir
-        # 执行代理：UserProxyAgent 在这里扮演「代码执行器」而非对话方，
-        # 其 code_execution_config 决定代码在哪里跑、跑多久。
-        self.executor = UserProxyAgent(
-            name="managed_executor",
-            code_execution_config={
-                "work_dir": work_dir,   # 容器内挂载/落盘的工作目录，产物与临时文件都放这里
-                "use_docker": True,     # 强制 Docker 隔离，避免宿主环境被污染或破坏
-                "timeout": 300          # 单次执行最长 300 秒，防止死循环/长任务拖垮服务
-            }
-        )
-        self.context = {}  # 持久化上下文；跨多次 execute 调用累积变量，注意它是可变的共享状态
-    
-    # 第 2 段：写入执行上下文（供后续逐次执行的代码共享变量）
-    # 关键点：这里不做任何序列化或校验，value 原样持有引用，
-    # 因此后续用 repr() 注入时，只有能稳定 repr 的类型（数字、字符串、布尔、容器等）才可靠；
-    # 若传入不可反序列化的对象（如文件句柄、连接），注入代码会得到无意义的 repr 字符串。
-    def set_context(self, key: str, value: any):
-        """设置执行上下文"""
-        self.context[key] = value
-    
-    # 第 3 段：把上下文注入代码并交给代理执行（核心拼装 + 委托执行 + 取回结果）
-    # 数据流：context 字典 → repr 文本 → 与用户代码拼接 → 发给执行代理 → 返回最后一条消息。
-    # 易错点：repr(v) 只是「值的字面量近似」，对自定义对象/函数/lambda 无法保真重建；
-    # 且拼接后是自上而下顺序执行，若 context 键名与代码中变量重名会被代码覆盖。
-    # 复杂度：拼接为 O(n)（n 为上下文项数），真正开销在 Docker 启动与网络往返。
-    def execute_with_context(self, code: str) -> str:
-        """使用上下文执行代码"""
-        # 注入上下文到代码
-        # 用换行把每个键值对渲染成 `key = <repr>` 的赋值语句，
-        # 相当于在用户代码前插入一段「变量预置」脚本，实现跨调用的状态延续。
-        context_vars = "\n".join(
-            f"{k} = {repr(v)}" for k, v in self.context.items()
-        )
-        
-        # 前置上下文 + 用户代码拼成完整脚本；注意顺序不可颠倒，
-        # 否则用户代码引用上下文变量时会 NameError。
-        full_code = f"{context_vars}\n{code}"
-        
-        # 通过执行代理发起「对话」来触发代码执行：AutoGen 里 assistant 的回复中
-        # 若含代码块，代理就会在沙箱里运行它。这里的 message 只是承载待执行代码的载体，
-        # 真正的执行发生在代理内部，返回值通过后续的 last_message() 读取。
-        self.executor.initiate_chat(
-            assistant,
-            message=f"执行代码:\n{full_code}"
-        )
-        
-        # 取回代理的最后一条消息作为执行结果（通常包含 stdout/stderr 或报错信息）。
-        # 边界：若代理未产生消息，或执行被 timeout 截断，这里拿到的可能是残缺/异常输出，
-        # 调用方不能假设返回值一定是成功的程序输出。
-        return self.executor.last_message()
+**这段代码在做什么**
+- 用字典做路由，新增语言只加一行，判断逻辑不动。
+- 查表失败时显式写入一条提示，否则该代码块会被静默跳过。
+- 每个执行器用各自的镜像，依赖互不污染。
+- 结果字典以语言名为键，同语言多次出现时后者会覆盖前者。
+
+运行结果：需要真实 API Key 与对应镜像；返回值为各语言最后一条消息，内容取决于模型与执行结果。
+
+**动手验证**
+
+下面的脚本用 Node 的子进程模拟「隔离执行 + 超时中断」，并对输出做断言。
+
+```js
+// 依赖：仅 Node 20+ 内置模块
+// 运行：node sandbox-exec.mjs
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+
+// 允许执行的代码前缀白名单，代替容器做最小隔离演示
+const ALLOWED = ["console.log"];
+
+function runSandbox(code, timeoutMs) {
+  if (!ALLOWED.some((p) => code.trimStart().startsWith(p))) {
+    return { status: "rejected", output: "代码不在白名单内" };
+  }
+  const r = spawnSync(process.execPath, ["-e", code], {
+    timeout: timeoutMs,
+    encoding: "utf8",
+  });
+  if (r.error && r.error.code === "ETIMEDOUT") {
+    return { status: "timeout", output: "执行超时被中断" };
+  }
+  return { status: "ok", output: (r.stdout || "").trim() };
+}
+
+const ok = runSandbox("console.log([1,2,3].length)", 3000);
+assert.equal(ok.status, "ok");
+assert.equal(ok.output, "3");
+
+const denied = runSandbox("process.exit(1)", 3000);
+assert.equal(denied.status, "rejected");
+
+const slow = runSandbox("console.log('start'); while(true){}", 300);
+assert.equal(slow.status, "timeout");
+
+console.log("正常执行:", ok.output);
+console.log("被拒绝:", denied.output);
+console.log("超时处理:", slow.output);
+console.log("断言全部通过");
 ```
-## 5. Human-in-the-Loop 模式
 
-### 5.1 基础人工介入
+预期输出：
+
+```
+正常执行: 3
+被拒绝: 代码不在白名单内
+超时处理: 执行超时被中断
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 每轮都卡住等输入 | human_input_mode 默认为 ALWAYS | 无人值守场景显式设为 NEVER |
+| 执行的不是你传入的代码 | 执行角色自己配了 llm_config，它会补全代码 | 执行角色不配 llm_config，或用官方文档中的禁用方式 |
+| 提示找不到镜像 | 本地没有该镜像且未拉取 | 提前执行 docker pull，或改用本机已有的镜像 |
+
+**用在哪里**
+
+场景一：后台管理的批量导入脚本生成。
+业务背景：运营上传 Excel，系统生成导入脚本并试跑样本。
+这一节的知识怎么用：用容器执行脚本，工作目录指向临时目录，timeout 设成几十秒。
+用什么指标衡量收益：导入脚本一次试跑成功率。
+什么时候不该用：Excel 里含真实手机号时，先脱敏再进容器。
+
+场景二：CI 中的代码生成校验。
+业务背景：合并请求里包含由模型生成的代码，需要先跑一遍测试。
+这一节的知识怎么用：在 CI 里启动执行器跑单测，把输出贴回合并请求评论。
+用什么指标衡量收益：回归阶段发现的生成代码缺陷数。
+什么时候不该用：需要真实第三方凭据的测试，不要放进容器执行。
+
+场景三：SQL 执行前的语法校验。
+业务背景：运营提交查询语句，先校验再上生产。
+这一节的知识怎么用：把校验放在只读账号与短超时下执行。
+用什么指标衡量收益：上生产后报语法错误的比例。
+什么时候不该用：语句涉及批量更新时，先人工审批再执行。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Code Execution 章节说明了 code_execution_config 的字段含义与容器隔离要求。借鉴方式：把镜像名与超时写进环境配置，按环境切换。
+- AutoGen 官方 GitHub 仓库的 examples 目录包含本地执行与容器执行两种配置的对照。借鉴方式：本地开发用本地执行，上线前切容器复测一遍。
+- Docker 官方文档的容器资源限制章节说明了内存与 CPU 的约束方式。借鉴方式：给执行容器单独设置资源上限，避免单次任务拖垮宿主机。
+
+**小结**
+- 执行能力与生成能力分开配置，执行角色默认不需要模型。
+- use_docker 与 timeout 是两个必须显式确认的字段。
+- 路由表的键要与传入的语言字符串完全一致，查表失败要显式记录。
+
+## 6. Human-in-the-Loop 的四种介入方式
+
+**先想一个问题**
+
+一个自动化脚本要删除过期文件。低风险的是删除七年前的日志，高风险的是删除近三十天的日志。你不想每次都弹确认框，也不想高风险操作无人把关。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：人工介入按风险分级，风险越高，停下来等人的点越多。
+    日常类比：像公司报销，小额自动通过，大额要主管签字。
+    不成立之处：模型的判断会漂移，同一任务在不同轮次可能被划到不同风险等级，所以分级规则要写死在代码里。
+
+!!! note "术语：渐进式授权"
+    定义：权限随任务推进逐级放开，默认从最小权限开始。
+    例子：先只允许读，确认分析正确后再放开执行，最后才放开写文件。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+  [*] --> RUNNING
+  RUNNING --> AWAITING_APPROVAL : "回复命中审批关键字"
+  AWAITING_APPROVAL --> RUNNING : "人工输入同意"
+  AWAITING_APPROVAL --> REJECTED : "人工输入拒绝"
+  RUNNING --> COMPLETED : "回复命中完成标记"
+  COMPLETED --> [*]
+  REJECTED --> [*]
+```
+
+1. 任务从 RUNNING 开始，模型持续产出步骤。
+2. 回复里出现约定的审批关键字时，状态切到 AWAITING_APPROVAL。
+3. 人工同意后回到 RUNNING，继续产生步骤。
+4. 人工拒绝则进入 REJECTED，任务结束且不继续执行。
+5. 回复里出现完成标记时进入 COMPLETED，正常收尾。
+
+**一步一步来**
+
+**第 1 步：按风险等级切换介入模式**
+① 这一步要做什么：把风险等级映射到 human_input_mode，高风险才真正等人。
 
 ```python
 from autogen import AssistantAgent, UserProxyAgent
 
-# 配置人工介入模式
-user_proxy = UserProxyAgent(
-    name="user_proxy",
-    human_input_mode="ALWAYS"  # 每次都需要人工确认
-)
-
-# 或在特定条件下介入
-conditional_proxy = UserProxyAgent(
-    name="conditional_proxy",
-    human_input_mode="TERMINATE",  # 遇到 TERMINATE 消息时介入
-    max_consecutive_auto_reply=5   # 自动回复次数限制
-)
-
-# 启动需要人工确认的对话
-user_proxy.initiate_chat(
-    assistant,
-    message="删除所有临时文件，确认执行？"
-)
-```
-
-### 5.2 人工审批工作流
-
-```python
-# 第 1 段：类定义与初始化（搭好"审批三件套"：AI 助手、人类代理、待审批队列）
-class HumanApprovalWorkflow:
-    """人工审批工作流"""
-    
+class ApprovalFlow:
     def __init__(self, llm_config):
-        # assistant 负责"发起"审批对话，human 代表"审批人"这一侧参与对话
-        # 二者是 AutoGen 中成对出现的 Agent：一个发起、一个响应
         self.assistant = AssistantAgent(name="assistant", llm_config=llm_config)
-        # human_input_mode="NEVER" 表示默认不做真实交互，适合无人值守/批量场景；
-        # 真正的"是否需要人参与"由 request_approval 按风险等级动态切换
-        self.human = UserProxyAgent(
-            name="human",
-            human_input_mode="NEVER"  # 默认自动执行
-        )
-        # 用列表保存审批记录，索引即 task_id，因此 task_id 依赖插入顺序，不能重排
-        self.pending_approvals = []
-    
-    # 第 2 段：发起审批（按风险等级动态决定"要不要真的问人"，并落库一条待审记录）
-    def request_approval(self, task: str, risk_level: str = "LOW"):
-        """
-        请求人工审批
-        
-        Args:
-            task: 待审批任务
-            risk_level: 风险等级 (LOW/MEDIUM/HIGH/CRITICAL)
-        """
-        # 核心策略：高风险才开启人类介入，低风险保持自动执行，避免无谓打扰
-        # 易错点：human_input_mode 是 Agent 的实例状态，这里是"就地改写"，
-        # 所以该工作流实例同一时刻只能承载一种模式，多任务并发会互相覆盖
-        if risk_level in ["HIGH", "CRITICAL"]:
-            # 高风险操作需要人工确认
-            self.human.human_input_mode = "ALWAYS"
-        else:
-            self.human.human_input_mode = "NEVER"
-        
-        # 先登记再对话：即使 initiate_chat 抛异常，记录也已存在，便于事后审计
-        # status 初始为 PENDING，后续由 approve_task / reject_task 改写
-        self.pending_approvals.append({
-            "task": task,
-            "risk_level": risk_level,
-            "status": "PENDING"
-        })
-        
-        # 把审批请求作为开场消息发给 human；注意 initiate_chat 会阻塞直到对话结束，
-        # 即 HIGH/CRITICAL 时这里会真的等待人类输入，调用方需注意超时与并发
-        self.assistant.initiate_chat(
-            self.human,
-            message=f"[审批请求 - {risk_level}] {task}"
-        )
-    
-    # 第 3 段：审批通过（只改状态，不做删除，保留完整审计轨迹）
-    def approve_task(self, task_id: int):
-        """审批通过"""
-        # 用 task_id < len(...) 做越界保护；由于采用列表索引，
-        # task_id 即"第几次 request_approval"，而非全局唯一 ID，这是易被误解之处
-        if task_id < len(self.pending_approvals):
-            self.pending_approvals[task_id]["status"] = "APPROVED"
-    
-    # 第 4 段：审批拒绝（在状态之外追加拒绝理由，方便人工回溯决策依据）
-    def reject_task(self, task_id: int, reason: str):
-        """审批拒绝"""
-        # 与 approve_task 同一套越界判断；边界条件：task_id 为负数时不会被拦截，
-        # 会从列表尾部反向索引，若需严格校验应额外判断 task_id >= 0
-        if task_id < len(self.pending_approvals):
-            self.pending_approvals[task_id]["status"] = "REJECTED"
-            # reason 字段按需写入，PENDING/APPROVED 记录中不会出现该键，
-            # 读取时应使用 .get("reason") 避免 KeyError
-            self.pending_approvals[task_id]["reason"] = reason
+        self.human = UserProxyAgent(name="human", human_input_mode="NEVER")
+        self.records = []   # 审批记录，按插入顺序编号
+
+    def request(self, task, risk_level="LOW"):
+        # 高风险才开启人工介入，低风险保持自动
+        self.human.human_input_mode = "ALWAYS" if risk_level in ("HIGH", "CRITICAL") else "NEVER"
+        self.records.append({"task": task, "risk": risk_level, "status": "PENDING"})
+        self.assistant.initiate_chat(self.human, message=f"[审批请求 {risk_level}] {task}")
+        return len(self.records) - 1   # 返回记录编号
 ```
-### 5.3 可中断恢复模式
+
+**这段代码在做什么**
+- human_input_mode 是实例状态，就地改写意味着同一时刻只能承载一种模式。
+- 先登记记录再发起对话，即使对话抛异常，审计记录也在。
+- 返回记录编号，调用方后续用它来改状态。
+- 高风险才打开 ALWAYS，低风险保持自动，减少无意义的打扰。
+
+运行结果：低风险任务不等待输入；高风险任务会阻塞在终端等待你输入，需要真实 API Key。
+
+**第 2 步：用关键字中断并支持恢复**
+① 这一步要做什么：约定一个中断标记，模型需要审批时把它写进回复，流程在此处暂停。
 
 ```python
-# 第 1 段：类骨架与状态初始化（定义状态机的三要素：谁在干活、当前处于哪个状态、靠什么信号叫停）
-# 为什么这样写：把"可中断"拆成两个正交的部件 —— 无状态的 LLM 生成器（AssistantAgent）与有状态的流程控制器（本类），
-# 这样状态迁移逻辑可独立于模型实现被测试。关键数据流：llm_config 仅透传给 AssistantAgent，本类不持有模型细节。
-# 易错点：state 用裸字符串而非 Enum，拼错状态名不会有任何静态检查兜底，新增状态时必须全局检索。
 class InterruptibleAgent:
-    """可中断智能体"""
-    # 中断协议的"信号线"：约定模型在需要人工审批时，把这串魔法字符串写进回复正文
-    # 抽成类常量而非散落字面量，让协议只在一处定义，避免多处拼写漂移
-    STOP_KEYWORD = "[HALT_FOR_APPROVAL]"
-    
+    STOP_KEYWORD = "[HALT_FOR_APPROVAL]"      # 中断信号，只在这一处定义
+
     def __init__(self, llm_config):
-        # 助手只管"生成"，审批与状态迁移全部由外层控制器承担，职责分离
         self.assistant = AssistantAgent(name="assistant", llm_config=llm_config)
-        self.state = "RUNNING"  # 构造即 RUNNING，无需额外启动调用；但此处未校验 llm_config 合法性，错误会延迟到首次调用才暴露
-    
-    # 第 2 段：主循环 —— 生成一步、判定中断、判定完成（单次任务的自驱动状态机）
-    # 为什么这样写：每轮只把最初的 task 作为 messages 传入，模型看不到自己前面的输出，所谓"进度"全靠模型在回复外隐式记住，
-    # 这是本实现最脆弱的一点：多轮循环下模型容易重复劳动或跑偏，真实系统应把 steps 拼回上下文。
-    # 易错点：while 条件只认 RUNNING，若模型既不吐 STOP_KEYWORD 也不吐完成标记，就会无限调用，生产环境必须加最大步数上限。
-    def process_task(self, task: str):
-        """带中断的任务处理"""
-        self.state = "RUNNING"  # 幂等重置，使同一实例可复用；副作用是上一轮的 AWAITING_APPROVAL 会被悄悄清掉
-        steps = []  # 本地累积已完成步骤，仅在非中断路径下随返回值一并交出
-        
-        while self.state == "RUNNING":
-            # 生成下一步
-            # 无状态调用：未传历史消息，模型对"第几步"没有任何显式信息
-            response = self.assistant.generate_reply(
-                messages=[{"content": task, "role": "user"}]
-            )
-            
-            # 检查是否需要中断
-            # 中断判定优先于完成判定：若回复同时含 STOP_KEYWORD 与 [DONE]，以中断为准，体现安全优先
-            if self.STOP_KEYWORD in response:
+        self.state = "RUNNING"
+
+    def process(self, task, max_steps=5):
+        steps = []
+        for _ in range(max_steps):            # 步数上限是防死循环的兜底
+            reply = self.assistant.generate_reply(messages=[{"role": "user", "content": task}])
+            if self.STOP_KEYWORD in reply:
                 self.state = "AWAITING_APPROVAL"
-                return {
-                    "status": "INTERRUPTED",
-                    "completed_steps": steps,  # 本次响应不入 steps，而是放进 pending_action，避免"未经批准却已记账"
-                    "pending_action": response
-                }
-            
-            steps.append(response)  # 只有通过中断判定的回复才算真正完成的一步
-            
-            # 检查是否完成
-            # 完成信号是子串包含，模型若在解释文字里引用 "[DONE]" 字样也会被误判为结束
-            if self._is_complete(response):
+                return {"status": "INTERRUPTED", "steps": steps, "pending": reply}
+            steps.append(reply)
+            if "[DONE]" in reply:
                 self.state = "COMPLETED"
-                break  # 显式跳出，使 return 唯一，避免两个出口的返回结构各自演化
-        
-        # 正常路径为 COMPLETED；若 state 被外部改动而退出循环，则原样透出该状态，调用方需自行解释未知状态
-        return {
-            "status": self.state,
-            "steps": steps
-        }
-    
-    # 第 3 段：审批后恢复（把人工决定当作新的用户输入重新灌进对话）
-    # 为什么这样写：resume 用 if 状态门禁限制了合法入口，只有 AWAITING_APPROVAL 时可被唤醒；
-    # 关键在于它并不回到 process_task 的循环里，恢复后的执行完全交给 initiate_chat 自己跑完。
-    # 易错点：其它状态下静默无操作，调用方无法区分"恢复失败"与"恢复成功"；initiate_chat 的返回值也未回收，进度不入 steps。
-    def resume(self, approval: str):
-        """恢复执行"""
-        if self.state == "AWAITING_APPROVAL":
-            # 用 [RESUME] 前缀包装人工输入，让模型能区分"这是审批结论"而不是一个新任务；
-            # 传 self.assistant 作为对话对象较反常，语义上等价于让它与自己对话，排查问题时应留意这一点
-            self.assistant.initiate_chat(
-                self.assistant,
-                message=f"[RESUME] {approval}"
-            )
-            self.state = "RUNNING"  # 置回 RUNNING 只表示"可再次被中断"，并不意味着重新进入上面的主循环
-    
-    # 第 4 段：完成判定（把自然语言里的完成信号收敛成一个布尔谓词）
-    # 为什么这样写：标记列表封在方法内部，调用方只关心真假；any() 短路求值，命中首个标记即返回，最坏 O(k·n)（k 为标记数，n 为回复长度）。
-    # 易错点：大小写敏感且是子串匹配，"[DONE]" 同样会命中 "[DONED]"；若需严格，应改为精确匹配或带词界的正则。
-    def _is_complete(self, response: str) -> bool:
-        """检查是否完成"""
-        completion_markers = ["[COMPLETE]", "[DONE]", "[FINISHED]"]  # 每次调用都重建列表，热点路径上可提升为类常量
-        return any(marker in response for marker in completion_markers)
+                break
+        return {"status": self.state, "steps": steps}
 ```
-### 5.4 渐进式授权模式
+
+**这段代码在做什么**
+- 中断判定放在完成判定之前，两条同时命中时以中断为准。
+- steps 只记录已完成的步骤，待审批的内容不记账。
+- max_steps 是必要的兜底，模型既不中断也不完成时会走完上限退出。
+- 回复文本用子串匹配，模型在解释文字里引用该标记也会误判，需要更严格的匹配时可改用正则。
+
+运行结果：需要真实 API Key；命中关键字时返回状态 INTERRUPTED，否则返回 COMPLETED 与步骤列表。
+
+**第 3 步：用权限表限制能力范围**
+① 这一步要做什么：把权限等级写成表，默认停在最低档，执行前先查表。
 
 ```python
-# 第 1 段：类声明与职责界定（渐进式授权器：按任务复杂度动态放权）
-# 设计意图：把"权限"从静态配置变成随任务推进而升级的状态机，
-# 让 agent 默认以最小权限启动，按需提权，从源头压缩误操作/越权的爆炸半径。
-class ProgressiveAuthorization:
-    """
-    渐进式授权 - 随任务复杂度调整权限
-    """
-    
-    # 第 2 段：权限等级表（能力矩阵 / 策略数据化）
-    # 用"等级名 -> 能力布尔开关"的字典把权限策略从代码逻辑里剥离出来，
-    # 便于扩展新等级或新能力维度而无需改动执行流程。
-    # 注意这是单向阶梯语义：FULL 本应隐式包含下层全部能力，此处用显式重复字段表达，
-    # 没有做层间继承，改表时要自行保证上层字段不会漏配。
-    AUTHORIZATION_LEVELS = {
-        "READ": {"code_execution": False, "file_write": False},
-        "EXECUTE": {"code_execution": True, "file_write": False},
-        "WRITE": {"code_execution": True, "file_write": True},
-        "FULL": {"code_execution": True, "file_write": True, "system": True}
-    }
-    
-    # 第 3 段：初始化（绑定底层 agent，并把权限停在最低档）
-    # 这里同时确定两件事：委托对象 assistant 以及初始权限 current_level。
-    # 默认 READ 是"安全起点"——对象构造完不会自带写/执行能力，必须显式提权，
-    # 避免默认高权限导致"忘了收紧"这类典型安全漏洞。
-    def __init__(self, llm_config):
-        self.assistant = AssistantAgent(name="assistant", llm_config=llm_config)
-        self.current_level = "READ"
-    
-    # 第 4 段：权限提升（唯一的状态变更入口）
-    # 关键点：只接受白名单内的等级名，非法字符串被静默忽略（不抛异常、也不改变现状），
-    # 这样调用方拼错等级名时至少不会把权限改成未定义状态。
-    # 边界条件：本方法并不校验"只能升不能降"，传入更低等级会真的降级；
-    # 若业务要求单调递增，需要在此处比较新旧等级的序关系后再赋值。
-    def escalate(self, new_level: str):
-        """提升权限等级"""
-        if new_level in self.AUTHORIZATION_LEVELS:
-            self.current_level = new_level
-            print(f"权限提升至: {new_level}")
-    
-    # 第 5 段：按当前权限执行任务（先策略检查，再委托给 agent）
-    # 数据流：用 self.current_level 查表取出能力开关快照 perms，
-    # 再对任务文本做关键词嗅探；一旦命中当前等级不具备的能力，
-    # 立即短路返回提示、绝不调用模型，做到"先鉴权后执行"。
-    # 易错点：能力判定基于 task 的 "execute"/"write" 子串匹配，属于粗粒度启发式——
-    # 描述里不含这些词但实际要写文件/跑代码的任务仍会绕过检查，仅适合教学演示；
-    # 另外 perms 只读不改，所以不会污染类级别的 AUTHORIZATION_LEVELS 常量，
-    # 单次执行的时间复杂度为 O(len(task))，瓶颈全在后续的 generate_reply 调用。
-    def execute_with_current_level(self, task: str):
-        """使用当前权限执行"""
-        perms = self.AUTHORIZATION_LEVELS[self.current_level]  # 当前等级的能力开关快照
-        
-        if not perms["code_execution"] and "execute" in task.lower():
-            return "需要 EXECUTE 权限"
-        
-        if not perms["file_write"] and "write" in task.lower():
-            return "需要 WRITE 权限"
-        
-        return self.assistant.generate_reply(
-            messages=[{"content": task, "role": "user"}]
-        )
-```
-## 6. 完整代码示例
-
-### 6.1 开发团队群聊
-
-```python
-"""
-AutoGen 多智能体开发团队示例
-角色：产品经理、架构师、前端、后端、测试
-"""
-
-import os
-from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
-
-# LLM 配置
-llm_config = {
-    "model": "gpt-4",
-    "api_key": os.environ.get("OPENAI_API_KEY"),
-    "temperature": 0.7
+LEVELS = {
+    "READ":    {"code_execution": False, "file_write": False},
+    "EXECUTE": {"code_execution": True,  "file_write": False},
+    "WRITE":   {"code_execution": True,  "file_write": True},
 }
 
-# 创建团队成员
-pm = AssistantAgent(
-    name="product_manager",
-    llm_config=llm_config,
-    system_message="你是一个经验丰富的产品经理，擅长需求分析和PRD撰写。"
-)
+class GuardedRunner:
+    def __init__(self, assistant):
+        self.assistant = assistant
+        self.level = "READ"          # 默认从最小权限开始
 
-architect = AssistantAgent(
-    name="architect",
-    llm_config=llm_config,
-    system_message="你是一个系统架构师，擅长技术方案设计和架构评审。"
-)
+    def escalate(self, level):
+        if level in LEVELS:          # 非法等级被忽略，不会写入未定义状态
+            self.level = level
 
-frontend = AssistantAgent(
-    name="frontend_developer",
-    llm_config=llm_config,
-    system_message="你是一个前端开发工程师，精通 React、Vue、TypeScript。"
-)
+    def run(self, task):
+        perms = LEVELS[self.level]
+        if not perms["code_execution"] and "execute" in task.lower():
+            return "需要 EXECUTE 权限"
+        return self.assistant.generate_reply(messages=[{"role": "user", "content": task}])
+```
 
-backend = AssistantAgent(
-    name="backend_developer",
-    llm_config=llm_config,
-    system_message="你是一个后端开发工程师，精通 Python、Go、数据库设计。"
-)
+**这段代码在做什么**
+- 默认等级是 READ，对象构造完不具备执行与写入能力。
+- escalate 只接受表内等级名，拼错时静默忽略，不会把权限改成未定义状态。
+- 能力判断基于任务文本关键字，属于粗粒度检查，描述里不含关键字但实际要写文件时会被放过。
+- perms 是只读快照，改动它不会污染模块级常量。
 
-tester = AssistantAgent(
-    name="qa_engineer",
-    llm_config=llm_config,
-    system_message="你是一个测试工程师，擅长测试策略和用例设计。"
-)
+运行结果：等级为 READ 且任务文本含 execute 时返回提示字符串，不发生模型调用。
 
-# 用户代理
-user_proxy = UserProxyAgent(
-    name="user",
-    human_input_mode="TERMINATE"
-)
+**动手验证**
 
-# 创建群聊
+下面的脚本实现第 2 步的状态机，用断言覆盖中断、恢复与完成三条路径。
+
+```js
+// 依赖：仅 Node 20+ 内置模块
+// 运行：node hitl-state.mjs
+import assert from "node:assert/strict";
+
+const STOP = "[HALT_FOR_APPROVAL]";
+const DONE = "[DONE]";
+
+function runTask(replies, maxSteps = 5) {
+  const steps = [];
+  for (let i = 0; i < Math.min(replies.length, maxSteps); i += 1) {
+    const reply = replies[i];
+    if (reply.includes(STOP)) {
+      return { status: "AWAITING_APPROVAL", steps, pending: reply };
+    }
+    steps.push(reply);
+    if (reply.includes(DONE)) {
+      return { status: "COMPLETED", steps };
+    }
+  }
+  return { status: "RUNNING", steps };
+}
+
+const interrupted = runTask(["第一步完成", `准备删除文件 ${STOP}`]);
+assert.equal(interrupted.status, "AWAITING_APPROVAL");
+assert.equal(interrupted.steps.length, 1);      // 待审批的一步不计入已完成
+
+const finished = runTask(["第一步完成", `收尾 ${DONE}`]);
+assert.equal(finished.status, "COMPLETED");
+assert.equal(finished.steps.length, 2);
+
+const runaway = runTask(["a", "b", "c", "d", "e", "f"], 5);
+assert.equal(runaway.status, "RUNNING");        // 步数上限兜底
+assert.equal(runaway.steps.length, 5);
+
+console.log("中断路径:", interrupted.status, "已完成步骤:", interrupted.steps.length);
+console.log("完成路径:", finished.status, "已完成步骤:", finished.steps.length);
+console.log("超步数兜底:", runaway.status, "已完成步骤:", runaway.steps.length);
+console.log("断言全部通过");
+```
+
+预期输出：
+
+```
+中断路径: AWAITING_APPROVAL 已完成步骤: 1
+完成路径: COMPLETED 已完成步骤: 2
+超步数兜底: RUNNING 已完成步骤: 5
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 低风险任务也在等人输入 | 风险判断写在模型侧，结果不稳定 | 风险等级由调用方传入，代码里写死映射关系 |
+| 待审批的步骤被算作已完成 | 中断判定写在追加步骤之后 | 先判中断，再追加步骤 |
+| 模型引用关键字导致误中断 | 用子串匹配判定状态 | 改为整行精确匹配或带词界的正则 |
+
+**用在哪里**
+
+场景一：财务付款审批。
+业务背景：批量付款需要按金额分级审批。
+这一节的知识怎么用：金额高于阈值时把 human_input_mode 设为 ALWAYS，否则自动执行。
+用什么指标衡量收益：审批环节的平均等待时长。
+什么时候不该用：金额小且收款方是白名单时，不必增加审批点。
+
+场景二：生产环境变更。
+业务背景：改配置、扩缩容这类操作需要有人盯着。
+这一节的知识怎么用：用中断关键字把执行停在提交命令之前。
+用什么指标衡量收益：回滚次数。
+什么时候不该用：灰度环境可以自动执行，先验证再上生产。
+
+场景三：批量删除类脚本。
+业务背景：运维要清理过期文件，误删代价高。
+这一节的知识怎么用：先用 READ 权限列出待删清单，人工确认后再提升到 WRITE。
+用什么指标衡量收益：误删事件次数。
+什么时候不该用：目录内容本身就是临时产物时，可以直接执行并保留删除日志。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Human-in-the-Loop 章节说明了 human_input_mode 的取值与各自触发条件。借鉴方式：把取值来源写成配置项，不同环境用不同默认值。
+- AutoGen 官方 GitHub 仓库的 examples 目录包含多轮人工确认的示例写法。借鉴方式：把审批记录落成结构化日志，便于事后审计。
+- LangGraph 官方文档的人机协作章节介绍了在执行前插入人工确认节点的做法。借鉴方式：把「停下来等人」当成流程图里的一个节点，而不是散落的 if 判断。
+
+**小结**
+- 风险等级由代码决定，不要让模型决定自己是否需要被审批。
+- 中断标记与完成标记都要有，缺一个就会出现无人值守时的无限循环。
+- 权限默认从最低档开始，提权是显式动作。
+
+## 7. 完整示例：开发团队群聊与代码审查流水线
+
+**先想一个问题**
+
+一个需求从提出到测试通过，要经过产品分析、架构设计、编码、测试设计四个环节。如果每个环节你都手动去调一次模型，中间结果靠复制粘贴，很快就乱了。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：把每个环节做成一个角色，用群聊把它们串成一条流水线。
+    日常类比：像工厂的流水线，每道工序只做一件事，做完把半成品放到传送带上。
+    不成立之处：流水线的工位是确定的，模型群聊的发言顺序可能变化，所以要设轮数上限。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["用户代理 发起需求"] --> B["产品经理 分析需求"]
+  B --> C["架构师 设计方案"]
+  C --> D["前端与后端 分工"]
+  D --> E["测试工程师 设计用例"]
+  E --> F["执行角色 跑测试"]
+  F --> G["命中终止条件 结束"]
+```
+
+1. 用户代理把需求写进消息列表，成为群聊开场白。
+2. 产品经理先发言，输出需求要点与验收口径。
+3. 架构师基于需求要点给出技术方案与模块划分。
+4. 前后端角色按方案拆出各自的开发任务。
+5. 测试工程师根据验收口径设计用例。
+6. 执行角色跑用例，输出结果后命中终止条件，群聊结束。
+
+**一步一步来**
+
+**第 1 步：用字典批量创建角色**
+① 这一步要做什么：把角色名与职责提示写进配置，循环创建智能体。
+
+```python
+from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
+
+ROLES = {
+    "product_manager": "你是产品经理，负责需求分析与验收口径。",
+    "architect":       "你是系统架构师，负责技术方案与模块划分。",
+    "frontend_dev":    "你是前端工程师，负责页面与交互实现。",
+    "backend_dev":     "你是后端工程师，负责接口与数据存储。",
+    "qa_engineer":     "你是测试工程师，负责测试策略与用例设计。",
+}
+
+# 字典推导式批量构造，角色名即 Agent 的 name
+members = [
+    AssistantAgent(name=name, llm_config=llm_config, system_message=desc)
+    for name, desc in ROLES.items()
+]
+```
+
+**这段代码在做什么**
+- 把角色与提示词放在一处，新增角色只改字典。
+- 字典的键顺序在 Python 3.7 之后是插入顺序，因此角色创建顺序与书写顺序一致。
+- system_message 是角色之间唯一的差别，模型配置完全相同。
+- members 列表的顺序会影响 round_robin 的轮询顺序。
+
+运行结果：只构造对象，控制台无输出。
+
+**第 2 步：建群聊并启动**
+① 这一步要做什么：把角色装进群聊，设置轮数上限与选择策略，然后发起任务。
+
+```python
 team = GroupChat(
-    agents=[pm, architect, frontend, backend, tester],
+    agents=members,
     messages=[],
-    max_round=20,
-    speaker_selection_method="auto"
+    max_round=20,                    # 旧版内容取值，以原文为准
+    speaker_selection_method="auto", # 由 LLM 决定下一位
 )
 
 manager = GroupChatManager(groupchat=team, llm_config=llm_config)
 
-# 启动团队协作
+user_proxy = UserProxyAgent(name="user", human_input_mode="TERMINATE")
+
 user_proxy.initiate_chat(
     manager,
-    message="""
-    请团队协作完成以下任务：
-    
-    1. 产品经理分析需求：用户注册登录系统
-    2. 架构师设计系统架构
-    3. 前后端分配开发任务
-    4. 测试工程师设计测试用例
-    """
+    message="请协作完成用户注册登录系统的设计，包含需求、架构、开发分工与测试用例。",
 )
 ```
 
-### 6.2 代码审查流水线
+**这段代码在做什么**
+- max_round 设为 20 是因为五个角色各说几轮就会用掉轮次。
+- auto 让选择跟随内容，架构师讲完后更可能轮到开发角色。
+- human_input_mode 为 TERMINATE 表示平时不打断，出现终止条件时才介入。
+- initiate_chat 的返回值里含完整历史，需要复盘时可以保存下来。
+
+运行结果：需要真实 API Key；控制台按轮次打印五位角色的发言，内容取决于模型。
+
+**第 3 步：把审查做成可调用的方法**
+① 这一步要做什么：把编码与审查两步封装成类，对外只暴露一个 run 方法。
 
 ```python
-"""
-自动代码审查流水线
-"""
-
-from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
-
 class CodeReviewPipeline:
-    """代码审查流水线"""
-    
     def __init__(self, llm_config):
-        # 编码智能体
         self.coder = AssistantAgent(
-            name="coder",
-            llm_config=llm_config,
-            system_message="你是一个 Python 开发工程师，编写高质量代码。"
-        )
-        
-        # 审查智能体
+            name="coder", llm_config=llm_config,
+            system_message="你是 Python 工程师，编写高质量代码。")
         self.reviewer = AssistantAgent(
-            name="reviewer",
-            llm_config=llm_config,
-            system_message="""你是一个代码审查专家，专注于：
-            1. 代码质量（可读性、规范性）
-            2. 性能问题
-            3. 安全漏洞
-            4. 测试覆盖
-            """
-        )
-        
-        # 执行器
+            name="reviewer", llm_config=llm_config,
+            system_message="你是代码审查专家，关注可读性、性能、安全与测试覆盖。")
         self.executor = UserProxyAgent(
-            name="executor",
-            human_input_mode="NEVER",
-            code_execution_config={"work_dir": "workspace", "use_docker": True}
-        )
-        
-        self.llm_config = llm_config
-    
-    def run(self, code: str) -> dict:
-        """运行审查流程"""
-        results = {
-            "original_code": code,
-            "issues": [],
-            "suggestions": []
-        }
-        
-        # Step 1: 编码
-        self.coder.initiate_chat(
-            self.executor,
-            message=f"编写并执行以下需求的代码：\n{code}"
-        )
-        written_code = self.executor.last_message()
-        
-        # Step 2: 审查
-        self.reviewer.initiate_chat(
-            self.executor,
-            message=f"审查以下代码并提供改进建议：\n{written_code}"
-        )
-        review_result = self.reviewer.last_message()
-        
-        # Step 3: 整合结果
-        if "error" in review_result.lower():
-            results["issues"].append(review_result)
-        else:
-            results["suggestions"].append(review_result)
-        
-        return results
+            name="executor", human_input_mode="NEVER",
+            code_execution_config={"work_dir": "workspace", "use_docker": True})
 
-# 使用示例
-pipeline = CodeReviewPipeline(llm_config)
-result = pipeline.run("实现一个 LRU 缓存")
+    def run(self, requirement):
+        # 第一步：生成并执行
+        self.coder.initiate_chat(self.executor, message=f"编写并执行：\n{requirement}")
+        written = self.executor.last_message()
+        # 第二步：审查
+        self.reviewer.initiate_chat(self.executor, message=f"审查以下代码并给出改进建议：\n{written}")
+        review = self.reviewer.last_message()
+        return {"code": written, "review": review}
 ```
 
-### 6.3 研究助手群聊
+**这段代码在做什么**
+- 三个角色分工明确：生成、审查、执行，执行角色不配模型。
+- run 方法只返回字典，调用方不必了解内部的对话过程。
+- 两次 initiate_chat 是串行的，总耗时约为两次对话之和。
+- 审查结果放在 review 字段里，是否通过由你写规则判断，不要让模型自己决定。
 
-```python
-"""
-研究助手 - 多智能体协作研究
-"""
+运行结果：需要真实 API Key 与 Docker；返回字典含 code 与 review 两个字段，内容取决于模型。
 
-# 第 1 段：导入依赖（这一段决定整个方案的"词汇表"）
-# AssistantAgent = 由 LLM 生成的发言者；GroupChat = 保存全部消息并施加发言规则；
-# GroupChatManager = 按规则挑选下一个发言者的调度器，三者缺一不可。
-# 易错点：下面用到的 UserProxyAgent 并没有出现在这一行，运行到 conduct_research 时才会暴露 NameError。
-from autogen import AssistantAgent, GroupChat, GroupChatManager
+**动手验证**
 
-# 第 2 段：团队定义与初始化（把三个角色装配成可复用的对象）
-# 三个 Agent 共享同一个 llm_config 字典；AutoGen 可能就地写入 cache_seed 等字段，
-# 因此它是共享可变状态——额外保存 self.llm_config 就是为了后续构造 GroupChatManager 时
-# 能拿到与角色完全一致的模型配置，避免两处配置漂移。
-class ResearchTeam:
-    """研究团队"""
-    
-    def __init__(self, llm_config):
-        # 三个角色的模型与采样参数完全相同，唯一差异是 system_message 给出的人设分工：
-        # 研究员负责广度（搜集），分析师负责深度（提炼），作家负责表达（成文）。
-        # 这种"同模型、不同提示"是多智能体最廉价的实现方式：不额外训练，只换提示词。
-        self.researcher = AssistantAgent(
-            name="researcher",
-            llm_config=llm_config,
-            system_message="你是一个研究员，负责搜集和整理信息。"
-        )
-        
-        self.analyst = AssistantAgent(
-            name="analyst",
-            llm_config=llm_config,
-            system_message="你是一个分析师，负责深度分析和提炼洞见。"
-        )
-        
-        self.writer = AssistantAgent(
-            name="writer",
-            llm_config=llm_config,
-            system_message="你是一个技术作家，负责撰写清晰的研究报告。"
-        )
-        
-        # 存引用而非深拷贝，确保 Manager 与三个角色读到的是同一份模型配置
-        self.llm_config = llm_config
-    
-    # 第 3 段：一次完整研究任务的编排（群聊 → 调度器 → 用户代理 → 取回结果）
-    def conduct_research(self, topic: str) -> str:
-        """执行研究任务"""
-        # 创建临时群聊
-        # 每次调用都新建 GroupChat 且 messages=[]，保证不同 topic 之间历史不串味；
-        # max_round=15 是硬性轮数上限（一轮 = 一次发言 = 一次 LLM 调用），
-        # 它既是成本闸门也是防死循环的兜底——太小报告写不完，太大则烧钱。
-        group = GroupChat(
-            agents=[self.researcher, self.analyst, self.writer],
-            messages=[],
-            max_round=15
-        )
-        # Manager 需要 llm_config，是因为"下一个谁发言"本身也交给 LLM 决策：
-        # 它把 group 的消息历史转成提示词选出下一位发言者，所以既是调度器也是调用者。
-        manager = GroupChatManager(groupchat=group, llm_config=self.llm_config)
-        
-        # 用户代理启动
-        # UserProxyAgent 代表"人"这一侧：human_input_mode="TERMINATE" 表示平时不打断、
-        # 只有出现终止条件时才要求人工介入，适合无人值守的批量运行。
-        # initiate_chat 把 message 作为开场白注入群聊，随后由 Manager 接管轮转。
-        user_proxy = UserProxyAgent(name="user", human_input_mode="TERMINATE")
-        user_proxy.initiate_chat(
-            manager,
-            message=f"请研究团队协作完成关于「{topic}」的研究报告。"
-        )
-        
-        # initiate_chat 的返回值（ChatResult，含 chat_history/cost 等）被忽略，这里只取最后一条消息当报告。
-        # 边界条件：若末尾是 TERMINATE 之类的控制消息而非正文，返回值可能不是完整报告，
-        # 更稳健的做法是回传整个 chat_history 或显式提取 writer 的最后一次发言。
-        return user_proxy.last_message()
+下面的脚本用 Node 模拟五位角色轮流发言，验证轮数上限与终止条件的配合。
 
-# 第 4 段：使用示例（注意 llm_config 需在此前于外部定义好）
-# 数据流：构造团队 → 传入研究主题 → 得到字符串报告；
-# 单次 run 的 LLM 调用量级与 max_round 相当（调度 + 各角色发言），需为成本预留预算。
-team = ResearchTeam(llm_config)
-report = team.conduct_research("大语言模型在代码生成领域的应用")
+```js
+// 依赖：仅 Node 20+ 内置模块
+// 运行：node team-pipeline.mjs
+import assert from "node:assert/strict";
+
+const members = ["product_manager", "architect", "frontend_dev", "backend_dev", "qa_engineer"];
+
+function runTeam(maxRound, shouldTerminate) {
+  const messages = [];
+  let round = 0;
+  while (round < maxRound) {
+    const speaker = members[round % members.length];
+    const content = `${speaker} 第 ${round + 1} 轮发言`;
+    messages.push({ speaker, content });
+    round += 1;
+    if (shouldTerminate(messages)) break;   // 终止条件优先于轮数上限
+  }
+  return messages;
+}
+
+const full = runTeam(20, () => false);
+assert.equal(full.length, 20);                       // 未命中终止条件，走满上限
+assert.equal(full.at(-1).speaker, "qa_engineer");
+
+const stopped = runTeam(20, (msgs) => msgs.length === 7);
+assert.equal(stopped.length, 7);                     // 命中终止条件提前结束
+assert.equal(stopped.at(-1).speaker, "architect");
+
+console.log("走满上限的轮数:", full.length);
+console.log("提前终止的轮数:", stopped.length);
+console.log("断言全部通过");
 ```
-### 6.4 带错误恢复的代码生成
 
-```python
-# 第 1 段：模块定位与依赖引入
-# 本模块演示基于 AutoGen 的"生成 → 执行 → 报错 → 再生成"闭环：让 LLM 扮演写代码的人和修代码的人，
-# 由执行器真正跑一遍产物，用运行期异常当作反馈信号驱动下一轮生成，直到成功或重试次数耗尽。
-"""带自动错误恢复的代码生成系统"""
+预期输出：
 
-# 只依赖两个核心角色：AssistantAgent（纯 LLM 对话，不执行代码）与 UserProxyAgent（可作为执行载体）。
-from autogen import AssistantAgent, UserProxyAgent
-
-
-# 第 2 段：类骨架与重试上限常量
-# 把 MAX_RETRIES 放在类属性而非实例属性，是为了让"最大重试次数"成为全局策略：
-# 所有实例共享同一份配置，后续想做按实例定制也可以被 __init__ 覆盖成实例属性。
-class SelfHealingCodeGenerator:
-    """自愈代码生成器"""
-    
-    MAX_RETRIES = 3
-    
-    # 第 3 段：构造三件套（生成者 / 调试者 / 执行者）
-    # 三个 Agent 共用同一份 llm_config，只有 system_message 做职责隔离——这就是"角色提示词即工作流分工"的思路。
-    # executor 用 human_input_mode="NEVER" 让流程完全无人值守；use_docker=True 把不可信代码关进容器，
-    # 代价是每次执行有容器启动开销，且宿主机与容器的工作目录映射需要真实存在（边界条件之一）。
-    def __init__(self, llm_config):
-        self.generator = AssistantAgent(
-            name="generator",
-            llm_config=llm_config,
-            system_message="你是一个代码生成专家，生成高质量 Python 代码。"
-        )
-        
-        # debugger 目前只做了注册、并未在 generate_with_recovery 中显式调用；
-        # 它依赖 AutoGen 的多 Agent 对话机制（generator 与 executor 互相触发）被动参与，属于易错点/待接线处。
-        self.debugger = AssistantAgent(
-            name="debugger",
-            llm_config=llm_config,
-            system_message="你是一个调试专家，精于修复代码错误。"
-        )
-        
-        self.executor = UserProxyAgent(
-            name="executor",
-            human_input_mode="NEVER",
-            code_execution_config={"work_dir": "workspace", "use_docker": True}
-        )
-    
-    # 第 4 段：对外主入口——带恢复的生成流程
-    # 返回 (code, success) 这种"值 + 布尔"元组，而不是抛异常，让调用方可以自己决定失败后怎么办（降级、告警、人工接管）。
-    # 数据流：requirement → generator/executor 对话 → executor.last_message() 取回文本 → 尝试执行 → 成功返回 / 失败回填 last_error。
-    def generate_with_recovery(self, requirement: str) -> tuple[str, bool]:
-        """
-        带错误恢复的代码生成
-        
-        Returns:
-            (code, success)
-        """
-        attempt = 0
-        
-        # 用 while 而非 for，是因为 attempt 只在"真正执行失败"后才自增：
-        # 无论生成还是执行阶段出现异常，都会走同一个计数口径，保证最多执行 MAX_RETRIES 次。
-        while attempt < self.MAX_RETRIES:
-            # 第 5 段：生成阶段——首轮"从零写"，后续轮"带着错误修"
-            # attempt == 0 与 else 分支的唯一区别是把 last_error 拼进提示词，形成"错误驱动"的迭代修复；
-            # 这也是为什么 last_error 只会在 attempt > 0 时被引用——它在第 6 段的 except 中被赋值，边界安全。
-            # 生成代码
-            if attempt == 0:
-                self.generator.initiate_chat(
-                    self.executor,
-                    message=f"生成代码：{requirement}"
-                )
-            else:
-                self.generator.initiate_chat(
-                    self.executor,
-                    message=f"根据错误修复代码：{requirement}\n错误：{last_error}"
-                )
-            
-            # last_message() 取的是整段对话最后一条消息的纯文本，通常含 Markdown 代码块与解释文字；
-            # 直接把它当"可执行源码"是这段代码最脆弱的假设，后续若接入正式生产需要做代码块抽取/清洗。
-            code = self.executor.last_message()
-            
-            # 第 6 段：执行与错误捕获——恢复机制的核心
-            # 这里用 try/except 把"执行失败"转成可继续的循环信号：捕获到异常就刷新 last_error 并进入下一轮，
-            # 从而把一次性脚本变成自愈流程。复杂度上，每轮都是 LLM 往返 + 沙箱执行，代价随重试数线性增长。
-            # 注意边界：AutoGen 的 execute_code_blocks 也常用"返回执行结果"而非抛异常的方式报告失败，
-            # 若失败被吞在返回值里，此处的 except 就不会触发，重试会过早判定成功——这是最需要留意的语义陷阱。
-            # 执行并检查错误
-            try:
-                self.executor.execute_code_blocks([
-                    ("python", code)
-                ])
-                
-                # 没抛异常即视为成功：立刻返回，避免把成功结果也拖进重试循环。
-                return code, True
-                
-            except Exception as e:
-                # 只保留错误字符串而非完整 traceback，是为了控制回填给提示词的上下文长度，防止提示词膨胀。
-                last_error = str(e)
-                attempt += 1
-                print(f"尝试 {attempt} 失败: {last_error}")
-        
-        # 第 7 段：重试耗尽后的兜底返回
-        # 返回最后一次生成的 code（可能仍是坏的）并标记 False，把最终裁决权交给调用方；
-        # 隐含边界：若 MAX_RETRIES <= 0，循环体一次都不进入，code/last_error 均未绑定，此处会抛 NameError。
-        return code, False
-
-
-# 第 8 段：使用示例——实例化 + 单次调用
-# llm_config 在此处是"外部注入"的隐式依赖：示例假定它已在上下文定义，教学演示时可直接视作占位。
-# 调用会阻塞到成功或重试耗尽，因此放在脚本顶层时，打印的失败信息就是最直观的恢复过程日志。
-# 使用示例
-generator = SelfHealingCodeGenerator(llm_config)
-code, success = generator.generate_with_recovery(
-    "实现一个函数计算字符串中每个字符出现的频率"
-)
 ```
-## 7. 最佳实践
+走满上限的轮数: 20
+提前终止的轮数: 7
+断言全部通过
+```
 
-### 7.1 群聊配置建议
+**常见坑**
 
-| 配置项 | 推荐值 | 说明 |
-|--------|--------|------|
-| `max_round` | 10-30 | 根据任务复杂度调整 |
-| `speaker_selection_method` | "auto" | 动态选择通常更灵活 |
-| `allow_repeat_speaker` | True | 允许关键人物多次发言 |
-| `messages` | [] | 从空列表开始 |
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 轮数用完了任务还没收尾 | 角色多而 max_round 偏小 | 按角色数乘以每人平均发言次数估算上限 |
+| 审查角色重复生成同一段代码 | 审查角色也配了执行能力 | 审查角色不配 code_execution_config |
+| 返回的报告不完整 | last_message 拿到的是控制类消息 | 改为从完整历史里取目标角色的最后一条发言 |
 
-### 7.2 性能优化
+**用在哪里**
+
+场景一：内部脚手架生成平台。
+业务背景：新项目初始化时按规范生成目录、配置与示例代码。
+这一节的知识怎么用：把五个角色换成规范校验需要的角色，用流水线跑一遍。
+用什么指标衡量收益：新项目初始化后仍需手工改动的文件数。
+什么时候不该用：项目模板已经很固定的场景，直接用模板文件。
+
+场景二：模型生成代码的入库前检查。
+业务背景：合并请求里的生成代码需要先过机器审查。
+这一节的知识怎么用：在合并请求触发时跑 CodeReviewPipeline，把 review 贴回评论。
+用什么指标衡量收益：人工评审提出的问题条数变化。
+什么时候不该用：改动只是格式化的场景，不必走审查流水线。
+
+场景三：需求评审的会前准备。
+业务背景：评审会前需要一份包含风险点的需求说明。
+这一节的知识怎么用：用产品与架构两个角色先跑一轮，产出会前材料。
+用什么指标衡量收益：评审会上被推翻的需求条目数。
+什么时候不该用：需求由客户直接给定且不可改时，先对齐范围。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Group Chat 章节给出了 GroupChat 与 GroupChatManager 的最小用法。借鉴方式：先跑通三个角色的最小版本，再逐个加角色。
+- AutoGen 官方 GitHub 仓库的 examples 目录包含多角色协作完成开发任务的示例脚本。借鉴方式：把示例里的角色名换成自己团队的岗位名，先比对输出再改提示词。
+- LangGraph 官方文档的多智能体章节介绍了把流程画成图再实现的做法。借鉴方式：写代码前先画节点与边，明确每个节点的输入输出。
+
+**小结**
+- 角色配置写在字典里，新增角色只改一处。
+- 终止条件优先于轮数上限，两个都要有。
+- 对外只暴露一个 run 方法，内部对话过程不泄漏给调用方。
+
+## 8. 最佳实践与成本控制
+
+**先想一个问题**
+
+你的群聊跑一次要调十几次模型。上线之后发现月度费用超出预期，但每个任务又都「看起来有必要跑这么多轮」。你需要在哪几个位置设闸门。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：群聊的成本等于轮数乘以每轮发送的内容量。
+    日常类比：像打长途电话，通话时长和每分钟话费共同决定账单。
+    不成立之处：模型的计费还区分输入与输出，两者单价不同，所以只压轮数不够，还要压发送内容。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["任务进入群聊"] --> B["max_round 轮数上限"]
+  B --> C["每轮拼接历史"]
+  C --> D["send_token_limit 发送上限"]
+  D --> E["模型调用 计费发生"]
+  E --> F["缓存命中 跳过调用"]
+  F --> G["任务结束 汇总消耗"]
+```
+
+1. 任务进入群聊后，第一道闸门是轮数上限。
+2. 每轮把历史拼成提示词，这一步决定发送内容的大小。
+3. 第二道闸门是发送上限，超出部分会被裁掉。
+4. 内容到达模型，计费在这一步发生。
+5. 命中缓存时跳过调用，省下一次费用。
+6. 任务结束后汇总本次的轮数与调用次数，作为下次配置的依据。
+
+**一步一步来**
+
+**第 1 步：把两个上限写进配置**
+① 这一步要做什么：给群聊设置轮数上限与发送内容上限。
 
 ```python
-# 1. 限制上下文长度
+from autogen import GroupChat
+
 group_chat = GroupChat(
     agents=agents,
     messages=[],
-    max_round=20,
-    send_token_limit=6000  # 限制每次发送的 token
+    max_round=20,            # 轮数上限，旧版内容取值，以原文为准
+    send_token_limit=6000,   # 每次发送的 token 上限，旧版内容取值，以原文为准
 )
-
-# 2. 使用缓存
-from autogen.caching import CacheDisk
-
-cache = CacheDisk(ttl=3600, max_size=1000)
-assistant = AssistantAgent(
-    name="assistant",
-    llm_config=llm_config,
-    cache=cache
-)
-
-# 3. 并行初始化
-import concurrent.futures
-
-def init_agent(args):
-    name, config = args
-    return AssistantAgent(name=name, llm_config=config)
-
-with concurrent.futures.ThreadPoolExecutor() as executor:
-    agents = list(executor.map(
-        init_agent,
-        [("agent1", llm_config), ("agent2", llm_config), ("agent3", llm_config)]
-    ))
 ```
 
-### 7.3 调试技巧
+**这段代码在做什么**
+- max_round 限制总轮数，直接决定调用次数的上限。
+- send_token_limit 限制单次发送量，间接影响每次调用的费用。
+- 两个上限配合，成本上界才可控。
+- 具体默认值与字段名需核对官方文档：要核对当前版本是否仍提供 send_token_limit。
+
+运行结果：只构造对象，无输出。
+
+**第 2 步：给调用加缓存与并发初始化**
+① 这一步要做什么：把重复的模型调用交给缓存，把互不依赖的角色初始化并行化。
 
 ```python
-import logging
+import concurrent.futures
+from autogen import AssistantAgent
 
-# 启用详细日志
-logging.basicConfig(level=logging.DEBUG)
+def build(name):
+    return AssistantAgent(name=name, llm_config=llm_config)
 
-# 自定义日志处理器
-class GroupChatLogger:
-    def __init__(self, log_file: str):
-        self.log_file = log_file
-    
-    def log_message(self, speaker: str, message: str):
-        timestamp = datetime.now().isoformat()
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            f.write(f"[{timestamp}] {speaker}: {message}\n")
+names = ["product_manager", "architect", "frontend_dev", "backend_dev"]
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+    members = list(pool.map(build, names))
 
-# 使用日志
-logger = GroupChatLogger("group_chat.log")
-for msg in group_chat.messages:
-    logger.log_message(msg["speaker"], msg["content"])
+print("已创建角色数:", len(members))
 ```
 
-## 8. 参考资源
+**这段代码在做什么**
+- 角色初始化互不依赖，可以并行执行，缩短启动时间。
+- max_workers 设为 4 与角色数一致，避免创建多余线程。
+- 缓存相关的类与参数需核对官方文档：要核对缓存模块的导入路径与构造参数。
+- 并行只影响启动阶段，对话仍然是串行的。
 
-- [AutoGen 官方文档](https://microsoft.github.io/autogen/)
-- [AutoGen GitHub 仓库](https://github.com/microsoft/autogen)
-- [GroupChat 示例](https://github.com/microsoft/autogen/blob/main/python/packages/autogen-agentchat/src/autogen_agentchat/groups/)
-- [AutoGen 论文](https://arxiv.org/abs/2308.08155)
+运行结果：形如 `已创建角色数: 4`，不需要调用模型。
 
----
+**动手验证**
 
-*本文档由 Claude 生成，最后更新：2026-05*
+下面的脚本估算不同配置下的调用次数上界，并对结果做断言。
 
-## 应用与行业实践
+```js
+// 依赖：仅 Node 20+ 内置模块
+// 运行：node budget.mjs
+import assert from "node:assert/strict";
 
-### 应用场景地图
+// 估算调用次数上界：轮数乘以每轮调用数，再加上选人带来的调用
+function estimateCalls(maxRound, callsPerRound, selectionCalls) {
+  if (maxRound <= 0) return 0;
+  return maxRound * (callsPerRound + selectionCalls);
+}
+
+// 轮询策略：选人不额外调用模型
+const roundRobinCalls = estimateCalls(20, 1, 0);
+// 动态策略：每轮多一次选人调用
+const autoCalls = estimateCalls(20, 1, 1);
+
+assert.equal(roundRobinCalls, 20);
+assert.equal(autoCalls, 40);
+assert.ok(autoCalls > roundRobinCalls);
+
+// 估算发送内容增长：每轮追加一条消息，内容量线性增长
+function estimateSentUnits(maxRound, unitPerMessage) {
+  let total = 0;
+  for (let i = 1; i <= maxRound; i += 1) total += i * unitPerMessage;
+  return total;
+}
+
+const sent = estimateSentUnits(20, 1);
+assert.equal(sent, 210); // 1 加到 20
+
+console.log("轮询调用次数上界:", roundRobinCalls);
+console.log("动态调用次数上界:", autoCalls);
+console.log("累计发送单位:", sent);
+console.log("断言全部通过");
+```
+
+预期输出：
+
+```
+轮询调用次数上界: 20
+动态调用次数上界: 40
+累计发送单位: 210
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 费用随轮数平方级上涨 | 每轮都把全部历史重发，内容量随轮数累加 | 设置发送上限，并在拼接前裁剪历史 |
+| 动态选人比预期贵一倍 | 每轮多一次选人调用 | 规则清晰的场景改用自定义选择，减少调用 |
+| 并发初始化后配置互相影响 | 多个角色共用同一个可变字典，被就地改写 | 每个角色使用独立的配置副本 |
+
+**用在哪里**
+
+场景一：长文档研究助手。
+业务背景：一次研究要经过检索、分析、成文三步。
+这一节的知识怎么用：按步骤设置轮数上限，成文阶段单独放大上限。
+用什么指标衡量收益：单次研究的模型调用次数。
+什么时候不该用：文档只有两页时，直接提问比建群聊省事。
+
+场景二：多语言脚本执行平台。
+业务背景：用户提交各语言代码片段，平台执行并返回结果。
+这一节的知识怎么用：给每种语言设置独立超时，避免慢查询拖垮队列。
+用什么指标衡量收益：执行任务的排队等待时长。
+什么时候不该用：代码片段只是演示时，不要开启容器执行。
+
+场景三：批量任务的成本看板。
+业务背景：团队想知道每个任务的调用次数与轮数分布。
+这一节的知识怎么用：把每轮的消息条数与调用次数记录下来，按日汇总。
+用什么指标衡量收益：单任务平均调用次数。
+什么时候不该用：任务量很少、无法形成分布时，不必先搭看板。
+
+**行业实践**
+
+- Microsoft AutoGen 官方文档的 Group Chat 章节列出了轮数上限等配置项的作用。借鉴方式：把上限做成环境变量，测试环境用小值，生产再放大。
+- AutoGen 官方 GitHub 仓库的 examples 目录包含缓存与成本相关的示例配置。借鉴方式：先在测试环境打开缓存跑一轮，对比命中前后的调用次数。
+- Docker 官方文档的容器资源限制章节说明了内存与 CPU 约束方式。借鉴方式：给执行容器单独设置资源上限，避免单任务占满宿主机。
+
+**小结**
+- 轮数上限决定调用次数上界，发送上限决定单次内容量。
+- 动态选人每轮多一次调用，规则清晰时改用自定义策略。
+- 缓存与并发初始化优化的是启动与重复调用，不改变对话本身的串行性。
+
+## 应用地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
 | --- | --- | --- | --- |
-| 电商后台每日订单对账，单日账单文件上万行 | GroupChat 模式中的固定顺序发言 | GroupChat + speaker_selection_method="round_robin" | 顺序固定可去掉选人抖动，但角色要拆到一人一职 |
-| 客服工单自动分诊并生成回复草稿 | GroupChat 架构中的 Manager 选人 | GroupChatManager + 自定义 speaker_selection_func | 草稿先内部流转，人工确认后再外发 |
-| 合同条款多角色审阅（法务/财务/业务） | 嵌套聊天与层级组 | 外层 GroupChat 调用内层 GroupChat | 内层结论要压成结构化摘要再回传外层 |
-| 代码仓库 issue 修复流水线 | AutoGen 代码执行 | UserProxyAgent + code_execution_config 指定 Docker | 容器内不挂载密钥，测试失败要允许重跑 |
-| 运维告警根因分析，日志/指标/变更三路取证 | Human-in-the-Loop 模式 | human_input_mode="TERMINATE" + 值班人确认 | 值班窗口外要留超时降级路径 |
-| 在线教育作业批改与讲解生成 | 最佳实践中的终止条件设计 | is_termination_msg + max_round | 终止标记要写成可判定的字符串 |
-| 数据看板口径核对，先生成 SQL 再验证 | AutoGen 代码执行 + GroupChat 模式 | 分析 Agent + 执行 Agent + 校验 Agent | 数据库账号只读，禁止 DDL |
-| 保险理赔材料初审，多份单据交叉核对 | 嵌套聊天与层级组 | 外层路由 + 内层逐材料核对 | 缺件要显式列出缺哪一份，不允许模型推测 |
+| 电商客服工单分诊 | 发言者选择策略、终止条件 | AutoGen 群聊 + 工单系统接口 | 含支付信息的工单不要让执行角色自动跑 |
+| 后台管理的批量导入脚本生成 | 代码执行与沙箱隔离 | UserProxyAgent + 容器执行 | work_dir 指向临时目录，超时设小 |
+| 合并请求的机器审查 | 自定义发言者选择、流水线封装 | AutoGen + CI 触发 | 结论贴回评论，合并与否由人决定 |
+| 数据报表自动生成 | 嵌套聊天与层级组 | AutoGen + 只读数据库账号 | 只读凭据，禁止写库 |
+| 生产变更操作 | Human-in-the-Loop 风险分级 | human_input_mode + 审批记录表 | 高风险设为 ALWAYS，并保留审计日志 |
+| 多语言脚本执行 | 多语言执行器路由 | python:3.11 / node:18 镜像 | 镜像里的依赖要预装，路由键需完全一致 |
+| 长文档研究助手 | 轮数上限与发送上限 | AutoGen 群聊 + 缓存 | 轮数上限即成本闸门，按预算设置 |
 
-### 三个场景拆解
+## 动手作业
 
-#### 场景 1：电商后台每日订单对账
+**目标**：搭一个三人代码互助群聊，包含编码、审查、执行三个角色，跑通一次完整任务。
 
-**业务背景**：财务每天拿平台账单与自有库订单逐行比对，单日文件在万行量级。人工抽检覆盖的行数占比低，差异常在结算前才暴露。
+**步骤**
+- 第 1 步：定义三个角色，编码与审查角色配 llm_config，执行角色只配 code_execution_config。
+- 第 2 步：创建 GroupChat，agents 按编码、审查、执行顺序排列，max_round 设为 6，messages 传空列表。
+- 第 3 步：用自定义选择方法实现一条规则：历史里出现代码块就找审查角色，出现报错就找执行角色。
+- 第 4 步：用执行角色发起对话，任务为「写一个统计字符串字符频率的函数并运行」。
+- 第 5 步：把 chat_messages 导出为 JSON 文件，统计本次的总轮数与消息条数。
 
-**怎么用本页知识解决**：把流程拆成读取、比对、执行三个角色，用固定顺序发言的群聊跑完一轮，避免模型自由选人带来的顺序漂移。
+**验收标准**
+- 运行脚本后能生成一个 JSON 文件，文件里消息条数大于等于 3。
+- 自定义选择方法的代码存在兜底分支，把历史清空后仍能返回一个合法角色名。
+- 轮数不超过 6，超过则视为未通过。
+- 执行角色的输出中包含函数运行结果或明确的报错信息。
+- 打印出的统计数字与实际 JSON 文件里的条数一致。
+- 把执行角色的 code_execution_config 里的 timeout 改成 1 秒后重跑，能观察到超时中断而不是进程挂死。
 
-```python
-import autogen
+## 综合对比
 
-llm_config = {"config_list": [{"model": "你的模型名"}]}  # 按运行环境替换
+| 维度 | 双人对话 | 单层群聊 | 层级组 | 嵌套群聊 |
+| --- | --- | --- | --- | --- |
+| 消息可见范围 | 只有两个角色互相可见 | 全部角色可见同一份列表 | 同层可见，跨层通过转发 | 子讨论只对子群聊可见 |
+| 每轮模型调用次数 | 1 次 | 1 次，动态选人再加 1 次 | 与转发层数量相关 | 主讨论与子讨论分别计费 |
+| 终止条件 | 双方约定或轮数上限 | 轮数上限加终止关键字 | 每层各自设上限 | 子讨论与主讨论各设上限 |
+| 调试难度 | 低，历史只有一条链 | 中，需要按角色筛选历史 | 高，要跨层追踪转发内容 | 高，要同时看两份历史 |
+| 适合任务规模 | 单一问题 | 三到五个角色的协作 | 分工固定的多领域任务 | 需要深挖单点的任务 |
+| 成本风险 | 轮数乘以 1 次调用 | 轮数乘以 1 到 2 次调用 | 与转发次数成正比 | 主讨论与子讨论调用量相加 |
+| 典型失败模式 | 双方互相等待 | 无人发言就结束 | 转发层抢着干活 | 子讨论结论被覆盖 |
 
-reader = autogen.AssistantAgent(        # 角色 1：只读文件，报字段与行数
-    name="reader", llm_config=llm_config,
-    system_message="读取两份对账文件，输出字段名与总行数，不判断差异。")
+## 自测题
 
-checker = autogen.AssistantAgent(       # 角色 2：只做逐行比对
-    name="checker", llm_config=llm_config,
-    system_message="用 pandas 逐行比对，输出差异订单号与差异字段。")
+??? question "1. GroupChat 与 GroupChatManager 的职责如何划分？"
+    GroupChat 负责持有与会者名单与消息列表，是消息的存储与规则载体。
+    GroupChatManager 负责调度：调用选择策略决定下一位发言者，并判断终止条件。
+    把消息存哪里与决定谁发言分开，是为了让选择逻辑可替换。
+    GroupChatManager 自身需要 llm_config，因为动态选择这一步也走模型。
 
-executor = autogen.UserProxyAgent(      # 角色 3：真正执行代码，不参与讨论
-    name="executor", human_input_mode="NEVER",
-    code_execution_config={"work_dir": "recon", "use_docker": True})
+??? question "2. round_robin 与 auto 两种策略的差别是什么？"
+    round_robin 按名单顺序取下一个发言者，不额外调用模型。
+    auto 把当前历史交给模型，由模型给出角色名，每轮多一次调用。
+    发言顺序固定且角色职责清晰时，轮询足够且更省调用。
+    需要按内容切换角色时，用 auto 或自定义选择方法。
 
-groupchat = autogen.GroupChat(          # 固定顺序，去掉选人随机性
-    agents=[reader, checker, executor], messages=[],
-    speaker_selection_method="round_robin", max_round=9)
+??? question "3. 自定义选择方法为什么必须有兜底分支？"
+    自定义方法返回的名字会直接用于查找角色。
+    如果所有规则都没命中且没有兜底，方法可能返回空值，调度停住。
+    兜底分支通常写成名单内轮询，保证任何情况下都返回合法名字。
 
-manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config)
-executor.initiate_chat(manager, message="对账 2024-06-01 的账单与订单文件")
-```
+??? question "4. 嵌套聊天省下的是什么，没省下的是什么？"
+    省下的是主群聊的上下文长度，子讨论的中间过程不进入主列表。
+    没省下的是费用，子讨论同样要调用模型并计费。
+    回传时只取子群聊的最后一条消息，避免把整份历史并进主列表。
 
-- 读取角色只报结构，比对角色只报差异，输出格式稳定，方便下游脚本解析。
-- round_robin 让每次运行的角色顺序一致，同一天的数据重跑结果可比。
-- 执行角色设 human_input_mode="NEVER"，批处理任务不需要人守在终端。
-- use_docker=True 把生成的 pandas 代码限制在容器里，避免改动宿主环境。
-- max_round 设成角色数乘以 3，防止某个角色反复追问把预算吃光。
+??? question "5. use_docker 与 timeout 各自解决什么问题？"
+    use_docker 决定代码在哪执行，开启后代码在容器内运行，文件与进程影响范围限于容器。
+    timeout 决定单次执行能跑多久，到点中断，避免死循环挂住进程。
+    容器不隔离网络访问，代码仍然可以往外发请求。
+    两个字段要按场景一起设置，缺一个都会留下风险。
 
-**怎么度量收益**：看三项。一是差异召回率，用差异行数除以人工复核表确认的差异行数；二是误报率，即模型报出的差异中复核后不成立的占比；三是端到端时长，用 Python 的 time.perf_counter 在批处理入口打点记录。
+??? question "6. human_input_mode 取 ALWAYS、TERMINATE、NEVER 的区别是什么？"
+    ALWAYS 表示每轮都等人输入，适合高风险操作。
+    TERMINATE 表示平时自动进行，命中终止条件时才要求人工介入。
+    NEVER 表示完全不等人，适合无人值守的批处理。
+    默认值不是 NEVER，批处理场景需要显式设置。
 
-**什么时候不该用**：
-- 差异规则能用一条 SQL 的 join 唯一确定时，多角色讨论只增加耗时。
-- 对账文件含客户手机号、身份证号，且项目所在环境不允许把文件内容发到模型服务时。
-- 差异量在十行以内并且每周只跑一次，直接人工比对成本更低。
+??? question "7. 为什么风险等级不应该由模型自己判断？"
+    模型的判断在不同轮次可能给出不同结果，同一任务的风险等级会漂移。
+    审批点的位置属于流程规则，规则应该写死在代码里。
+    常见做法是调用方传入风险等级，代码里用映射表决定是否开启人工介入。
 
-#### 场景 2：客服工单自动分诊与回复草稿
+??? question "8. 控制群聊成本的两个主要参数是什么？"
+    第一个是轮数上限，它决定调用次数的上界。
+    第二个是发送内容上限，它决定每次调用发送的内容量。
+    动态选人策略每轮会多一次调用，规则清晰时改用自定义方法可以减少调用。
+    两个参数都需要显式确认，具体字段名以你的版本为准。
 
-**业务背景**：客服系统每天新增工单量随活动波动，峰值时人工分诊成为排队瓶颈。错分到退款组的工单会被退回重走流程，客户等待时间拉长。
+## 延伸阅读
 
-**怎么用本页知识解决**：用 GroupChatManager 的选人逻辑承载分诊规则，先按工单标签路由到对应专家 Agent，再由质检 Agent 出草稿。
-
-```python
-import autogen
-
-def pick_speaker(last_speaker, groupchat):      # 自定义选人：先看标签再选人
-    text = str(groupchat.messages[-1].get("content", ""))
-    if last_speaker.name == "dispatcher":       # 分诊员刚说完，进到专家
-        return refund_agent if "退款" in text else tech_agent
-    if last_speaker.name in ("refund_agent", "tech_agent"):
-        return qa_agent                          # 专家说完，进质检出草稿
-    return None                                  # 返回 None 交回默认逻辑
-
-groupchat = autogen.GroupChat(
-    agents=[dispatcher, refund_agent, tech_agent, qa_agent],
-    messages=[], max_round=8,
-    speaker_selection_method=pick_speaker)       # 用函数替换模型选人
-
-dispatcher.initiate_chat(
-    autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config),
-    message=work_order_text)
-```
-
-- 选人函数读的是标签字符串，不是模型判断，路由结果可写单元测试。
-- 分诊员只输出标签与理由，不写正文，减少一次生成成本。
-- 质检 Agent 在最后一步出草稿，草稿前缀加 `[待人工确认]` 标记。
-- 返回 None 时退回默认选人逻辑，遇到未覆盖的标签不会卡死流程。
-- 群聊消息列表就是审计日志，事后可回放每一步是谁说的。
-
-**怎么度量收益**：看分诊准确率（分诊标签与工单最终处理组一致的比例，用客服系统的标签字段导出比对）、平均首次响应时长（工单系统自带时间戳字段）、草稿采纳率（人工发送内容与草稿的编辑距离低于阈值算采纳）。
-
-**什么时候不该用**：
-- 工单类型集中在两类且规则只有几条 if，直接写规则代码比建群聊可靠。
-- 工单含用户提交的身份证照片或银行卡截图，图片无法只靠文本标签分诊。
-- 业务要求每次回复都可追溯到具体条款编号，而模型草稿无法保证引用正确。
-
-#### 场景 3：代码仓库 issue 修复流水线
-
-**业务背景**：中小团队每周积累的缺陷单里，重复的复现步骤与日志排查占掉不少工时。修复本身要跑测试，人工一轮轮贴日志容易中断。
-
-**怎么用本页知识解决**：外层群聊做分工与评审，内层群聊专门跑复现和测试，内层结束后只把摘要回传。内层用 register_nested_chats 挂在外层某个 Agent 上。
-
-```python
-import autogen
-
-coder = autogen.AssistantAgent(name="coder", llm_config=llm_config,
-    system_message="根据 issue 描述改代码，改完请求跑测试。")
-tester = autogen.AssistantAgent(name="tester", llm_config=llm_config,
-    system_message="执行测试命令，报告失败用例名与报错首行。")
-reviewer = autogen.AssistantAgent(name="reviewer", llm_config=llm_config,
-    system_message="判断改动是否只覆盖本 issue，输出 PASS 或 REJECT。")
-
-inner = autogen.GroupChat(agents=[coder, tester], messages=[], max_round=6)
-inner_manager = autogen.GroupChatManager(groupchat=inner, llm_config=llm_config)
-
-reviewer.register_nested_chats(                 # 内层：复现并跑测试
-    [{"recipient": inner_manager, "message": "复现该 issue 并跑相关测试",
-      "summary_method": "last_msg",             # 只把最后一条结论带回外层
-      "max_turns": 4}],
-    trigger=lambda sender: sender.name != "reviewer")
-
-outer = autogen.GroupChat(agents=[coder, tester, reviewer], messages=[],
-    max_round=12, speaker_selection_method="auto")
-```
-
-- 内层只负责复现与测试，测试环境崩了不会污染外层的讨论上下文。
-- summary_method="last_msg" 让外层只看到结论，token 消耗可控。
-- trigger 排除 reviewer 自身，避免它触发自己进入死循环。
-- 外层用 auto 选人，评审被拒绝时会自动回到 coder 重改。
-- 内层 max_turns 要小于外层 max_round，保证总有收敛机会。
-
-**怎么度量收益**：看首次修复通过率（pytest 退出码为 0 的 issue 占比，用 CI 的 job 结果统计）、平均轮次（ChatResult 中 messages 条数，按 issue 归档）、内层摘要长度（用 token 计数工具统计回传文本）。
-
-**什么时候不该用**：
-- 仓库测试套件本身不稳定，失败率高，Agent 会把环境抖动当成代码缺陷。
-- 改动涉及数据库迁移或线上配置，自动跑测试无法覆盖，必须人工评审。
-- 代码库不允许出内网，而模型服务在公网，此时只能走本地部署模型。
-
-### 行业先进实践
-
-**代码执行放进容器（出处：AutoGen 官方文档 Code Executors 章节）**：官方文档提供 Docker 命令行执行器，把模型生成的代码放进容器运行，并允许限制工作目录与网络。有效的原因是生成的代码可能删文件或装依赖，容器隔离把影响范围收在工作目录内。借鉴时先在本地用进程内执行器调通逻辑，接入共享环境前换成容器执行。
-
-**先试工作流再上多智能体（出处：Anthropic 官方工程博客 Building Effective Agents）**：该文把提示链、路由、并行、编排-工作者、评估-优化列为常见模式，并建议从最简方案起步。有效的原因是多数任务用固定步骤就能完成，多智能体引入的通信开销换不来对应收益。借鉴时先写出单 Agent 加固定步骤的版本，跑不通再拆角色。
-
-**人工介入做成可中断可恢复（出处：LangGraph 官方文档 human-in-the-loop）**：该文档描述在图节点处暂停、保存状态、人工修改后继续执行。有效的原因是长流程里人不可能一直守着，状态持久化让确认动作可以延后。借鉴时把确认点设计成状态机的一次暂停，而不是阻塞在终端等输入。
-
-**显式交接加链路追踪（出处：OpenAI Agents SDK 官方文档 handoffs 与 tracing）**：该文档把任务交接定义为一次可命名、可记录的动作，并配套追踪能力。有效的原因是出错时能定位到是哪一次交接丢了上下文。借鉴时给每次角色切换起固定名称，并把名称写进日志字段。
-
-**生成式调用的可观测字段（需核对官方文档：OpenTelemetry GenAI semantic conventions 的字段名与稳定级别）**：需要核对模型名、token 数、请求耗时这些属性当前的正式名称，以及该约定是否已标记为稳定。核对清楚后再决定日志字段命名，避免后续改名导致看板重做。
-
-### 从学到用：落地路线
-
-1. **试点**：选一个输入输出都能落成文件的离线任务，比如报表核对，跑通三角色群聊。验收标准是同一份输入连跑三次，输出文件的行数与字段完全一致。
-2. **验证**：把试点结果与人工结论逐条比对，记录差异召回率与误报率。验收标准是连续五个工作日的人工复核表都能对上，且误报率不超过设定阈值。
-3. **推广**：把通过验证的流程封装成脚本，接入定时任务，其他团队按同一模板替换角色提示词。验收标准是有两个以上业务方在自己环境跑通，并且配置项来自配置文件而非改代码。
-4. **防回退**：给每个流程留一份基准输入与期望输出，纳入 CI 每日跑一次；改动提示词必须同时更新基准。验收标准是基准用例失败时 CI 阻断合并，且失败原因能在日志里定位到具体角色。
-
-### 动手作业
-
-**目标**：搭一个三角色群聊，对一份两列 CSV（订单号、金额）做核对，输出差异清单并给出归因摘要。
-
-**步骤**：
-1. 造两份各 200 行的 CSV，人为埋入 5 行金额不一致和 2 行只在一侧出现的记录。
-2. 定义 reader、checker、executor 三个 Agent，提示词里写死各自的输出字段。
-3. 用 GroupChat 组装，speaker_selection_method 设为 round_robin，max_round 设为 9。
-4. executor 的 code_execution_config 指定工作目录与沙箱，先跑一次看差异清单。
-5. 把 max_round 改成 3，观察流程被截断时输出缺了什么，再改回 9。
-6. 把 5 行金额差异改成 0 行，确认脚本输出"无差异"而不是编造结论。
-7. 用 time.perf_counter 记录整轮耗时，写入日志文件。
-
-**验收标准**：
-- 7 行埋入的差异全部出现在输出清单里，订单号与差异字段逐条对得上。
-- 同一份输入连跑三次，输出的差异行数与订单号集合完全相同。
-- 把 max_round 改成 3 后输出不完整，改回 9 后恢复完整，两种情况的日志都可查。
-- 无差异输入下，输出不含任何模型编造的订单号。
-- 日志里有本轮耗时与群聊消息条数两个字段。
-
+- Microsoft AutoGen 官方文档：Group Chat 章节
+- Microsoft AutoGen 官方文档：GroupChatManager 章节
+- Microsoft AutoGen 官方文档：Nested Chats 章节
+- Microsoft AutoGen 官方文档：Code Execution 章节
+- Microsoft AutoGen 官方文档：Human-in-the-Loop 章节
+- Microsoft AutoGen 官方文档：版本迁移指南中的类名与参数变更说明
+- AutoGen 官方 GitHub 仓库：examples 目录下的 groupchat 示例
+- LangGraph 官方文档：多智能体协作章节
+- Docker 官方文档：容器资源限制章节

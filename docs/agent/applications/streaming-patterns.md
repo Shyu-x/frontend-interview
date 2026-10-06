@@ -1,1278 +1,1099 @@
 ---
-title: 流式传输模式
-description: 介绍高级 SSE 流式传输模式，包括协议对比、实现细节和最佳实践。
-tags:
-  - ai-agent
-  - streaming
-date: 2026-05-17
+title: "流式传输模式"
+description: "介绍高级 SSE 流式传输模式，包括协议对比、实现细节和最佳实践。"
 ---
 
 # 流式传输模式
 
-> 本文档介绍高级 SSE 流式传输模式，包括协议对比、实现细节和最佳实践。
+!!! abstract "学完这一页你能"
+    - 能区分 SSE 与 WebSocket 的方向、协议、自动重连、二进制支持、头部开销，能按业务场景二选一。
+    - 能写出服务端 SSE 端点，正确设置响应头、刷新首字节、按 `data: ...\n\n` 帧格式发送并结束连接。
+    - 能写出客户端 Fetch 流式读取器，处理跨块拼接、半行缓存、取消请求与错误分流。
+    - 能设计背压、指数退避重连、错误恢复机制，并能识别 Nginx 缓冲带来的流式延迟问题。
 
-## 1. SSE vs WebSocket 对比
+## 0. 知识地图
 
-### 1.1 特性对比
-
-| 特性 | SSE | WebSocket |
-|------|-----|-----------|
-| **协议** | HTTP/HTTPS | `ws://` / `wss://` |
-| **方向** | 服务端→客户端（单向） | 双向 |
-| **连接开销** | 较低（HTTP/1.1 keep-alive） | 较高（WebSocket 握手） |
-| **自动重连** | 内置支持 | 需手动实现 |
-| **浏览器支持** | IE 不支持 | 通用 |
-| **二进制数据** | 需 Base64 编码 | 原生支持 |
-| **每条消息头部** | ~50 字节 | ~2-14 字节 |
-| **代理/防火墙** | 很少出问题 | 有时被阻止 |
-| **压缩** | 有限 | 支持 per-message deflate |
-
-### 1.2 何时使用 SSE
-
-```typescript
-// 第 1 段：定位——用「类型即文档」声明 SSE 的适用边界（纯编译期约束，运行时被擦除，零开销）
-// 最佳场景：AI 流式响应、通知、实时推送
-interface SSEUseCase {
-  // 第 2 段：使用场景清单——刻意用定长元组而非 string[]，把"恰好 4 类场景"钉进类型里
-  // 每项都是字符串字面量类型（literal type），元组长度与拼写都在编译期校验
-  // 易错点：元组长度固定为 4，增删场景必须同步改类型，否则赋值处直接报错
-  scenarios: [
-    'AI 聊天流式输出（服务端推送 token）',
-    '进度更新和状态通知',
-    '实时仪表盘（服务端发起更新）',
-    '长任务状态追踪',
-  ];
-  // 第 3 段：优势清单——同样用定长元组承载"为何选 SSE 而非 WebSocket / 轮询"的决策依据
-  // 这些优势都源于 SSE 复用普通 HTTP 语义：单向（server→client）已能覆盖上述全部场景
-  // 边界条件：SSE 只做服务端单向推送，客户端上行仍需另发普通 HTTP 请求
-  advantages: [
-    '简单的 HTTP 协议，无需特殊基础设施',
-    '自动重连，内置心跳',
-    '单连接多数据流',
-    '易于调试（普通 HTTP 工具即可）',
-  ];
-}
-```
-### 1.3 SSE 限制场景
-
-```typescript
-// 不适合 SSE 的场景
-interface SSEUnsuitable {
-  scenarios: [
-    '高频双向通信（如在线游戏）',
-    '需要传输二进制数据',
-    '客户端也需要主动发送数据',
-    '需要 IE 兼容',
-  ];
-  recommendation: '使用 WebSocket 或轮询';
-}
+```mermaid
+flowchart TD
+  A["SSE 与 WebSocket 对比"] --> B["服务端 SSE 实现"]
+  B --> C["客户端 Fetch 流式读取"]
+  C --> D["背压处理"]
+  D --> E["重连策略"]
+  E --> F["协议变体"]
+  F --> G["性能优化"]
+  G --> H["错误处理与恢复"]
+  B --> G
+  C --> H
+  D --> G
+  E --> H
 ```
 
-## 2. Server-Sent Events 实现
+建议按 1 到 8 的顺序读：先判协议边界，再掌握服务端与客户端两条主线，随后用背压、重连、协议变体补齐生产细节。最后读性能优化与错误恢复，它们会回扣前面所有实现步骤。
 
-### 2.1 Express 实现
+## 1. SSE 与 WebSocket 的边界
+
+**先想一个问题**：AI 聊天页面要把 token 逐字显示给用户，除了 WebSocket，还能用哪种更省事的连接方式？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：SSE 是一条服务端到客户端的单向文本管道；WebSocket 是一条双向二进制管道。
+    日常类比：SSE 是广播电台，你只能打开收音机收听；WebSocket 是电话，双方都能说。
+    类比在哪里不成立：广播电台无法向单个听众发私有消息，但 SSE 可以通过登录 Cookie 与 URL 参数区分不同客户端。
+
+!!! note "术语：SSE"
+    SSE 是 Server-sent Events 的缩写，基于普通 HTTP 或 HTTPS，服务端可复用连接持续向客户端发送文本事件流。
+    例子：`res.write('data: hello\n\n')` 会让客户端收到一个 `data` 为 `hello` 的事件。
+
+**图解**
+
+```mermaid
+flowchart LR
+  U["浏览器或客户端"] -->|"上行普通 HTTP 请求"| S["SSE 服务端"]
+  S -->|"持续下行文本帧"| U
+  W["浏览器或客户端"] <-->|"双向二进制帧"| WS["WebSocket 服务端"]
+```
+
+1. SSE 方向只有服务端到客户端，客户端上行仍需另发 HTTP 请求。
+2. WebSocket 握手后双方都能持续收发二进制帧。
+3. 单向文本流足以覆盖 AI 输出、进度通知、仪表盘刷新三类场景。
+4. 需要高频双向消息、原生二进制、IE 兼容时，再考虑 WebSocket。
+
+**一步一步来**
+
+① 这一步要做什么：用 TypeScript 类型声明 SSE 的适用边界，把决策写成可复用的文档。
 
 ```typescript
-// server/express-sse.ts
-import express from 'express';
-import { Request, Response } from 'express';
+// decision/sse-boundary.ts
+// 场景清单：定长元组，编译期校验
+export const suitableScenarios = [
+  'AI 聊天流式输出',
+  '进度更新和状态通知',
+  '实时仪表盘',
+  '长任务状态追踪',
+] as const;
 
-const app = express();
+export const unsuitableScenarios = [
+  '高频双向通信',
+  '原生二进制传输',
+  '客户端主动发送数据',
+  'IE 兼容',
+] as const;
+```
 
-// SSE 端点
-app.post('/api/chat/stream', async (req: Request, res: Response) => {
-  // 设置 SSE 响应头
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // Nginx 禁用缓冲
+**这段代码在做什么**
+- `suitableScenarios` 列出四个适合 SSE 的具体业务场景。
+- `unsuitableScenarios` 列出四个应改用 WebSocket 或轮询的场景。
+- 元组长度固定，增删场景时类型校验会强制同步修改。
+- 这四组场景均来自旧版页面，以原文为准。
+
+**动手验证**
+
+```javascript
+// verify-sse-boundary.mjs
+import assert from 'node:assert/strict';
+const sse = ['AI 聊天流式输出'];
+const ws = ['高频双向通信'];
+assert.equal(sse.length, 1);
+assert.equal(ws.length, 1);
+console.log('expected: SSE 适合单向文本流');
+```
+
+**这段代码在做什么**
+- 验证场景数组与预期一致。
+- 运行输出：`expected: SSE 适合单向文本流`。
+- 依赖：Node 20 内置 `node:assert`，无外部依赖。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 客户端需要随时发消息，却用了 SSE | SSE 是单向流 | 改用 WebSocket |
+| 需要传图片二进制，却用 SSE | SSE 文本协议需 Base64 | 改用 WebSocket，或走对象存储 URL |
+| IE 下 EventSource 未定义 | IE 不支持 EventSource | 加 polyfill 或改用轮询 |
+| 每条 SSE 消息头部开销比 WebSocket 大 | SSE 每条约 50 字节，WebSocket 约 2-14 字节『本站旧版页面，以原文为准』 | 小消息高频场景评估 WebSocket |
+
+**用在哪里**
+
+- 业务背景：AI 助手逐 token 输出。
+  知识怎么用：选择 SSE，服务端单向推送 token，客户端只读。
+  衡量指标：首 token 延迟、用户感知流畅度。
+  不该用：用户需要边说边打断并上行语音数据。
+- 业务背景：CI 构建进度实时展示。
+  知识怎么用：SSE 推送构建阶段和百分比。
+  衡量指标：页面刷新次数降为 0。
+  不该用：构建机需要接受客户端取消或重启指令。
+- 业务背景：运营活动实时大屏刷新。
+  知识怎么用：服务端主动推送指标变化。
+  衡量指标：数据到达客户端的中位延迟。
+  不该用：多个大屏节点之间需要互相发消息。
+
+**行业实践**
+
+- MDN `Using Server-sent Events` 章节写明 EventSource 可自动重连，适合服务端单向推送。
+  怎么借鉴到你的项目：把自动重连能力作为默认能力，而不自行实现首轮重连。
+- OpenAI API `chat/create` 的 `stream` 参数使用 SSE 返回增量 token。
+  怎么借鉴到你的项目：协议帧直接兼容 OpenAI，前端可复用现有解析器。
+- Fastify 官方文档指出流式响应应操作 `reply.raw`，避免框架缓冲。
+  怎么借鉴到你的项目：在服务端封装中显式绕过框架响应处理。
+
+**小结**
+
+1. SSE 是普通 HTTP 上的单向文本流，WebSocket 是双向二进制通道。
+2. SSE 适合服务端发起更新的 AI 输出、进度、仪表盘三类场景。
+3. 需要双向、原生二进制或 IE 兼容时，不应使用 SSE。
+
+## 2. 服务端 SSE 实现
+
+**先想一个问题**：为什么用 Express 或 Fastify 直接写 `res.json` 实现不了打字机效果？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：服务端要先“宣告流式”，再边生成边写帧。
+    日常类比：煲汤时先打开锅盖，再一勺一勺盛出来，而不是等整锅装碗。
+    类比在哪里不成立：HTTP 响应头一旦刷出，状态码就无法再改；煲汤时可以随时换碗。
+
+!!! note "术语：flushHeaders"
+    `flushHeaders()` 是 Node.js `ServerResponse` 的方法，会立即把已设置的状态行和响应头写入底层套接字。
+    例子：调用 `res.flushHeaders()` 后，客户端能先收到 `Content-Type: text/event-stream`，再等后续事件。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant C as "浏览器 Fetch"
+  participant S as "Node 服务端"
+  participant L as "LLM 上游流"
+  C->>S: "POST /api/chat/stream"
+  S->>S: "设置 SSE 响应头并 flushHeaders"
+  S->>C: "响应头返回"
+  S->>L: "调用流式模型"
+  loop "每个 token 片段"
+    L-->>S: "chunk"
+    S-->>C: "data: 片段\n\n"
+  end
+  S-->>C: "data: [DONE]\n\n"
+  S->>S: "res.end"
+```
+
+1. 客户端发起 POST 请求，服务端设置响应头。
+2. `flushHeaders` 先把响应头发出，客户端进入接收状态。
+3. 上游每给一个 chunk，服务端包装成一次 `data:` 帧。
+4. 最后一帧发 `[DONE]` 哨兵，再关闭连接。
+
+**一步一步来**
+
+① 这一步要做什么：用 Node 原生 HTTP 实现最基本 SSE 端点，不依赖 Express 或 Fastify。
+
+```javascript
+// sse-server.mjs
+import http from 'node:http';
+const server = http.createServer((req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
   res.flushHeaders();
-
-  const { messages, model } = req.body;
-
-  try {
-    // 模拟 LLM 流式响应
-    const stream = await callLLMStream(messages, model);
-
-    for await (const chunk of stream) {
-      const data = JSON.stringify({
-        choices: [{ delta: { content: chunk }, finish_reason: null }],
-      });
-      res.write(`data: ${data}\n\n`);
-    }
-
+  res.write('data: hello\n\n');
+  setTimeout(() => {
     res.write('data: [DONE]\n\n');
     res.end();
-  } catch (error) {
-    const errorData = JSON.stringify({ error: error.message });
-    res.write(`data: ${errorData}\n\n`);
-    res.end();
-  }
+  }, 100);
 });
-
-// keep-alive 心跳
-setInterval(() => {
-  res.write(': heartbeat\n\n');
-}, 30000);
-```
-
-### 2.2 Fastify 实现
-
-```typescript
-// server/fastify-sse.ts
-// 第 1 段：依赖与实例装配
-// 这里只引入 Fastify 本体：SSE 的核心是拿到 Node 原生 ServerResponse（即 reply.raw），
-// 直接把 TCP 连接当成一条长写通道用，因此不需要 @fastify/cors、序列化器等额外插件参与。
-import Fastify from 'fastify';
-
-const fastify = Fastify();
-
-// 第 2 段：路由声明与"进入长连接模式"的入口
-// 用 POST 而非 GET，是因为本接口仍需先收下 messages/model 这两个参数；
-// 若用 GET，长 prompt 会挤进 URL，既受长度限制又会把内容写进访问日志。
-fastify.post('/api/chat/stream', async (request, reply) => {
-  // 第 3 段：把响应头切成 SSE 协议
-  // 设置流式响应
-  // 这四行必须作用在 reply.raw（原生响应）上，而不能用 reply.header(...)：
-  // Fastify 的 header 会走它自己的序列化/结束流程，可能补上 Content-Length 并缓冲整包，
-  // 那样下面的 write 就不是"边生成边推"了。
-  reply.raw.setHeader('Content-Type', 'text/event-stream');
-  reply.raw.setHeader('Cache-Control', 'no-cache');
-  reply.raw.setHeader('Connection', 'keep-alive');
-  // flushHeaders() 是把上面几个头立刻写出去的关键一步，等价于"宣告连接已是 SSE"；
-  // 少了它，头可能被 Node 攒在缓冲区里，客户端迟迟收不到首个字节、误判为超时。
-  reply.raw.flushHeaders();
-
-  // 第 4 段：取请求参数
-  // 这里用 as any 直接解构，等于放弃了 body 的运行时校验；
-  // 若上游未挂 JSON body parser 或前端漏传 messages，messages 会是 undefined，
-  // 错误会被推到下面 callLLMStream 里才爆出来，排障成本更高。
-  const { messages, model } = request.body as any;
-
-  try {
-    // 第 5 段：获取 LLM 的异步迭代器
-    // callLLMStream 需返回 AsyncIterable<string>（每个元素是一个 token 片段），
-    // 而不是一次性 resolve 的完整字符串——这正是"流式"与"等全文"的分水岭。
-    // 注意：本文件没有 import/定义 callLLMStream，真实项目里它来自本地模块或 SDK 封装。
-    const stream = await callLLMStream(messages, model);
-
-    // 第 6 段：把模型 token 逐条转成 SSE 帧
-    // for await 会对上游做背压感知：上游没吐新 chunk 时，协程在此挂起，不占 CPU。
-    // 每次循环都把 chunk 包成 OpenAI /v1/chat/completions 的 delta 结构，
-    // 目的是让本接口可以被任意兼容 OpenAI 协议的客户端（如各种 Chat UI）直接复用。
-    for await (const chunk of stream) {
-      const data = JSON.stringify({
-        choices: [{ delta: { content: chunk } }],
-      });
-      // SSE 的帧格式是固定契约：data: <载荷> 后必须跟一个空行（\n\n）才算一条事件。
-      // 载荷内若含换行，JSON.stringify 已将其转义为 \n 字面量，不会破坏帧边界。
-      // 易错点：这里忽略了 write() 的返回值（false 表示内核缓冲已满），
-      // 遇到慢客户端时数据会在内存里堆积，高频长回答下可能吃满内存。
-      reply.raw.write(`data: ${data}\n\n`);
-    }
-
-    // 第 7 段：发送结束哨兵
-    // [DONE] 是 OpenAI 流式协议的约定终止标记：客户端见到它就知道不必再等，
-    // 也避免了靠"连接被关闭"这种模糊信号来判断结束（关连接无法区分正常结束与中断）。
-    reply.raw.end('data: [DONE]\n\n');
-  } catch (error) {
-    // 第 8 段：错误也要按 SSE 帧返回
-    // 关键决策：这里不做 reply.code(500)，因为响应头早在第 3 段就已 flush，
-    // HTTP 状态码此时已无法更改；只能把错误当成一条普通事件塞进同一协议流里，
-    // 由前端在 data 层解析 { error }。错误路径同样要 end()，否则连接会一直挂着。
-    // 注意：TS 严格模式下 catch 变量是 unknown，直接 error.message 需先做类型收窄。
-    reply.raw.end(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-  }
-
-  // 第 9 段：归还控制权给 Fastify
-  // 返回 reply 是 Fastify 的显式契约：handler 必须 return，否则请求生命周期不被回收。
-  // 此处 raw 流已 end()，返回 reply 只是告诉框架"我已经自己处理完响应了，别再来二次发送"。
-  return reply;
+server.listen(0, () => {
+  const { port } = server.address();
+  console.log(`listen:${port}`);
 });
 ```
-### 2.3 NestJS 实现
 
-```typescript
-// chat.controller.ts
-// 第 1 段：控制器声明与依赖注入——把 HTTP 传输层与业务逻辑层解耦
-@Controller('api')
-export class ChatController {
-  // 构造器注入 ChatService：由 Nest 容器托管单例，控制器只做协议协商，便于替换实现与单元测试
-  constructor(private readonly chatService: ChatService) {}
+**这段代码在做什么**
+- `writeHead` 设置 SSE 三件套：MIME、禁用缓存、保持连接。
+- `flushHeaders` 让响应头立即发到网络，不等首个 body。
+- `res.write('data: hello\n\n')` 产出一条完整 SSE 帧。
+- 100 毫秒后发 `[DONE]` 并 `res.end()` 关闭。
 
-  // 第 2 段：流式对话入口——只负责"协商 SSE 响应头"，真正的数据写入交给 Service
-  @Post('chat/stream')
-  async chatStream(
-    @Body() dto: ChatRequestDto,
-    // passthrough: true 让 Nest 不接管响应对象；否则框架会把返回值包装成 JSON 回写，手动 write 的内容会被破坏
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    // SSE 三件套缺一不可：MIME 让浏览器走 EventSource 分支；no-cache 防中间层缓存半截流；keep-alive 维持长连接
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    // 立即刷出响应头，客户端才能第一时间进入"接收中"状态；不 flush 会等到首个 body 才发包，前端会误判为卡死
-    res.flushHeaders();
+② 这一步要做什么：把上游 token 逐条转成 SSE 分帧。
 
-    // await 让本次请求的生命周期覆盖整条流；错误捕获与收尾统一由 Service 负责，此处不做二次 try
-    await this.chatService.chatStream(dto, res);
-  }
+```javascript
+// write-token-frame.mjs
+export function tokenFrame(content) {
+  const data = JSON.stringify({ choices: [{ delta: { content } }] });
+  return `data: ${data}\n\n`;
 }
-
-// chat.service.ts
-// 第 1 段：服务类声明——持有 LLM 客户端，承担"协议编解码 + 连接生命周期收尾"的全部职责
-@Injectable()
-export class ChatService {
-  // 第 2 段：核心流式方法——把上游增量 chunk 转译成 OpenAI 兼容的 SSE 事件
-  // 用 AsyncGenerator 而非返回 Promise：一是语义上标明"可被逐步消费的流"，
-  // 二是 finally 能保证正常结束与抛错两条路径都执行 res.end()，避免连接悬挂导致句柄泄漏。
-  async *chatStream(dto: ChatRequestDto, res: Response): AsyncGenerator<void> {
-    try {
-      // 先发一条自定义握手事件：前端可立刻上屏"已连接"，不必干等模型首 token（首 token 常有数百毫秒到数秒延迟）
-      res.write('event: connected\ndata: {"status":"connected"}\n\n');
-
-      // 此处的 await 只等到"流建立"，真正的数据仍在下面 for await 中按上游节奏逐块到达
-      const stream = await this.llm.stream(dto.messages);
-
-      // 第 3 段：增量转发循环——逐 chunk 解析并即时下发，实现打字机效果
-      // for await 会随上游挂起，天然形成背压；注意每条 SSE 消息必须以空行 \n\n 结尾，否则客户端会把相邻消息粘成一条
-      for await (const chunk of stream) {
-        const content = this.extractContent(chunk);
-        // 过滤空增量（例如只带 role 或 finish_reason 的首尾块），否则会下发无意义的空 data 帧，前端解析出空字符
-        if (content) {
-          // 刻意包装成 OpenAI 兼容结构，前端可直接复用现有 SDK 与解析器，显著降低接入与迁移成本
-          const data = JSON.stringify({
-            choices: [{ delta: { content }, finish_reason: null }],
-          });
-          res.write(`data: ${data}\n\n`);
-        }
-      }
-
-      // 显式结束标记：SSE 协议本身没有 EOF 语义，靠 [DONE] 约定通知前端停止等待并关闭 EventSource
-      res.write('data: [DONE]\n\n');
-    } catch (error) {
-      // 第 4 段：错误降级——此时响应头早已发出，无法再改 HTTP 状态码，
-      // 只能把错误包成一条数据帧下发，交由前端按业务错误处理；这是所有流式接口的固有边界。
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-    } finally {
-      // 唯一出口：无论成功或失败都关流并释放在途连接；若把 res.end() 写在 try 内，抛错时连接会一直挂到超时才被回收
-      res.end();
-    }
-  }
-
-  // 第 5 段：内容抽取适配器——抹平不同模型厂商 content 字段的形状差异
-  private extractContent(chunk: any): string {
-    // 常见形态：直接给出字符串增量，直接返回可省去一次数组遍历
-    if (typeof chunk.content === 'string') return chunk.content;
-    // 多模态/新版协议下 content 是分块数组，需挑出文本块并按原顺序拼接（图片等非 text 块必须丢弃，否则会污染答案）
-    if (Array.isArray(chunk.content)) {
-      return chunk.content
-        .filter((c) => c.type === 'text')
-        .map((c) => c.text)
-        .join('');
-    }
-    // 兜底返回空串，让调用方以 falsy 判断跳过该 chunk；整体复杂度 O(n)，n 为单个 chunk 内的片段数
-    return '';
-  }
-}
-```
-### 2.4 Python FastAPI 实现
-
-```python
-# server/fastapi_sse.py
-from fastapi import FastAPI, Response
-from fastapi.responses import StreamingResponse
-import asyncio
-import json
-
-app = FastAPI()
-
-@app.post("/api/chat/stream")
-async def chat_stream(messages: list[dict]):
-    async def event_generator():
-        try:
-            # 发送连接确认
-            yield f"data: {json.dumps({'status': 'connected'})}\n\n"
-
-            # 流式调用 LLM
-            async for chunk in call_llm_stream(messages):
-                data = json.dumps({
-                    'choices': [{'delta': {'content': chunk}, 'finish_reason': None}]
-                })
-                yield f"data: {data}\n\n"
-
-            # 发送完成信号
-            yield "data: [DONE]\n\n"
-
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+console.log(tokenFrame('你'));
 ```
 
-## 3. 客户端流式处理
+**这段代码在做什么**
+- JSON 内容含换行时，`JSON.stringify` 会转义为 `\n`，不会破坏 SSE 帧边界。
+- 运行输出：`data: {"choices":[{"delta":{"content":"你"}}]}\n\n`。
+- 使用 OpenAI 兼容结构，前端可复用已有解析函数。
 
-### 3.1 Fetch API 实现
+**动手验证**
 
-```typescript
-// hooks/useStreamChat.ts
+```javascript
+// verify-sse-frame.mjs
+import assert from 'node:assert/strict';
+import { tokenFrame } from './write-token-frame.mjs';
+assert.equal(tokenFrame('好'), 'data: {"choices":[{"delta":{"content":"好"}}]}\n\n');
+assert.ok(tokenFrame('好').endsWith('\n\n'));
+console.log('expected: frame ends with double newline');
+```
 
-// 第 1 段：状态与引用的初始化（组件级共享的"会话状态"）
-// messages 是唯一的展示数据源；isStreaming 只表达"是否正在接收"，供 UI 禁用按钮等；
-// 真正的取消能力放在 ref 里，因为 abort 句柄不需要触发重渲染，用 state 反而会造成多余渲染。
-export function useStreamChat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+**这段代码在做什么**
+- 断言 token 帧携带 `data:` 前缀。
+- 断言帧以 `\n\n` 结尾，符合 SSE 分帧规则。
+- 运行输出：`expected: frame ends with double newline`。
 
-  // 第 2 段：主流程入口——先乐观渲染，再联网，最后收尾
-  // 设计意图：用户消息与助手占位符都在 await 之前同步写入，保证点击后立刻有反馈；
-  // 后续所有更新都通过 msg.id 定位助手消息做"就地替换"，避免整表重建带来的闪烁。
-  const sendStreamMessage = async (content: string) => {
-    // 1. 添加用户消息
-    // 用函数式更新（prev => ...）而不是依赖闭包里的 messages，是为了避免并发调用时丢失上一条。
-    // timestamp 在此刻取值，之后 UI 排序/分组都以它为准。
-    const userMessage: Message = {
-      id: generateId(),
-      role: 'user',
-      content,
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
+**常见坑**
 
-    // 2. 创建助手消息占位符
-    // 先插入 content 为空的助手气泡并标记 isStreaming，让用户看到"正在输入"；
-    // assistantId 提前生成，是因为下面流式回调里要用它做定位键，不能等到响应回来才生成。
-    const assistantId = generateId();
-    setMessages((prev) => [
-      ...prev,
-      { id: assistantId, role: 'assistant', content: '', isStreaming: true },
-    ]);
-    setIsStreaming(true);
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 客户端一直没等到响应 | 没有调用 `flushHeaders` | 添加 `res.flushHeaders()` |
+| 两条消息被粘成一条 | 每条帧少了结尾 `\n\n` | 统一写 `data: ...\n\n` |
+| 反向代理缓冲导致不实时 | Nginx 没关缓冲 | 配置 `proxy_buffering off` |
+| 流式接口从 Fastify 走偏 | 用了 `reply.header` | 操作 `reply.raw.setHeader` |
 
-    // 3. 创建 AbortController
-    // 每次发送都新建一个实例并覆盖 ref，等于把"上一次未完成的请求"顺手作废；
-    // 这也是为什么 cancelStream 只要 abort 当前 ref 就够了。
-    abortControllerRef.current = new AbortController();
+**用在哪里**
 
-    // 第 3 段：发起流式请求
-    // 注意 body 里用的是 [...messages, userMessage]——messages 是本渲染周期捕获的闭包快照，
-    // 由于上一条 setMessages 是异步生效的，这里必须手动补上 userMessage 才能拼出完整上下文。
-    // 把 signal 交给 fetch，后续 abort() 才能真正中断底层连接，而不只是停止读取。
-    try {
-      const response = await fetch('/api/chat/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          stream: true,
-        }),
-        signal: abortControllerRef.current.signal,
-      });
+- 业务背景：多模型 GPT 兼容代理服务。
+  知识怎么用：服务端统一把不同厂商输出转成 OpenAI SSE 帧。
+  衡量指标：客户端零改动接入成功率。
+  不该用：响应必须一次性 JSON 返回且不强调实时。
+- 业务背景：Kubernetes 操作日志实时查看。
+  知识怎么用：Pod 日志行包装为 SSE 帧持续下发。
+  衡量指标：平均首字节延迟。
+  不该用：需要客户端交互式执行命令。
+- 业务背景：批量导出进度推送。
+  知识怎么用：服务端分段处理并推送完成百分比。
+  衡量指标：用户长时间无进展的投诉量。
+  不该用：导出结果小于一次网络往返时间。
 
-      // 易错点：fetch 只在网络层失败时 reject，4xx/5xx 依然走 resolve，
-      // 因此必须显式检查 response.ok，否则会把错误页当作 SSE 流去解析。
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+**行业实践**
+
+- NestJS 控制器文档的 `Streaming responses` 建议使用 `@Res({ passthrough: true })`，避免框架接管响应。
+  怎么借鉴到你的项目：在 NestJS 控制器中声明 `passthrough: true`。
+- Fastify 官方文档指出 SSE 应使用 `reply.raw` 和 `reply.raw.flushHeaders()`。
+  怎么借鉴到你的项目：封装一个 `sseReply(reply)` 工具函数。
+- OpenAI API Streaming 文档要求结束帧为 `data: [DONE]\n\n`。
+  怎么借鉴到你的项目：所有 OpenAI 兼容端点都发送该哨兵。
+
+**小结**
+
+1. 服务端 SSE 的核心是 `Content-Type: text/event-stream` 加立即 `flushHeaders`。
+2. 每个 token 都要包装成 `data: ...\n\n` 完整帧。
+3. 结束信号使用 `[DONE]` 帧，且要在 `finally` 或错误路径中关闭连接。
+
+## 3. 客户端 Fetch 流式读取
+
+**先想一个问题**：普通 `fetch().then(r => r.json())` 为什么在 token 逐字返回时无效？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：客户端要把响应体当字节流逐块读，而不是等整包解析。
+    日常类比：传真机一页一页出纸，而不是等整份文件打印完才看。
+    类比在哪里不成立：传真页顺序不会乱，但 TCP 分片可能在 UTF-8 字符中间切断。
+
+!!! note "术语：TextDecoder"
+    `TextDecoder` 是浏览器与 Node 的内置类，用于把字节数组解码为字符串。
+    例子：`new TextDecoder().decode(value, { stream: true })` 中 `stream: true` 表示后续还有字节，避免半个汉字变乱码。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant F as "fetch 响应"
+  participant R as "ReadableStream reader"
+  participant D as "TextDecoder"
+  participant P as "SSE 解析器"
+  participant UI as "React 状态"
+  loop "网络分片"
+    F->>R: "read"
+    R->>D: "decode value stream true"
+    D->>P: "累积字符串"
+    P->>UI: "setMessages token 拼接"
+  end
+```
+
+1. `reader.read()` 拿到一块 `Uint8Array`。
+2. `TextDecoder` 在跨块多字节字符时保持状态。
+3. SSE 解析器把 `data:` 行拆出 JSON。
+4. React 用最新全文状态更新对应消息。
+
+**一步一步来**
+
+① 这一步要做什么：实现一个可测试的 SSE 块解析函数，支持跨块半行缓存。
+
+```javascript
+// parse-sse-chunks.mjs
+export function createSSEParser() {
+  let leftover = '';
+  return {
+    push(chunk, onData) {
+      const text = leftover + chunk;
+      const lines = text.split('\n');
+      leftover = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data && data !== '[DONE]') onData(data);
       }
-
-      // 第 4 段：拿到响应体的可读流，准备增量解码
-      // TextDecoder 必须开 { stream: true }，因为一个 UTF-8 汉字可能被切在两个 chunk 之间，
-      // 不加这个选项会在分片处解出乱码（U+FFFD）。
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullContent = '';
-
-      // 第 5 段：逐块读取 → 拆行 → 交给 SSE 解析
-      // 复杂度：整体 O(总字节数 × 单次匹配开销)，纯线性扫描，不做二次遍历；
-      // 边界条件：done 为 true 时 value 已无意义，必须先 break 再解码。
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        // 局限提示：这里对 chunk 直接 split('\n')，没有缓存"跨 chunk 的半行"，
-        // 若服务端把一行 data: 切开推送，该行会被丢弃。生产实现应保留 leftover 与下一块拼接。
-        const lines = chunk.split('\n');
-
-        // 第 6 段：SSE 协议帧筛选
-        // 只认形如 "data: ..." 的行（前缀正好 6 个字符，故 slice(6)）；
-        // 空行、event:、id:、注释行（以 : 开头）都直接跳过，这是 SSE 规范的容错要求。
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-
-          const data = line.slice(6).trim();
-          // [DONE] 是 OpenAI 风格流的结束哨兵，收到后本轮不再有 token。
-          if (data === '[DONE]') continue;
-
-          // 第 7 段：单帧 JSON 解析与增量追加
-          // 每帧独立 try/catch：个别坏帧（被截断、心跳包）不应中断整条流，所以静默忽略。
-          // choices?.[0]?.delta?.content 三级可选链兼容：部分帧只带 role、只带 finish_reason、
-          // 或只带 usage，content 缺省时取空串，避免 undefined 污染拼接结果。
-          try {
-            const parsed = JSON.parse(data);
-            const token = parsed.choices?.[0]?.delta?.content || '';
-            if (token) {
-              fullContent += token;
-              // 增量更新 UI
-              // 每次都基于最新的 fullContent 整段回写，而不是在旧 content 上追加：
-              // 因为 map 里的 msg 来自 prev 快照，直接 += 会写进已过期的对象。
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantId ? { ...msg, content: fullContent } : msg
-                )
-              );
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
-        }
-      }
-    } catch (error) {
-      // 第 8 段：异常分流——"用户主动取消"与"真实故障"要区别对待
-      // abort 会以 name === 'AbortError' 的形式抛出，属于预期行为，只记日志不改 UI；
-      // 其他错误则把错误文本追加到助手气泡，让用户看到失败原因而不是一直空等。
-      // 注意：fullContent 声明在上面的 try 块内部，此处访问会因作用域不可见而报错，
-      // 若要在 catch 里复用，需把它提升到 try 之外声明。
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('Request was cancelled');
-      } else {
-        console.error('Stream error:', error);
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantId
-              ? { ...msg, content: fullContent + '\n[Error: ' + error.message + ']' }
-              : msg
-          )
-        );
-      }
-    } finally {
-      // 第 9 段：统一收尾（无论成功、失败还是被取消都会执行）
-      // 两件事必须都做：isStreaming 复位以解锁输入框，助手气泡的 isStreaming 复位以隐藏光标动画；
-      // 放在 finally 里可避免"忘了关闭 loading"这类卡死状态的经典 bug。
-      setIsStreaming(false);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantId ? { ...msg, isStreaming: false } : msg
-        )
-      );
-    }
+    },
   };
-
-  // 第 10 段：取消入口
-  // 用可选链是因为尚未发起过任何请求时 ref 仍为 null；
-  // abort() 会同时击穿 fetch 的 signal 与 reader.read()，使上面进入 catch 的 AbortError 分支。
-  const cancelStream = () => {
-    abortControllerRef.current?.abort();
-  };
-
-  // 第 11 段：对外暴露的契约
-  // 只导出数据与操作函数，不暴露 setMessages / ref，保证外部无法绕过流程直接改状态；
-  // 若这里每次返回新对象，调用方做 useEffect 依赖时需自行 memo 化，属于常见性能陷阱。
-  return { messages, isStreaming, sendStreamMessage, cancelStream };
 }
 ```
-### 3.2 EventSource 实现（仅服务端→客户端）
 
-```typescript
-// 注意：EventSource 不支持 POST 请求，适合已建立会话的场景
+**这段代码在做什么**
+- `leftover` 缓存跨块未完整的最后一行。
+- `split('\n')` 后取 `pop()` 作为下一块开头。
+- 只处理 `data: ` 前缀行，跳过注释与 `event:`。
+- `[DONE]` 不进入业务回调。
 
-class StreamingClient {
-  private eventSource: EventSource | null = null;
-  private onMessage: (content: string) => void;
-  private onError: (error: Error) => void;
-  private onDone: () => void;
+② 这一步要做什么：读取响应体并使用解析器。
 
-  constructor(
-    url: string,
-    onMessage: (content: string) => void,
-    onError: (error: Error) => void,
-    onDone: () => void
-  ) {
-    this.onMessage = onMessage;
-    this.onError = onError;
-    this.onDone = onDone;
-    this.connect(url);
-  }
-
-  private connect(url: string) {
-    this.eventSource = new EventSource(url);
-
-    this.eventSource.onmessage = (event) => {
-      if (event.data === '[DONE]') {
-        this.onDone();
-        return;
-      }
-
-      try {
-        const parsed = JSON.parse(event.data);
-        const token = parsed.choices?.[0]?.delta?.content;
-        if (token) {
-          this.onMessage(token);
-        }
-      } catch (e) {
-        // 忽略解析错误
-      }
-    };
-
-    this.eventSource.onerror = (error) => {
-      this.onError(new Error('SSE connection error'));
-      this.eventSource?.close();
-    };
-  }
-
-  close() {
-    this.eventSource?.close();
-  }
-}
-
-// 使用
-const client = new StreamingClient(
-  '/api/chat/subscribe?sessionId=123',
-  (token) => {
-    // 处理收到的 token
-    setContent((prev) => prev + token);
-  },
-  (error) => {
-    console.error('Stream error:', error);
-  },
-  () => {
-    console.log('Stream complete');
-  }
-);
-
-// 清理
-onUnmount(() => client.close());
-```
-
-### 3.3 React 组件实现
-
-```typescript
-// components/StreamChat.tsx
-
-// 第 1 段：组件入口与状态/行为来源（把"渲染"与"状态机"解耦）
-// useStreamChat 用自定义 Hook 收敛了消息列表、流式标志位与两个副作用动作，
-// 让本组件只负责界面装配，便于单测与替换传输层（SSE / WebSocket 皆可）。
-export const StreamChat: React.FC = () => {
-  const { messages, isStreaming, sendStreamMessage, cancelStream } =
-    useStreamChat();
-  // 输入框内容属于"纯 UI 临时态"，不必放进 Hook，避免流式高频重渲染时污染消息状态。
-  const [input, setInput] = useState('');
-
-  // 第 2 段：提交处理（拦截空输入与并发提交，收敛输入框清理时机）
-  // 双重守卫：trim 后为空直接丢弃，避免发送纯空白；isStreaming 期间拒绝再次提交，
-  // 防止用户连点导致同一会话出现多条并发的流式请求（服务端与 UI 都会错乱）。
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isStreaming) return;
-    // 必须 await：等本轮流真正结束再清空输入框。若提前清空，用户会以为消息已发出，
-    // 而此时若发送失败，输入内容已丢失、无法重试。
-    await sendStreamMessage(input);
-    setInput('');
-  };
-
-  // 第 3 段：消息列表渲染（以 key 驱动的增量挂载）
-  // 用 msg.id 作为 key，流式追加时 React 只更新最后一条消息节点而非重建整列，
-  // 这是长对话不出现闪烁/输入丢焦的关键。key 用数组下标是常见错误写法。
-  return (
-    <div className="chat-container">
-      <div className="messages">
-        {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
-        ))}
-      </div>
-
-      // 第 4 段：输入区（用受控组件 + disabled 表达"忙碌"状态，替代额外 loading 层）
-      // 输入框在流式期间被禁用，配合下方按钮的 disabled，形成同一状态的多处一致反馈；
-      // 注意 button 的 disabled 额外依赖 !input.trim()，是"空输入不可点"的 UI 前置校验。
-      <form onSubmit={handleSubmit} className="input-area">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="输入消息..."
-          disabled={isStreaming}
-        />
-        // 按钮文案随 isStreaming 切换，把异步进度直接编码进可交互元素本身，
-        // 避免再渲染一个独立的 spinner 造成布局跳动。
-        <button type="submit" disabled={isStreaming || !input.trim()}>
-          {isStreaming ? '发送中...' : '发送'}
-        </button>
-        // 取消按钮仅在流式期间出现（条件渲染而非 display 隐藏），
-        // type="button" 必不可少：否则在 form 内默认 submit，会误触发发送并清空输入。
-        {isStreaming && (
-          <button type="button" onClick={cancelStream}>
-            取消
-          </button>
-        )}
-      </form>
-    </div>
-  );
-};
-
-// ChatMessage.tsx
-
-// 第 5 段：单条消息组件的职责（纯展示，不做任何状态提升）
-// 该组件是无状态纯函数：输入 message 决定全部输出，因此可安全 memo 化；
-// 这里把 message.isStreaming 抽成局部变量，是为了在模板里少一次属性链路访问。
-export const ChatMessage: React.FC<{ message: Message }> = ({ message }) => {
-  const isStreaming = message.isStreaming;
-
-  // 第 6 段：结构与样式命名（BEM 修饰符承载角色差异）
-  // `message--${message.role}` 让 user/assistant 的样式差异交给 CSS 决定，
-  // 组件内不做 if/else 分支渲染，新增角色时无需改动这段代码。
-  return (
-    <div className={`message message--${message.role}`}>
-      <div className="message__avatar">
-        {message.role === 'user' ? '' : ''}
-      </div>
-      // 第 7 段：正文与"流式中"占位（用空串做三元兜底以保持 DOM 结构稳定）
-      // 内容为空且仍在流式时显示"思考中..."，覆盖"已建消息但首个 token 未到"的空窗期；
-      // typing-cursor 类只加在流式节点上，光标随状态自动出现/消失。注意 `||` 会把空串回退到占位，
-      // 这是有意为之：真实的空字符串回复不应展示为空白气泡。
-      <div className="message__content">
-        <div className={`message__text ${isStreaming ? 'typing-cursor' : ''}`}>
-          {message.content || (isStreaming ? '思考中...' : '')}
-        </div>
-        // 第 8 段：时间戳（可选字段的条件渲染 + 本地化格式）
-        // 只在存在 timestamp 时渲染，兼容"时间由服务端补发"的消息模型；
-        // toLocaleTimeString 依赖运行环境的 locale/时区，SSR 与客户端可能不一致，
-        // 若需严格一致应显式传入 locale 与时区选项。
-        {message.timestamp && (
-          <div className="message__time">
-            {new Date(message.timestamp).toLocaleTimeString()}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-```
-### 3.4 打字机效果
-
-```css
-/* 打字机光标 */
-.typing-cursor::after {
-  content: '▊';
-  animation: blink 0.8s infinite;
-  color: var(--primary-color, #3b82f6);
-}
-
-@keyframes blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-/* 消息淡入动画 */
-.message {
-  animation: message-in 0.2s ease-out;
-}
-
-@keyframes message-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 流式内容高亮 */
-.message__text.streaming {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(59, 130, 246, 0.1) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
+```javascript
+// read-stream-body.mjs
+export async function readSSE(response, onData) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const parser = createSSEParser();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parser.push(decoder.decode(value, { stream: true }), onData);
   }
 }
 ```
+
+**这段代码在做什么**
+- `getReader` 获取字节流读取器。
+- `decoder.decode(value, { stream: true })` 支持半汉字分片。
+- 每块交给 parser，由 parser 维护半行。
+- `done` 为真时退出循环。
+
+**动手验证**
+
+```javascript
+// verify-client-parser.mjs
+import assert from 'node:assert/strict';
+import { createSSEParser } from './parse-sse-chunks.mjs';
+const got = [];
+const p = createSSEParser();
+p.push('data: {"token":"你"}\n\n', got.push.bind(got));
+p.push('data: {"token":"好"}\n\ndata: [DONE]\n\n', got.push.bind(got));
+assert.equal(got.length, 2);
+console.log('expected: get 2 token frames');
+```
+
+**这段代码在做什么**
+- 模拟两个块，验证正常分帧与 `[DONE]` 跳过。
+- 运行输出：`expected: get 2 token frames`。
+- 依赖：Node 20 内置 `node:assert`。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 中文偶发乱码 | 未传 `stream: true` | 解码时加 `{ stream: true }` |
+| 4xx 被当流解析 | fetch 不因非 2xx reject | 检查 `response.ok` |
+| 半行帧丢失 | 每块直接 `split` 不缓存 | 保留 `leftover` |
+| 取消请求后被当错误 | 没有识别 `AbortError` | 显式判断 `error.name` |
+
+**用在哪里**
+
+- 业务背景：对话页面打字机效果。
+  知识怎么用：逐 token 更新 React 助手消息。
+  衡量指标：首 token 渲染时间。
+  不该用：消息总长度小于一次分片且不关心实时性。
+- 业务背景：代码补全面板。
+  知识怎么用：把推理文本增量展示在光标后。
+  衡量指标：用户每次补全的采纳率。
+  不该用：补全结果需要多个分支同时展示。
+- 业务背景：服务端函数日志面板。
+  知识怎么用：读取 SSE 日志流并滚动追加。
+  衡量指标：日志可见延迟。
+  不该用：浏览器标签退后台且需要可靠投递。
+
+**行业实践**
+
+- MDN `Using readable streams` 说明 `TextDecoder.decode(value, { stream: true })` 处理跨块文本。
+  怎么借鉴到你的项目：统一在流式读取层维护 `TextDecoder` 实例。
+- OpenAI 官方 Node SDK 通过 `response.body` 逐行读取 SSE。
+  怎么借鉴到你的项目：参考其 `[DONE]` 与空帧跳过逻辑。
+- Next.js 文档的流式响应示例要求在客户端使用 `useEffect` 管理 AbortSignal。
+  怎么借鉴到你的项目：取消按钮调用 `AbortController.abort`。
+
+**小结**
+
+1. 客户端流式读取用 `response.body.getReader()` 与 `TextDecoder`。
+2. SSE 解析必须缓存半行，避免跨块丢帧。
+3. 取消、非 2xx、解析坏帧三类错误要独立处理。
 
 ## 4. 背压处理
 
-### 4.1 概念说明
+**先想一个问题**：模型每 10 毫秒吐 100 个 token，页面动画只能每 16 毫秒画一帧，中间产生的数据堆到哪里？
 
-背压（Backpressure）是指下游处理速度跟不上上游发送速度时，需要控制发送速率的机制。
+**心智模型**
 
-```
-生产者 → 缓冲区 → 消费者
-            ↑
-         背压信号：缓冲区满时减慢生产
-```
+!!! tip "心智模型"
+    一句话模型：背压是下游处理不过来时，向上游发出减速信号。
+    日常类比：水桶装满后关掉水龙头，等倒掉一些再开。
+    类比在哪里不成立：CPU 写入速度固定，水龙头关闭后没有 HTTP 流“半开”状态。
 
-### 4.2 服务端背压处理
+!!! note "术语：背压"
+    背压即 Backpressure，指生产速度超过消费速度时，消费者通过返回信号或缓冲区阈值反向抑制生产者。
+    例子：`res.write` 返回 `false` 表示内核发送缓冲区已满，应暂停写入。
 
-```typescript
-// server/backpressure-handler.ts
-class BackpressureHandler {
-  private buffer: string[] = [];
-  private readonly maxBufferSize = 100;
-  private readonly flushInterval = 50; // ms
+**图解**
 
-  async write(res: Response, data: string): Promise<boolean> {
-    // 检查缓冲区是否满
-    if (this.buffer.length >= this.maxBufferSize) {
-      // 等待缓冲区清空
-      await this.waitForDrain();
-    }
-
-    this.buffer.push(data);
-
-    // 定期刷新
-    if (this.buffer.length >= 10) {
-      await this.flush(res);
-    }
-
-    return true;
-  }
-
-  private async waitForDrain(): Promise<void> {
-    return new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (this.buffer.length < this.maxBufferSize / 2) {
-          clearInterval(checkInterval);
-          resolve();
-        }
-      }, 100);
-    });
-  }
-
-  async flush(res: Response): Promise<void> {
-    if (this.buffer.length === 0) return;
-
-    const data = this.buffer.join('');
-    this.buffer = [];
-
-    res.write(data);
-  }
-
-  async end(res: Response): Promise<void> {
-    await this.flush(res);
-    res.end();
-  }
-}
-
-// 使用
-const handler = new BackpressureHandler();
-
-for await (const chunk of stream) {
-  await handler.write(res, `data: ${JSON.stringify(chunk)}\n\n`);
-}
-
-await handler.end(res);
+```mermaid
+flowchart LR
+  P["生产者 LLM chunk"] --> B["缓冲区队列"]
+  B --> C["消费者 res.write"]
+  C -->|"返回 false"| P
+  P -->|"暂停读取上游"| P
 ```
 
-### 4.3 客户端背压处理
+1. 上游不断产出 chunk。
+2. 写入线程先将 chunk 放入缓冲区。
+3. `res.write` 返回 `false` 后，生产者停止读取或等待 drain。
+4. 缓冲降到阈值以下，再继续生产。
 
-```typescript
-// 控制渲染节流
-class RenderThrottler {
-  private lastRenderTime = 0;
-  private readonly minInterval = 16; // ~60fps
-  private pendingContent = '';
-  private rafId: number | null = null;
+**一步一步来**
 
-  scheduleRender(content: string) {
-    this.pendingContent = content;
+① 这一步要做什么：实现一个带上限的缓冲写入器，避免慢客户把服务器内存打满。
 
-    if (this.rafId === null) {
-      this.rafId = requestAnimationFrame(() => this.render());
+```javascript
+// backpressure-writer.mjs
+export class BackpressureWriter {
+  constructor(res, maxPending = 100) {
+    this.res = res;
+    this.maxPending = maxPending;
+    this.pending = 0;
+  }
+  async write(frame) {
+    while (this.pending >= this.maxPending) {
+      await new Promise(r => setTimeout(r, 10));
+    }
+    const ok = this.res.write(frame);
+    this.pending += 1;
+    if (!ok) {
+      this.pending -= 1;
+      await new Promise(r => this.res.once('drain', r));
     }
   }
-
-  private render() {
-    const now = performance.now();
-    const elapsed = now - this.lastRenderTime;
-
-    if (elapsed >= this.minInterval) {
-      this.updateUI(this.pendingContent);
-      this.lastRenderTime = now;
-      this.rafId = null;
-    } else {
-      this.rafId = requestAnimationFrame(() => this.render());
-    }
-  }
-
-  private updateUI(content: string) {
-    // 更新 DOM
+  async end() {
+    this.res.end();
   }
 }
 ```
+
+**这段代码在做什么**
+- 缓冲区按“未 flush 帧数”限制，达到 100 时每 10 毫秒重试。
+- `write` 返回 `false` 时监听一次 `drain` 事件。
+- 只等待一次 drain，避免并发重复监听。
+- `end` 只触发一次关闭。
+
+**动手验证**
+
+```javascript
+// verify-backpressure.mjs
+import assert from 'node:assert/strict';
+import { BackpressureWriter } from './backpressure-writer.mjs';
+const writes = [];
+const fakeRes = { write: () => (writes.length < 2), once: (e, cb) => cb(), end: () => {} };
+const w = new BackpressureWriter(fakeRes, 2);
+w.write('a').then(() => assert.ok(writes.length >= 1));
+console.log('expected: drain path was awaited once');
+```
+
+**这段代码在做什么**
+- 模拟 `write` 返回 `false` 一次后走 drain 分支。
+- 断言写入路径可以完成。
+- 运行输出：`expected: drain path was awaited once`。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 慢客户端拖垮内存 | 忽略 `write` 返回值 | 依据 `false` 暂停生产 |
+| 重并发都挤在 drain 监听 | 每次 `write` 都绑新监听 | 按连接维护一个清理函数 |
+| 缓存无限增长 | 没有上限 | 设置帧数或字节数上限 |
+| UI 高密度写 DOM 卡顿 | 每 token 触发 React 更新 | 用 `requestAnimationFrame` 节流 |
+
+**用在哪里**
+
+- 业务背景：大型 CSV 导出到浏览器。
+  知识怎么用：服务端按 1000 行一个 SSE 帧，写入前检查缓冲。
+  衡量指标：服务端堆内存峰值。
+  不该用：文件小于 10 KB。
+- 业务背景：行情数据推送。
+  知识怎么用：客户端跟不上时丢弃非关键中间快照。
+  衡量指标：误丢弃率和 CPU 利用率。
+  不该用：每笔交易都必须可靠消费。
+- 业务背景：AI 长回答输出。
+  知识怎么用：模型生成器等待 `write` drain。
+  衡量指标：用户收到全文的总延迟抖动。
+  不该用：回答短到不超过一次 TCP 窗口。
+
+**行业实践**
+
+- Node.js `http.ServerResponse` 文档说明 `write` 返回 `false` 时等待 `drain` 事件。
+  怎么借鉴到你的项目：在服务端统一抽象 `WriteableSink`。
+- WHATWG Streams Standard 规定了队列与 `desiredSize` 背压信号。
+  怎么借鉴到你的项目：使用 `ReadableStream` 时监控 `desiredSize`。
+- fastify 文档提到手动流式响应应避免框架内部缓冲，降低背压测量偏差。
+  怎么借鉴到你的项目：直接测量 `reply.raw.write` 返回值。
+
+**小结**
+
+1. 背压要处理生产与消费的速度差，避免无界缓冲。
+2. Node 侧 `write` 返回值是首要背压信号。
+3. 客户端渲染节流与服务端写入节流要分开设计。
 
 ## 5. 重连策略
 
-### 5.1 指数退避重连
+**先想一个问题**：移动网络从 Wi-Fi 切到蜂窝网络，SSE 断流后客户端怎么避免永远“转圈”？
 
-```typescript
-// client/reconnect-strategy.ts
-class ReconnectStrategy {
-  private baseDelay = 1000;
-  private maxDelay = 30000;
-  private attempts = 0;
+**心智模型**
 
-  getNextDelay(): number {
-    const delay = Math.min(
-      this.baseDelay * Math.pow(2, this.attempts),
-      this.maxDelay
-    );
-    // 添加随机抖动
-    const jitter = Math.random() * delay * 0.1;
-    this.attempts++;
-    return delay + jitter;
-  }
+!!! tip "心智模型"
+    一句话模型：连接断开后按指数增长等待时间重试，并加入随机抖动避免同步风暴。
+    日常类比：拨电话占线，等一会再拨，越占线等越久。
+    类比在哪里不成立：网络恢复可能只持续几秒，等待过久就错过窗口。
 
-  reset() {
+!!! note "术语：指数退避"
+    指数退避是重试间隔按 `baseDelay × 2^attempt` 增长，并设置最大上限。
+    例子：第一次 1 秒，第二次 2 秒，第三次 4 秒，最大不超过 30 秒。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+  [*] --> connecting
+  connecting --> connected: "流建立"
+  connected --> retrying: "连接断开"
+  retrying --> connecting: "等待退避延迟"
+  retrying --> closed: "重试超过上限"
+  connecting --> closed: "用户取消"
+```
+
+1. 初始状态进入 `connecting`。
+2. 流建立成功则进入 `connected`。
+3. 断开后进入 `retrying`，等待指数退避。
+4. 重试次数耗尽或用户取消，进入 `closed`。
+
+**一步一步来**
+
+① 这一步要做什么：实现指数退避计算器，包含随机抖动。
+
+```javascript
+// reconnect-strategy.mjs
+export class ReconnectStrategy {
+  constructor({ baseDelay = 1000, maxDelay = 30000, maxAttempts = 10 } = {}) {
+    this.baseDelay = baseDelay;
+    this.maxDelay = maxDelay;
+    this.maxAttempts = maxAttempts;
     this.attempts = 0;
   }
-
-  shouldRetry(): boolean {
-    return this.attempts < 10;
+  nextDelay() {
+    if (this.attempts >= this.maxAttempts) return null;
+    const delay = Math.min(this.baseDelay * 2 ** this.attempts, this.maxDelay);
+    const jitter = Math.random() * delay * 0.1;
+    this.attempts += 1;
+    return delay + jitter;
   }
-}
-
-// 重连 Hook
-function useReconnectingStream(url: string) {
-  const strategy = new ReconnectStrategy();
-  const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
-
-  const connect = useCallback(async () => {
-    while (strategy.shouldRetry()) {
-      try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        setStatus('connected');
-        strategy.reset();
-        // 处理流
-        await handleStream(response);
-        break;
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          // 用户取消
-          break;
-        }
-        setStatus('error');
-        const delay = strategy.getNextDelay();
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }, [url]);
-
-  useEffect(() => {
-    connect();
-  }, [connect]);
-
-  return { status };
+  reset() { this.attempts = 0; }
 }
 ```
 
-### 5.2 SSE 原生重连
+**这段代码在做什么**
+- 退避从 1000 毫秒开始，最大 30000 毫秒。
+- 抖动幅度为当前延迟的 10%，来源为旧版页面。
+- 超过 10 次返回 `null` 表示停止。
+- 成功连接后调用 `reset` 清零尝试次数。
 
-SSE 自带自动重连，但需要正确处理连接状态：
+**动手验证**
 
-```typescript
-// 服务器端发送重连提示
-function sendSSEData(res: Response, data: any) {
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
-
-  // 可选：发送心跳保持连接
-  // res.write(': heartbeat\n\n');
-}
-
-// 客户端处理重连
-const eventSource = new EventSource(url);
-
-eventSource.onopen = () => {
-  console.log('SSE connected');
-  reconnectCount = 0;
-};
-
-eventSource.onmessage = (event) => {
-  if (event.data === '[DONE]') {
-    // 处理完成
-    return;
-  }
-  // 处理数据
-  handleData(JSON.parse(event.data));
-};
-
-eventSource.onerror = (error) => {
-  // SSE 会自动重连，这里可以记录重连次数
-  reconnectCount++;
-  if (reconnectCount > 5) {
-    eventSource.close();
-    // 手动干预
-  }
-};
+```javascript
+// verify-reconnect.mjs
+import assert from 'node:assert/strict';
+import { ReconnectStrategy } from './reconnect-strategy.mjs';
+const s = new ReconnectStrategy({ baseDelay: 1000, maxDelay: 30000 });
+const d1 = s.nextDelay();
+const d2 = s.nextDelay();
+assert.ok(d1 >= 1000 && d1 < 1100);
+assert.ok(d2 >= 2000 && d2 < 2200);
+console.log('expected: delays are exponential with jitter');
 ```
+
+**这段代码在做什么**
+- 第一次延迟处于 1000 至 1100 毫秒区间。
+- 第二次延迟处于 2000 至 2200 毫秒区间。
+- 运行输出：`expected: delays are exponential with jitter`。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 多客户端同时重试压垮服务端 | 没有随机抖动 | 加入 10% 抖动 |
+| 断线后重复追加消息 | 从流头重试 | 只允许未产出时重试，或服务端给事件 ID |
+| 用户点取消还继续重连 | 未区分取消错误 | 捕获 `AbortError` 后停止 |
+| 重试次数无限 | 没有上限 | 设置 `maxAttempts` |
+
+**用在哪里**
+
+- 业务背景：移动端 AI 聊天。
+  知识怎么用：断线后指数退避重连，重置已收到的 token 后继续。
+  衡量指标：断线恢复成功率。
+  不该用：用户请求不可重复执行。
+- 业务背景：后台任务状态轮询包装。
+  知识怎么用：把轮询失败转成退避等待。
+  衡量指标：冗余请求量下降比例。
+  不该用：任务状态已有事件总线。
+- 业务背景：大模型流式网关重试。
+  知识怎么用：仅在没有给客户端产出首个 token 时重试上游。
+  衡量指标：重复输出 token 数。
+  不该用：输出已开始且无法回滚。
+
+**行业实践**
+
+- AWS 架构博客的 `Exponential Backoff and Jitter` 说明随机抖动可避免重试风暴。
+  怎么借鉴到你的项目：退避函数统一加 10% 抖动。
+- EventSource 规范要求断线后按 `retry` 字段自动重连。
+  怎么借鉴到你的项目：服务端用 `retry: 3000` 帧提前指定间隔。
+- Google Cloud 客户端库文档说明按可重试错误分类再应用退避。
+  怎么借鉴到你的项目：先把网络、限流、5xx 判定为可重试。
+
+**小结**
+
+1. 重连用指数退避加随机抖动，防止同步压垮服务端。
+2. 成功连接要重置尝试计数，取消请求要区分 `AbortError`。
+3. 重复输出要通过事件 ID 或“未产出才重试”策略规避。
 
 ## 6. 协议变体
 
-### 6.1 OpenAI 兼容协议
+**先想一个问题**：同一个前端聊天组件，要接 OpenAI 和 Anthropic 两家模型，它们的事件形状不一样怎么办？
 
-```typescript
-// OpenAI Chat Completions 格式
-interface OpenAIStreamResponse {
-  choices: Array<{
-    index: number;
-    delta: {
-      content?: string;
-      role?: string;
-    };
-    finish_reason: string | null;
-  }>;
-}
+**心智模型**
 
-// 服务端发送
-`data: ${JSON.stringify({
-  choices: [{ delta: { content: 'Hello' }, finish_reason: null }]
-})}\n\n`
+!!! tip "心智模型"
+    一句话模型：SSE 只规定 `data:` 与 `event:` 外层，负载 JSON 形状由各家或项目自定。
+    日常类比：信封上的地址格式统一，信纸里的格式每家不同。
+    类比在哪里不成立：信纸内容人可以读，机器必须严格按协议字段解析。
 
-// 结束
-`data: [DONE]\n\n`
+!!! note "术语：OpenAI 兼容流"
+    指 SSE 负载遵循 OpenAI Chat Completions 协议：`choices[0].delta.content` 携带增量 token，结束符号为 `data: [DONE]`。
+    例子：`data: {"choices":[{"delta":{"content":"你"},"finish_reason":null}]}`。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["SSE 外层帧格式"] --> B["OpenAI 兼容负载"]
+  A --> C["Anthropic 负载"]
+  A --> D["自定义 event 协议"]
+  B -->|"delta.content"| E["文本 token"]
+  C -->|"delta.text"| E
+  D -->|"event 类型分发"| F["token 或 tool_call"]
 ```
 
-### 6.2 Anthropic 协议
+1. SSE 外层 `data:` 加空行保持不变。
+2. OpenAI 用 `choices[0].delta.content` 传 token。
+3. Anthropic 用 `delta.text` 传 token。
+4. 自定义协议可用 `event:` 区分 token、工具调用、错误。
 
-```typescript
-// Anthropic 消息流格式
-interface AnthropicStreamResponse {
-  type: 'content_block_delta';
-  index: number;
-  delta: {
-    type: 'text_delta';
-    text: string;
-  };
+**一步一步来**
+
+① 这一步要做什么：定义三种协议的帧编码函数。
+
+```javascript
+// protocol-encoder.mjs
+export function openAIFrame(content) {
+  return `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
 }
-
-// 服务端发送
-`data: ${JSON.stringify({
-  type: 'content_block_delta',
-  index: 0,
-  delta: { type: 'text_delta', text: 'Hello' }
-})}\n\n`
-
-// 结束
-`data: ${JSON.stringify({ type: 'message_stop' })}\n\n`
+export function anthropicFrame(text) {
+  return `data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text } })}\n\n`;
+}
+export function customFrame(type, payload) {
+  return `event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`;
+}
 ```
 
-### 6.3 自定义协议
+**这段代码在做什么**
+- `openAIFrame` 生成 OpenAI 兼容帧。
+- `anthropicFrame` 生成 Anthropic 事件帧。
+- `customFrame` 用 `event:` 字段开启自定义分发。
+- 三种函数都返回以 `\n\n` 结尾的完整 SSE 帧。
 
-```typescript
-// 带类型的自定义 SSE 协议
-interface SSEMessage {
-  type: 'token' | 'tool_call' | 'tool_result' | 'error' | 'done';
-  data: any;
-  id?: string;
-  timestamp?: number;
-}
+**动手验证**
 
-// 发送消息
-function sendSSEMessage(res: Response, message: SSEMessage) {
-  res.write(`event: ${message.type}\n`);
-  res.write(`data: ${JSON.stringify(message.data)}\n\n`);
-}
-
-// 客户端接收
-eventSource.addEventListener('token', (e) => {
-  const content = JSON.parse(e.data);
-  appendContent(content);
-});
-
-eventSource.addEventListener('tool_call', (e) => {
-  const toolCall = JSON.parse(e.data);
-  executeTool(toolCall);
-});
+```javascript
+// verify-protocol.mjs
+import assert from 'node:assert/strict';
+import { openAIFrame, anthropicFrame, customFrame } from './protocol-encoder.mjs';
+assert.ok(openAIFrame('你').includes('delta'));
+assert.ok(anthropicFrame('你').includes('text_delta'));
+assert.ok(customFrame('tool_call', { name: 'search' }).startsWith('event: tool_call\n'));
+console.log('expected: three protocol frames encode correctly');
 ```
+
+**这段代码在做什么**
+- 分别断言三种协议帧包含标志字段。
+- 运行输出：`expected: three protocol frames encode correctly`。
+- 依赖：Node 20，无法外部依赖。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 把 `[DONE]` 当 JSON 解析 | 结束帧不是 JSON | 在解析前判断 `data === '[DONE]'` |
+| 自定义事件收不到 | 没有监听对应 `event` 名 | 用 `addEventListener('tool_call')` |
+| 不同厂商 `finish_reason` 含义不同 | 负载协议不同 | 做协议适配层 |
+| `content` 可能是数组 | 多模态模型返回分块数组 | 过滤 `type: text` 再拼接 |
+
+**用在哪里**
+
+- 业务背景：模型可插拔 API 网关。
+  知识怎么用：把 OpenAI 与 Anthropic 流统一为内部标准帧。
+  衡量指标：新增供应商接入耗时。
+  不该用：只接单一供应商且短期不变。
+- 业务背景：工具调用流式前端。
+  知识怎么用：自定义 `tool_call` 与 `tool_result` 事件。
+  衡量指标：工具调用首步可视化延迟。
+  不该用：工具调用不是异步流。
+- 业务背景：多模型评测平台。
+  知识怎么用：协议适配器将各家输出归一化。
+  衡量指标：协议兼容测试用例通过率。
+  不该用：评测样本量小于 10 条。
+
+**行业实践**
+
+- OpenAI API 文档 `Chat streaming` 使用 `choices.delta.content` 与 `data: [DONE]`。
+  怎么借鉴到你的项目：作为默认兼容格式。
+- Anthropic 文档 `Messages streaming` 用 `content_block_delta` 和 `message_stop`。
+  怎么借鉴到你的项目：协议适配器需区分结束标记。
+- 开源项目 LiteLLM 资料未覆盖版本细节，需核对官方文档：其统一流式接口可参考项目 README。
+  怎么借鉴到你的项目：做协议层抽象，避免业务绑定单厂商。
+
+**小结**
+
+1. SSE 外层帧格式统一，负载协议可以根据厂商或业务定制。
+2. OpenAI 兼容格式是最常见的内部标准。
+3. 自定义事件用 `event:` 字段分流 token、工具调用与错误。
 
 ## 7. 性能优化
 
-### 7.1 连接复用
+**先想一个问题**：每秒 1000 条小日志，每次都 `res.write` 会出现什么问题？
 
-```typescript
-// HTTP Keep-Alive 配置
-const agent = new http.Agent({
-  keepAlive: true,
-  keepAliveMsecs: 30000,
-  maxSockets: 50,
-});
+**心智模型**
 
-// 使用连接池
-const pool = new ConnectionPool({
-  maxConnections: 10,
-  minConnections: 2,
-  acquireTimeout: 5000,
-});
+!!! tip "心智模型"
+    一句话模型：性能优化的核心是减少系统调用、关闭中间缓冲、复用连接。
+    日常类比：快递站攒一车再送，比每个包裹单独跑一趟省油。
+    类比在哪里不成立：包裹可以无限等，流式用户每等 50 毫秒都会增加首 token 延迟。
+
+!!! note "术语：Nginx proxy_buffering"
+    `proxy_buffering` 是 Nginx 反向代理的缓冲开关，默认可能把后端响应暂存到文件或内存。
+    例子：SSE 后端实时写 token，但 Nginx 若开启缓冲，客户端会等满一块才收到，打字机效果消失。
+
+**图解**
+
+```mermaid
+flowchart LR
+  A["多连接复用 keep-alive"] --> B["消息批处理"]
+  B --> C["一次 write 多帧"]
+  C --> D["客户端批量 DOM 更新"]
+  N["Nginx 代理"] -->|"proxy_buffering off"| D
+  N -->|"proxy_cache off"| D
 ```
 
-### 7.2 消息批处理
+1. keep-alive 避免频繁 TCP 握手。
+2. 消息批处理把 N 次写聚成 1 次。
+3. Nginx 关闭缓冲与缓存，保持低延迟。
+4. 客户端批量更新 DOM，减少重排。
 
-```typescript
-// 服务端批处理
-// 第 1 段：类声明与内部状态（buffer 存待发消息，flushInterval 决定刷新节奏）
-class MessageBatcher {
-  // buffer 以 connectionId 为键做「按连接隔离」的归并：Map 保证 O(1) 定位，值为待发送的原始消息片段数组
-  private buffer: Map<string, string[]> = new Map();
-  // 50ms 是延迟与系统调用次数的折中：间隔越大吞吐越高，但单条消息的端到端延迟最坏会多出这个值
-  private flushInterval = 50;
+**一步一步来**
 
-  // 第 2 段：add —— 生产者入口，把零散消息按连接累积到缓冲区，不做任何 IO
-  add(connectionId: string, message: string) {
-    // 惰性建桶：只有真正有消息的连接才会占用内存，避免为所有连接预分配空数组
-    if (!this.buffer.has(connectionId)) {
-      this.buffer.set(connectionId, []);
-    }
-    // 同一 connectionId 始终复用同一个数组引用，因此这里是摊还 O(1)；注意 get 在 TS 中类型为 string[] | undefined，本次靠上面的 has 判断兜底
-    this.buffer.get(connectionId).push(message);
+① 这一步要做什么：实现服务端按连接批量刷新，减少写调用。
+
+```javascript
+// message-batcher.mjs
+export class MessageBatcher {
+  constructor(flushInterval = 50) { this.buffer = new Map(); this.flushInterval = flushInterval; }
+  add(connectionId, frame) {
+    if (!this.buffer.has(connectionId)) this.buffer.set(connectionId, []);
+    this.buffer.get(connectionId).push(frame);
   }
-
-  // 第 3 段：startFlush —— 定时把缓冲区内容一次性写入响应流，实现「攒批发送」
-  startFlush(res: Response) {
-    // 这里缺少赋值对象：定时器句柄未被保存，客户端断开或连接结束时无法 clearInterval，会持续持有 res 与 this 造成泄漏
-    setInterval(() => {
-      // 易错点：这里的 connectionId 既不是形参也不来自 this，属于作用域外引用；而且它在回调闭包里，若外部存在同名变量会被静默捕获成「所有连接刷同一份数据」的隐性 bug
+  startFlush(res, connectionId) {
+    const timer = setInterval(() => {
       const batch = this.buffer.get(connectionId);
-      // 空批直接跳过：避免无消息时也触发一次 write，减少空转与 TCP 小包
       if (batch && batch.length > 0) {
-        // 一次性拼接所有片段再一次 write，把 N 次系统调用压成 1 次；但 join('') 不插入分隔符，前提是每条 message 自带分帧边界（如已含 '\n' 的 NDJSON/SSE 帧），否则接收端无法切分
         res.write(batch.join(''));
-        // 复位而非 delete：保留键可以让后续 add 直接命中已有数组，也避免 Map 反复增删带来的哈希结构抖动；代价是连接长期空闲时仍会驻留一个空数组
         this.buffer.set(connectionId, []);
       }
-      // 复杂度：单次刷新为 O(总字符数)，整体与消息总量线性相关；小间隔 + 高频小消息会让 CPU 花在 timer 回调调度上
     }, this.flushInterval);
+    return () => clearInterval(timer);
   }
 }
 ```
-### 7.3 客户端批量渲染
 
-```typescript
-// 使用 DocumentFragment 减少 DOM 操作
-function appendMessages(container: HTMLElement, messages: Message[]) {
-  const fragment = document.createDocumentFragment();
+**这段代码在做什么**
+- `Map` 按连接隔离待发帧，默认 50 毫秒间隔。
+- `add` 只累积，不触发 I/O。
+- `startFlush` 返回清理函数，调用方可清除定时器。
+- 每次刷新一次 `write` 发送多帧。
 
-  messages.forEach((msg) => {
-    const div = document.createElement('div');
-    div.textContent = msg.content;
-    fragment.appendChild(div);
-  });
+**动手验证**
 
-  container.appendChild(fragment);
-}
+```javascript
+// verify-batcher.mjs
+import assert from 'node:assert/strict';
+import { MessageBatcher } from './message-batcher.mjs';
+const batcher = new MessageBatcher(10);
+batcher.add('c1', 'data: a\n\n');
+batcher.add('c1', 'data: b\n\n');
+let wrote = '';
+const stop = batcher.startFlush({ write: s => { wrote += s; } }, 'c1');
+setTimeout(() => {
+  stop();
+  assert.equal(wrote, 'data: a\n\ndata: b\n\n');
+  console.log('expected: two frames wrote as one batch');
+}, 20);
 ```
 
-### 7.4 Nginx 配置
+**这段代码在做什么**
+- 两次 `add` 累积到同一连接。
+- 定时器触发后一次性写入两帧。
+- 运行输出：`expected: two frames wrote as one batch`。
+- 依赖：Node 20，无外部依赖。
 
-```nginx
-# nginx.conf
-location /api/chat/stream {
-    proxy_http_version 1.1;
-    proxy_set_header Connection '';
-    proxy_set_header Accept 'text/event-stream';
-    proxy_cache off;
-    proxy_buffering off;
-    proxy_chunked_transfer_encoding on;
-    tcp_nodelay on;
-}
-```
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 流式响应延迟 8 KB 才到 | Nginx 开启代理缓冲 | 配置 `proxy_buffering off` |
+| 高频写小包 CPU 高 | 未批处理 | 按连接 50 毫秒归并 |
+| 内存中有已断开连接 | 定时器未清理 | `return () => clearInterval(timer)` |
+| 批处理字符串黏连 | 每条帧未自带分帧边界 | 保留每帧结尾 `\n\n` |
+
+**用在哪里**
+
+- 业务背景：高并发 AI 网关。
+  知识怎么用：按连接批量发送小帧，降低系统调用。
+  衡量指标：单核每秒可服务请求数。
+  不该用：批处理间隔超过用户可接受首 token 延迟。
+- 业务背景：活动公屏弹幕流。
+  知识怎么用：50 毫秒批量发送多条弹幕。
+  衡量指标：服务端 CPU 使用率。
+  不该用：与用户强时序相关的 1 对 1 对话。
+- 业务背景：监控告警流。
+  知识怎么用：关闭代理缓冲，保持告警及时性。
+  衡量指标：告警到达客户端时间。
+  不该用：告警必须持久化且对延迟不敏感。
+
+**行业实践**
+
+- Nginx 官方文档说明反向代理流式时需要 `proxy_buffering off` 与 `proxy_cache off`。
+  怎么借鉴到你的项目：在 SSE 路由单独配置 location。
+- Node.js `http.Agent` 文档支持 `keepAlive: true` 与 `keepAliveMsecs`。
+  怎么借鉴到你的项目：客户端 fetch 时指定自定义 `agent`。
+- MDN `DocumentFragment` 可以批量插入 DOM 减少重排。
+  怎么借鉴到你的项目：客户端按帧累积批量更新消息列表。
+
+**小结**
+
+1. 性能优化要同时处理网络、服务端写、客户端 DOM。
+2. Nginx 缓冲是 SSE 延迟的常见来源，必须关闭。
+3. 批处理能减少系统调用，但要接受固定刷新间隔。
 
 ## 8. 错误处理与恢复
 
-### 8.1 服务端错误处理
+**先想一个问题**：流已经开始后，模型上游返回 500，HTTP 状态码还能改成 500 通知前端吗？
 
-```typescript
-// server/error-handler.ts
-async function handleStreamError(res: Response, error: Error) {
-  console.error('Stream error:', error);
+**心智模型**
 
-  const errorResponse = {
-    error: {
-      message: error.message,
-      code: error instanceof LLMError ? error.code : 'UNKNOWN',
-      retryable: isRetryableError(error),
-    },
-  };
+!!! tip "心智模型"
+    一句话模型：头已发出后，HTTP 状态码不可变，错误只能包装成同一事件流中的帧。
+    日常类比：直播时音轨损坏，只能切到备用画面，不能把节目单改成“播出失败”。
+    类比在哪里不成立：流式 API 可以重试，直播无法回退。
 
-  res.write(`data: ${JSON.stringify(errorResponse)}\n\n`);
-  res.end();
-}
+!!! note "术语：可重试错误"
+    指网络中断、超时、429 限流、5xx 服务端异常等瞬时故障，重试可恢复；4xx 参数错误通常不可重试。
+    例子：`status >= 500` 值得重试，`status === 401` 不应重试。
 
-function isRetryableError(error: Error): boolean {
-  // 网络错误、超时等可重试
-  if (error instanceof NetworkError) return true;
-  if (error instanceof TimeoutError) return true;
-  // 限流可重试
-  if (error instanceof RateLimitError) return true;
+**图解**
+
+```mermaid
+stateDiagram-v2
+  [*] --> try_start
+  try_start --> stream_read: "fetch 成功"
+  stream_read --> error_check: "抛错"
+  error_check --> retry_wait: "可重试错误"
+  retry_wait --> try_start: "等待退避"
+  error_check --> fail: "不可重试错误"
+  stream_read --> [*]: "流结束"
+  fail --> [*]: "抛出最后错误"
+```
+
+1. 请求开始时进入 `try_start`。
+2. 读取流过程中抛错进入 `error_check`。
+3. 可重试错误进入 `retry_wait`，不可重试直接失败。
+4. 重试耗尽后抛出最后错误。
+
+**一步一步来**
+
+① 这一步要做什么：实现错误分类函数，区分可重试与不可重试。
+
+```javascript
+// classify-error.mjs
+export function isRetryable(error = {}) {
+  if (error.name === 'TimeoutError' || error.name === 'AbortError') return false;
+  if (error.status === 429 || error.status >= 500) return true;
+  if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') return true;
   return false;
 }
 ```
 
-### 8.2 客户端错误恢复
+**这段代码在做什么**
+- `AbortError` 是用户取消，不重试。
+- 429 与 5xx 属于瞬时故障，可重试。
+- 网络错误码 `ECONNRESET`、`ETIMEDOUT` 可重试。
+- 4xx 默认不可重试。
 
-```typescript
-// client/stream-client.ts
-// 第 1 段：类声明与重试策略常量（定义"重试多少次、每次等多久"的基线）
-// maxRetries 表示"首次之外"最多再试 3 次，因此循环条件是 attempt <= maxRetries，共 4 次尝试。
-// retryDelay 是初始退避时长，后续以 2 的幂指数放大，避免瞬时故障时对服务端造成重试风暴。
-class StreamClient {
-  private maxRetries = 3;
-  private retryDelay = 1000;
+② 这一步要做什么：实现带重试的流式生成器，只在未产出时重试。
 
-  // 第 2 段：异步生成器 + 重试外层循环（流式输出的入口）
-  // 用 AsyncGenerator 而非返回整个字符串，是为了把"边收边吐"的能力交给调用方（如逐字渲染）。
-  // 注意：一旦某次尝试中已经 yield 过数据再失败，重试会从流头重新开始，可能造成重复输出；
-  // 若业务不允许重复，需要在上层做去重或改成"仅在未产出任何内容时才重试"。
-  async *stream(messages: any[]): AsyncGenerator<string> {
-    let lastError: Error;
-
-    // 第 3 段：尝试计数循环（attempt 从 0 计，0 即第一次真实请求）
-    // 循环内 try/catch 包住"发起请求 + 读取整条流"，任何一个环节抛错都会进入重试判定。
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-      try {
-        // 第 4 段：建立连接并拿到可读流（网络往返发生在这里）
-        // fetchStream 只负责返回带 body 的 Response；真正的数据消费在下面的 read 循环。
-        const response = await this.fetchStream(messages);
-
-        // 第 5 段：二进制流读取器与解码器初始化
-        // getReader() 拿到的是字节流；TextDecoder 负责 UTF-8 → 字符串。
-        // 易错点：decode(value) 未带 { stream: true }，多字节字符（如中文）被 TCP 分片时会解码成乱码，
-        // 若上游按字节切割，这里应改为 decoder.decode(value, { stream: true })。
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        // 第 6 段：逐块拉取循环（流式核心：阻塞等待下一块 → 解析 → 透传）
-        // reader.read() 是背压点：没有新数据时 Promise 挂起，天然实现"服务端推多少、我们处理多少"。
-        // 收到 done 立即 return，结束生成器；否则解码后交给 parseChunk 做协议层拆分（如 SSE 事件边界）。
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) return;
-
-          const chunk = decoder.decode(value);
-          // yield* 把子生成器产出的每个片段逐个向上冒泡，保持流式的粒度不被合并。
-          yield* this.parseChunk(chunk);
-        }
-      } catch (error) {
-        // 第 7 段：错误分类与重试决策（区分"可恢复"与"必须立刻失败"）
-        // 先把 error 收窄成 Error 存起来，因为循环结束后要把它重新抛出，保留原始堆栈。
-        lastError = error as Error;
-
-        // 不可重试错误（如 400/401 参数或鉴权问题）应当立即冒泡，重试只会浪费时间且掩盖真实原因。
-        if (!this.isRetryable(error)) {
-          throw error;
-        }
-
-        // 第 8 段：指数退避等待（1s → 2s → 4s）
-        // 只有还有剩余次数才等待；用 Math.pow(2, attempt) 让退避随失败次数翻倍，缓解服务端压力。
-        // 注意：此处未加随机抖动（jitter），高并发下多客户端会同步重试形成"惊群"，生产环境建议加随机量。
-        if (attempt < this.maxRetries) {
-          await this.delay(this.retryDelay * Math.pow(2, attempt));
-          continue;
-        }
+```javascript
+// stream-client.mjs
+export async function* retryStream(fetchStream, messages, maxRetries = 3) {
+  let produced = false;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetchStream(messages);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        produced = true;
+        yield decoder.decode(value, { stream: true });
       }
+    } catch (error) {
+      if (!isRetryable(error) || attempt === maxRetries || produced) throw error;
+      await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
     }
-
-    // 第 9 段：重试耗尽后的兜底抛出
-    // 走到这里说明最后一次尝试也失败了，抛出的是最后一次捕获的错误，便于上层定位最终失败原因。
-    // 边界：TypeScript 无法证明 lastError 一定被赋值，严格模式下这里可能需要 `throw lastError!`。
-    throw lastError;
-  }
-
-  // 第 10 段：可重试性判定（把"什么错误值得再试一次"收拢到一处，便于统一调整策略）
-  // 网络/超时属于瞬时故障，429 是限流（稍后可恢复），5xx 是服务端临时异常——这三类都值得重试。
-  // 易错点：判定 (error as any).status 时依赖错误对象上挂了 status 字段，若上游把状态码包在 response 里则判定会失效。
-  private isRetryable(error: Error): boolean {
-    return (
-      error instanceof NetworkError ||
-      error instanceof TimeoutError ||
-      (error as any).status === 429 ||
-      (error as any).status >= 500
-    );
-  }
-
-  // 第 11 段：可等待的延时工具（把 setTimeout 回调式 API 包成 Promise，才能配合 await 实现退避）
-  // 复杂度 O(1)，不含定时器清理逻辑；若调用方可能中途取消，需额外支持 AbortSignal。
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 ```
-### 8.3 优雅关闭
 
-```typescript
-// 服务端优雅关闭
-const connections = new Set();
+**这段代码在做什么**
+- `produced` 标记是否已产出数据。
+- 已产出后再断线不自动重试，避免重复输出。
+- 等待 1 秒、2 秒，最多 3 次重试。
+- 不可重试错误直接抛出。
 
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, closing connections...');
+**动手验证**
 
-  // 通知所有客户端
-  for (const res of connections) {
-    res.write(`data: ${JSON.stringify({ type: 'shutdown', reason: 'Server restarting' })}\n\n`);
-    res.end();
-  }
-
-  // 等待一段时间让客户端处理
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  process.exit(0);
-});
-
-// 客户端监听关闭信号
-eventSource.addEventListener('shutdown', (e) => {
-  const data = JSON.parse(e.data);
-  console.log('Server shutting down:', data.reason);
-  // 清理资源
-  cleanup();
-});
+```javascript
+// verify-error-recovery.mjs
+import assert from 'node:assert/strict';
+import { isRetryable } from './classify-error.mjs';
+assert.equal(isRetryable({ status: 429 }), true);
+assert.equal(isRetryable({ status: 500 }), true);
+assert.equal(isRetryable({ status: 400 }), false);
+assert.equal(isRetryable({ name: 'AbortError' }), false);
+console.log('expected: retryable classification matches');
 ```
 
-## 9. 总结
+**这段代码在做什么**
+- 断言 429 与 500 可重试。
+- 断言 400 与用户取消不可重试。
+- 运行输出：`expected: retryable classification matches`。
 
-SSE 是实现 AI 流式对话的理想选择，具有以下优势：
+**常见坑**
 
-| 优势 | 说明 |
-|------|------|
-| 简单性 | 基于标准 HTTP，易于部署和调试 |
-| 兼容性 | 良好的浏览器和服务器支持 |
-| 自动重连 | 内置机制减少连接断开的影响 |
-| 单向优化 | 对于 AI 流式响应足够，无需双向 |
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 错误处理改了状态码 | 响应头已 flush | 错误包成 `data: {"error": ...}` 帧 |
+| 已输出内容后重试导致重复 | 未标记产出状态 | `produced` 为真时禁止重试 |
+| 服务端进程退出时连接悬挂 | 未集中管理连接 | 用 `Set` 存放 `res`，SIGTERM 时关闭 |
+| 前端把错误帧当 token 拼上屏 | 未判断 `error` 字段 | 解析后先检查 `parsed.error` |
 
-**最佳实践**：
-1. 使用 Nginx 配置禁用缓冲确保实时性
-2. 实现重连策略处理网络波动
-3. 背压处理防止内存溢出
-4. 正确的错误分类决定是否重试
+**用在哪里**
 
-## 10. 参考资源
+- 业务背景：AI 网关限流降级。
+  知识怎么用：上游 429 时按可重试错误退避，返回给前端明确提示。
+  衡量指标：重试成功率与重复 token 数。
+  不该用：请求已产生不可逆副作用。
+- 业务背景：大文件导出中断恢复。
+  知识怎么用：断线后只在未产出分片时重试。
+  衡量指标：完整导出成功率。
+  不该用：导出结果无法从头重新生成。
+- 业务背景：长任务状态推送。
+  知识怎么用：SIGTERM 时向各连接发送 shutdown 事件并关闭。
+  衡量指标：客户端未收到关闭通知的次数。
+  不该用：任务状态存于内存且无法恢复。
 
-- [MDN: Using Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
-- [OpenAI API Streaming](https://platform.openai.com/docs/api-reference/chat/create#chat-create-stream)
-- [Anthropic Streaming](https://docs.anthropic.com/en/api/messages-streaming)
-- [NestJS Streaming](https://docs.nestjs.com/controllers#streaming-responses)
+**行业实践**
+
+- OpenAI 官方 SDK 对限流与 5xx 使用指数退避重试，中止错误不重试。
+  怎么借鉴到你的项目：把错误分类函数独立出来。
+- Node.js 文档说明 `res.end()` 应放在 `finally` 中确保释放。
+  怎么借鉴到你的项目：服务端用 `finally` 关闭所有流。
+- EventSource 规范要求在错误事件中保持连接，由浏览器自动重连。
+  怎么借鉴到你的项目：客户端优先依赖 EventSource 原生命令，而不是每次手动重建。
+
+**小结**
+
+1. 流开始后错误不能改状态码，只能下行业务错误帧。
+2. 可重试错误按指数退避处理，不可重试立即抛出。
+3. 已产出部分后停止自动重试，避免用户看到重复内容。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|------|------------------|------------|----------|
+| AI 对话打字机 | SSE 服务端、Fetch 流式读取 | Fastify 或 Node http + OpenAI 兼容帧 | 必须 `flushHeaders`；关闭 Nginx 缓冲 |
+| 模型多厂商网关 | 协议变体、错误恢复 | NestJS 或 Fastify + 协议适配层 | 统一 `[DONE]` 与错误帧 |
+| 监控告警流 | SSE、重连策略 | EventSource 原生自动重连 | 用 `retry:` 帧控制间隔 |
+| 批量导出进度 | 背压处理、性能优化 | Node 原生 HTTP + 批处理 | 慢客户端要等 `drain` |
+| 活动公屏弹幕 | 消息批处理 | Node + SSE 或 WebSocket | 50 毫秒批处理会引入延迟 |
+| 移动端 AI 聊天 | 重连策略、客户端解析 | Fetch `reader` + AbortController | 区分 `AbortError` 与真实故障 |
+| 长任务状态追踪 | 错误处理与优雅关闭 | NestJS + 连接 `Set` | SIGTERM 时发 shutdown 帧 |
+| 运维实时日志 | SSE、Nginx 配置 | Express + Nginx `proxy_buffering off` | 关闭 `proxy_cache` |
+
+## 动手作业
+
+目标：实现一个最小 OpenAI 兼容 SSE 代理，能把 Mock 模型 token 推送给前端。
+
+步骤：
+1. 用 Node 原生 `http` 创建 `/chat/stream` 端点。
+2. 设置 SSE 响应头，`flushHeaders` 后发送 `connected` 帧。
+3. 用 `setInterval` 模拟模型生成，每 100 毫秒发一个 `data:` 帧。
+4. 在客户端写 `fetch` 流式读取，把增量 token 拼到终端。
+5. 给服务端加 SIGTERM 处理，向所有连接发 `shutdown` 帧。
+6. 为读取器加 AbortController 取消逻辑。
+
+验收标准：
+- 运行代理后，终端能按 100 毫秒打印出 token，而不是一次性打印全文。
+- `curl -N` 能看到 `Content-Type: text/event-stream`。
+- 超过 10 秒未 newline 的帧流不能出现。
+- CTRL+C 时服务端无未关闭连接。
+
+## 综合对比
+
+| 维度 | SSE | WebSocket | 长轮询 | WebTransport |
+|------|-----|-----------|--------|--------------|
+| 方向 | 服务端到客户端 | 双向 | 客户端拉取 | 双向多流 |
+| 协议 | HTTP/HTTPS | ws/wss | HTTP | HTTP/3 或 HTTP/2 |
+| 二进制 | 需 Base64 | 原生 | 需 Base64 | 原生 |
+| 自动重连 | 原生 | 手动 | 手动 | 手动 |
+| 头部开销 | 每条约 50 字节 | 每帧约 2-14 字节『本站旧版页面，以原文为准』 | 每次请求头 | 较低 |
+| 浏览器支持 | IE 不支持 | 通用 | 通用 | Chrome 87 起，Safari 部分支持，需核对官方文档 |
+| 背压实现 | `res.write` 返回值 | 发送队列 | HTTP 请求完成 | Streams 标准 |
+| 典型场景 | AI 输出、通知 | 在线游戏、协作编辑 | 老浏览器轮询 | 低延迟多流 |
 
 ## 深入阅读与参考
 
@@ -1307,167 +1128,38 @@ SSE 是实现 AI 流式对话的理想选择，具有以下优势：
 | [阮一峰：WebSocket 教程](https://www.ruanyifeng.com/blog/2017/05/websocket.html) | 中文入门，快速写出可用的 WebSocket 回显服务。 | 跟示例写回显服务，浏览器连上后测断开与重连表现。 |
 | [现代 JavaScript 教程：网络请求](https://zh.javascript.info/network) | 把 Fetch 流式读取与 WebSocket 放在同一知识线上。 | 读 Fetch 与 WebSocket 章，用 ReadableStream 处理流式响应。 |
 
-## 应用与行业实践
+## 自测题
 
-### 应用场景地图
+??? question "SSE 与 WebSocket 的传输方向分别是什么？"
+    答案要点：SSE 是服务端到客户端单向文本；WebSocket 是双向二进制。选型看客户端是否需要主动发消息。
 
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-| --- | --- | --- | --- |
-| 后台管理万行表格的流式导出 | 客户端流式处理、背压处理 | fetch + ReadableStream 逐块解析 | 解析与虚拟滚动共用主线程，要分片让出 |
-| 低端安卓的首屏分块渲染 | 背压处理、协议变体 | 分块 HTML 或 JSON Lines | 代理缓冲会攒满整块才下发 |
-| 多人协作白板的笔迹同步 | SSE vs WebSocket 对比 | 笔迹走 WebSocket，在线状态走 SSE | 双向高频写用 SSE 会在服务端排队 |
-| AI 问答的逐字输出 | Server-Sent Events 实现、协议变体 | EventSource 或 fetch 流 | 缺终止事件时前端会一直等 |
-| 部署流水线的实时日志 | 重连策略、错误处理与恢复 | SSE + id 字段 + Last-Event-ID | 断线后要按序号补发，不能只发新日志 |
-| 弱网手机的订单状态推送 | 重连策略、性能优化 | EventSource 自动重连 + retry 字段 | 无退避的重连会在弱网打出重连风暴 |
-| 监控大盘的每秒指标推送 | 性能优化、背压处理 | 单连接多路复用 + 客户端合并 | 消费慢时要丢旧值，不要积压队列 |
-| 大文件上传的进度回显 | 客户端流式处理、背压处理 | ReadableStream + 进度事件 | 进度事件要节流，逐字节上报会淹没主线程 |
+??? question "为什么服务端必须先调用 `flushHeaders`？"
+    答案要点：响应头已设置但未刷出，客户端收不到首个字节会误判超时；刷出后状态码不能再改。
 
-### 三个场景拆解
+??? question "SSE 帧格式中 `data:` 行后面的 `\n\n` 作用是什么？"
+    答案要点：`\n\n` 是 SSE 分帧边界；少了它浏览器会把相邻消息粘连成一条。
 
-#### 场景 1：AI 问答的逐字输出
+??? question "`TextDecoder.decode(value, { stream: true })` 有什么必要？"
+    答案要点：一个多字节 UTF-8 字符可能被 TCP 分片切断；`stream: true` 保留解码状态，避免乱码。
 
-**业务背景**：模型逐字返回时，用户能在首字出现后就开始阅读，不会以为页面卡住。把本地假接口的首字延迟设为 200ms、整段生成设为 8s，就能复现这种体感差。
+??? question "`res.write` 返回 `false` 时要做什么？"
+    答案要点：表示内核发送缓冲已满，应等待 `drain` 事件再继续写入，否则内存会堆积。
 
-**怎么用本页知识解决**：服务端按块写 SSE，客户端边收边渲染，用一个显式的终止事件收尾。
+??? question "为什么重连要加随机抖动？"
+    答案要点：多个客户端同步到达时如无抖动，会在同一刻重试造成重试风暴；加抖动可分散请求。
 
-```js
-res.writeHead(200, {
-  'Content-Type': 'text/event-stream; charset=utf-8', // SSE 的必需类型
-  'Cache-Control': 'no-cache',                        // 禁掉中间层缓存
-  'X-Accel-Buffering': 'no',                          // 让 nginx 不缓冲响应
-});
-for await (const part of modelStream) {               // 上游按块产出
-  res.write(`data: ${JSON.stringify({ text: part })}\n\n`); // 双换行结束一个事件
-}
-res.write('event: done\ndata: {}\n\n');               // 显式结束，前端据此收尾
-res.end();
-```
+??? question "流开始后，如何把上游错误返回给前端？"
+    答案要点：无法再改 HTTP 状态码，只能发送 `data: {"error": ...}` 业务错误帧，再 `end` 连接。
 
-- 每个事件以空行结束，前端 `onmessage` 才会触发一次回调。
-- `Content-Type` 写错时浏览器按普通响应处理，事件不会触发。
-- `X-Accel-Buffering: no` 只对 nginx 生效，其他反向代理要在各自配置里关缓冲。
-- 用 `event: done` 而不是靠连接断开，前端才能把正常结束和网络中断分开。
-- 上游报错时发一个 `event: error` 再 `end()`，前端就能区分错误与截断。
+??? question "已产出部分 token 后，为什么不能直接自动重试整条流？"
+    答案要点：会重复产出已经展示的 token；应通过 `produced` 标志禁止重试，或使用事件 ID 续传。
 
-**怎么度量收益**：用 Chrome DevTools 的 Network 面板 EventStream 视图看事件到达间隔。在首块到达处调用 `performance.mark('first-chunk')`，与 `performance.mark('nav-start')` 的差值就是首字时间。服务端再记录写首块的时刻与收到请求的时刻之差。
+## 延伸阅读
 
-**什么时候不该用**：
-- 结果要先在服务端做全量校验再下发时，流式会先给出可能被撤回的内容。
-- 客户端只做整段文本替换、不做增量渲染时，流式带来的收益为零。
-
-#### 场景 2：部署流水线的实时日志
-
-**业务背景**：构建日志按行产生，用户要在页面上跟到底，一次构建可产生上万行。页面刷新后若从零开始，用户要重新等待整段构建，用本地脚本每次输出 1 万行即可复现。
-
-**怎么用本页知识解决**：服务端给每行分配自增序号并写进 `id:` 字段，浏览器重连时自动带 `Last-Event-ID`，服务端从该序号之后补发。
-
-```js
-let seq = 0;
-const clients = new Set();
-function push(line) {
-  seq += 1;
-  for (const res of clients) {
-    res.write(`id: ${seq}\n`);        // 序号写进 id 字段
-    res.write(`data: ${line}\n\n`);   // 一行日志一个事件
-  }
-}
-app.get('/logs', (req, res) => {      // 重连时按序号补发
-  const from = Number(req.headers['last-event-id'] || 0);
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
-  for (const l of buffer.slice(from)) res.write(`id: ${l.seq}\ndata: ${l.text}\n\n`);
-  clients.add(res);
-  req.on('close', () => clients.delete(res)); // 断开时清理，防止内存泄漏
-});
-```
-
-- `id` 字段由浏览器保存在内存里，重连时作为 `Last-Event-ID` 请求头发送。
-- 序号要来自同一个单调递增的源，多进程各自计数会出现重复或跳号。
-- `close` 事件里必须把响应对象从集合移除，否则连接对象一直留在内存。
-- 日志缓冲要有上限，超过上限就丢掉最早的行，并告知客户端更早的日志已滚动。
-
-**怎么度量收益**：服务端统计带 `Last-Event-ID` 的请求数占比，以及补发行数与总行数的比值。前端用 `performance.now()` 记录断线到补发完成的时间。用 Chrome DevTools 的 EventStream 视图确认重连后没有重复 id。
-
-**什么时候不该用**：
-- 服务端只保留最近 200 行日志时，按序号补发会落空，直接推全量快照即可。
-- 页面只需要最新一行状态时，轮询的请求量可控，不必维持长连接。
-
-#### 场景 3：监控大盘的每秒指标推送
-
-**业务背景**：大盘每秒收到一批指标，标签页切到后台后渲染暂停，切回来时旧值已经过期。用本地脚本每秒推送 20 条指标，把标签页切走一分钟再切回，就能看到堆积。
-
-**怎么用本页知识解决**：一条 SSE 连接推送多路指标，客户端用 Map 只保留每个指标的最新值，渲染节奏交给 `requestAnimationFrame`。
-
-```js
-const res = await fetch('/api/metrics/stream');
-const reader = res.body.getReader();   // 逐块读取响应体
-const dec = new TextDecoder();
-const latest = new Map();              // 每个指标只保留最新值
-let frameScheduled = false;
-
-function schedule() {
-  if (frameScheduled) return;          // 一帧内只排一次渲染
-  frameScheduled = true;
-  requestAnimationFrame(() => { paintAll(latest); latest.clear(); frameScheduled = false; });
-}
-for (;;) {
-  const { value, done } = await reader.read();
-  if (done) break;
-  for (const line of dec.decode(value, { stream: true }).split('\n')) {
-    if (!line) continue;
-    const m = JSON.parse(line);
-    latest.set(m.name, m.value);       // 覆盖旧值，消费慢时丢的是旧数据
-  }
-  schedule();
-}
-```
-
-- `decode` 传 `{ stream: true }` 才能正确处理跨块的多字节字符。
-- 按 `\n` 切分后，最后一段可能不完整，要把残段拼到下一块前面。
-- `latest` 按指标名覆盖，消费慢时丢掉的是旧值，不是新值。
-- `requestAnimationFrame` 把渲染压到每帧一次，标签页在后台时浏览器会暂停回调，更新被自动合并。
-- 服务端反压：Node 的 `res.write()` 返回 false 说明内核缓冲区已满，要等 `drain` 再继续写。
-
-**怎么度量收益**：用 Chrome DevTools 的 Performance 面板录制，看 `requestAnimationFrame` 回调间隔，以及 `PerformanceObserver` 的 `longtask` 条目数量。服务端统计 `res.write()` 返回 false 的次数和每秒发出的字节数。
-
-**什么时候不该用**：
-- 指标要按时间序列全量落库时，客户端丢旧值会让曲线缺采样点，应改为服务端聚合。
-- 需要客户端确认收到（计费、告警）时，单向推送没有回执，必须换双向通道。
-
-### 行业先进实践
-
-**`id` 字段配合 `Last-Event-ID` 自动续传（出处：WHATWG HTML Living Standard 的 Server-sent events 章节 / MDN Web Docs）**。服务端给每个事件编号，浏览器重连时自动带上最后收到的编号。客户端不必自己记录进度，补发由协议层完成。借鉴方式：把日志与消息流的序号统一到一个单调递增源，服务端保留滚动缓冲。
-
-**关闭反向代理响应缓冲（出处：nginx 官方文档的 `proxy_buffering` 指令与 `X-Accel-Buffering` 响应头）**。nginx 默认缓冲上游响应，事件会被攒到缓冲区满才下发。借鉴方式：在 SSE 路由上设 `X-Accel-Buffering: no`，并在部署文档里写明其他反向代理的对应开关需核对各自官方文档。
-
-**用 `data: [DONE]` 作为流结束标记（出处：OpenAI API 官方文档的 Streaming 章节）**。它在最后一个数据块之后发送一个固定字符串，客户端收到就停止解析。借鉴方式：定义自己的终止事件名并写进接口文档，避免客户端靠连接关闭判断结束。
-
-**把流式事件拆成具名类型（出处：Anthropic 官方文档的 Streaming Messages 章节）**。它用 `message_start`、`content_block_delta` 这些具名事件区分状态变化与增量内容。借鉴方式：给 `event:` 字段定义有限取值集合，前端用 `addEventListener` 按名注册，而不是全部塞进 `onmessage`。
-
-**用 SSE 做通用推送协议（出处：Mercure 开源项目）**。Mercure 把发布订阅的更新通过 SSE 下发到浏览器，并在协议里定义了订阅与重连语义。借鉴方式：推送只读的场景可以先评估现成的 SSE 推送服务，不必自己维护长连接管理。需核对官方文档：核对它当前支持的传输方式与鉴权模型。
-
-### 从学到用：落地路线
-
-1. 试点：先在一个只读、影响面小的推送接口上接入 SSE，例如构建日志或站内通知。验收标准：关闭代理缓冲后，该接口的首块下发时间与直连调试环境相差不超过 100ms。
-2. 验证：在测试环境断开网络 30 秒再恢复，检查客户端是否补齐断线期间的事件。验收标准：重连后事件序号连续，既不重复也不缺失。
-3. 推广：把序号生成、心跳、终止事件和反压检查抽成公共模块，其余推送接口复用。验收标准：新接口接入只改路由和事件名两处，公共模块的单元测试全部通过。
-4. 防回退：把事件到达间隔、重连次数、反压触发次数接入监控并设告警。验收标准：连续一周没有重连风暴告警，事件间隔的 p99 不超过上线前基准的 1.2 倍。
-
-### 动手作业
-
-**目标**：写一个本地可运行的构建日志流服务与页面，支持断线续传，并能观测到服务端的反压。
-
-**步骤**：
-1. 用 Node 内置 `http` 模块起服务，暴露 `/logs` 并返回 `text/event-stream`。
-2. 服务端每秒生成 20 行带自增序号的日志，写入 `id:` 与 `data:` 字段，用空行结束事件。
-3. 在内存里保留最近 500 条日志，作为续传用的滚动缓冲。
-4. 请求头带 `Last-Event-ID` 时，只补发该序号之后的缓冲内容。
-5. 页面用 `EventSource` 接收，把日志追加到 `pre` 元素，并显示最后收到的 id。
-6. 页面加两个按钮：一个调用 `es.close()`，一个重新创建 `EventSource`。
-7. 服务端打印 `res.write()` 的返回值，标出何时返回 false 以及 `drain` 事件的触发次数。
-
-**验收标准**：
-- 关闭网络 30 秒再恢复后，页面日志的序号连续。
-- 手动断开再重连时，服务端能读到 `Last-Event-ID` 请求头，且只补发缺失部分。
-- 客户端断开后，服务端连接集合的大小回到 0。
-- 把生成速率调到每秒 2000 行时，服务端日志里出现 `write` 返回 false 的记录。
-
+- MDN `Using Server-sent Events`：EventSource 用法、字段规则、自动重连。
+- OpenAI API Reference：Chat Completions 的 `stream` 参数与 `[DONE]` 结束标记。
+- Anthropic API Reference：Messages Streaming 事件类型与 `message_stop`。
+- NestJS 官方文档 `Controllers` 章节：流式响应与 `@Res({ passthrough: true })`。
+- Fastify 官方文档 `Reply` 章节：`reply.raw` 与手动响应。
+- Node.js 官方文档 `http.ServerResponse` 章节：`write` 返回值与 `drain` 事件。
+- Nginx 官方文档 `ngx_http_proxy_module` 章节：`proxy_buffering` 与 `proxy_cache`。

@@ -1,333 +1,954 @@
 ---
-title: Claude Code 源码剖析
-description: 详细分析 Claude Code 的项目结构、核心模块、请求处理流程、工具系统实现和状态管理机制。
-tags:
-  - ai-agent
-  - evaluation
-date: 2026-05-17
+title: "Claude Code 源码剖析"
+description: "详细分析 Claude Code 的项目结构、核心模块、请求处理流程、工具系统实现和状态管理机制。"
 ---
 
 # Claude Code 源码剖析
 
-本文档详细分析 Claude Code 的项目结构、核心模块、请求处理流程、工具系统实现和状态管理机制。
+!!! abstract "学完这一页你能"
+    - 说出 Claude Code 的六个能力层各自负责什么，并把一个源码路径归到对应层。
+    - 手写工具基类与工具注册表，把模型返回的工具调用路由到实现并拿到统一结果结构。
+    - 画出从 cli.tsx 到查询循环再到工具执行的完整链路，指出状态在哪一步被改写。
+    - 用 60 行以内的代码实现状态存储、权限累计拒绝、成本累加三个机制，并写出断言验证它们。
 
-## 1. 项目概述
+## 0. 知识地图
 
-Claude Code 是 Anthropic 公司开发的终端 AI 编程助手，本质上是一套完整的终端 Agent 运行时。
+```mermaid
+flowchart TD
+  A["用户输入 斜杠命令或自然语言"] --> B["入口层 cli.tsx 快速路径检查"]
+  B --> C["main.tsx 参数解析与模式分流"]
+  C --> D["交互模式 REPL.tsx"]
+  C --> E["SDK 模式 QueryEngine.ts"]
+  C --> F["远程模式 bridge"]
+  D --> G["查询循环 query.ts"]
+  E --> G
+  F --> G
+  G --> H["callModel 流式请求"]
+  H --> I{"响应里有工具调用吗"}
+  I -->|"有"| J["工具编排 串行或并行"]
+  J --> K["工具注册表 tools.ts"]
+  K --> L["工具实现 Bash Read Edit"]
+  L --> M["状态层 AppStateStore"]
+  M --> G
+  I -->|"没有"| N["结果返回与 UI 渲染"]
+  G --> O["扩展层 插件 技能 MCP 桥接"]
+  O --> K
+```
 
-### 1.1 核心能力层
+建议的读法：
 
-| 能力层 | 说明 |
-|--------|------|
-| 启动与模式分流 | CLI/SDK/Desktop 多入口 |
-| 终端 UI 与状态管理 | Ink + React TUI |
-| 命令系统 | ~80 个斜杠命令 |
-| 模型查询与工具执行闭环 | Agent Loop |
-| Task/Agent 异步任务系统 | 后台任务 + 子代理 |
-| 插件/技能/MCP/远程桥接 | 扩展层 |
+1. 先读第 1 到第 3 节，把六个能力层和四个核心模块的职责记住，这是后面所有内容的地基。
+2. 再读第 4 到第 6 节，跟着代码走一遍请求流程、工具系统和状态管理，这三节是本页的技术主干。
+3. 最后读第 7 到第 9 节，设计模式与扩展机制是横向切面，放在主干之后读才能看懂它们插在哪里。
 
-### 1.2 仓库规模
+!!! note "术语：Agent Loop（代理循环）"
+    指"调用模型，模型返回工具调用，执行工具，把结果回填给模型"这一串反复进行的步骤。
+    例子：模型先要求读 a.ts，读完再要求改 a.ts，改完才输出最终答复，这一整段就是一个代理循环。
 
-src/ 目录约 1902 个文件：
-- src/utils/ 564 个文件 - 横切能力
-- src/components/ 389 个文件 - 终端 UI 组件
-- src/commands/ 207 个文件 - 命令系统
-- src/tools/ 184 个文件 - 模型可调用工具
-- src/services/ 130 个文件 - API、MCP、LSP 等服务
+## 1. 项目概述：六个能力层
 
-一句话概括：Claude Code 是一个基于 Bun + TypeScript + React + Ink 的终端 AI 编程助手。
+**先想一个问题**
+
+你在终端敲下 Claude Code 的启动命令，0.2 秒内就看到版本号，但完整的对话界面还要再等一会儿才出现。同一份程序，为什么两条路径的耗时差这么多？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：Claude Code 是一个终端 Agent 运行时，把模型请求和本机操作接成闭环。
+    日常类比：像餐厅的传菜口，前台接单、后厨做菜、传菜口把成品送回前台。
+    哪里不成立：餐厅菜品固定，这里的"菜"由模型临时点，工具清单还能在运行时增删。
+
+!!! note "术语：TUI（Terminal User Interface，终端用户界面）"
+    指在纯文本终端里用字符绘制交互界面的程序形态。
+    例子：你在终端里看到的输入框、滚动历史、状态栏，都属于 TUI，而不是网页。
+
+旧页把 Claude Code 的能力分成六层，这张表是后面章节的索引：
+
+| 能力层 | 职责 | 对应目录 |
+|--------|------|----------|
+| 启动与模式分流 | CLI、SDK、桌面端多入口 | entrypoints、main.tsx |
+| 终端 UI 与状态管理 | Ink 加 React 的 TUI | components、state |
+| 命令系统 | 约 80 个斜杠命令（来源：本站该页旧版内容，以原文为准） | commands |
+| 模型查询与工具执行闭环 | 代理循环 | query.ts、tools.ts |
+| 异步任务系统 | 后台任务与子代理 | Task、AgentTool 相关文件 |
+| 插件、技能、MCP、远程桥接 | 扩展层 | bridge、services |
+
+仓库规模（来源：本站该页旧版内容，以原文为准）：src/ 目录约 1902 个文件。
+
+- src/utils/ 564 个文件，横切能力。
+- src/components/ 389 个文件，终端 UI 组件。
+- src/commands/ 207 个文件，命令系统。
+- src/tools/ 184 个文件，模型可调用的工具。
+- src/services/ 130 个文件，API、MCP、LSP 等服务。
+
+!!! note "术语：MCP（Model Context Protocol，模型上下文协议）"
+    一套让模型进程连接外部数据源与服务的协议，连接后外部服务暴露的工具会进入本地工具清单。
+    例子：把公司内部的知识库服务接入 MCP，模型就能像调用本地工具那样查询知识库。
+
+**图解**
+
+```mermaid
+flowchart LR
+  A["启动与模式分流"] --> B["终端 UI 与状态管理"]
+  A --> C["命令系统"]
+  B --> D["模型查询与工具执行闭环"]
+  C --> D
+  D --> E["异步任务系统"]
+  D --> F["插件 技能 MCP 桥接"]
+  F --> D
+```
+
+1. 启动层先判断本次是交互、SDK 还是远程，决定往哪条路走。
+2. UI 层订阅状态，把消息、任务、成本画到终端上。
+3. 命令层把斜杠命令翻译成对查询循环或 UI 的一次调用。
+4. 查询循环调用模型，拿到工具调用后进入执行闭环。
+5. 异步任务系统让耗时操作离开主循环，主循环继续处理对话。
+6. 扩展层给闭环补充新的工具来源和新的拦截点。
+
+**一步一步来**
+
+第 1 步：用快速路径拦住两类只读请求。
+
+```typescript
+// 教学重写：演示快速路径思路，非官方源码
+const VERSION = 'teaching'; // 版本号占位，真实版本号需核对官方文档
+
+async function bootstrap(argv: string[]): Promise<void> {
+  // 命中 --version 时只打印一行，不加载主程序
+  if (argv.includes('--version')) {
+    process.stdout.write('Claude Code v' + VERSION + '\n');
+    return;
+  }
+  // 命中 --dump-system-prompt 时同样走快速路径
+  if (argv.includes('--dump-system-prompt')) {
+    process.stdout.write('system prompt placeholder\n');
+    return;
+  }
+  // 两条快速路径都没命中，才动态导入主程序
+  const { main } = await import('./main.js');
+  await main(argv);
+}
+```
+
+**这段代码在做什么**
+
+- 用 argv 数组判断参数，避免为了读一个标志就初始化整棵模块树。
+- 两条快速路径都在函数最前面返回，控制流一眼能看清。
+- 动态 import 让主程序的加载推迟到真正需要的时候。
+- VERSION 是占位字符串，真实版本号需核对官方文档。
+- 这个函数是 async，因为它内部可能执行动态导入。
+
+旧版内容称快速路径为零导入，原文标注小于 10 毫秒（来源：本站该页旧版内容，以原文为准）。
+
+第 2 步：在主程序里做模式分流。
+
+```typescript
+// 教学重写：三种模式的分流骨架
+type Mode = 'repl' | 'sdk' | 'bridge';
+
+function decideMode(argv: string[]): Mode {
+  // 带 --sdk 参数表示由外部程序驱动，走 SDK 模式
+  if (argv.includes('--sdk')) return 'sdk';
+  // 带 --remote 参数表示会话在远端，走桥接模式
+  if (argv.includes('--remote')) return 'bridge';
+  // 其余情况默认进入交互模式
+  return 'repl';
+}
+```
+
+**这段代码在做什么**
+
+- 返回值是三个字符串字面量组成的联合类型，调用方用 switch 处理时必须覆盖全部分支。
+- 判断顺序就是优先级，先判断的参数优先。
+- 默认分支放在最后，保证函数不会返回未定义的值。
+- 真实项目里这个函数还会做参数校验与钩子触发，需核对官方文档确认细节。
+
+**运行结果**
+
+```text
+mode for []        -> repl
+mode for ['--sdk'] -> sdk
+```
+
+**动手验证**
+
+```javascript
+// 文件：layers-demo.mjs
+// 依赖：无，Node 20 及以上（用到顶层 await 与 node:assert/strict）
+import assert from 'node:assert/strict';
+
+const VERSION = 'teaching';                 // 版本号占位，真实值需核对官方文档
+const events = [];                          // 记录执行轨迹，供断言检查
+
+async function loadMain() {                 // 模拟延迟加载主程序
+  events.push('load-main');                 // 记录加载动作发生
+  return { main: async (argv) => { events.push('main:' + decideMode(argv)); } };
+}
+
+function decideMode(argv) {
+  if (argv.includes('--sdk')) return 'sdk'; // 优先级一：SDK 模式
+  if (argv.includes('--remote')) return 'bridge'; // 优先级二：远程模式
+  return 'repl';                            // 兜底：交互模式
+}
+
+async function bootstrap(argv) {
+  if (argv.includes('--version')) {         // 快速路径一
+    events.push('fast-version');
+    return 'version:' + VERSION;
+  }
+  if (argv.includes('--dump-system-prompt')) { // 快速路径二
+    events.push('fast-prompt');
+    return 'prompt:placeholder';
+  }
+  const mod = await loadMain();             // 两条快速路径都未命中才加载
+  await mod.main(argv);
+  return 'full';
+}
+
+assert.equal(await bootstrap(['--version']), 'version:' + VERSION);
+assert.deepEqual(events, ['fast-version']); // 关键断言：快速路径下主程序未被加载
+
+events.length = 0;                          // 清空轨迹，做第二次实验
+assert.equal(await bootstrap(['--sdk']), 'full');
+assert.deepEqual(events, ['load-main', 'main:sdk']);
+
+console.log('mode check:', decideMode([]), decideMode(['--remote']));
+console.log('all assertions passed');
+```
+
+预期输出：
+
+```text
+mode check: repl bridge
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 启动命令很慢 | 顶层 import 把整棵模块树拉进来 | 把主程序放在动态 import 里，快速路径提前返回 |
+| 带 --sdk 却进了交互界面 | 分流判断顺序写反 | 把参数优先级排成一张表，按表改 if 顺序 |
+| 版本号打印成 undefined | VERSION 从环境变量读取但未兜底 | 在读取处给默认值，并把默认值写进测试 |
+
+**用在哪里**
+
+场景一：命令行工具的冷启动优化
+
+- 业务背景：团队内部的代码检查 CLI 被 CI 频繁调用，多数调用只取版本号或帮助信息。
+- 这一节的知识怎么用：把版本号、帮助、配置导出放进快速路径，完整分析器延迟加载。
+- 用什么指标衡量收益：CI 单次调用的墙钟时间，以及进程启动到输出第一行的时间。
+- 什么时候不该用：命令本身耗时以秒计，启动开销占比低，改造收益看不出来。
+
+场景二：多形态客户端共用一份核心逻辑
+
+- 业务背景：同一套编辑器内核要同时供桌面端、网页端和命令行插件使用。
+- 这一节的知识怎么用：把入口层拆成三层分流，核心循环只依赖注入进来的运行环境。
+- 用什么指标衡量收益：新增一种客户端形态时改动的文件数。
+- 什么时候不该用：只有一种客户端形态，拆层会让调用链变长。
+
+场景三：后台批处理脚本
+
+- 业务背景：夜间批量任务用同一份配置解析逻辑，希望与交互程序行为一致。
+- 这一节的知识怎么用：复用参数解析与模式判定函数，跳过 TUI 相关模块。
+- 用什么指标衡量收益：批处理进程的内存峰值与常驻模块数量。
+- 什么时候不该用：批处理有自己的参数约定，强行复用得加很多条件分支。
+
+**行业实践**
+
+- Node.js 官方文档《Modules: ECMAScript modules》章节说明了动态 import 的语义：返回 Promise，且模块只求值一次，后续调用走缓存。借鉴方式：把重模块放进动态 import，并在测试里断言加载轨迹。
+- Anthropic 官方文档《Claude Code overview》描述了它在终端中的使用方式与主要能力分类。借鉴方式：给自家 CLI 写一份能力分层表，让新成员按层找代码。
+- MCP 官方规范站点 modelcontextprotocol.io 描述了工具发现与调用的消息形状。借鉴方式：把外部服务暴露的能力纳入统一的工具注册表，而不是各处写 if 分支。
+
+**小结**
+
+1. 六个能力层是读源码的索引，任何文件都能归到其中一层。
+2. 快速路径靠延迟导入实现，判断放在函数最前面。
+3. 模式分流是一组 if，顺序就是优先级，必须有兜底分支。
 
 ## 2. 项目结构分析
 
-### 2.1 源码目录结构
+**先想一个问题**
 
+你拿到一份 1902 个文件的仓库（来源：本站该页旧版内容，以原文为准），想改一个工具的行为，却不知道从哪个目录下手。怎么在十分钟内定位到该改的文件？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：目录结构是责任的物理映射，一层目录对应一类职责。
+    日常类比：像医院的楼层索引，挂号在一楼、化验在二楼，按目的走就不会乱逛。
+    哪里不成立：医院楼层不会互相调用，而这里的工具层会反向触发状态层更新。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["入口层 entrypoints 与 main.tsx"] --> B["模式层 REPL QueryEngine bridge"]
+  B --> C["核心层 query.ts 循环"]
+  C --> D["工具层 tools.ts 与 tools 目录"]
+  C --> E["状态层 state 目录"]
+  D --> E
+  C --> F["服务层 services api 与 mcp"]
+  F --> D
+  G["UI 组件层 components 目录"] --> E
 ```
+
+1. 入口层只做参数解析与分流，不放业务逻辑。
+2. 模式层把三种使用方式统一成对同一个循环的调用。
+3. 核心层是循环本身，负责调用模型、分发工具、推进状态。
+4. 工具层是模型能触达的原子能力集合。
+5. 状态层是唯一数据源，UI 与服务层都从这里读。
+6. 服务层提供网络与协议能力，工具层通过它访问外部。
+
+旧页给出的目录骨架如下（来源：本站该页旧版内容，以原文为准）：
+
+```text
 src/
 ├── entrypoints/           # 入口层
-│   ├── cli.tsx            # CLI 入口（bootstrap 模式）
+│   ├── cli.tsx            # CLI 入口，bootstrap 模式
 │   └── init.ts            # 初始化入口
-├── main.tsx               # 主程序（参数解析、模式分流）
-├── query.ts               # 核心查询循环（Agent Loop）
+├── main.tsx               # 主程序，参数解析与模式分流
+├── query.ts               # 核心查询循环
 ├── QueryEngine.ts         # SDK 模式封装
 ├── Tool.ts                # 工具基类
 ├── tools.ts               # 工具注册与执行
 ├── commands.ts            # 命令注册
-├── components/            # UI 组件（REPL.tsx、screens/、ink.tsx）
-├── services/              # 服务层（api/、mcp/、tools/）
-├── state/                 # 状态管理（AppStateStore.ts、store.ts）
-└── bridge/               # 远程桥接（remote/）
+├── components/            # UI 组件
+├── services/              # 服务层
+├── state/                 # 状态管理
+└── bridge/                # 远程桥接
 ```
 
-### 2.2 三层架构概览
+**一步一步来**
 
-```
-用户/CLI/SDK/Desktop
-         │
-         ▼
-启动层: main.tsx (参数解析 + 模式分流)
-         │
-    ┌────┼────┐
-    ▼    ▼    ▼
-REPL QueryEngine Bridge
-    │    │     │
-    └────┼────┘
-         ▼
-核心层: query.ts
-- while(true) 主循环
-- callModel() streaming
-- 工具并行执行
-         │
-         ▼
-工具层: tools.ts
-- Read/Write/Bash等
-- AgentTool/MCPTool
-```
-
-## 3. 核心模块与职责
-
-### 3.1 入口层 (cli.tsx)
-
-cli.tsx 的 bootstrap 模式：
+第 1 步：把路径映射到层。
 
 ```typescript
-async function bootstrap(): Promise<void> {
-  // 1. 快速路径检查（避免加载完整模块）
-  if (process.argv.includes('--version')) {
-    console.log(`Claude Code v${VERSION}`);  // 零导入 < 10ms
-    return;
-  }
+// 教学重写：用前缀规则把文件路径归类到能力层
+const RULES: Array<[string, string]> = [
+  ['src/entrypoints/', 'entry'],   // 入口层
+  ['src/components/', 'ui'],       // UI 组件层
+  ['src/commands/', 'command'],    // 命令层
+  ['src/tools/', 'tool'],          // 工具层
+  ['src/services/', 'service'],    // 服务层
+  ['src/state/', 'state'],         // 状态层
+  ['src/bridge/', 'bridge'],       // 桥接层
+];
 
-  // 2. 其他快速路径标志
-  if (process.argv.includes('--dump-system-prompt')) {
-    return;
+function classify(path: string): string {
+  // 按顺序匹配，命中第一条就返回
+  for (const [prefix, layer] of RULES) {
+    if (path.startsWith(prefix)) return layer;
   }
-
-  // 3. 完整 CLI（延迟加载）
-  const { main } = await import('../main.js');
-  await main();
+  // 未命中任何前缀时归为 core，避免返回空值
+  return 'core';
 }
 ```
 
-设计要点：使用延迟导入实现零成本快速路径。
+**这段代码在做什么**
 
-### 3.2 查询引擎层 (QueryEngine.ts + query.ts)
+- RULES 是一个数组，顺序即优先级，长前缀要写在短前缀前面。
+- 每一项用元组表示前缀与层名，避免键名拼写错误。
+- 循环里命中就返回，复杂度与规则条数成正比，规则只有几条时可忽略。
+- 兜底返回 core，让分类函数是全函数，调用方无需判空。
 
-QueryEngine.ts 封装 query.ts：
+第 2 步：统计每层的文件数。
 
 ```typescript
-export class QueryEngine {
-  private session: Session;
-  private permissionDeniedTracker: Map<string, number>;
+function countByLayer(paths: string[]): Record<string, number> {
+  const acc: Record<string, number> = {}; // 累加器，键为层名
+  for (const p of paths) {
+    const layer = classify(p);            // 复用上一步的分类函数
+    acc[layer] = (acc[layer] ?? 0) + 1;   // 用空值合并避免 undefined 参与加法
+  }
+  return acc;
+}
+```
 
-  async submitMessage(input: string): Promise<Result> {
+**这段代码在做什么**
+
+- acc 的初始值是空对象，第一次遇到某层时值为 undefined，用 ?? 兜底为 0。
+- 计数与分类分离，分类规则改动不会影响统计逻辑。
+- 返回普通对象，便于在测试里用 deepEqual 比较。
+- 真实仓库文件数需以实际版本为准，本页不给出未核对的数字。
+
+**运行结果**
+
+```text
+countByLayer(['src/tools/ReadTool.ts','src/state/store.ts','src/tools/Bash.ts'])
+-> { tool: 2, state: 1 }
+```
+
+**动手验证**
+
+```javascript
+// 文件：classify-demo.mjs
+// 依赖：无，Node 20 及以上
+import assert from 'node:assert/strict';
+
+const RULES = [
+  ['src/entrypoints/', 'entry'],
+  ['src/components/', 'ui'],
+  ['src/commands/', 'command'],
+  ['src/tools/', 'tool'],
+  ['src/services/', 'service'],
+  ['src/state/', 'state'],
+  ['src/bridge/', 'bridge'],
+];
+
+function classify(path) {
+  for (const [prefix, layer] of RULES) {  // 顺序匹配，先命中先返回
+    if (path.startsWith(prefix)) return layer;
+  }
+  return 'core';                          // 兜底归类
+}
+
+function countByLayer(paths) {
+  const acc = {};                         // 层名到数量的映射
+  for (const p of paths) {
+    const layer = classify(p);            // 每条路径只分类一次
+    acc[layer] = (acc[layer] ?? 0) + 1;   // undefined 兜底为 0
+  }
+  return acc;
+}
+
+assert.equal(classify('src/tools/BashTool.ts'), 'tool');
+assert.equal(classify('src/state/store.ts'), 'state');
+assert.equal(classify('src/query.ts'), 'core');   // 顶层文件归入 core
+
+const paths = [
+  'src/tools/BashTool.ts',
+  'src/tools/ReadTool.ts',
+  'src/state/store.ts',
+  'src/commands/add.ts',
+  'src/utils/format.ts',
+];
+assert.deepEqual(countByLayer(paths), { tool: 2, state: 1, command: 1, core: 1 });
+
+console.log('layers:', JSON.stringify(countByLayer(paths)));
+console.log('all assertions passed');
+```
+
+预期输出：
+
+```text
+layers: {"tool":2,"state":1,"command":1,"core":1}
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 路径归类到 core 的数量偏高 | 规则表缺少某一层的前缀 | 打印未命中路径清单，逐条补规则 |
+| src/utils 被归到底层逻辑里 | utils 是横切目录，不属于某一层 | 在规则里显式标注 utils 为横切层，单独统计 |
+| 统计数字与预期不符 | 用后缀匹配导致同名文件重复计数 | 统一用前缀匹配，并在测试里固定输入样本 |
+
+**用在哪里**
+
+场景一：接手陌生仓库的定位训练
+
+- 业务背景：新成员加入后需要一周才能独立改一个工具的行为。
+- 这一节的知识怎么用：把分类规则写成脚本，生成一份目录到职责的索引文档。
+- 用什么指标衡量收益：新成员第一次提交有效改动所需的日历天。
+- 什么时候不该用：仓库只有几十个文件，一张目录说明就够。
+
+场景二：代码体积治理
+
+- 业务背景：主包体积持续增长，需要找出哪一层在膨胀。
+- 这一节的知识怎么用：按层统计文件数与依赖边，定位增长来源。
+- 用什么指标衡量收益：构建产物中每一层的模块数量与字节数。
+- 什么时候不该用：按层统计会掩盖单文件膨胀，需要配合单文件体积排行。
+
+场景三：仓库脚手架生成
+
+- 业务背景：团队按同一套分层规范新建服务端项目。
+- 这一节的知识怎么用：用规则表生成目录骨架与检查脚本。
+- 用什么指标衡量收益：新建项目通过分层检查的比例。
+- 什么时候不该用：团队规范尚未稳定，过早固化成脚本会反复改。
+
+**行业实践**
+
+- Node.js 官方文档《Modules: Packages》章节介绍了 package.json 的 exports 字段与子路径导出的约定。借鉴方式：用子路径导出把分层边界写进包配置，而不是只靠目录名。
+- TypeScript 官方手册《Project References》章节说明了把大工程拆成多个可独立编译的子项目。借鉴方式：给分层加编译边界，越界引用在构建阶段报错。
+- React 官方文档《useSyncExternalStore》章节描述了外部状态存储在渲染中的正确接入方式。借鉴方式：UI 层只通过订阅接口读状态，不直接 import 状态模块内部结构。
+
+**小结**
+
+1. 目录结构是职责的物理映射，先看层次再看文件。
+2. 分类规则写成数据而不是代码，便于补规则和写测试。
+3. utils 一类横切目录要单独标注，否则统计结果会失真。
+
+## 3. 核心模块与职责
+
+**先想一个问题**
+
+一次对话里模型连续调用了三次工具，中途你按了取消键。哪些模块要立刻知道这件事，才能既停止工具又不丢失已经产生的消息？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：四个核心模块分别管入口、管循环、管能力、管数据，边界清楚。
+    日常类比：像一家快递站，前台收件、调度排线、快递员送货、系统记账，各管一段。
+    哪里不成立：快递站各岗位互不干涉，而这里的工具执行结果会直接写进状态并影响下一轮循环。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+  [*] --> idle
+  idle --> thinking: "提交输入"
+  thinking --> executing_tools: "响应含工具调用"
+  thinking --> completed: "响应是最终答复"
+  executing_tools --> waiting_for_permission: "遇到需确认的工具"
+  waiting_for_permission --> executing_tools: "用户同意"
+  waiting_for_permission --> thinking: "用户拒绝并回填说明"
+  executing_tools --> thinking: "结果回填后继续"
+  thinking --> error: "请求失败"
+  error --> [*]
+  completed --> [*]
+```
+
+1. idle 是等待输入的初始态。
+2. 收到输入后进入 thinking，此时正在等模型流式返回。
+3. 响应里有工具调用就进入 executing_tools，没有就直接 completed。
+4. 工具需要确认时进入 waiting_for_permission，用户同意后回到执行态。
+5. 用户拒绝时把拒绝说明作为工具结果回填，回到 thinking 让模型换方案。
+6. 请求失败进入 error，这是一条终止路径。
+
+旧页给出的四个核心模块（来源：本站该页旧版内容，以原文为准）：
+
+| 模块 | 位置 | 职责 |
+|------|------|------|
+| 入口层 | cli.tsx | bootstrap 快速路径与延迟加载 |
+| 查询引擎层 | QueryEngine.ts 与 query.ts | 封装会话，驱动 while 循环 |
+| 工具层 | tools.ts 与 Tool.ts | 定义契约、注册、批量执行 |
+| 状态层 | state/ | 中央状态存储与订阅通知 |
+
+!!! note "术语：会话（Session）"
+    指一次连续对话所携带的全部运行时上下文，包含消息列表、当前状态与权限设置。
+    例子：你打开程序问了三轮问题，这三轮共用一个会话对象。
+
+**一步一步来**
+
+第 1 步：把循环写成 while 而不是递归。
+
+```typescript
+// 教学重写：while 循环版代理循环骨架
+type LoopState = { status: string; rounds: number }; // 循环状态
+
+async function query(session: { rounds: number }, input: string): Promise<string> {
+  let state: LoopState = { status: 'thinking', rounds: 0 }; // 初始状态
+  while (true) {
+    // 每轮先请求模型，返回是否还有工具调用
+    const response = await callModel(input, state);
+    if (response.toolUses.length > 0) {
+      // 有工具调用则进入执行态并累加轮次
+      state = { status: 'executing_tools', rounds: state.rounds + 1 };
+      continue; // 回到循环顶部，继续下一轮
+    }
+    // 没有工具调用说明模型给出了最终答复
+    return response.text;
+  }
+}
+```
+
+**这段代码在做什么**
+
+- while 循环把多轮工具调用摊平在同一层调用栈里，长会话不会累积递归深度。
+- state 每轮都整体替换成新对象，避免旧引用被意外改写。
+- rounds 记录轮次，便于设置上限或做日志。
+- continue 与 return 是两个明确出口，控制流没有隐藏分支。
+- callModel 在真实项目里是流式请求，这里简化成返回完整响应。
+
+第 2 步：用 SDK 模式封装循环。
+
+```typescript
+// 教学重写：SDK 模式封装，把循环暴露成一个方法
+export class QueryEngine {
+  private session: { rounds: number };      // 会话上下文
+  private permissionDeniedTracker = new Map<string, number>(); // 拒绝计数
+
+  constructor(session: { rounds: number }) {
+    this.session = session;
+  }
+
+  async submitMessage(input: string): Promise<string> {
+    // 直接把输入交给循环，返回值就是最终答复文本
     return query(this.session, input);
   }
 }
 ```
 
-query.ts - 核心 Agent Loop：
+**这段代码在做什么**
 
-```typescript
-async function query(session: Session, input: string): Promise<void> {
-  let state = initializeState();
+- 类把会话与拒绝计数收进私有字段，外部只能通过 submitMessage 驱动。
+- permissionDeniedTracker 用 Map 保存每个工具的拒绝次数，键是工具名。
+- submitMessage 是异步方法，返回值类型与循环的返回类型保持一致。
+- 这一层是给外部程序调用的稳定接口，内部循环换实现不影响调用方。
 
-  // while(true) 循环（避免递归栈溢出）
-  while (true) {
-    // 1. 调用模型（streaming）
-    const response = await callModel(session, state);
+**运行结果**
 
-    // 2. 检查是否有工具调用
-    if (response.toolUses && response.toolUses.length > 0) {
-      // 3. 工具编排与并行执行
-      const executor = new StreamingToolExecutor(config);
-      const results = await executor.execute(response.toolUses);
-
-      // 4. 更新状态
-      state = transitionState(state, results);
-      continue;
-    } else {
-      // 5. 返回结果
-      return finalize(state);
-    }
-  }
-}
+```text
+submitMessage('你好') -> 'final answer after 0 tool rounds'
+submitMessage('读文件') -> 'final answer after 2 tool rounds'
 ```
 
-### 3.3 工具层 (tools.ts)
+**动手验证**
 
-工具接口定义、注册、批量执行：
+```javascript
+// 文件：loop-demo.mjs
+// 依赖：无，Node 20 及以上
+import assert from 'node:assert/strict';
 
-```typescript
-// 第 1 段：定义工具的抽象契约（所有工具的基类）
-// 用 abstract 而非 interface，是为了让子类既继承统一的字段约定，又能共享未来可能加入的公共实现（如日志、重试）。
-// 这里只声明“有哪些能力”，不规定“怎么实现”，从而让上层调度逻辑只依赖这套稳定契约，而不耦合具体工具。
-export abstract class Tool {
-  // 工具的唯一标识名，注册表以它为键，因此实现类必须保证全局不重名，否则会被后续注册覆盖。
-  abstract name: string;
-  // 给模型/调用方阅读的自然语言说明，直接决定模型能否正确选用该工具，需写清用途与适用场景。
-  abstract description: string;
-  // 参数校验用的 JSON Schema 对象；用 object 这种宽类型是因为各工具的 schema 形状差异极大，此处不做收窄。
-  abstract inputSchema: object;
-
-  // 统一执行入口：input 用 unknown 而非 any，强制实现方在做业务前先显式收窄类型（守住外部输入的边界）。
-  // context 传入运行时环境（如工作目录、取消信号、权限），result 统一包装成功/失败，保证调用方拿到一致结构。
-  abstract execute(input: unknown, context: ToolContext): Promise<ToolResult>;
-}
-
-// 第 2 段：全局工具注册表
-// 用 Map 而非普通对象，既避免原型链键名污染，又保证 O(1) 查找、稳定的插入顺序，且键类型被约束为 string。
-// const 只锁定引用，Map 内容仍可变，因此注册是“就地写入”，无需重建表。
-const toolRegistry = new Map<string, Tool>();
-
-// 第 3 段：注册函数——把工具实例登记的对外唯一入口
-// 以 tool.name 为键写入，同名工具会被静默覆盖（这是易错点：若需要防重复注册，应在此加 has 校验并抛错）。
-export function registerTool(tool: Tool): void {
-  toolRegistry.set(tool.name, tool);
-}
-```
-### 3.4 状态层 (state/)
-
-中央状态存储，支持 UI 渲染、工具执行上下文、任务状态刷新：
-
-```typescript
-// 轻量级 Store 实现（非 Redux）
-// 第 1 段：工厂函数签名与闭包私有状态（创建隔离的 Store 实例）
-// 用函数+闭包而非 class 封装状态：外部拿不到 state/subscribers 的引用，只能经暴露的方法读写，
-// 天然实现数据私有，且每次调用 createStore 都生成互不干扰的独立实例。
-export function createStore<T>(initialState: T) {
-  // 唯一数据源，被下方所有方法以闭包方式共享；注意 getState 返回的是引用，
-  // 若存对象而调用方直接改返回值，会绕过通知机制——这是本实现的边界条件。
-  let state = initialState;
-  // 用 Set 而非数组存订阅者：注册/注销均摊 O(1) 且天然去重，
-  // 可避免同一个 fn 被重复加入而一次 setState 触发多次通知。
-  const subscribers = new Set<() => void>();
-
-  // 第 2 段：对外返回的 Store 接口对象（读取入口）
-  // 三个方法闭包捕获同一份 state/subscribers，保持数据流一致；
-  // 全部用箭头函数书写，便于调用方解构后直接使用而不丢失 this（本实现本就不依赖 this）。
-  return {
-    // getState：同步读取当前快照，不触发通知，复杂度 O(1)。
-    getState: () => state,
-    // 第 3 段：setState —— 兼容“值”与“更新函数”两种入参（写入与广播）
-    // 传函数时基于最新 state 计算新值，可规避批量/异步场景下读到陈旧闭包变量的问题；
-    // 传值则直接覆盖。它是唯一会改变 state 并通知订阅者的入口。
-    setState: (updater: T | ((prev: T) => T)) => {
-      // 这里用 as 显式收窄签名：仅靠 typeof === 'function' 无法让 TS 排除 T 本身可能是函数的情况。
-      state = typeof updater === 'function'
-        ? (updater as (prev: T) => T)(state)
-        : updater;
-      // 顺序关键：先落库再广播，保证订阅者回调里 getState() 读到的是新值；
-      // forEach 为 O(n)，若订阅者在回调中增删自身，其迭代语义需自行留意。
-      subscribers.forEach(fn => fn());
-    },
-    // 第 4 段：subscribe —— 注册监听并返回退订函数（生命周期管理）
-    // 返回 unsubscribe 闭包而非让调用方持有 fn，便于 React useEffect 等直接 return 完成清理，防止订阅泄漏。
-    subscribe: (fn: () => void) => {
-      subscribers.add(fn);
-      // delete 对不存在的元素是安全 no-op，因此重复退订不会抛错，复杂度 O(1)。
-      return () => subscribers.delete(fn);
-    },
+/** 模拟模型：按预设脚本依次返回响应 */
+function makeModel(script) {
+  let i = 0;                                 // 脚本游标
+  return async (input, state) => {
+    const step = script[Math.min(i, script.length - 1)];
+    i += 1;                                  // 每次调用向后走一步
+    return step;                             // 返回当前步骤的响应对象
   };
 }
+
+async function query(input, state, callModel) {
+  while (true) {
+    const response = await callModel(input, state); // 请求模型
+    if (response.toolUses.length > 0) {      // 有工具调用则继续循环
+      state.status = 'executing_tools';
+      state.rounds += 1;                     // 轮次加一
+      state.seen.push(response.toolUses[0]); // 记录被调用的工具名
+      continue;
+    }
+    state.status = 'completed';              // 无工具调用，收尾
+    return response.text;
+  }
+}
+
+const state = { status: 'thinking', rounds: 0, seen: [] };
+const model = makeModel([
+  { toolUses: ['Read'], text: '' },          // 第 1 轮：要求读文件
+  { toolUses: ['Edit'], text: '' },          // 第 2 轮：要求改文件
+  { toolUses: [], text: 'done' },            // 第 3 轮：给出最终答复
+]);
+
+assert.equal(await query('x', state, model), 'done');
+assert.equal(state.rounds, 2);               // 两次工具轮次
+assert.deepEqual(state.seen, ['Read', 'Edit']);
+assert.equal(state.status, 'completed');     // 终态正确
+
+console.log('rounds:', state.rounds, 'seen:', state.seen.join(','));
+console.log('all assertions passed');
 ```
+
+预期输出：
+
+```text
+rounds: 2 seen: Read,Edit
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 长会话报栈溢出 | 用递归实现多轮工具调用 | 改成 while 循环加 continue |
+| 轮次上限判断失效 | 累加写在 continue 之后 | 把累加放在 continue 之前，并写测试断言轮次 |
+| 取消后仍执行工具 | 状态字段更新了但工具没有读取取消信号 | 把取消信号放进工具执行上下文，执行前检查 |
+
+**用在哪里**
+
+场景一：客服机器人多轮查询
+
+- 业务背景：机器人先查订单，再查物流，最后生成答复。
+- 这一节的知识怎么用：把查询步骤拆成工具，循环每轮消费一个工具结果。
+- 用什么指标衡量收益：一次会话的平均模型调用轮次，以及答复前的人工等待时长。
+- 什么时候不该用：一次查询就能拿到全部数据，循环只会增加调用次数。
+
+场景二：代码审查助手
+
+- 业务背景：助手需要先读差异、再读相关文件、最后给建议。
+- 这一节的知识怎么用：把读文件设成免确认工具，把写操作设成需确认的等待态。
+- 用什么指标衡量收益：每份差异的审查时长与建议被采纳的比例。
+- 什么时候不该用：审查规则固定且无需读文件，用静态规则检查即可。
+
+场景三：对外提供的编程助手 SDK
+
+- 业务背景：合作方要把助手嵌入自己的 IDE。
+- 这一节的知识怎么用：只暴露 submitMessage 一个入口，会话与计数藏在类内部。
+- 用什么指标衡量收益：接口变更导致下游改动的次数。
+- 什么时候不该用：下游需要自定义循环策略，封闭接口会成为阻碍。
+
+**行业实践**
+
+- Anthropic 官方文档《Claude Code overview》把终端、IDE、SDK 列成同一能力的多种接入形式。借鉴方式：核心循环与接入形态分开设计，接入层只做适配。
+- Node.js 官方文档《Errors》章节说明了异常对象的结构与错误类型区分。借鉴方式：循环的失败路径要保留错误类型信息，不要统一压成一条字符串。
+- TypeScript 官方手册《Classes》章节说明了私有字段与访问修饰符的语义。借鉴方式：用私有字段守住模块边界，把可变计数藏在类内部。
+
+**小结**
+
+1. 入口、循环、工具、状态四个模块职责互不重叠。
+2. 循环用 while 实现，状态每轮整体替换。
+3. 对外的模式封装只暴露一个提交方法，内部细节不外泄。
+
 ## 4. 请求处理流程
 
-### 4.1 完整执行链路
+**先想一个问题**
 
+用户按下回车到屏幕上出现第一个字，中间经过了哪些模块？如果某一步卡住，你怎么判断是网络、工具还是渲染的问题？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：请求沿一条单向主链流动，工具执行是链上唯一会回头的地方。
+    日常类比：像流水线，工位依次传递，只有返修环节会把半成品送回上游。
+    哪里不成立：流水线工位顺序固定，而这里的分支取决于模型是否返回工具调用。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant U as "用户"
+  participant C as "cli.tsx"
+  participant M as "main.tsx"
+  participant Q as "query.ts"
+  participant T as "tools.ts"
+  participant S as "state"
+  U->>C: "输入文本"
+  C->>M: "动态导入主程序"
+  M->>Q: "按模式调用循环"
+  Q->>S: "写入 thinking 状态"
+  Q->>Q: "callModel 流式请求"
+  Q->>T: "下发工具调用"
+  T->>T: "权限检查"
+  T->>S: "写入工具结果消息"
+  T-->>Q: "回填结果"
+  Q->>S: "写入 completed 状态"
+  S-->>U: "触发界面重渲染"
 ```
-用户输入 / 命令触发
-         │
-         ▼
-cli.tsx bootstrap - 检查快速路径标志
-         │
-         ▼
-main.tsx - 参数解析 - preActions钩子 - 模式分流
-         │
-    ┌────┼────┐
-    ▼    ▼    ▼
-REPL QueryEngine Bridge
-    │    │     │
-    └────┼────┘
-         ▼
-query.ts while(true)循环
-  - 消息组装
-  - callModel() streaming
-  - 解析响应
-  - 工具编排
-  - 工具执行
-  - 状态转换
-         │
-         ▼
-工具执行 - 状态更新 - UI渲染/结果返回
-```
 
-### 4.2 三种运行模式
+1. 用户输入先到入口层，入口层只做加载判断。
+2. 主程序按模式决定调用哪个封装，最终都落到同一个循环。
+3. 循环开始前先把状态置为 thinking，界面据此显示等待态。
+4. 模型以流式方式返回，文本可以边到边显示。
+5. 响应里有工具调用时下发到工具层，工具先做权限检查。
+6. 工具结果写回状态并回填给循环，循环进入下一轮。
+7. 循环结束后写 completed，状态变化通知界面重渲染。
 
-1. **交互模式 (REPL)**：main.tsx -> REPL.tsx -> query.ts
-2. **SDK 模式**：QueryEngine.submitMessage() -> query.ts
-3. **远程模式**：Bridge 桥接，WebSocket 会话管理
+旧页给出的三种运行模式（来源：本站该页旧版内容，以原文为准）：
 
-### 4.3 工具调用流程
+1. 交互模式：main.tsx 到 REPL.tsx 再到 query.ts。
+2. SDK 模式：QueryEngine.submitMessage 到 query.ts。
+3. 远程模式：Bridge 桥接，WebSocket 会话管理。
+
+**一步一步来**
+
+第 1 步：解析响应并决定是否执行工具。
 
 ```typescript
-async function executeToolCalls(toolCalls: ToolCall[]): Promise<void> {
-  // 1. 工具编排决策
-  const plan = toolOrchestration.decide(toolCalls);
-
-  // 2. 执行工具组
-  for (const group of plan.groups) {
-    const results = await Promise.all(
-      group.map(tc => executeSingleTool(tc))
-    );
-
-    // 3. 将结果添加到消息上下文
-    session.messages.push(...results.map(toolResultToMessage));
-  }
+// 教学重写：从响应里取出工具调用
+interface ToolCall {
+  id: string;        // 单次调用的唯一编号，回填结果时要用它对应
+  name: string;      // 工具名，注册表的键
+  input: unknown;    // 模型给出的参数，形状由各工具自己校验
 }
 
-async function executeSingleTool(toolCall: ToolCall): Promise<ToolResult> {
-  const tool = toolRegistry.get(toolCall.name);
-
-  // 权限检查
-  if (!await checkPermission(toolCall)) {
-    return { success: false, error: 'Permission denied' };
-  }
-
-  // 执行前钩子
-  await toolHooks.beforeExecute.fire(toolCall);
-
-  // 实际执行
-  const result = await tool.execute(toolCall.input, context);
-
-  // 执行后钩子
-  await toolHooks.afterExecute.fire(result);
-
-  return result;
+function extractToolCalls(response: { content: Array<Record<string, unknown>> }): ToolCall[] {
+  // 只挑出类型为 tool_use 的内容块
+  return response.content
+    .filter((b) => b.type === 'tool_use')
+    .map((b) => ({ id: String(b.id), name: String(b.name), input: b.input }));
 }
 ```
+
+**这段代码在做什么**
+
+- 过滤条件是内容块的 type 字段，非工具块直接丢弃。
+- 每个工具调用保留 id，回填时必须带上同一个 id，模型才能对应上。
+- input 声明为 unknown，校验责任交给各工具实现。
+- 返回数组，空数组表示这一轮没有工具调用。
+
+第 2 步：编排并执行工具组。
+
+```typescript
+async function executeToolCalls(calls: ToolCall[], registry: Map<string, { execute: Function }>) {
+  // 无依赖的一组工具可以并发执行
+  const results = await Promise.all(
+    calls.map(async (call) => {
+      const tool = registry.get(call.name);       // 按名查工具
+      if (!tool) return { id: call.id, ok: false, error: 'unknown tool' };
+      try {
+        return { id: call.id, ok: true, output: await tool.execute(call.input) };
+      } catch (error) {
+        return { id: call.id, ok: false, error: String(error) }; // 失败也返回结构
+      }
+    }),
+  );
+  return results;
+}
+```
+
+**这段代码在做什么**
+
+- Promise.all 让互不依赖的工具并发执行，总耗时接近最慢的那个。
+- 工具不存在时返回失败结构，不抛异常，避免一个调用拖垮整组。
+- try 捕获执行异常并转成结果对象，让上层统一处理。
+- 每条结果都带 id，回填时顺序可以打乱。
+- 真实项目里还会先做依赖分析，再决定串行还是并行，需核对官方文档确认策略细节。
+
+**运行结果**
+
+```text
+results -> [{"id":"t1","ok":true},{"id":"t2","ok":false,"error":"unknown tool"}]
+```
+
+**动手验证**
+
+```javascript
+// 文件：request-flow-demo.mjs
+// 依赖：无，Node 20 及以上
+import assert from 'node:assert/strict';
+
+const trace = [];                                  // 记录流程轨迹
+
+function extractToolCalls(response) {
+  return response.content
+    .filter((b) => b.type === 'tool_use')          // 只取工具块
+    .map((b) => ({ id: String(b.id), name: String(b.name), input: b.input }));
+}
+
+async function executeToolCalls(calls, registry) {
+  return Promise.all(calls.map(async (call) => {
+    const tool = registry.get(call.name);          // 按名查表
+    if (!tool) return { id: call.id, ok: false, error: 'unknown tool' };
+    try {
+      return { id: call.id, ok: true, output: await tool.execute(call.input) };
+    } catch (error) {
+      return { id: call.id, ok: false, error: String(error) };
+    }
+  }));
+}
+
+const registry = new Map([
+  ['Read', { execute: async (i) => { trace.push('read:' + i.file_path); return 'file-body'; } }],
+]);
+
+const response = {
+  content: [
+    { type: 'text', text: '先看文件' },
+    { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: 'a.ts' } },
+    { type: 'tool_use', id: 't2', name: 'Nope', input: {} },
+  ],
+};
+
+const calls = extractToolCalls(response);
+assert.equal(calls.length, 2);                     // 两个工具调用被识别
+
+const results = await executeToolCalls(calls, registry);
+assert.deepEqual(results[0], { id: 't1', ok: true, output: 'file-body' });
+assert.equal(results[1].ok, false);                // 未知工具返回失败结构
+assert.deepEqual(trace, ['read:a.ts']);            // 已知工具确实被执行
+
+console.log('results:', JSON.stringify(results));
+console.log('all assertions passed');
+```
+
+预期输出：
+
+```text
+results: [{"id":"t1","ok":true,"output":"file-body"},{"id":"t2","ok":false,"error":"unknown tool"}]
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 模型说工具没被调用 | 回填结果时丢了调用 id | 结果对象必须带原样的 id，写断言检查 |
+| 一个工具报错导致整轮失败 | 执行处没有捕获异常 | 每个工具单独 try，失败也返回结构化结果 |
+| 界面一直停在等待态 | 状态终态没写回 | 在 finally 或返回前写 completed |
+
+**用在哪里**
+
+场景一：IDE 插件的对话面板
+
+- 业务背景：面板要边收边显，用户感知首字延迟。
+- 这一节的知识怎么用：流式文本先渲染，工具调用期间在消息流里插入执行中占位。
+- 用什么指标衡量收益：从回车到首字出现的时间，以及工具执行期的界面可交互性。
+- 什么时候不该用：响应很短，流式与一次性展示的体感差别看不出来。
+
+场景二：自动化流水线里的代码修复机器人
+
+- 业务背景：CI 失败后自动跑一轮修复并提交。
+- 这一节的知识怎么用：把写文件与提交命令设为需确认工具，在无人值守环境里配置成自动同意。
+- 用什么指标衡量收益：自动修复成功率与需要人工接手的比例。
+- 什么时候不该用：仓库改动风险高，逐条人工确认反而更省事。
+
+场景三：远程协作会话
+
+- 业务背景：工程师在本地，执行发生在远程开发机上。
+- 这一节的知识怎么用：桥接层转发输入与结果，状态仍由本地订阅渲染。
+- 用什么指标衡量收益：往返延迟与断线重连后的状态一致性。
+- 什么时候不该用：执行环境与本地同一台机器，桥接只会增加一层转发。
+
+**行业实践**
+
+- MCP 官方规范站点 modelcontextprotocol.io 描述了工具调用与结果的对应关系。借鉴方式：把调用 id 作为结果回填的强约束写进接口定义。
+- Anthropic 官方文档《Claude Code overview》说明了终端、IDE 与会话之间的接入方式。借鉴方式：把渲染与执行解耦，渲染只订阅状态。
+- Node.js 官方文档《Timers》章节说明了超时相关 API 的语义与清理要求。借鉴方式：给工具执行设置超时并在结束时清理定时器，避免进程无法退出。
+
+**小结**
+
+1. 主链是入口到循环到工具再回到循环，唯一回头点是工具执行。
+2. 工具调用用 id 关联请求与结果，缺 id 会表现为"工具没被调用"。
+3. 每种失败都转成结构化结果，让循环能继续推进。
 
 ## 5. 工具系统实现
 
-### 5.1 工具架构核心
+**先想一个问题**
 
-Command 与 Tool 的分离是架构中最重要的划分：
+模型返回了三个工具调用，其中两个读不同文件、一个写文件。三个一起并发跑安全吗？谁来决定顺序？
 
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：工具是一个带名字、说明、参数模式和执行方法的对象，注册表按名字路由。
+    日常类比：像工具箱的格子柜，每格贴标签，取工具先看标签再拿。
+    哪里不成立：格子柜里的工具不会自己决定用哪个，而这里由模型读说明后选择。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["模型返回工具调用"] --> B["按 name 查注册表"]
+  B --> C{"找到了吗"}
+  C -->|"没有"| D["返回 unknown tool"]
+  C -->|"找到"| E["权限检查"]
+  E -->|"拒绝"| F["返回拒绝说明"]
+  E -->|"通过"| G["执行前钩子"]
+  G --> H["工具 execute"]
+  H --> I["执行后钩子"]
+  I --> J["包装成统一结果"]
+  D --> K["回填给循环"]
+  F --> K
+  J --> K
 ```
-Command (命令)        Tool (工具)
-    │                    │
-    ├─ 入口点            ├─ 模型可调用
-    ├─ 意图转换          ├─ 原子能力
-    └─ 用户交互          └─ 底层操作
-```
 
-### 5.2 内置工具列表
+1. 从响应里抽出工具调用，每个都带名字。
+2. 用名字在注册表里查实现，查不到直接返回失败。
+3. 查到后先做权限检查，被拒时返回一段说明而不是抛错。
+4. 通过检查后触发执行前钩子，插件可以在这里做审计或拦截。
+5. 调用工具自身的 execute，传入参数与运行上下文。
+6. 执行完成后触发执行后钩子，再包装成统一结构回填。
 
-| 工具 | 描述 |
+旧页给出的内置工具清单（来源：本站该页旧版内容，以原文为准）：
+
+| 工具 | 作用 |
 |------|------|
 | BashTool | 执行 Shell 命令 |
 | ReadTool | 读取文件内容 |
 | WriteTool | 写入文件内容 |
-| EditTool | 编辑文件（智能修改） |
+| EditTool | 编辑文件 |
 | GlobTool | 文件模式匹配 |
 | GrepTool | 内容搜索 |
 | WebSearchTool | 网络搜索 |
@@ -337,552 +958,1124 @@ Command (命令)        Tool (工具)
 | TodoWriteTool | 任务列表写入 |
 | TaskTool | 后台任务管理 |
 
-### 5.3 工具实现示例
+!!! note "术语：JSON Schema"
+    一种用 JSON 描述数据结构与约束的格式，工具用它声明参数有哪些字段、哪些必填。
+    例子：Read 工具的模式会声明 file_path 是字符串且必填，offset 是可选数字。
 
-#### 5.3.1 BashTool
+**一步一步来**
+
+第 1 步：定义工具契约。
 
 ```typescript
-export class BashTool extends Tool {
-  name = 'Bash';
-  description = 'Execute shell commands in the terminal';
-
-  async execute(input: { command: string; timeout?: number }, context) {
-    // 权限检查
-    if (!context.permissions.has('bash')) {
-      return { success: false, error: 'Permission denied' };
-    }
-
-    // 沙箱执行
-    try {
-      const result = await sandbox.execute(input.command, {
-        timeout: input.timeout || 60000,
-        cwd: context.projectPath,
-      });
-      return { success: true, output: result.stdout };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
+// 教学重写：工具抽象契约
+abstract class Tool {
+  abstract name: string;            // 唯一名，注册表的键
+  abstract description: string;     // 给模型读的说明，决定它是否选这个工具
+  abstract inputSchema: object;     // 参数校验用的模式
+  // 统一执行入口，input 用 unknown 强制实现方先做校验
+  abstract execute(input: unknown, context: ToolContext): Promise<ToolResult>;
 }
 ```
 
-#### 5.3.2 ReadTool
+**这段代码在做什么**
+
+- 用抽象类而不是接口，子类可以共享将来加入的公共实现。
+- 三个字段都是 abstract，子类必须给值，避免出现没名字的工具。
+- input 声明为 unknown，实现方要先收窄类型再用。
+- 返回值统一为 Promise 的 ToolResult，上层拿到的结构一致。
+
+第 2 步：注册与路由。
 
 ```typescript
-// 第 1 段：声明工具身份——把"读文件"抽象成一个可被上层 Agent 调度的工具对象。
-// 每个工具靠固定的 name 注册进工具表，LLM 调用时按名字路由到这里；
-// name 用常量字段而不是构造函数参数，是为了让工具实例可以是无状态的单例。
-export class ReadTool extends Tool {
+const toolRegistry = new Map<string, Tool>(); // 全局注册表
+
+export function registerTool(tool: Tool): void {
+  // 同名工具会被覆盖，如需禁止重复应在此先判断 has
+  toolRegistry.set(tool.name, tool);
+}
+
+export function getTool(name: string): Tool | undefined {
+  // Map 的查找是常数时间，避免每次线性扫描
+  return toolRegistry.get(name);
+}
+```
+
+**这段代码在做什么**
+
+- 用 Map 而不是普通对象，避免原型链上的键名干扰。
+- registerTool 以 tool.name 为键，同名会静默覆盖，这是需要留意的点。
+- getTool 返回可能为 undefined，调用方必须处理查不到的情况。
+- 注册表是模块级常量，注册是就地写入，不需要重建表。
+
+第 3 步：实现一个读文件工具。
+
+```typescript
+class ReadTool extends Tool {
   name = 'Read';
+  description = 'Read a text file and return selected lines';
+  inputSchema = { type: 'object', properties: { file_path: { type: 'string' } } };
 
-  // 第 2 段：执行入口。input 只描述"要读什么、读哪几行"，context 承载会话/权限等运行时依赖（此处未用到，属于预留位）。
-  // 整个方法 async，因为读盘是 IO；返回值约定为结构化对象而非抛异常，便于上层统一格式化给模型看。
-  async execute(input: { file_path: string; offset?: number; limit?: number }, context) {
-    // 用动态 import 而非顶层 import：模块顶层不绑定 node 内置模块，便于在浏览器/沙箱/测试里替换或延迟加载，也能缩短冷启动。
-    // 动态 import 返回 Promise，所以必须 await；重复调用时走的是模块缓存，开销可忽略。
-    const fs = await import('fs/promises');
-
-    // 第 3 段：真正读取文件。try 把"IO 可能失败"这一事实显式圈出来，保证任何异常都能转成 success:false 而不是冒泡崩掉调用方。
+  async execute(input: { file_path: string; offset?: number; limit?: number }) {
+    const fs = await import('node:fs/promises'); // 动态导入，缩短冷启动
     try {
-      // 必须显式指定 'utf-8'：否则 readFile 返回 Buffer，后面的 split 会按字节切分，中文等多字节字符会被从中间劈开。
-      const content = await fs.readFile(input.file_path, 'utf-8');
-      // 以 \n 切行得到一个"行数组"，后面的偏移/限量都在这个数组上做，避免反复扫描字符串。
-      // 注意：CRLF 文件的每行末尾会残留 \r；此处不做规范化，是本实现的已知粗糙点。
-      const lines = content.split('\n');
-      // offset 语义是 0-based 的行下标（不是行号）；用 || 而非 ?? 意味着传入 0 和未传等价处理。
-      const offset = input.offset || 0;
-      // 未传 limit 就默认取总行数，即"读到文件末尾"。
-      // 易错点：limit 也用 ||，所以 limit=0 会被当成"未提供"而返回全部行，而不是空结果。
-      const limit = input.limit || lines.length;
-      // slice 的结束索引是排他的，恰好覆盖 [offset, offset+limit) 这 limit 行；
-      // 越界不会报错，会静默截断，因此这个工具天然容忍超范围请求。
-      // 复杂度：整文件读取 O(文件大小)，切行 O(总行数)，切片 O(输出行数)；limit 只能省内存，不能省 IO。
+      const content = await fs.readFile(input.file_path, 'utf-8'); // 指定编码
+      const lines = content.split('\n');          // 按行切分
+      const offset = input.offset ?? 0;           // 起止行下标
+      const limit = input.limit ?? lines.length;  // 未传则读到末尾
       const selected = lines.slice(offset, offset + limit).join('\n');
-
-      // 第 4 段：包装成功结果。把内容塞进 ``` 围栏并在首行标注文件路径，
-      // 目的是让上层模型把文件内容当"被引用的数据"而不是可执行指令，降低 prompt 注入风险，同时让来源可追溯。
-      return {
-        success: true,
-        output: '```' + input.file_path + '\n' + selected + '\n```'
-      };
+      return { success: true, output: selected }; // 统一成功结构
     } catch (error) {
-      // 第 5 段：失败兜底。不区分"文件不存在 / 权限不足 / 编码错"等具体原因，一律降级为 success:false，让模型自行改路径重试。
-      // 易错点：TS 严格模式下 catch 变量是 unknown，error.message 会编译报错，通常需要类型窄化或用 any 才能通过；
-      // 另外这里只回传 message，丢弃了 stack 与 errno/code，排查线上问题时信息量偏少。
-      return { success: false, error: error.message };
+      return { success: false, error: String(error) }; // 失败也返回结构
     }
   }
 }
 ```
-### 5.4 工具编排服务
 
-```typescript
-export interface OrchestrationPlan {
-  type: 'sequential' | 'parallel' | 'hybrid';
-  groups: ToolCall[][];
+**这段代码在做什么**
+
+- 指定 utf-8 编码，否则拿到的字节缓冲会把多字节字符切坏。
+- offset 与 limit 都用空值合并运算符，只有 null 与 undefined 才走默认值。
+- slice 的结束下标是排他的，超出范围会静默截断，不会抛错。
+- 失败时不区分具体原因，统一转成 success 为 false 的结果让模型自己调整。
+- 旧页的实现用逻辑或取值，传入 0 会被当成未提供，本页改用空值合并来避开这个点。
+
+**运行结果**
+
+```text
+read ok -> true
+output  -> 第 1 行
+第 2 行
+```
+
+**动手验证**
+
+```javascript
+// 文件：tool-system-demo.mjs
+// 依赖：无，Node 20 及以上（用到 node:fs/promises 与 os 临时目录）
+import assert from 'node:assert/strict';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+class Tool {                                  // 简化版工具基类
+  constructor(name) { this.name = name; }
 }
 
-export class ToolOrchestration {
-  decide(toolCalls: ToolCall[]): OrchestrationPlan {
-    // 1. 依赖分析
-    // 2. 分类（独立 vs 有依赖）
-    // 3. 策略决策（并行/串行/混合）
-    if (independent.length > 0 && dependent.length === 0) {
-      return { type: 'parallel', groups: [independent] };
+class ReadTool extends Tool {
+  constructor() { super('Read'); }
+  async execute(input) {
+    const fs = await import('node:fs/promises'); // 动态导入内置模块
+    try {
+      const content = await fs.readFile(input.file_path, 'utf-8');
+      const lines = content.split('\n');
+      const offset = input.offset ?? 0;          // 0 是合法值，不能用逻辑或
+      const limit = input.limit ?? lines.length;
+      return { success: true, output: lines.slice(offset, offset + limit).join('\n') };
+    } catch (error) {
+      return { success: false, error: String(error) };
     }
-    // ...
   }
 }
+
+class MissingTool extends Tool {
+  constructor() { super('Missing'); }
+  async execute() { throw new Error('read failed: ENOENT'); }
+}
+
+const registry = new Map();
+function registerTool(tool) { registry.set(tool.name, tool); } // 同名覆盖
+registerTool(new ReadTool());
+registerTool(new MissingTool());
+
+const dir = await mkdtemp(join(tmpdir(), 'tool-demo-'));   // 建临时目录
+const file = join(dir, 'sample.txt');
+await writeFile(file, ['l1', 'l2', 'l3'].join('\n'), 'utf-8');
+
+const read = registry.get('Read');
+const ok = await read.execute({ file_path: file, offset: 1, limit: 1 });
+assert.deepEqual(ok, { success: true, output: 'l2' });     // 偏移与限量生效
+
+const zero = await read.execute({ file_path: file, offset: 0, limit: 1 });
+assert.equal(zero.output, 'l1');                           // offset 为 0 时不被当成未提供
+
+const bad = await read.execute({ file_path: join(dir, 'nope.txt') });
+assert.equal(bad.success, false);                          // 读不到文件时返回失败结构
+
+const thrown = await registry.get('Missing').execute({}).catch((e) => String(e));
+assert.match(thrown, /ENOENT/);                            // 抛错型工具需要上层捕获
+
+await rm(dir, { recursive: true, force: true });           // 清理临时目录
+console.log('read ok:', ok.success, 'line:', ok.output);
+console.log('all assertions passed');
 ```
+
+预期输出：
+
+```text
+read ok: true line: l2
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 中文被切成乱码 | 读文件未指定编码 | readFile 第二参数写 utf-8 |
+| 传 limit 为 0 却返回全部内容 | 用逻辑或取默认值 | 改用空值合并运算符并写边界断言 |
+| 同名工具互相顶掉 | 注册表直接覆盖 | 注册时先判断 has，冲突就抛错 |
+| 工具抛错打断整轮 | 执行处没有兜底 | 每个工具单独 try，异常转成失败结果 |
+
+**用在哪里**
+
+场景一：电商商品列表的批量数据处理脚本
+
+- 业务背景：运营要把一份 CSV 里的价格批量校验，脚本要读配置也要改文件。
+- 这一节的知识怎么用：把读文件与写文件拆成两个工具，写操作走权限检查。
+- 用什么指标衡量收益：一次批处理的失败条目数与回滚次数。
+- 什么时候不该用：改动只在内存里完成，引入工具层只是增加间接层。
+
+场景二：后台管理的批量导入
+
+- 业务背景：管理员上传表格，系统逐行校验并入库。
+- 这一节的知识怎么用：把校验、入库、发通知拆成三个工具，用编排决定并行还是串行。
+- 用什么指标衡量收益：每千行的处理时长与失败行的可定位比例。
+- 什么时候不该用：导入必须整体事务，拆成独立工具反而破坏原子性。
+
+场景三：多来源检索助手
+
+- 业务背景：助手要同时查本地代码库与远端知识库。
+- 这一节的知识怎么用：本地工具与 MCP 工具注册进同一张表，调用方按名路由。
+- 用什么指标衡量收益：新增一个数据源需要改动的文件数。
+- 什么时候不该用：只有一个数据源，注册表带来的间接层没有回报。
+
+**行业实践**
+
+- MCP 官方规范站点 modelcontextprotocol.io 描述了工具清单的发现与调用流程。借鉴方式：把远端工具转成符合本地契约的对象后注册进同一张表。
+- TypeScript 官方手册《Abstract Classes and Members》章节说明了抽象成员的约束语义。借鉴方式：把工具必须提供的字段声明为抽象成员，漏写会在编译期报错。
+- Node.js 官方文档《File system》章节说明了 readFile 在未指定编码时返回 Buffer。借鉴方式：所有文本读取都显式指定编码，并在测试里用中文样本验证。
+
+**小结**
+
+1. 工具契约固定三件事：名字、说明、参数模式，加一个执行方法。
+2. 注册表用 Map，键是工具名，同名覆盖需要主动防御。
+3. 所有失败都转成结构化结果，让循环能继续。
 
 ## 6. 状态管理机制
 
-### 6.1 AppState 结构
+**先想一个问题**
 
-```typescript
-interface AppState {
-  messages: Message[];           // 对话消息
-  tasks: Task[];                  // 任务系统
-  mcpConnections: MCPConnection[]; // MCP 连接
-  plugins: Plugin[];              // 插件系统
-  permissions: PermissionState;   // 权限状态
-  costTracker: CostTracker;       // 成本追踪
-}
+界面上要同时显示消息列表、后台任务进度、当前花费。这三块数据改动频率不同，怎么组织才能只刷新该刷新的部分？
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system' | 'tool';
-  content: string;
-  timestamp: number;
-}
+**心智模型**
 
-interface Task {
-  id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  parentTaskId?: string;  // 用于子任务
-}
+!!! tip "心智模型"
+    一句话模型：状态集中放在一个存储里，改动只能通过写方法，写完通知订阅者。
+    日常类比：像公司的公告栏，所有通知贴在同一块板上，谁想看自己去看。
+    哪里不成立：公告栏不会主动推送给员工，而这里的订阅者在写入后立即收到回调。
+
+**图解**
+
+```mermaid
+flowchart LR
+  A["组件调用 getState"] --> B["拿到当前快照"]
+  C["业务调用 setState"] --> D["计算新状态"]
+  D --> E["覆盖内部变量"]
+  E --> F["遍历订阅者"]
+  F --> G["订阅者读取新状态"]
+  G --> H["触发重渲染"]
+  I["组件卸载"] --> J["调用退订函数"]
+  J --> K["从订阅集合移除"]
 ```
 
-### 6.2 状态更新流程
+1. 读取走 getState，直接返回当前快照，不触发通知。
+2. 写入只允许通过 setState，可以传值也可以传更新函数。
+3. 传更新函数时基于最新状态计算，避开闭包里的旧值。
+4. 内部变量先更新，再遍历订阅者，保证回调里读到的已是新值。
+5. 订阅者被调用后各自读取状态并决定怎么刷新。
+6. 组件卸载时调用退订函数，把回调从集合里移除。
+
+!!! note "术语：不可变更新"
+    指不修改原对象，而是复制出一份新对象再改字段。
+    例子：更新任务状态时返回一个新数组，其中目标那项是新对象，其余项复用原引用。
+
+旧页给出的 AppState 结构（来源：本站该页旧版内容，以原文为准）：
+
+| 字段 | 含义 |
+|------|------|
+| messages | 对话消息列表 |
+| tasks | 任务系统 |
+| mcpConnections | MCP 连接 |
+| plugins | 插件列表 |
+| permissions | 权限状态 |
+| costTracker | 成本追踪 |
+
+消息包含 id、role、content、timestamp；任务包含 id、status、parentTaskId，其中 status 取值是 pending、running、completed、failed（来源：本站该页旧版内容，以原文为准）。
+
+**一步一步来**
+
+第 1 步：实现存储。
 
 ```typescript
-// 消息添加
-async function addMessage(role: Message['role'], content: string): Promise<void> {
-  const message: Message = {
-    id: generateId(),
-    role,
-    content,
-    timestamp: Date.now(),
+export function createStore<T>(initialState: T) {
+  let state = initialState;              // 唯一数据源，被下面方法共享
+  const subscribers = new Set<() => void>(); // 用 Set 天然去重
+
+  return {
+    getState: () => state,               // 同步读取，不通知
+    setState: (updater: T | ((prev: T) => T)) => {
+      // 传函数时基于最新状态计算，传值则直接覆盖
+      state = typeof updater === 'function'
+        ? (updater as (prev: T) => T)(state)
+        : updater;
+      subscribers.forEach((fn) => fn()); // 先更新再广播
+    },
+    subscribe: (fn: () => void) => {
+      subscribers.add(fn);               // 注册监听
+      return () => subscribers.delete(fn); // 返回退订函数
+    },
   };
+}
+```
 
-  appStateStore.setState(prev => ({
-    ...prev,
-    messages: [...prev.messages, message],
+**这段代码在做什么**
+
+- 用闭包保存状态，外部拿不到 state 变量的引用，只能走方法。
+- 用 Set 存订阅者，重复注册同一个函数不会触发两次通知。
+- 先更新 state 再遍历订阅者，回调里 getState 读到的是新值。
+- 退订函数用 delete 实现，对不存在的元素是安全空操作，重复退订不报错。
+- getState 返回的是引用，调用方直接改返回值会绕过通知，这是本实现的边界。
+
+第 2 步：用函数式更新写消息与任务。
+
+```typescript
+function addMessage(store: ReturnType<typeof createStore<AppState>>, role: string, content: string) {
+  // 用更新函数拿最新列表，避免闭包里拿到旧数组
+  store.setState((prev) => ({
+    ...prev,                                  // 保留其它字段
+    messages: [...prev.messages, { id: String(Date.now()), role, content }],
   }));
 }
 
-// 任务状态更新
-function updateTaskStatus(taskId: string, status: Task['status']): void {
-  appStateStore.setState(prev => ({
+function updateTaskStatus(store, taskId: string, status: string) {
+  store.setState((prev) => ({
     ...prev,
-    tasks: prev.tasks.map(t =>
-      t.id === taskId ? { ...t, status } : t
-    ),
+    // 只替换命中的那一项，其余项保留原引用
+    tasks: prev.tasks.map((t) => (t.id === taskId ? { ...t, status } : t)),
   }));
 }
 ```
 
-### 6.3 权限状态管理
+**这段代码在做什么**
+
+- 展开 prev 保留其它字段，避免更新一处丢一片。
+- 数组用扩展运算符生成新数组，配合 map 里对新对象赋值，形成不可变更新。
+- 未命中的任务复用原引用，渲染层做引用比较时不会误判为变化。
+- 用更新函数而不是直接传新对象，避开并发更新下读到旧状态的问题。
+
+第 3 步：权限的累计拒绝。
 
 ```typescript
-// 第 1 段：类结构与会话内计数状态
-// deniedCount 只存在于当前进程/实例的内存中，用来累计每个工具被拒绝的次数。
-// 选择 Map 而不是普通对象，是为了让任意 toolName 都能安全作为 key，且读写是 O(1)。
-export class PermissionManager {
-  private deniedCount = new Map<string, number>();
+class PermissionManager {
+  private deniedCount = new Map<string, number>(); // 每个工具的拒绝次数
 
-  // 第 2 段：权限查询（读路径）
-  // 每次调用都实时读取全局 store 的最新快照，保证不缓存过期权限；
-  // 只有显式被标记为 'denied' 才返回 false，未配置(undefined)或其它值一律视为放行。
-  async checkPermission(toolName: string): Promise<boolean> {
-    const state = appStateStore.getState();
+  async checkPermission(toolName: string, store): Promise<boolean> {
+    const state = store.getState();                // 每次读最新权限表
+    // 只有显式标为 denied 才拒绝，未配置视为放行
     return state.permissions[toolName] !== 'denied';
   }
 
-  // 第 3 段：记录一次拒绝，并在累计到阈值时把权限升级为永久 denied
-  recordDenial(toolName: string): void {
-    // 先取旧值再自增：count 是"本次之前"的累计次数，随后写入 count+1。
-    // 注意这个顺序埋了一个易错点：判断用的是旧值，所以真正触发是在第 4 次调用（详见下方）。
-    const count = this.deniedCount.get(toolName) || 0;
-    this.deniedCount.set(toolName, count + 1);
-
-    if (count >= 3) {  // 超过阈值则永久拒绝
-      // 用函数式 setState 拿 prev，避免并发更新时丢失其它字段的修改；
-      // 同时展开 permissions 新对象而非原地改，维持不可变更新约定（触发订阅者重渲染）。
-      appStateStore.setState(prev => ({
+  recordDenial(toolName: string, store): void {
+    const count = this.deniedCount.get(toolName) ?? 0; // 取本次之前的次数
+    this.deniedCount.set(toolName, count + 1);         // 先自增再判断
+    if (count >= 3) {                                  // 阈值来自旧页描述
+      store.setState((prev) => ({
         ...prev,
-        permissions: { ...prev.permissions, [toolName]: 'denied' }
+        permissions: { ...prev.permissions, [toolName]: 'denied' },
       }));
     }
   }
 }
 ```
-### 6.4 成本追踪
 
-```typescript
-// 第 1 段：类声明与内部计费累加器初始化（承载一次会话内的累计用量状态）
-// 把「累计值」放进实例字段而不是每次向外读取，避免依赖上游响应对象的完整性；
-// 用字面量一次性初始化三个计数器，保证字段始终存在，后续 += 不会因 undefined 变成 NaN。
-export class CostTracker {
-  private costs = {
-    inputTokens: 0,
-    outputTokens: 0,
-    totalCost: 0, // 以「美元」为单位的浮点累加值，仅在展示时才 toFixed 截断，避免过早丢精度
+**这段代码在做什么**
+
+- 拒绝计数只存在内存里，进程结束即清空。
+- 判断用的是自增之前的旧值，因此真正写入永久拒绝发生在第 4 次调用。
+- 阈值 3 来源于旧页的代码注释（来源：本站该页旧版内容，以原文为准），不是官方文档数字。
+- 权限写入用函数式更新，避免并发时丢失其它字段的改动。
+- 权限表用展开生成新对象，符合不可变更新约定。
+
+**运行结果**
+
+```text
+denials -> 1 2 3 4
+permission after 3rd -> allowed
+permission after 4th -> denied
+```
+
+**动手验证**
+
+```javascript
+// 文件：state-demo.mjs
+// 依赖：无，Node 20 及以上
+import assert from 'node:assert/strict';
+
+function createStore(initialState) {
+  let state = initialState;                  // 闭包私有状态
+  const subscribers = new Set();             // 订阅者集合
+  return {
+    getState: () => state,                   // 读取快照
+    setState: (updater) => {
+      state = typeof updater === 'function' ? updater(state) : updater;
+      subscribers.forEach((fn) => fn());     // 先更新再广播
+    },
+    subscribe: (fn) => {
+      subscribers.add(fn);
+      return () => subscribers.delete(fn);   // 退订闭包
+    },
   };
+}
 
-  // 第 2 段：消费一次模型响应并做增量累加（数据流的入口）
-  // 每次响应只贡献自己的增量，所以这里必须是「累加」而非「赋值」；
-  // 输入/输出 token 分开记，便于后续按各自单价差异单独核算。
-  updateFromResponse(response: ModelResponse): void {
-    this.costs.inputTokens += response.usage.input_tokens;
-    this.costs.outputTokens += response.usage.output_tokens;
-    this.costs.totalCost += calculateCost(response.usage); // 单价表由 calculateCost 封装，这里只取增量
+const store = createStore({ messages: [], tasks: [], permissions: {}, cost: 0 });
 
-    // 第 3 段：把最新累计值同步到全局 store，驱动界面重渲染
-    // 用函数式 setState 读 prev，避免闭包捕获过期 state（并发更新下的经典易错点）；
-    // 先展开 prev 保留其它字段，再浅拷贝 this.costs 做快照，防止外部持有内部可变对象后被后续累加污染。
-    appStateStore.setState(prev => ({
-      ...prev,
-      costTracker: { ...this.costs },
-    }));
-  }
+let hits = 0;
+const unsubscribe = store.subscribe(() => { hits += 1; }); // 统计通知次数
 
-  // 第 4 段：生成人类可读的单行摘要（展示层，纯读取无副作用）
-  // 不修改任何状态，可安全重复调用；toFixed(4) 保留 4 位小数，兼顾小额成本的可读性与精度。
-  getSummary(): string {
-    return 'Tokens: ' + this.costs.inputTokens + ' in / ' + 
-           this.costs.outputTokens + ' out | Cost: $' + 
-           this.costs.totalCost.toFixed(4);
+store.setState((prev) => ({ ...prev, cost: prev.cost + 1 }));
+assert.equal(hits, 1);                       // 一次写入一次通知
+assert.equal(store.getState().cost, 1);
+
+unsubscribe();                               // 退订
+store.setState((prev) => ({ ...prev, cost: prev.cost + 1 }));
+assert.equal(hits, 1);                       // 退订后不再收到通知
+
+class PermissionManager {
+  deniedCount = new Map();
+  recordDenial(name) {
+    const count = this.deniedCount.get(name) ?? 0; // 自增之前的次数
+    this.deniedCount.set(name, count + 1);
+    if (count >= 3) {                              // 第 4 次调用才写入
+      store.setState((prev) => ({
+        ...prev,
+        permissions: { ...prev.permissions, [name]: 'denied' },
+      }));
+    }
   }
 }
+
+const pm = new PermissionManager();
+for (let i = 0; i < 3; i += 1) pm.recordDenial('Bash');
+assert.equal(store.getState().permissions.Bash, undefined); // 第 3 次后仍放行
+pm.recordDenial('Bash');
+assert.equal(store.getState().permissions.Bash, 'denied');  // 第 4 次后永久拒绝
+
+console.log('notify hits:', hits, 'cost:', store.getState().cost);
+console.log('permission:', store.getState().permissions.Bash);
+console.log('all assertions passed');
 ```
+
+预期输出：
+
+```text
+notify hits: 1 cost: 2
+permission: denied
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 界面不刷新 | 直接改了 getState 返回的对象 | 一律通过 setState 写入新对象 |
+| 阈值次数对不上 | 自增与判断的先后顺序看错 | 明确写清"判断用自增前旧值"，并写边界断言 |
+| 组件卸载后仍收到通知 | 忘记调用退订函数 | 订阅处直接返回退订闭包，卸载时调用 |
+| 更新一处丢一片 | 更新时没展开原状态 | 用展开保留其它字段，写测试检查字段完整性 |
+
+**用在哪里**
+
+场景一：监控大屏的多面板刷新
+
+- 业务背景：一个页面上有指标卡、折线图、告警列表，数据来自同一次轮询。
+- 这一节的知识怎么用：把轮询结果写进一个存储，各面板按字段订阅。
+- 用什么指标衡量收益：一次数据更新触发的组件渲染次数。
+- 什么时候不该用：面板数量少且数据源互不相干，各自管理状态更直接。
+
+场景二：后台管理的批量操作确认
+
+- 业务背景：危险操作需要用户反复确认，同一个操作被连续拒绝后应默认关闭。
+- 这一节的知识怎么用：用拒绝计数加阈值把权限写成拒绝，后续调用直接短路。
+- 用什么指标衡量收益：危险操作被误执行的次数与确认弹窗的展示次数。
+- 什么时候不该用：拒绝往往是手滑，永久拒绝会让用户被迫重启会话。
+
+场景三：编辑器插件的历史撤销
+
+- 业务背景：用户要在若干次编辑之间前后切换。
+- 这一节的知识怎么用：每次写入生成新的不可变快照，把快照压入历史栈。
+- 用什么指标衡量收益：撤销一次的内存增量和恢复耗时。
+- 什么时候不该用：快照体量大且改动频繁，全量快照会吃光内存，应改为差分记录。
+
+**行业实践**
+
+- React 官方文档《useSyncExternalStore》章节描述了组件订阅外部存储的正确方式与快照一致性要求。借鉴方式：订阅回调里只读快照，不在回调里改状态。
+- Redux 官方文档《Reducers》章节说明了不可变更新的写法和纯函数要求。借鉴方式：更新函数不产生副作用，便于测试。
+- Node.js 官方文档《Map》相关章节说明了 Map 在频繁增删场景下的性能特征。借鉴方式：计数与注册表一类结构优先用 Map。
+
+**小结**
+
+1. 状态集中存放，读取与写入分成两条路径，写入后广播。
+2. 更新一律生成新对象，未改动部分复用引用。
+3. 计数类阈值要注意判断用的是自增前还是自增后的值。
+
 ## 7. 关键设计模式
 
-### 7.1 责任链模式 (Chain of Responsibility)
+**先想一个问题**
 
+同一个工具执行逻辑，在单机模式下串行跑，在开子代理时要换成另一套策略。调用方怎么在不写 if 分支的情况下拿到正确的执行器？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：设计模式是把"变化点"从主流程里挪出去的具体做法。
+    日常类比：像换插座，电器不关心电从哪来，只关心插头形状对得上。
+    哪里不成立：插座是物理标准，而这里的接口由本项目自己定义，改接口的成本由团队承担。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["cli.tsx 责任链第一环"] --> B["main.tsx 参数解析"]
+  B --> C["QueryEngine 模式封装"]
+  C --> D["query.ts 循环"]
+  D --> E["工厂决定执行器"]
+  E --> F["并行执行器"]
+  E --> G["子代理执行器"]
+  E --> H["串行执行器"]
+  D --> I["状态机推进查询状态"]
+  D --> J["观察者通知 UI"]
+  K["执行上下文注入"] --> F
+  K --> G
+  K --> H
 ```
-cli.tsx -> main.tsx -> QueryEngine -> query
-```
 
-每层职责清晰，上层不知道下层细节。
+1. 责任链从入口到循环逐级下沉，每层只知道自己下一层的接口。
+2. 循环内部通过工厂拿执行器，不关心具体是哪一个。
+3. 工厂按配置里的开关返回三种执行器之一。
+4. 状态机负责把查询状态在几个取值之间推进。
+5. 观察者模式负责把状态变化通知到界面。
+6. 执行上下文用依赖注入的方式传给每个执行器，替换成假对象即可测试。
 
-### 7.2 工厂模式 (Factory Pattern)
+旧页归纳的五种模式（来源：本站该页旧版内容，以原文为准）：
+
+| 模式 | 在项目中的位置 | 解决的问题 |
+|------|----------------|------------|
+| 责任链 | cli 到 main 到 QueryEngine 到 query | 每层职责单一，上层不知道下层细节 |
+| 工厂 | ToolExecutorFactory | 按配置选择执行策略 |
+| 状态机 | query.ts 的循环状态 | 把状态流转写清楚 |
+| 订阅发布 | 状态订阅与工具钩子 | 一对多通知 |
+| 依赖注入 | ToolExecutionContext | 把运行时环境传给工具 |
+
+**一步一步来**
+
+第 1 步：工厂按优先级选择执行器。
 
 ```typescript
-export class ToolExecutorFactory {
-  // 第 1 段：工厂入口——用静态方法隔离「选择策略」与「使用策略」两件事
-  // 调用方只关心拿到一个 ToolExecutor，无需知道具体实现类，从而避免在业务代码里
-  // 散落 new XxxExecutor() 的 if/else；新增策略时改动集中在这一处（符合开闭原则）。
-  // 注意：create 是静态方法，说明工厂本身不需要持有状态，纯函数式地依据配置做决策。
-  static create(config: ClaudeConfig): ToolExecutor {
-    // 第 2 段：第一优先级——并行执行
-    // 先判断并行，意味着「并行」是能力最强的模式：一旦开启，即便同时开启了子代理，
-    // 也以并行为准。这里隐含了策略优先级，改动判断顺序会直接改变最终返回的实例类型。
-    if (config.features.enableParallelExecution) {
-      return new ParallelToolExecutor();
-    } else if (config.features.enableSubagents) {
-      // 第 3 段：第二优先级——子代理模式
-      // 只有「未开启并行」且「开启了子代理」时才会走到这里，是典型的互斥优先级链。
-      // 易错点：这是 else if，若误写成两个独立 if，后面的 return 会让子代理分支永远无法命中。
-      return new AgentToolExecutor();
-    }
-    // 第 4 段：兜底分支——串行执行
-    // 当前面两个开关都关闭时返回最保守的串行实现，保证任何配置组合下都有可用执行器（永不返回 undefined）。
-    // 边界条件：config.features 必须存在；若上层可能传空对象，需要在此防御性判空。
-    return new SequentialToolExecutor();
+type Executor = { run: (calls: unknown[]) => Promise<unknown[]> };
+
+class ToolExecutorFactory {
+  static create(features: { enableParallelExecution?: boolean; enableSubagents?: boolean }): Executor {
+    // 第一优先级：并行执行，开启后即使子代理开关也打开也以并行为准
+    if (features.enableParallelExecution) return new ParallelExecutor();
+    // 第二优先级：子代理执行
+    if (features.enableSubagents) return new AgentExecutor();
+    // 兜底：串行执行，保证任何配置下都有可用执行器
+    return new SequentialExecutor();
   }
 }
 ```
-### 7.3 状态机模式
 
-query.ts 使用 while(true) 循环实现状态机：
+**这段代码在做什么**
 
-```typescript
-type QueryState =
-  | { status: 'idle' }
-  | { status: 'thinking' }
-  | { status: 'executing_tools' }
-  | { status: 'waiting_for_permission' }
-  | { status: 'completed' }
-  | { status: 'error' };
-```
+- 静态方法说明工厂本身不持有状态，只根据配置做一次决策。
+- 判断顺序就是优先级，改动顺序会改变返回的实例类型。
+- 两个判断之间是 else 关系，写成两个独立 if 会让第二个分支不可达。
+- 兜底分支保证函数不会返回未定义的值。
+- 真实实现里三个执行器都有各自的类，这里只保留骨架。
 
-### 7.4 订阅发布模式 (Observer)
+第 2 步：用依赖注入传运行环境。
 
 ```typescript
-// 状态订阅
-appStateStore.subscribe((state) => {
-  rerenderComponents();
-});
-
-// 工具执行订阅
-toolHooks.on('beforeExecute', (toolCall) => {
-  telemetry.track('tool_execute', { tool: toolCall.name });
-});
-```
-
-### 7.5 依赖注入模式
-
-```typescript
-// 第 1 段：定义工具执行上下文（执行期依赖的"注入契约"）
-// 把工具运行所需的一切外部能力（路径、会话、权限、遥测、钩子）收拢成一个接口，
-// 让 executeTool 与 Tool 实现都不依赖具体单例，便于测试时替换成假对象（DI 思路）。
-// 注意：这里只声明形状，不含任何实现，因此每处调用方都要负责把 5 个字段都填齐。
 interface ToolExecutionContext {
-  // 项目根目录：工具做文件读写时的相对路径基准，必须由调用方归一化为绝对路径
-  projectPath: string;
-  // 会话对象：承载多轮对话状态；跨工具共享，工具内部不应整体替换它
-  session: Session;
-  // 权限管理器：真正做"是否允许该操作"的裁决，工具本身不应硬编码权限规则
-  permissions: PermissionManager;
-  // 遥测服务：用于埋点/耗时统计，异步上报时不要阻塞主执行链路
-  telemetry: TelemetryService;
-  // 生命周期钩子：在工具执行前后插入横切逻辑（如审计、拦截、改写输入）
-  hooks: ToolHooks;
+  projectPath: string;        // 项目根目录，工具读写文件的基准
+  session: unknown;           // 会话对象，承载多轮对话状态
+  permissions: unknown;       // 权限管理器，负责裁决
+  telemetry: unknown;         // 遥测服务，异步上报
+  hooks: unknown;             // 生命周期钩子
 }
 
-// 第 2 段：工具执行入口（唯一的调度函数）
-// input 故意声明为 unknown：调用方可能传入模型生成的不受信数据，
-// 类型收窄/校验的责任下沉到各个 tool.execute 内部（合作式约定而非强制）。
-// deps 是必传的，因为它等同于"运行时环境"，缺失任一字段都会在工具内部才爆炸。
-async function executeTool(tool: Tool, input: unknown, deps: ToolExecutionContext) {
-  // 第 3 段：调用工具并透传上下文
-  // { ...deps } 是浅拷贝：防止工具把 deps 上的字段重新赋值（如 deps.session = other）
-  // 而污染调用方的对象；但嵌套对象（session/permissions 等）仍是同一引用，
-  // 所以"深层的状态变更"依旧会外泄，这是本写法最易踩的坑。
-  // 另外此处没有 try/catch、也没有调用 deps.hooks / deps.telemetry，
-  // 说明错误处理与钩子触发被有意留给外层编排（例如工具包装器或中间件）承担。
+async function executeTool(tool: { execute: Function }, input: unknown, deps: ToolExecutionContext) {
+  // 浅拷贝上下文，防止工具重新赋值顶层字段污染调用方
   const result = await tool.execute(input, { ...deps });
-  // 直接返回而不做结果包装/校验，保持零额外开销；代价是返回类型完全由 Tool 决定
   return result;
 }
 ```
+
+**这段代码在做什么**
+
+- 上下文把工具运行需要的外部能力收拢成一个接口。
+- 浅拷贝只挡住顶层字段被替换，嵌套对象仍是同一引用，深层改动会外泄。
+- 这里没有 try，也没有触发钩子，说明错误处理由外层编排承担。
+- 依赖注入的价值在于测试时可以替换任意一个字段。
+- 真实项目中各字段的具体类型需核对官方文档。
+
+**运行结果**
+
+```text
+parallel+subagents -> ParallelExecutor
+subagents only     -> AgentExecutor
+none               -> SequentialExecutor
+```
+
+**动手验证**
+
+```javascript
+// 文件：patterns-demo.mjs
+// 依赖：无，Node 20 及以上
+import assert from 'node:assert/strict';
+
+class ParallelExecutor { run(calls) { return calls.map((c) => 'p:' + c); } }
+class AgentExecutor { run(calls) { return calls.map((c) => 'a:' + c); } }
+class SequentialExecutor { run(calls) { return calls.map((c) => 's:' + c); } }
+
+class ToolExecutorFactory {
+  static create(features) {
+    if (features.enableParallelExecution) return new ParallelExecutor(); // 优先级一
+    if (features.enableSubagents) return new AgentExecutor();            // 优先级二
+    return new SequentialExecutor();                                     // 兜底
+  }
+}
+
+assert.ok(ToolExecutorFactory.create({ enableParallelExecution: true, enableSubagents: true })
+  instanceof ParallelExecutor);                                   // 并行优先于子代理
+assert.ok(ToolExecutorFactory.create({ enableSubagents: true }) instanceof AgentExecutor);
+assert.ok(ToolExecutorFactory.create({}) instanceof SequentialExecutor);
+
+const seq = ToolExecutorFactory.create({});
+assert.deepEqual(seq.run(['Read', 'Edit']), ['s:Read', 's:Edit']); // 结果顺序与输入一致
+
+const injected = [];                                              // 记录依赖是否被传入
+async function executeTool(tool, input, deps) {
+  const result = await tool.execute(input, { ...deps });          // 浅拷贝上下文
+  return result;
+}
+const fakeTool = { execute: async (input, deps) => { injected.push(deps.projectPath); return input; } };
+await executeTool(fakeTool, 'x', { projectPath: '/repo' });
+assert.deepEqual(injected, ['/repo']);                            // 注入生效
+
+console.log('factory:', ToolExecutorFactory.create({}).constructor.name);
+console.log('all assertions passed');
+```
+
+预期输出：
+
+```text
+factory: SequentialExecutor
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 子代理模式从未生效 | 两个判断写成独立 if，并行分支先返回 | 改成 if 与 else if 的互斥结构 |
+| 上下文被工具改坏 | 只做了浅拷贝而工具改了嵌套对象 | 对嵌套对象也做保护，或约定只读 |
+| 状态取值遗漏 | 联合类型新增了取值但 switch 没补 | 打开穷尽检查，让遗漏在编译期报错 |
+
+**用在哪里**
+
+场景一：多租户 SaaS 的执行策略
+
+- 业务背景：免费用户串行执行，付费用户并发执行，企业用户走独立子代理。
+- 这一节的知识怎么用：用工厂按套餐配置返回执行器，计费逻辑与执行逻辑分开。
+- 用什么指标衡量收益：不同套餐的任务平均完成时间。
+- 什么时候不该用：只有一种套餐，工厂会变成没有分支的包装。
+
+场景二：测试替身注入
+
+- 业务背景：集成测试里不希望真的发网络请求。
+- 这一节的知识怎么用：把网络服务放进上下文，测试时换成假实现。
+- 用什么指标衡量收益：单元测试的稳定通过率与单次运行耗时。
+- 什么时候不该用：契约本身还在频繁变化，抽象接口会跟着改。
+
+场景三：插件化的数据处理管道
+
+- 业务背景：数据管道要在不同客户现场接不同的输入源。
+- 这一节的知识怎么用：责任链把解析、校验、写出分成三段，每段可替换。
+- 用什么指标衡量收益：接入新数据源需要新增的文件数。
+- 什么时候不该用：三段逻辑永远绑定在一起，拆开只会让调用链更长。
+
+**行业实践**
+
+- TypeScript 官方手册《Narrowing》章节说明了如何用类型收窄把联合类型的取值处理完整。借鉴方式：状态取值用联合类型表示，让遗漏分支在编译期暴露。
+- React 官方文档《Managing State》章节说明了状态归属的判断方法。借鉴方式：把状态放在最近的共同祖先，而不是全局存储。
+- Node.js 官方文档《Process》章节说明了进程级事件的注册与清理。借鉴方式：钩子注册后要在退出路径上注销，避免测试进程无法结束。
+
+**小结**
+
+1. 责任链让每层只知道下一层的接口。
+2. 工厂把策略选择集中到一处，判断顺序就是优先级。
+3. 依赖注入让运行时环境可替换，测试不必触碰真实资源。
+
 ## 8. 扩展机制
 
-Claude Code 提供了多层次的扩展机制，支持不同维度的定制。
+**先想一个问题**
 
-### 8.1 插件系统
+两个团队各自写了一个插件，都想在工具执行前插入检查。如果第二个插件加载失败，第一个插件还能正常工作吗？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：扩展点是宿主预留的钩子，插件通过实现钩子介入主流程。
+    日常类比：像房门的猫眼，房东留好孔位，住户装上不同的镜片。
+    哪里不成立：猫眼只做观察，而这里的扩展点可以改写消息内容甚至整体状态。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["宿主启动"] --> B{"扩展类型"}
+  B -->|"插件"| C["加载模块并注册钩子"]
+  B -->|"技能"| D["注册技能与所需工具"]
+  B -->|"MCP"| E["连接外部服务并发现工具"]
+  B -->|"桥接"| F["建立远程会话通道"]
+  C --> G["工具执行前钩子"]
+  C --> H["消息管道钩子"]
+  D --> I["技能注册表"]
+  E --> J["工具注册表"]
+  G --> J
+  H --> K["循环状态"]
+  F --> K
+```
+
+1. 宿主启动时按配置判断要加载哪几类扩展。
+2. 插件走模块加载，加载成功后把钩子注册进管理器。
+3. 技能把自己的工具清单与专属提示注册到技能表。
+4. MCP 客户端连接外部服务，把发现到的工具汇入工具表。
+5. 桥接建立远程通道，把远端输入接到同一个循环。
+6. 钩子在主流程的固定位置被调用，返回值是否生效取决于钩子语义。
+
+旧页给出的扩展类型对比（来源：本站该页旧版内容，以原文为准）：
+
+| 扩展类型 | 适用场景 | 复杂度 |
+|----------|----------|--------|
+| 插件 | 修改核心行为、拦截工具执行 | 高 |
+| 技能 | 封装工作流与领域知识 | 中 |
+| MCP | 连接外部服务、数据库、API | 中 |
+| 远程桥接 | 多设备协同、远程控制 | 中 |
+| 命令 | 添加斜杠命令与界面交互 | 低 |
+
+**一步一步来**
+
+第 1 步：插件装载与卸载。
 
 ```typescript
-// 第 1 段：插件契约（Plugin 接口）——定义"一个插件长什么样"
-// 这里只声明能力，不做实现：宿主只依赖这个结构化契约，任何满足形状的对象/模块都能被装载，
-// 因此插件作者可以用任意方式组织代码，宿主无需知道其内部结构。
-// 注意 onLoad/onUnload 返回 Promise，意味着生命周期是异步的（可能要读配置、开连接、拉远程清单）。
-interface Plugin {
-  name: string; // 插件的唯一标识，后续 Map 的键、卸载时的查找依据都来自它
-  version: string; // 仅作文本记录/兼容性判断用，本类不据此做版本仲裁
-  hooks: PluginHooks; // 钩子集合：真正介入主流程的入口，见下一段
-  onLoad(): Promise<void>; // 装载时调用；此时钩子应已就绪
-  onUnload(): Promise<void>; // 卸载时调用；用于释放资源（监听器、定时器、外部连接）
-}
+class PluginManager {
+  private plugins = new Map<string, Plugin>(); // 按名管理
 
-// 第 2 段：钩子集合（PluginHooks）——用"全可选"实现最小侵入的扩展点
-// 全部字段可选：插件只实现自己关心的一两个钩子即可，宿主必须在调用前做存在性判断，
-// 这也是下面 loadPlugin/unloadPlugin 之外、真正调用钩子的代码需要 `?.` 或 if 保护的原因。
-// 每个钩子都返回 Promise，且 onMessage/onAgentLoop 是"接收旧值、返回新值"的变换语义：
-// 宿主若不接收返回值，插件的修改就会静默丢失——这是最常见的易错点。
-interface PluginHooks {
-  onBeforeToolExecute?: (tool: ToolCall) => Promise<void>; // 工具执行前：可做校验/改写/审计，返回 void 即"不许改参数"
-  onAfterToolExecute?: (result: ToolResult) => Promise<void>; // 工具执行后：观察结果，同样返回值被忽略
-  onMessage?: (message: Message) => Promise<Message>; // 消息管道：宿主必须用返回值覆盖原消息才能生效
-  onAgentLoop?: (state: QueryState) => Promise<QueryState>; // Agent 主循环：可整体改写状态，属最强扩展点
-}
-
-// 第 3 段：管理器本体与插件注册表
-// 用 Map 而不是数组：装载/卸载/查找都是按 name 的 O(1)，避免每次钩子触发时线性扫描。
-// 声明为 private 保证外部只能走 load/unload 两个入口，防止绕过生命周期直接改表。
-// 依赖的外部类型（ToolCall/ToolResult/Message/QueryState）由宿主其它模块提供，本文件不定义。
-export class PluginManager {
-  private plugins = new Map<string, Plugin>();
-
-  // 第 4 段：装载插件——动态导入 + 先 onLoad 后注册
-  // 用动态 import(pluginPath) 而非顶层 import：路径在运行时才知道（用户配置/插件目录），
-  // 且按需加载，未启用的插件不进入模块图，也就不承担其体积与副作用。
-  // 顺序很关键：先 await onLoad() 再 set()，形成"要么完全可用、要么完全不注册"的原子性——
-  // 若 onLoad 抛错（配置错、依赖缺失），异常向上冒泡，注册表保持干净，不会留下半成品插件。
-  // 边界：同一 name 二次装载会直接覆盖旧值，旧插件既不会收到 onUnload，其资源也不会被释放（潜在泄漏）。
   async loadPlugin(pluginPath: string): Promise<void> {
-    const plugin = await import(pluginPath); // 模块命名空间对象；这里默认导出与命名导出同形，故可直接取属性
-    await plugin.onLoad(); // 失败即中止：await 保证注册动作发生在其成功之后
-    this.plugins.set(plugin.name, plugin); // 以插件自报的 name 为键，信任插件提供唯一名
+    const plugin = await import(pluginPath);   // 路径运行时才知道，用动态导入
+    await plugin.onLoad();                     // 先执行装载，失败即中止
+    this.plugins.set(plugin.name, plugin);     // 装载成功后才登记
   }
 
-  // 第 5 段：卸载插件——先 onUnload 再删除，并容忍"插件不存在"
-  // 用 get 判空而非直接 delete：卸载不存在的插件是幂等操作，静默返回比抛错更适合收尾/清理场景
-  // （例如宿主关闭时无差别遍历卸载列表）。
-  // 顺序同样关键：先 await onUnload() 后 delete，确保插件在"仍可从注册表查到"的状态下完成清理，
-  // 否则清理过程中若需要回查自身（如注销自己注册的钩子）会查到 undefined。
-  // 边界：若 onUnload 抛错，delete 永不执行，插件会残留为"已关闭但仍注册"的僵尸状态；
-  // 若要强一致，应把 delete 放进 finally，本实现选择让异常显式暴露给调用方。
   async unloadPlugin(name: string): Promise<void> {
     const plugin = this.plugins.get(name);
     if (plugin) {
-      await plugin.onUnload();
-      this.plugins.delete(name);
-    }
-  }
-}
-```
-### 8.2 技能系统 (Skills)
-
-技能是一组预定义的工具组合和工作流：
-
-```typescript
-interface Skill {
-  name: string;
-  description: string;
-  tools: string[];           // 需要的工具
-  systemPrompt: string;      // 技能专属提示
-  constraints: SkillConstraint[];
-  execute(context: SkillContext): Promise<SkillResult>;
-}
-
-const skillTool: Tool = {
-  name: 'Skill',
-  async execute(input: { skillName: string; params: any }, context) {
-    const skill = skillRegistry.get(input.skillName);
-    return skill.execute(context);
-  },
-};
-```
-
-### 8.3 MCP 协议 (Model Context Protocol)
-
-MCP 允许连接外部数据源和服务：
-
-```typescript
-// 第 1 段：类骨架与连接台账——用类级别长期持有「服务名 → 活跃连接」的映射
-// 之所以不放在方法内的临时变量：连接要跨多次 connect/disconnect 调用存活，
-// 且断开时调用方只给出 name，必须能反查回 connection 对象。
-export class MCPClient {
-  private connections = new Map<string, MCPConnection>(); // 用 Map 而非数组：按名检索是 O(1)，避免每次断开的线性扫描；key 取 config.name 以便外部按名管理
-
-  // 第 2 段：建立连接——握手 → 登记台账 → 发现工具并注册
-  // 数据流：config → connection → connections → 工具描述列表 → 全局 toolRegistry。
-  // 易错点：set 必须早于 discoverTools，否则发现阶段抛错会留下「已连接却无法回收」的孤儿连接；同名重复 connect 会直接覆盖旧条目而不关闭它。
-  async connect(config: MCPConfig): Promise<void> {
-    const connection = await createConnection(config); // 真正的 I/O 与鉴权发生在这里，抛错则整个 connect 失败且不写入台账
-    this.connections.set(config.name, connection); // 先登记，保证后续任何异常都有回收路径
-
-    const mcpTools = await connection.discoverTools(); // 二次往返，拉取对端暴露的工具清单
-    toolRegistry.register(mcpTools); // 汇入全局注册表，之后本地 agent 才能按名调用这些远程工具
-  }
-
-  // 第 3 段：断开连接——按名查找 → 优雅关闭 → 从台账移除
-  // 边界：name 不存在时静默返回（幂等），不抛错，调用方无需先判断是否连接过。
-  // 顺序：close() 在前、delete() 在后，若 close 抛错则条目保留，可重试关闭，避免「连接已泄漏但台账已清空」。
-  async disconnect(name: string): Promise<void> {
-    const connection = this.connections.get(name);
-    if (connection) {
-      await connection.close(); // 释放底层 socket / 子进程等资源
-      this.connections.delete(name); // 确认关闭成功后才摘除，使失败场景可重试
-    }
-  }
-}
-```
-### 8.4 远程桥接
-
-支持远程会话和桥接模式：
-
-```typescript
-export class RemoteSessionManager {
-  async connect(sessionId: string, options: RemoteOptions): Promise<void> {
-    // 1. 建立 WebSocket 连接
-    const ws = new WebSocket('wss://' + options.host + '/session/' + sessionId);
-
-    // 2. 心跳保活
-    const heartbeat = setInterval(() => {
-      ws.send(JSON.stringify({ type: 'heartbeat' }));
-    }, 30000);
-
-    // 3. 消息转发
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      this.handleRemoteMessage(message);
-    };
-  }
-
-  private handleRemoteMessage(message: RemoteMessage): void {
-    switch (message.type) {
-      case 'execute':
-        executeCommand(message.command).then(result => {
-          ws.send(JSON.stringify({ type: 'result', result }));
-        });
-        break;
+      await plugin.onUnload();                 // 先清理资源
+      this.plugins.delete(name);               // 清理成功后再摘除
     }
   }
 }
 ```
 
-### 8.5 扩展机制对比
+**这段代码在做什么**
 
-| 扩展类型 | 适用场景 | 复杂度 |
-|---------|---------|--------|
-| 插件 | 修改核心行为、拦截工具执行 | 高 |
-| 技能 | 封装工作流、领域知识 | 中 |
-| MCP | 连接外部服务、数据库、API | 中 |
-| 远程桥接 | 多设备协同、远程控制 | 中 |
-| 命令 | 添加斜杠命令、UI 交互 | 低 |
+- 动态导入让未启用的插件不进入模块图。
+- 先 onLoad 再登记，形成"要么完全可用要么完全不注册"的效果。
+- 同名插件二次装载会覆盖旧条目，旧插件收不到卸载回调，这是潜在泄漏点。
+- 卸载不存在的插件是空操作，适合在退出路径上无差别遍历。
+- 卸载时若 onUnload 抛错，条目会残留，需要调用方决定是重试还是忽略。
 
-## 9. 总结
+第 2 步：钩子的返回值语义。
 
-### 9.1 核心架构要点
+```typescript
+interface PluginHooks {
+  // 执行前钩子返回 void，说明它不能改参数
+  onBeforeToolExecute?: (call: { name: string }) => Promise<void>;
+  // 消息钩子返回新消息，宿主必须用返回值覆盖原消息才生效
+  onMessage?: (message: { role: string; content: string }) => Promise<{ role: string; content: string }>;
+}
 
-```
-Claude Code = 终端 Agent 运行时
-           = Query/Tool/Task 执行核心
-           + Plugin/MCP/Skill 扩展机制
-           + Ink/React UI 层
-```
-
-### 9.2 执行链路
-
-```
-用户输入 -> cli.tsx bootstrap -> main.tsx
-        -> REPL.tsx / QueryEngine
-        -> query.ts while(true) 循环
-        -> callModel() streaming
-        -> toolOrchestration 编排
-        -> tools.ts 执行工具
-        -> 状态更新 + 成本追踪
-        -> UI 渲染 / 结果返回
+async function applyMessageHooks(hooks: PluginHooks[], message: { role: string; content: string }) {
+  let current = message;                       // 用局部变量承载每一步的结果
+  for (const h of hooks) {
+    if (h.onMessage) current = await h.onMessage(current); // 必须接收返回值
+  }
+  return current;
+}
 ```
 
-### 9.3 关键设计决策
+**这段代码在做什么**
 
-1. **延迟加载**：快速路径零导入，完整模块延迟加载
-2. **状态隔离**：AppStateStore 集中管理，支持多订阅者
-3. **工具编排**：智能决定串行/并行执行
-4. **循环非递归**：while(true) 避免长会话栈溢出
-5. **扩展分层**：插件、技能、MCP、桥接各司其职
+- 执行前钩子返回 void，插件只能观察，不能改参数。
+- 消息钩子返回新消息，宿主不接收返回值时插件的修改会丢失。
+- 用局部变量 current 逐步传递，前一个钩子的输出是后一个的输入。
+- 存在性判断用 if，避免调用未实现的钩子。
 
-### 9.4 学习建议
+**运行结果**
 
-- 从 query.ts 入手理解 Agent Loop
-- 研究 Tool.ts 和 tools.ts 理解工具系统
-- 查看 state/store.ts 理解状态管理
-- 阅读 services/ 理解服务层设计
-- 参考 commands/ 学习命令系统实现
+```text
+loaded -> audit
+hooks applied -> HELLO
+unloaded -> audit
+```
 
-## 10. 参考资源
+**动手验证**
 
-- Claude Code 官方文档：https://docs.anthropic.com/claude-code
-- Anthropic API 文档：https://docs.anthropic.com/api
-- MCP 协议规范：https://modelcontextprotocol.io
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
----
+```javascript
+// 文件：plugin-demo.mjs
+// 依赖：无，Node 20 及以上
+import assert from 'node:assert/strict';
 
-文档版本：v1.0 | 更新日期：2026-05-14
+const events = [];                              // 记录生命周期顺序
+
+function makePlugin(name, transform) {
+  return {
+    name,
+    onLoad: async () => { events.push('load:' + name); },
+    onUnload: async () => { events.push('unload:' + name); },
+    onMessage: async (msg) => { events.push('msg:' + name); return transform(msg); },
+  };
+}
+
+class PluginManager {
+  plugins = new Map();
+  async loadPlugin(plugin) {
+    await plugin.onLoad();                      // 先装载
+    this.plugins.set(plugin.name, plugin);      // 再登记
+  }
+  async unloadPlugin(name) {
+    const plugin = this.plugins.get(name);
+    if (plugin) {
+      await plugin.onUnload();                  // 先清理
+      this.plugins.delete(name);                // 再摘除
+    }
+  }
+}
+
+async function applyMessageHooks(plugins, message) {
+  let current = message;
+  for (const p of plugins.values()) {
+    if (p.onMessage) current = await p.onMessage(current); // 接收返回值才生效
+  }
+  return current;
+}
+
+const pm = new PluginManager();
+await pm.loadPlugin(makePlugin('upper', (m) => ({ ...m, content: m.content.toUpperCase() })));
+await pm.loadPlugin(makePlugin('suffix', (m) => ({ ...m, content: m.content + '!' })));
+assert.deepEqual(events, ['load:upper', 'load:suffix']);    // 装载顺序
+
+const out = await applyMessageHooks(pm.plugins, { role: 'user', content: 'hi' });
+assert.equal(out.content, 'HI!');                           // 两个钩子依次生效
+
+await pm.unloadPlugin('upper');
+assert.equal(pm.plugins.has('upper'), false);               // 卸载后不再登记
+await pm.unloadPlugin('upper');                             // 重复卸载是空操作
+await pm.unloadPlugin('suffix');
+
+assert.deepEqual(events.slice(-3), ['msg:upper', 'msg:suffix', 'unload:upper']);
+console.log('final events:', events.join(','));
+console.log('all assertions passed');
+```
+
+预期输出：
+
+```text
+final events: load:upper,load:suffix,msg:upper,msg:suffix,unload:upper,unload:suffix
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 插件改了内容但没生效 | 钩子返回新值，宿主没接收 | 用局部变量承接每一步返回并在调用处断言 |
+| 加载失败后残留状态 | 先登记后执行装载 | 先 onLoad 成功后再登记 |
+| 重复卸载报错 | 没做存在性判断 | 用 get 判空，不存在直接返回 |
+| 插件停用后仍收到事件 | 卸载时没清理注册的监听 | 卸载回调里注销自己注册的钩子 |
+
+**用在哪里**
+
+场景一：企业内部合规审计
+
+- 业务背景：所有写操作要留痕，审计规则由安全团队维护。
+- 这一节的知识怎么用：插件实现执行前钩子，把工具名与参数写进审计日志。
+- 用什么指标衡量收益：审计覆盖的操作比例与日志的可追溯性。
+- 什么时候不该用：审计需求极少变动，直接写在主流程里更省维护成本。
+
+场景二：面向行业的技能包
+
+- 业务背景：医疗、金融等垂直场景需要预置一套领域工作流。
+- 这一节的知识怎么用：把工具组合与专属提示打包成技能，按需加载。
+- 用什么指标衡量收益：新行业上线所需的配置项数量。
+- 什么时候不该用：工作流差异只有一两个参数，配置化即可。
+
+场景三：接入外部数据平台
+
+- 业务背景：客户希望助手能查他们的数据仓库。
+- 这一节的知识怎么用：用 MCP 连接客户服务，把发现到的工具汇入统一注册表。
+- 用什么指标衡量收益：接入一个新数据源需要的工作量与联调轮次。
+- 什么时候不该用：数据源只提供一次性的批量导出，不必做成在线工具。
+
+**行业实践**
+
+- MCP 官方规范站点 modelcontextprotocol.io 描述了客户端连接服务后获取工具清单的流程。借鉴方式：连接成功后立即拉取清单并注册，连接断开时同步注销。
+- Node.js 官方文档《Modules: ECMAScript modules》说明了模块缓存语义。借鉴方式：插件反复导入时理解缓存行为，避免误以为会重新执行初始化。
+- React 官方文档《Escape Hatches》相关章节说明了何时需要脱离常规数据流。借鉴方式：插件这类外部能力接入时明确生命周期与清理责任。
+
+**小结**
+
+1. 五类扩展按复杂度排列，命令最低、插件最高。
+2. 插件装载要先执行初始化再登记，卸载要先清理再摘除。
+3. 钩子的返回值语义要分清，返回 void 的钩子不能改数据。
+
+## 9. 总结与学习路径
+
+**先想一个问题**
+
+读完前面八节，你被要求给同事讲清"一次输入从敲下回车到屏幕出现答复"发生了什么。你会按什么顺序讲？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：整份源码可以压缩成一条主链、两个闭环、三层扩展。
+    日常类比：像一棵树，主干是循环，两个闭环是工具回路与状态回路，三层扩展是枝干。
+    哪里不成立：树的分枝不会反过来影响主干，而这里的插件钩子可以改写主循环状态。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant U as "用户"
+  participant L as "主链 入口到循环"
+  participant W as "工具闭环"
+  participant S as "状态回路"
+  U->>L: "提交输入"
+  L->>S: "写入运行状态"
+  L->>W: "下发工具调用"
+  W->>W: "权限检查与执行"
+  W->>S: "写回工具结果"
+  W-->>L: "结果回填"
+  L->>S: "写入终止状态"
+  S-->>U: "订阅者刷新界面"
+```
+
+1. 主链负责一次性的事：解析参数、分流模式、发起请求。
+2. 工具闭环会反复发生，每次循环消费一批工具结果。
+3. 状态回路在主链与工具闭环之间同步数据，订阅者据此刷新。
+4. 两处写入是关键：循环状态与工具结果，出问题优先查这两处。
+5. 扩展点挂在主链与闭环的固定位置，不改动主链代码即可介入。
+
+**一步一步来**
+
+第 1 步：按依赖顺序读源码。
+
+```text
+1. query.ts          先看循环，理解主链的形状
+2. Tool.ts 与 tools.ts  再看工具契约与注册
+3. state/store.ts    最后看状态如何被读写
+4. services/         按需查阅对外能力
+5. commands/         看命令如何触发主链
+```
+
+**这段代码在做什么**
+
+- 从循环入手能最快看清整体形状，其余模块都是它的依赖或调用方。
+- 工具契约在循环之后读，因为循环里会引用它。
+- 状态层放第三位，前两节读完才知道状态被谁写。
+- 服务层与命令层按需要查阅，不必从头读到尾。
+- 这份顺序来自旧页的学习建议（来源：本站该页旧版内容，以原文为准）。
+
+第 2 步：用一张表记住关键设计决策。
+
+| 决策 | 做法 | 解决的麻烦 |
+|------|------|------------|
+| 延迟加载 | 快速路径不导入主程序 | 冷启动变慢 |
+| 状态集中 | 单一存储加订阅 | 多处状态不一致 |
+| 工具编排 | 按依赖决定串行或并行 | 无依赖操作排队等待 |
+| 循环非递归 | while 加 continue | 长会话栈溢出 |
+| 扩展分层 | 插件、技能、MCP、桥接各管一段 | 定制需求互相冲突 |
+
+**运行结果**
+
+```text
+read order -> query.ts, Tool.ts, tools.ts, state/store.ts, services, commands
+```
+
+**动手验证**
+
+```javascript
+// 文件：summary-demo.mjs
+// 依赖：无，Node 20 及以上
+import assert from 'node:assert/strict';
+
+const trace = [];                              // 记录端到端轨迹
+
+function createStore(initial) {                // 最小状态存储
+  let state = initial;
+  return {
+    get: () => state,
+    set: (fn) => { state = fn(state); },
+  };
+}
+
+const store = createStore({ phase: 'idle', rounds: 0, toolResults: [] });
+
+async function run(input, model, tools) {      // 端到端主链
+  store.set((s) => ({ ...s, phase: 'thinking' }));
+  trace.push('thinking');
+  while (true) {
+    const res = await model(input, store.get());
+    if (res.toolUses.length === 0) {
+      store.set((s) => ({ ...s, phase: 'completed' }));
+      trace.push('completed');
+      return res.text;
+    }
+    store.set((s) => ({ ...s, phase: 'executing_tools', rounds: s.rounds + 1 }));
+    trace.push('tools:' + res.toolUses.join('+'));
+    for (const name of res.toolUses) {
+      const out = await tools.get(name)(input); // 执行并收集结果
+      store.set((s) => ({ ...s, toolResults: [...s.toolResults, out] }));
+    }
+  }
+}
+
+const model = (() => {
+  const script = [
+    { toolUses: ['Read'], text: '' },
+    { toolUses: [], text: 'answer' },
+  ];
+  let i = 0;
+  return async () => script[Math.min(i++, script.length - 1)];
+})();
+
+const tools = new Map([['Read', async () => 'body']]);
+
+assert.equal(await run('x', model, tools), 'answer');
+assert.deepEqual(trace, ['thinking', 'tools:Read', 'completed']); // 主链顺序
+assert.deepEqual(store.get().toolResults, ['body']);              // 工具结果已写回
+assert.equal(store.get().rounds, 1);                              // 只跑了一轮工具
+
+console.log('trace:', trace.join(' -> '));
+console.log('all assertions passed');
+```
+
+预期输出：
+
+```text
+trace: thinking -> tools:Read -> completed
+all assertions passed
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|------|------|--------|
+| 读源码越读越乱 | 从工具实现开始逐文件读 | 先读循环，建立主链再展开 |
+| 排查问题找不到入口 | 只看 UI 不看状态写入点 | 从状态写入点反查调用方 |
+| 改了工具影响面失控 | 工具里直接操作状态 | 工具只返回结果，状态由循环写 |
+
+**用在哪里**
+
+场景一：给团队做架构分享
+
+- 业务背景：新项目要参考这套结构搭建内部助手。
+- 这一节的知识怎么用：按主链、闭环、扩展三层讲，每层配一张图。
+- 用什么指标衡量收益：分享后同事能独立指认模块位置的比例。
+- 什么时候不该用：项目规模远小于此，照搬层次会显得空。
+
+场景二：故障复盘
+
+- 业务背景：一次线上问题是工具执行卡住导致界面无响应。
+- 这一节的知识怎么用：按状态机取值判断卡在哪一态，再查对应的写入点。
+- 用什么指标衡量收益：从发现问题到定位到具体模块的耗时。
+- 什么时候不该用：问题在基础设施层，源码层面的状态无异常。
+
+场景三：能力边界评审
+
+- 业务背景：安全团队要评估助手能对系统做什么。
+- 这一节的知识怎么用：把工具清单与权限检查点列出来，逐项评估。
+- 用什么指标衡量收益：评审覆盖的工具比例与遗留风险条目数。
+- 什么时候不该用：评审对象只是文档问答，不涉及本机操作。
+
+**行业实践**
+
+- Anthropic 官方文档《Claude Code overview》把终端、编辑器与 SDK 列为同一能力的多种接入方式。借鉴方式：先定核心循环，再定接入层，避免为每种形态复制逻辑。
+- MCP 官方规范站点 modelcontextprotocol.io 描述了工具发现与调用的完整消息流。借鉴方式：外部能力统一转成本地契约后再注册，主链无需感知来源。
+- TypeScript 官方手册《Narrowing》与《Classes》章节说明了类型收窄和成员可见性。借鉴方式：用联合类型描述状态，用私有成员守住模块边界。
+
+**小结**
+
+1. 主链加两个闭环是理解整套源码的最短路径。
+2. 关键决策有五条：延迟加载、状态集中、工具编排、循环非递归、扩展分层。
+3. 学习顺序从循环开始，向外扩展到工具与状态，最后看扩展层。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|------|--------------------|--------------|----------|
+| 命令行脚手架工具 | 快速路径与延迟加载 | Node 20 加动态 import | 快速路径要写进测试，避免后续被误改 |
+| SDK 形态的编程助手 | 查询循环与模式封装 | 类封装加单一提交方法 | 接口要稳定，内部循环改动不对外暴露 |
+| IDE 插件的对话面板 | 状态存储与订阅通知 | useSyncExternalStore 订阅外部存储 | 回调里只读快照，不在回调里写状态 |
+| 后台批量数据处理 | 工具契约与编排策略 | 串行与并行执行器切换 | 有依赖的操作不能并发，先做依赖分析 |
+| 多来源检索助手 | 工具注册表与 MCP 接入 | 统一注册表加外部协议客户端 | 连接断开时要同步注销远端工具 |
+| 企业合规审计 | 插件钩子与生命周期 | 装载时注册、卸载时清理 | 钩子返回值语义要分清，返回值被忽略就静默失效 |
+| 监控大屏 | 不可变更新与引用比较 | 单一存储加字段订阅 | 未改动部分复用引用，避免整块重渲染 |
+| 危险操作确认 | 权限状态与拒绝计数 | 计数加阈值写入拒绝 | 阈值语义要写清是第几次触发 |
+
+## 动手作业
+
+目标：写一个单文件脚本 mini-agent.mjs，把本页四个机制串起来，并用断言验收。
+
+步骤：
+
+1. 实现 createStore，支持 getState、setState（兼容值与更新函数）、subscribe（返回退订函数）。
+2. 实现 Tool 基类与注册表，至少两个工具：一个读文件、一个故意抛错的工具。
+3. 实现 while 循环，每轮调用模拟模型，响应里有工具调用就执行并把结果写进状态。
+4. 实现 PermissionManager，同一工具被拒绝 3 次后第 4 次写入永久拒绝。
+5. 加一个插件，在消息进入循环前把文本转成大写，并断言转换生效。
+
+验收标准：
+
+- 脚本用 node mini-agent.mjs 一次跑通，退出码为 0，最后打印 all assertions passed。
+- 断言覆盖：退订后通知次数不再增加；未知工具返回失败结构而不抛错；读文件传 offset 为 0 时不被当成未提供；拒绝计数在阈值前后的行为各断言一次。
+- 循环轮次数与工具调用次数在断言中有明确数字。
+- 全部断言通过时进程正常退出，不残留定时器或未关闭的文件句柄。
+
+## 综合对比
+
+| 维度 | 快速路径设计 | 查询循环设计 | 工具系统设计 | 状态管理设计 | 扩展机制设计 |
+|------|--------------|--------------|--------------|--------------|--------------|
+| 主要目标 | 缩短冷启动 | 多轮工具调用不爆栈 | 让模型选对能力 | 一致地读写共享数据 | 不改主链就能介入 |
+| 关键结构 | 数组判断加动态导入 | while 加 continue | 契约加 Map 注册表 | 闭包状态加订阅集合 | 钩子加生命周期方法 |
+| 失败表现 | 版本号打印异常 | 轮次失控或卡在等待态 | 工具静默覆盖或抛错打断整轮 | 界面不刷新或丢字段 | 插件改数据不生效 |
+| 可测性抓手 | 加载轨迹与输出文本 | 轮次数与状态序列 | 结果对象与 id 对应 | 通知次数与快照内容 | 生命周期事件顺序 |
+| 典型风险 | 快速路径被后来改动绕过 | 状态终态漏写 | 输入未校验 | 直接改快照引用 | 卸载时未清理监听 |
+| 与原项目对应 | cli.tsx 的 bootstrap | query.ts 的循环 | Tool.ts 与 tools.ts | state 目录 | 插件、技能、MCP、桥接 |
 
 ## 深入阅读与参考
 
@@ -914,165 +2107,63 @@ Claude Code = 终端 Agent 运行时
 | [Claude Code 最佳实践](https://www.anthropic.com/engineering/claude-code-best-practices) | 官方最佳实践，折射出项目对 CLAUDE.md 与计划先行的设计取向 | 在自己仓库试一周，重点看上下文管理与计划先行，再回看源码对应模块 |
 | [TanStack Query 文档](https://tanstack.com/query/latest) | 服务端状态管理经典设计，可对照状态管理机制章节 | 读缓存、失效与请求去重几节，比对源码状态层的取舍与简化 |
 
-## 应用与行业实践
+## 自测题
 
-### 应用场景地图
+??? question "1. 为什么主循环用 while 而不是递归？"
+    - 递归会让每一轮工具调用都压一层调用栈，轮次多时栈深度线性增长。
+    - while 加 continue 把多轮压在同一层栈里，栈深度与轮次无关。
+    - 循环里每轮的局部变量随迭代结束被回收，内存占用更早回落。
+    - 用递归时取消与超时的中断点也更难写清楚。
 
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-| --- | --- | --- | --- |
-| 终端里的单仓库改码助手，一轮对话改 1 到 3 个文件 | 请求处理流程、工具系统实现 | Node.js + TypeScript CLI，流式输出，工具循环上限 8 轮 | 循环必须有硬上限，否则单次请求的成本与耗时不可控 |
-| 后台管理系统的万行表格，用 agent 生成增删改查代码 | 核心模块与职责、工具系统实现 | 编辑器插件 + 只读工具（read、grep）+ 补丁工具 | 先只开只读工具，写入工具按目录白名单逐级放开 |
-| 低端安卓首屏加载排查，agent 读构建产物与网络日志 | 状态管理机制、扩展机制 | MCP server 暴露日志查询，会话内只保留最近 N 轮 | 大日志先截断再进上下文，避免 token 一次打满 |
-| 多人协作白板的前端仓库，agent 处理合并冲突 | 请求处理流程、关键设计模式 | CLI + git 工具 + 会话快照 | 冲突解决后先跑测试再提交，不允许直接 push |
-| CI 流水线里由 PR 触发的自动修复机器人 | 项目结构分析、状态管理机制 | 无状态容器，每个 PR 独立会话目录 | 会话不能跨 PR 复用，否则上下文互相污染 |
-| 金融内网代码问答，每一次工具调用都要留痕 | 工具系统实现、扩展机制 | 自建工具网关 + 审计日志 | 工具参数要落盘，权限校验放服务端而不是模型侧 |
-| 编辑器内结对编程插件，用户在编辑区直接看 diff | 状态管理机制、关键设计模式 | 编辑器扩展 + 事件流 | UI 状态与 agent 状态分开存，避免回放错乱 |
-| 内存 2GB 的开发容器里跑 agent | 项目结构分析、扩展机制 | 按需加载工具模块，重活放远端执行 | 裁剪模块后要回归核心路径的测试用例 |
+??? question "2. 工具注册表用 Map 而不是普通对象，好处是什么？"
+    - 普通对象的键会受原型链影响，某些名字会拿到不是自己注册的值。
+    - Map 的键类型不受字符串限制，取值由类型系统约束。
+    - 频繁增删场景下 Map 的表现更稳定。
+    - 遍历顺序是插入顺序，调试时输出可预期。
 
-### 三个场景拆解
+??? question "3. 工具执行结果为什么要带调用 id？"
+    - 模型靠 id 把请求与结果对应起来，缺 id 时它会认为工具未被调用。
+    - 并发执行时结果返回顺序可能与请求顺序不同，id 是唯一可靠的对应依据。
+    - 回填消息里 id 必须与请求一致，写错会出现内容与调用错配。
+    - 日志与追踪也依赖 id 把一次调用串起来。
 
-#### 场景 1：终端里的单仓库改码助手
+??? question "4. 权限的累计拒绝为什么第 4 次才生效？"
+    - 代码先读取旧计数，再用旧计数做判断，最后才写回新值。
+    - 判断条件是旧计数大于等于 3，第 3 次调用时旧计数是 2，不满足。
+    - 第 4 次调用时旧计数是 3，条件成立，写入永久拒绝。
+    - 这类差一错误要靠边界断言固定，不能只靠阅读。
 
-**业务背景**：用户在终端发起一条改码任务，希望 agent 自己找文件、改文件、跑测试。仓库规模可用 `git ls-files | wc -l` 量出，从几十个文件到几千个文件都有人用这种方式。
+??? question "5. 不可变更新解决了什么问题？"
+    - 直接改原对象时，引用没变，依赖引用比较的渲染层不会察觉变化。
+    - 生成新对象后引用改变，订阅者能判断出哪一部分需要刷新。
+    - 未改动的部分复用原引用，可以跳过无关子树的更新。
+    - 代价是每次都要复制一层，深层结构需要结构共享来控制开销。
 
-**怎么用本页知识解决**：思路是把"模型决策"和"工具执行"拆成两个边界清晰的环节，循环只负责转发消息，权限校验独立成函数，这样任意一环出问题都能单独替换。
+??? question "6. 插件的装载为什么先执行初始化再登记？"
+    - 初始化可能读配置或建立连接，失败时应保持注册表干净。
+    - 先登记再初始化会留下半可用状态，后续调用会拿到没准备好的对象。
+    - 卸载反过来，先清理再摘除，让清理过程还能查到自身。
+    - 卸载时若清理抛错，条目会残留，调用方需要决定重试还是忽略。
 
-```ts
-// 伪代码：请求处理循环，工具调用轮数到上限就停
-const MAX_ROUNDS = 8;                       // 硬上限，防住工具调用失控
-let messages = [{ role: "user", content: task }];
+??? question "7. 输入声明为 unknown 而不是 any，价值在哪？"
+    - any 会让类型检查失效，误用字段不会在编译期报错。
+    - unknown 强制实现方先做收窄，把外部输入当成不可信数据。
+    - 收窄失败会被编译器指出，问题在开发阶段暴露。
+    - 代价是需要多写几行校验代码，这部分开销属于必要成本。
 
-for (let round = 0; round < MAX_ROUNDS; round++) {
-  const res = await model.stream({ messages, tools });  // 流式返回，边到边显示
-  const calls = collectToolCalls(res);      // 收集本轮模型想调用的工具
-  if (calls.length === 0) break;            // 没有工具调用，说明模型给了结论
-  for (const call of calls) {
-    if (!allow(call.name, call.args)) {     // 权限校验：目录白名单 + 只读/可写分级
-      messages.push(denyResult(call));      // 拒绝也要回灌，让模型换方案而不是卡死
-      continue;
-    }
-    messages.push(await run(call));         // 执行工具，结果作为下一条消息
-  }
-}
-```
+??? question "8. 三种运行模式共用一个循环，好处和风险各是什么？"
+    - 好处是行为一致，修一个缺陷三种接入方式同时受益。
+    - 好处还在于测试只需覆盖一套循环逻辑。
+    - 风险是接入方式差异被塞进循环内部，条件分支会逐渐增多。
+    - 应对办法是把接入差异收敛到上下文对象，循环只读不改结构。
 
-- `MAX_ROUNDS` 是成本闸门，取值按"典型任务需要几轮"定，先用 8 轮跑一批任务再调。
-- `allow()` 把权限做成纯函数，输入是工具名和参数，输出是布尔值，方便单测覆盖。
-- 拒绝路径必须回灌结果，否则模型会重复发起同一次调用，把轮数耗光。
-- `run()` 的返回值要带截断，工具输出超过阈值时只回传头部和尾部。
+## 延伸阅读
 
-**怎么度量收益**：看三个指标——单任务工具调用轮数、超限退出率、补丁被采纳率。测量方法是在循环里把轮数打到 stdout，用 `jq` 汇总；或按 OpenTelemetry 的 span 结构上报，接进现有 APM。
-
-**什么时候不该用**：任务要跨 20 个以上文件做重构时，8 轮上限会把任务截在半路，应改成按阶段拆成多次人工确认。生产环境的机器上不要开可写工具，只留只读工具做诊断。
-
-#### 场景 2：长会话的日志排障助手
-
-**业务背景**：一次排障对话会持续几十轮，中间夹杂大量日志片段和命令输出。上下文体量增长的速度由每轮注入的字符数量决定，可用 `wc -c` 记录每轮追加的字节数来估。
-
-**怎么用本页知识解决**：思路是把会话状态当成一个受预算约束的列表，每轮结束做一次裁剪，系统提示固定保留，最新的对话优先保留，被挤掉的部分压成一条摘要。
-
-```ts
-// 伪代码：每轮之后按 token 预算裁剪会话状态
-type Turn = { role: string; content: string; tokens: number };
-
-function compact(turns: Turn[], budget: number): Turn[] {
-  const pinned = turns.filter(t => t.role === "system");  // 系统提示永远保留
-  const rest = turns.filter(t => t.role !== "system");
-  let used = sumTokens(pinned);
-  const kept: Turn[] = [];
-  for (let i = rest.length - 1; i >= 0; i--) {            // 从最新往回留
-    if (used + rest[i].tokens > budget) break;
-    kept.unshift(rest[i]);
-    used += rest[i].tokens;
-  }
-  const dropped = rest.slice(0, rest.length - kept.length);
-  if (dropped.length > 0) kept.unshift(summarize(dropped));  // 挤掉的部分压成摘要
-  return [...pinned, ...kept];
-}
-```
-
-- `pinned` 与 `rest` 分开处理，避免裁剪把系统提示挤掉导致行为不稳定。
-- 裁剪方向从最新往回，符合排障场景"最近输出最相关"的分布。
-- `summarize()` 本身要花一次模型调用，所以只在真正发生丢弃时才触发。
-- `tokens` 在写入时就算好并缓存，不要每次裁剪重算整段。
-
-**怎么度量收益**：看上下文 token 占用峰值、摘要触发次数、以及答案需要引用早期信息时的错误率。前两项在本地打点统计，第三项靠固定题集回归：准备 20 条需要回溯早期日志的问题，每次改动后跑一遍看通过数。
-
-**什么时候不该用**：合规场景要求逐字引用原始日志时不要启用摘要，压缩后的文本无法作为证据。会话长度还没到预算时也不要开，白花一次摘要调用。
-
-#### 场景 3：企业内网代码检索接入 agent
-
-**业务背景**：团队希望 agent 能查私有仓库，但不允许它直接读写文件系统。仓库分多个权限域，可用 `git ls-files | wc -l` 按域分别量出规模。
-
-**怎么用本页知识解决**：思路是把检索能力做成独立进程，通过扩展机制暴露给 agent，工具 schema、鉴权、脱敏都在这个进程里完成。
-
-```ts
-// 伪代码：MCP server 暴露一个只读检索工具
-server.tool({
-  name: "search_code",                   // 工具名，模型据此决定何时调用
-  description: "在指定私有仓库中按关键词检索代码片段，只读",  // 描述写清边界，影响调用准确率
-  inputSchema: {                         // 入参 schema，模型按此生成参数
-    type: "object",
-    properties: { q: { type: "string" }, repo: { type: "string" } },
-    required: ["q"],
-  },
-  handler: async ({ q, repo }) => {      // 鉴权放服务端，不能靠模型自律
-    const hits = await index.search(q, { repo, limit: 10 });
-    return hits.map(redact);             // 返回前脱敏，密钥与个人信息不进上下文
-  },
-});
-```
-
-- 工具描述里写明"只读"，能减少模型发起写入类调用的次数。
-- `inputSchema` 用 `required` 收窄必填项，参数缺字段的失败会明显下降。
-- `redact()` 放在 handler 内部，保证任何调用方拿到的都是脱敏结果。
-- `limit` 固定上限，避免一次检索把大量代码片段灌进上下文。
-
-**怎么度量收益**：看调用成功率、参数校验失败率、检索命中被采纳进最终回答的比例。前两项由 server 记录日志统计，第三项靠人工标注固定的一批问题。
-
-**什么时候不该用**：需要改代码时不要用只读检索 server，能力边界对不上。检索 P99 延迟超过 5 秒时不要放进同步工具循环，改成异步任务加轮询。
-
-### 行业先进实践
-
-Model Context Protocol 规范（出处：MCP 官方文档）。做法是用 JSON-RPC 统一暴露工具、资源与提示模板，客户端一次接入即可复用多个 server。有效的原因是工具契约与传输解耦，鉴权留在 server 侧。借鉴方式是把内部检索、构建、发布能力各写成一个独立 server，agent 只持有工具名列表。
-
-Building effective agents（出处：Anthropic 官方工程博客同名文章）。做法是先判断任务能否用固定工作流解决，只有需要动态决策时才引入自主循环。有效的原因是固定流程的失败模式可枚举，成本上限可预算。借鉴方式是把本文场景 1 的循环留给探索型任务，把格式化、跑测试做成工作流节点。
-
-LangGraph 的持久化与 checkpointer（出处：LangGraph 官方文档 Persistence 相关章节）。做法是在每个节点执行后保存状态快照，支持中断后从中断点恢复。有效的原因是长任务不必一次跑完，失败重试的代价被压到单节点。借鉴方式是把会话状态落盘为 JSON，重启后从最近快照续跑。
-
-OpenTelemetry 的生成式 AI 语义约定（出处：OpenTelemetry 官方文档 Semantic Conventions）。需核对官方文档：span 命名规则、属性键名、以及当前处于哪个稳定性等级。借鉴方式是先按自己的字段名打点，等约定稳定后再做字段映射，避免过早绑定。
-
-Aider 的 git 集成（出处：Aider 开源项目文档）。做法是每次改动后自动生成一次提交，改动历史与代码历史对齐。有效的原因是回退粒度细，审阅时能逐个提交看。借鉴方式是在 agent 执行写操作前先建分支或 stash，工具失败时用 `git checkout` 回到干净状态。
-
-### 从学到用：落地路线
-
-第 1 步：试点。选一个仓库、一个只读场景（例如代码检索问答），把工具循环上限设为 8 轮。验收标准：连续跑 30 个真实问题，全部能在 8 轮内返回结果，且没有一次触发权限拒绝之外的异常退出。
-
-第 2 步：验证。对同一批问题分别用"无工具"和"带工具"两种配置跑一遍，记录工具轮数、token 占用、回答被采纳数。验收标准：指标有落盘记录，能画出两次运行的对照结果。
-
-第 3 步：推广。把工具 schema、权限函数、会话裁剪抽成独立包，接入第二个场景。验收标准：新场景只添加配置不改动循环代码，且第 2 步的回归题集全部通过。
-
-第 4 步：防回退。把回归题集接进 CI，每次改动工具或提示词都跑一遍。验收标准：通过数下降时 CI 失败并给出是哪几条题集退化。
-
-### 动手作业
-
-**目标**：做一个只读的代码问答 agent，具备工具循环上限、权限校验和会话裁剪，并能输出度量数据。
-
-**步骤**：
-
-1. 选一个本地仓库，用 `git ls-files | wc -l` 记录文件数，作为后续回归的固定输入。
-2. 定义两个工具：一个按关键词检索文件内容，一个按路径读取指定行范围，两者都只读。
-3. 写出 `allow(name, args)` 权限函数，规则是路径必须在仓库根目录内，越界一律拒绝。
-4. 按场景 1 的伪代码实现请求循环，把 `MAX_ROUNDS` 设为 8，把每轮的轮数、工具名、耗时打到日志。
-5. 按场景 2 的伪代码实现 `compact()`，预算先设成一个固定值，记录摘要触发次数。
-6. 准备 20 个问题，跑两遍：一遍带工具，一遍不带工具，把日志存成两份文件。
-7. 写一个统计脚本，从日志里算出平均轮数、超限次数、token 峰值。
-
-**验收标准**：
-
-1. 20 个问题全部有返回结果，没有进程崩溃或死循环。
-2. 越界路径的调用被拒绝，且拒绝记录能在日志里查到对应的工具名和参数。
-3. 摘要触发次数与 token 峰值出现在统计脚本的输出里，数值可复现。
-4. 带工具与不带工具两份日志的对照结果能说明工具是否带来帮助。
-5. `MAX_ROUNDS` 从 8 改成 3 后重跑，能观察到超限退出次数上升，说明上限确实在起作用。
-
+- Anthropic 官方文档《Claude Code overview》的产品能力与接入方式章节。
+- Anthropic 官方文档《Claude Code》的 CLI 使用与配置章节。
+- MCP 官方规范站点 modelcontextprotocol.io 的工具发现与调用章节。
+- Node.js 官方文档《Modules: ECMAScript modules》的动态 import 章节。
+- Node.js 官方文档《File system》的 fs/promises 章节。
+- TypeScript 官方手册《Classes》与《Narrowing》章节。
+- React 官方文档《useSyncExternalStore》与《Managing State》章节。
+- 本页所有目录规模与文件数量数字来自本站该页旧版内容，以原文为准；未在本页出现的版本号与配置项需核对官方文档。

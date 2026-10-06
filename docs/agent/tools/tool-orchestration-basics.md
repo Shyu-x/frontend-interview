@@ -1,1269 +1,1936 @@
 ---
-title: 工具编排：并行与串行
-description: 工具编排的设计哲学，以及并行执行与串行执行两种基础模式。
-tags:
-  - ai-agent
-  - tools
-date: 2026-05-17
+title: "工具编排：并行与串行"
+description: "工具编排的设计哲学，以及并行执行与串行执行两种基础模式。"
 ---
 
 # 工具编排：并行与串行
 
-> 本文是「工具编排」系列第 1 篇（共 3 篇）。下一篇：[工具编排：混合与选择策略](tool-orchestration-hybrid.md)
+!!! abstract "学完这一页你能"
+    - 说清一次工具调用和一条工具链的差别，并写出编排器的规划、调度、执行三段职责。
+    - 把一组带依赖的工具画成有向无环图，用深度优先搜索检出环，用拓扑分层求出可并行分组。
+    - 用 Promise.all、Promise.allSettled、并发上限写出手动可测的并行执行器，并为失败配上重试、退避与降级值。
+    - 写出带上下文、条件步骤、状态回退、结果缓存的串行流水线，每段代码都能在 Node 20+ 里跑出断言结果。
 
-> 深度解析 AI Agent 工具编排的设计哲学与工程实践
-
-## 1. 工具编排概述
-
-### 1.1 为什么需要编排
-
-在 AI Agent 系统中，单一工具往往无法完成复杂任务。编排（Orchestration）解决的核心问题是**如何协调多个工具有序、有效地完成目标**。
-
-```mermaid
-flowchart LR
-    subgraph Input["输入"]
-        task["任务"]
-    end
-    
-    subgraph Orchestrator["编排器"]
-        decision["决策引擎"]
-        planner["规划器"]
-        executor["执行器"]
-    end
-    
-    subgraph Tools["工具"]
-        T1["工具 A"]
-        T2["工具 B"]
-        T3["工具 C"]
-    end
-    
-    subgraph Output["输出"]
-        result["结果"]
-    end
-    
-    task --> Orchestrator
-    Orchestrator --> decision
-    decision --> planner
-    planner --> executor
-    executor --> T1
-    executor --> T2
-    executor --> T3
-    T1 --> result
-    T2 --> result
-    T3 --> result
-```
-
-**核心挑战**：
-
-| 挑战 | 描述 | 影响 |
-|------|------|------|
-| 依赖管理 | 工具 A 的输出是工具 B 的输入 | 执行顺序必须正确 |
-| 并行优化 | 独立任务应并行执行 | 减少总执行时间 |
-| 错误处理 | 单点失败可能导致整体失败 | 需要容错机制 |
-| 状态同步 | 跨工具共享中间状态 | 避免数据不一致 |
-
-### 1.2 编排 vs 执行
-
-| 维度 | 直接执行 | 编排模式 |
-|------|----------|----------|
-| **粒度** | 单工具调用 | 多工具协调 |
-| **决策点** | 固定流程 | 动态决策 |
-| **错误恢复** | 简单重试 | 多级回退 |
-| **可观测性** | 黑盒 | 白盒追踪 |
-| **适用场景** | 简单任务 | 复杂工作流 |
-
-```python
-# 直接执行模式
-result = tool_a()
-result = tool_b(result)  # 硬编码依赖
-
-# 编排模式
-class Orchestrator:
-    def __init__(self):
-        self.executor = ParallelExecutor()
-        self.strategy = CostAwareStrategy()
-
-    def execute(self, task):
-        dag = self.build_dag(task)
-        return self.executor.run(dag)
-```
-
-### 1.3 编排目标
+## 0. 知识地图
 
 ```mermaid
 flowchart TB
-    subgraph Goals["编排目标"]
-        direction["方向控制"]
-        efficiency["效率优化"]
-        reliability["可靠性保证"]
-        observability["可观测性"]
-    end
-    
-    subgraph Process["处理流程"]
-        parse["任务解析"]
-        plan["执行计划"]
-        execute["协调执行"]
-        monitor["状态监控"]
-    end
-    
-    subgraph Metrics["关键指标"]
-        time["执行时间"]
-        cost["资源消耗"]
-        quality["结果质量"]
-    end
-    
-    parse --> plan
-    plan --> execute
-    execute --> monitor
-    Goals --> Process
-    Process --> Metrics
+    root["工具编排：并行与串行"]
+    s1["1 概述：为什么需要编排"]
+    s2["2 依赖分析：DAG 与拓扑分层"]
+    s3["3 并行执行：分组与并发上限"]
+    s4["4 结果聚合与错误处理"]
+    s5["5 串行执行：流水线"]
+    s6["6 状态传递与中间结果缓存"]
+    s7["7 并行还是串行：选择策略"]
+    root --> s1
+    s1 --> s2
+    s2 --> s3
+    s2 --> s5
+    s3 --> s4
+    s4 --> s7
+    s5 --> s6
+    s6 --> s7
 ```
 
-## 2. 并行执行
-
-### 2.1 依赖分析
-
-依赖分析是并行执行的基础。通过构建有向无环图（DAG），可以确定哪些任务可以并行执行。
-
-```python
-from dataclasses import dataclass, field
-from typing import Dict, List, Set
-from enum import Enum
-
-# 第 1 段：依赖类型枚举（刻画"边"的语义）
-# 依赖并非只有"必须等"一种：条件依赖与可选依赖决定了调度器在什么情况下可以放行后继节点。
-# 这里先只建模类型，实际判定逻辑由调度层根据 dependency_type 决定；枚举值用字符串便于序列化/落库。
-class DependencyType(Enum):
-    """依赖类型"""
-    STRICT = "strict"          # 必须等待前一个完成
-    CONDITIONAL = "conditional" # 满足条件时依赖
-    OPTIONAL = "optional"      # 可选依赖
-
-# 第 2 段：工具节点数据模型（图的顶点）
-# 用 dataclass 是为了自动生成 __init__/__eq__ 等样板代码；可变默认值必须用 field(default_factory=...)。
-# 若直接写 depends_on: Set[str] = set() 会导致所有实例共享同一个集合（Python 经典陷阱），
-# 因此这里用 default_factory 保证每个节点拿到独立容器。
-@dataclass
-class ToolNode:
-    """工具节点"""
-    id: str
-    tool_name: str
-    inputs: Dict[str, any] = field(default_factory=dict)
-    depends_on: Set[str] = field(default_factory=set)
-    dependency_type: DependencyType = DependencyType.STRICT
-
-    # 判定"入边是否全部就绪"：depends_on 是前驱 id 的集合，只有当它被 completed 完全包含时才可执行。
-    # issubset 的语义天然满足"全部满足"，注意空集恒为 True，即无依赖节点随时可跑。
-    def can_execute(self, completed: Set[str]) -> bool:
-        """检查是否可以执行"""
-        return self.depends_on.issubset(completed)
-
-# 第 3 段：依赖图容器（管理顶点与边，并做合法性与并行度分析）
-# 采用邻接表（edges 列表 + 节点内 depends_on 集合）而非矩阵：工具图通常稀疏，稀疏表示省内存。
-# 注意 edges 与 depends_on 是同一事实的两份存储，必须同步维护，add_edge 是唯一的写入点。
-class DependencyGraph:
-    """依赖图构建与验证"""
-
-    # 初始化两张表：nodes 以 id 为键支持 O(1) 查顶点；edges 保存有向边 (前驱, 后继)。
-    # edges 用 list 而非 set，是为了保留插入顺序，方便复现循环路径与调试。
-    def __init__(self):
-        self.nodes: Dict[str, ToolNode] = {}
-        self.edges: List[tuple[str, str]] = []
-
-    # 重复添加同名 id 会静默覆盖旧节点：这是"后写胜出"策略，调用方需自行避免误覆盖。
-    def add_node(self, node: ToolNode):
-        self.nodes[node.id] = node
-
-    # 加边即同时更新两侧视图：edges 记结构，depends_on 记该节点的入边集合。
-    # 只在两端节点都已存在时才生效，避免悬空引用；这也意味着必须先 add_node 再 add_edge。
-    def add_edge(self, from_id: str, to_id: str):
-        """添加依赖边: from_id → to_id (to_id 依赖 from_id)"""
-        if from_id in self.nodes and to_id in self.nodes:
-            self.edges.append((from_id, to_id))
-            self.nodes[to_id].depends_on.add(from_id)
-
-    # 第 4 段：循环依赖检测（DFS 三色标记法）
-    # visited 记录"已彻底探索完"的节点，rec_stack 记录"当前递归路径上"的节点。
-    # 若在递归路径上再次遇到某节点，说明回到了自身所在路径，即存在环。
-    # 用 path.copy() 传递而非回溯修改，是为了让每个分支拿到独立快照，便于精确定位环的起点；
-    # 代价是每层复制 O(路径长度)，整体为 O(V*(V+E)) 级别的空间放大（此处以可读性优先）。
-    def detect_cycles(self) -> List[List[str]]:
-        """检测循环依赖"""
-        visited = set()
-        rec_stack = set()
-        cycles = []
-
-        def dfs(node_id: str, path: List[str]):
-            visited.add(node_id)
-            rec_stack.add(node_id)
-            path.append(node_id)
-
-            # 遍历所有出边寻找后继；此处用线性扫描 edges，故单次 DFS 的邻居查找是 O(E)。
-            for edge in self.edges:
-                if edge[0] == node_id:
-                    next_id = edge[1]
-                    if next_id not in visited:
-                        dfs(next_id, path.copy())
-                    elif next_id in rec_stack:
-                        # 发现循环
-                        # path.index 找到环的入口，切片即得到该环的节点序列（不含重复的闭合点）。
-                        cycle_start = path.index(next_id)
-                        cycles.append(path[cycle_start:])
-
-            # 出栈：离开当前节点时把它从递归路径上移除，否则会误报成环。
-            rec_stack.remove(node_id)
-
-        # 外层遍历保证非连通图（多个弱连通分量）也能被完整覆盖。
-        for node_id in self.nodes:
-            if node_id not in visited:
-                dfs(node_id, [])
-
-        return cycles
-
-    # 第 5 段：拓扑分层求并行组（Kahn 算法变体）
-    # 入度为 0 的节点表示"所有前驱都已完成"，它们彼此无依赖，可同一批并行执行；
-    # 每批完成后把它们的出边删掉（等价于后继入度减 1），下一轮再取新的零入度集合。
-    # 复杂度 O(V*E)：外层每轮至少消化一个节点，内层对当前组每个节点扫描全部边；
-    # 若需更优可用邻接表把内层降为 O(出度)。
-    def get_parallel_groups(self) -> List[List[str]]:
-        """
-        获取可并行执行的节点组
-        使用拓扑排序的思想
-        """
-        # 先统计每个节点的入度；in_degree 的键集合即图的所有顶点。
-        in_degree = {n: 0 for n in self.nodes}
-        for from_id, to_id in self.edges:
-            in_degree[to_id] += 1
-
-        groups = []
-        completed = set()
-
-        # 循环不变量：completed 严格递增，因此最多迭代 V 轮；一旦某轮取不到零入度节点，
-        # 说明剩余节点仍互相牵制，即存在环——此时无法给出拓扑序，直接抛错。
-        while len(completed) < len(self.nodes):
-            # 找出所有入度为0的节点
-            # 同时排除已完成的节点：入度归零的节点可能已在前一轮被消费。
-            current_group = [
-                node_id for node_id, deg in in_degree.items()
-                if deg == 0 and node_id not in completed
-            ]
-
-            if not current_group:
-                raise ValueError("Circular dependency detected")
-
-            groups.append(current_group)
-            completed.update(current_group)
-
-            # 更新入度（模拟"删除"这一层节点）：把 current_group 的所有出边对应的后继入度减 1。
-            # 注意入度只减不删边，rely 后续轮次可能重复扫描同一条边（这是 O(V*E) 的来源）。
-            for group_id in current_group:
-                for from_id, to_id in self.edges:
-                    if from_id == group_id:
-                        in_degree[to_id] -= 1
-
-        return groups
-```
-### 2.2 任务分组
-
-基于依赖分析结果，将任务分组以实现最优并行度。
-
-```python
-# 第 1 段：模块导入（为后续“并行执行”预留的三套并发原语）
-# 注意：本文件里这三个 import 目前都未被实际调用——分组器只负责“排程”，
-# 真正的执行由外层调度器消费分组结果后完成：ThreadPoolExecutor/Future 用于阻塞型工具，
-# asyncio 用于协程型工具。保留它们是为了让调度层与本模块共用同一套类型语言。
-from typing import List, Dict, Any, Callable
-from concurrent.futures import ThreadPoolExecutor, Future
-import asyncio
-
-# 第 2 段：声明分组器类型（全是无状态静态方法，可安全并发调用）
-# 全部用 @staticmethod 的意图：分组是 tools -> groups 的纯函数，不持有实例状态，
-# 因此多线程/多进程下无需加锁，也不会出现“上一次分组污染下一次”的问题。
-# 契约边界：本类不校验 tools 的 id 是否唯一、depends_on 是否成环、亲和表是否自洽，
-# 这些前置约束由调用方或 DependencyGraph 内部承担。
-class TaskGrouper:
-    """任务分组器"""
-
-    # 第 3 段：按依赖关系分组——拓扑分层，得到“同层可并行”的批
-    # 原理：把依赖看成有向无环图（DAG），同层节点互不依赖可并行，层间必须串行，
-    # 前一层全部完成才能进入下一层。这是三种分组里唯一带有“正确性硬约束”的一种，
-    # 其余两种只影响性能。复杂度：建图 O(V+E)，分层取决于 graph 实现（Kahn 典型为 O(V+E)）。
-    @staticmethod
-    def group_by_dependency(tools: List[ToolNode]) -> List[List[ToolNode]]:
-        """按依赖关系分组"""
-        # 构建依赖图
-        # 必须先把所有工具登记为节点，包括零依赖的孤立节点，
-        # 否则它们既不会出现在 edges 里、也不会出现在分组结果中，等于被静默丢弃。
-        graph = DependencyGraph()
-        for tool in tools:
-            graph.add_node(tool)
-
-        # 添加边
-        # 边的方向是 dep_id -> tool.id，即“被依赖者指向依赖者”，
-        # 这样拓扑排序出的层序天然满足“先做前置、后做本节点”。
-        # 易错点 1：enumerate 给出的 i 在循环体内从未被使用，属历史残留，不要误以为它参与排序。
-        # 易错点 2：dep_id 必须能在 tools 中找到，否则图中会产生悬空引用，
-        # 后面把 id 映射回 ToolNode 时就会失配（见下方 ValueError）。
-        for i, tool in enumerate(tools):
-            for dep_id in tool.depends_on:
-                graph.add_edge(dep_id, tool.id)
-
-        # 获取分组
-        # graph 返回的是“id 的二维列表”（组间有序、组内无序），
-        # 因函数签名要求 List[List[ToolNode]]，这里需要把 id 反向映射回对象。
-        # 关键数据流：gid -> 线性扫描 tools 找到首个 id 匹配者 -> 取出 ToolNode。
-        # 性能陷阱：内层 [t.id for t in tools] 每取一个 gid 就重建一次 id 列表，
-        # 整体退化为 O(N^2)（N 为工具数）；工具规模大时应预先构建 {id: tool} 字典。
-        # 边界行为：一旦某个 gid 不在 tools 中，.index() 直接抛 ValueError，属于快速失败而非静默丢组。
-        group_ids = graph.get_parallel_groups()
-        groups = [[tools[[t.id for t in tools].index(gid)] for gid in group]
-                  for group in group_ids]
-        return groups
-
-    # 第 4 段：按资源需求分组——贪心装箱，保证“同组内资源总占用不超上限”
-    # 与第 3 段相比，这里不追求最优分组（装箱是 NP-hard），只求可行性：
-    # 采用首次适应（First-Fit）在线策略，按 tools 的给定顺序逐个尝试塞入当前组，
-    # 塞不下就封箱、另起一组。复杂度 O(N * R)，R 为资源种类数，代价极低。
-    # 输入契约：tool.inputs 可能不含 'resources' 键，故用 .get('resources', {}) 兜底为空需求。
-    @staticmethod
-    def group_by_resource(tools: List[ToolNode], resource_limits: Dict[str, int]):
-        """
-        按资源需求分组
-        避免同时使用同一资源的工具
-        """
-        # resource_usage 是“尚未封箱的那一组”的累计占用量；
-        # 它随加入而增长、随封箱而清零，因此任何时刻都只代表当前组的占用。
-        resource_usage = {res: 0 for res in resource_limits}
-        groups = []
-        current_group = []
-
-        for tool in tools:
-            resources = tool.inputs.get('resources', {})
-
-            # 检查阶段：只读地试探能否放下，不修改任何状态；
-            # 只有全部资源都通过才进入提交阶段，避免“部分资源已扣减”的脏中间态。
-            can_add = True
-            for res, amount in resources.items():
-                # resource_usage.get(res, 0) 对未登记过的资源兜底为 0；
-                # 但下一行的 resource_limits[res] 没有兜底——请求了 limits 中未声明的资源会直接 KeyError。
-                # 这是有意的边界约定：资源清单必须显式覆盖全部需求，宁可报错也不默默忽略。
-                if resource_usage.get(res, 0) + amount > resource_limits[res]:
-                    can_add = False
-                    break
-
-            if can_add:
-                current_group.append(tool)
-                for res, amount in resources.items():
-                    resource_usage[res] += amount
-            else:
-                groups.append(current_group)
-                current_group = [tool]
-                # 重置资源
-                # 关键数据流：current_group 已切换为 [tool]，usage 表被整体清零；
-                # ⚠ 易错点（原实现缺陷）：清零后并未把“新组第一个工具 tool”自身的资源需求补记进去，
-                # 于是新组的初始占用被低估为 0，后续判断会偏乐观，可能放进本不该放的工具。
-                # 若要修正需在此处再遍历一次 resources 累加（当前注释不改代码，仅标注风险）。
-                for res in resource_usage:
-                    resource_usage[res] = 0
-
-        # 收尾：循环退出时最后一组还没封箱，必须补进结果，否则整组丢失；
-        # 若 tools 为空，则 current_group 为空，不会产生多余的空组。
-        if current_group:
-            groups.append(current_group)
-
-        return groups
-
-    # 第 5 段：按亲和性分组——把“经常一起使用”的工具黏成同一组
-    # 这是三种分组里唯一面向性能/缓存局部性的启发式：亲和工具同组可共享预热、连接或中间产物。
-    # 算法是单向贪心扫描：按 tools 顺序遇到未分配的工具，就把它与其“尚未被占用”的亲和伙伴合并。
-    # 复杂度：外层 O(N)，但内层每次用 [t.id for t in tools].index(sim_id) 线性查找，
-    # 最坏 O(N * K)（K 为亲和条目总数），且重复构造 id 列表，规模大时同样建议预建索引。
-    # 边界与易错点：
-    #   1) affinity_map 引用了 tools 中不存在的 id 时，.index() 抛 ValueError；
-    #   2) 若 sim_id 恰等于 tool.id（自环），此时该 id 尚未写入 assigned，会被重复追加进同一组；
-    #   3) 亲和关系未见对称性保证：只有 A->B 而没有 B->A 时，按顺序扫描可能漏合并，
-    #      调用方应保证亲和表双向一致。
-    @staticmethod
-    def group_by_affinity(tools: List[ToolNode], affinity_map: Dict[str, List[str]]):
-        """
-        按亲和性分组
-        将经常一起使用的工具放在同一组
-        """
-        groups = []
-        # assigned 保证组间互斥：同一工具只能出现在一个组里，否则会被重复执行。
-        assigned = set()
-
-        for tool in tools:
-            if tool.id in assigned:
-                continue
-
-            # 检查亲和性
-            group = [tool]
-            similar = affinity_map.get(tool.id, [])
-
-            for sim_id in similar:
-                # 已被别组占用的伙伴直接跳过，不做“抢人”操作，保证已定分组不被回头破坏。
-                if sim_id not in assigned:
-                    group.append(tools[[t.id for t in tools].index(sim_id)])
-                    assigned.add(sim_id)
-
-            groups.append(group)
-            assigned.add(tool.id)
-
-        return groups
-```
-### 2.3 结果聚合
-
-并行执行后，需要将各任务结果聚合。
-
-```python
-# 第 1 段：依赖导入与聚合策略枚举（定义外部依赖和策略取值域）
-# typing 的 Any/Dict/Optional 只用于类型标注，运行时不产生开销；注意下面代码用到了 List，
-# 但此处并未从 typing 导入 List——在启用注解求值（如未加 from __future__ import annotations）的
-# Python 版本中，这会直接抛 NameError，是典型的复制粘贴遗漏点。
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
-from enum import Enum
-
-# 第 2 段：用 Enum 固化策略集合（把"魔法字符串"收敛为可枚举的合法取值）
-# 用 Enum 而非裸字符串，是为了让 IDE/类型检查能在编译期发现拼写错误；
-# 其成员值 "sequential" 等是稳定的序列化契约，改名会破坏外部持久化数据。
-class AggregationStrategy(Enum):
-    SEQUENTIAL = "sequential"      # 按顺序聚合
-    MERGE = "merge"                # 合并结果
-    REDUCE = "reduce"              # 归约操作
-    CONDITIONAL = "conditional"    # 条件聚合
-
-# 第 3 段：执行结果数据载体（统一各工具的返回契约）
-# 用 @dataclass 自动生成 __init__/__repr__/__eq__，避免手写样板；
-# error 与 execution_time 带默认值，因此它们之后不能再出现无默认值的字段（否则 TypeError）。
-# 注意：dataclass 默认 eq=True 但 frozen=False，实例仍可被就地修改，聚合时需自行防御。
-@dataclass
-class ExecutionResult:
-    """执行结果"""
-    tool_id: str                   # 工具唯一标识，merge 模式下降级为字典键名
-    success: bool                  # 成败标志，几乎所有聚合分支的第一道过滤条件
-    data: Any                      # 载荷类型不定（dict/list/数值），是各分支 isinstance 分派的前提
-    error: Optional[str] = None    # 失败原因，仅在 success=False 时有意义
-    execution_time: float = 0.0    # 便于后续做耗时统计，默认 0 表示未采集
-
-# 第 4 段：聚合器主体与策略分派（策略模式的入口）
-# 把策略保存在实例属性上，便于运行时切换；aggregate 只负责"选路"，
-# 具体算法下沉到 _aggregate_* 私有方法，符合开闭原则：新增策略只需加分支和新方法。
-class ResultAggregator:
-    """结果聚合器"""
-
-    def __init__(self, strategy: AggregationStrategy = AggregationStrategy.MERGE):
-        self.strategy = strategy    # 默认 MERGE：最常见的"把多份结果拼成一份"场景
-
-    def aggregate(self, results: List[ExecutionResult]) -> Dict[str, Any]:
-        """聚合多个结果"""
-
-        # 用 == 比较 Enum 成员，保证与传入的枚举实例语义一致（不要用 is 比较跨定义的同值枚举）。
-        # 边界：四个分支覆盖了枚举全集，但若 self.strategy 被赋成非法值（如字符串），
-        # 函数会走到末尾隐式返回 None，调用方将拿到 None 而非 dict——这是本方法的隐患所在。
-        if self.strategy == AggregationStrategy.SEQUENTIAL:
-            return self._aggregate_sequential(results)
-        elif self.strategy == AggregationStrategy.MERGE:
-            return self._aggregate_merge(results)
-        elif self.strategy == AggregationStrategy.REDUCE:
-            return self._aggregate_reduce(results)
-        elif self.strategy == AggregationStrategy.CONDITIONAL:
-            return self._aggregate_conditional(results)
-
-    # 第 5 段：顺序聚合（强调"时序可追溯"，不做任何内容合并）
-    # 这里刻意保留原始顺序与每条成败，适合需要回放执行链路的场景；
-    # 复杂度 O(n)，一次列表推导即拿到全部条目，另外两次 sum/len 也是 O(n)，总计仍是线性。
-    def _aggregate_sequential(self, results: List[ExecutionResult]) -> Dict[str, Any]:
-        """顺序聚合：保留执行顺序"""
-        return {
-            # 失败条目的 data 可能是 None，这里不做过滤而是原样透出，让下游自行决定是否展示。
-            "sequence": [
-                {"tool_id": r.tool_id, "data": r.data, "success": r.success}
-                for r in results
-            ],
-            "total_count": len(results),                                    # 总条数，含失败项
-            "success_count": sum(1 for r in results if r.success)           # 失败项不贡献计数
-        }
-
-    # 第 6 段：合并聚合（按载荷类型做"多态"归并，是信息量最高的一支）
-    # 关键数据流：只处理 success=True 的结果，失败项被静默丢弃（不进入 merged，也不报错）；
-    # 三种载荷的处理策略不同——dict 直接 update（同名键后来者覆盖，存在数据丢失风险）、
-    # list 统一塞进 "items" 累积（因此工具原始列表不再保持分片边界）、
-    # 标量则以 tool_id 为键落库（tool_id 冲突同样会被覆盖）。
-    def _aggregate_merge(self, results: List[ExecutionResult]) -> Dict[str, Any]:
-        """合并聚合：合并所有结果"""
-        merged = {}
-        for r in results:
-            if r.success:                                   # 唯一的准入闸门：失败结果直接跳过
-                if isinstance(r.data, dict):
-                    merged.update(r.data)                   # 浅合并，嵌套 dict 只替换引用不递归合并
-                elif isinstance(r.data, list):
-                    if "items" not in merged:
-                        merged["items"] = []                # 懒初始化，避免为无列表结果凭空造出空 items
-                    merged["items"].extend(r.data)          # extend 原地追加，避免 O(n) 的反复重建
-                else:
-                    merged[r.tool_id] = r.data              # 标量/自定义对象以工具 ID 作键，天然抗冲突要求唯一
-
-        # 同时回传成功计数，方便调用方判断 merged 是否"缩水"（例如全失败时 merged 为空 dict）。
-        return {"data": merged, "success_count": sum(1 for r in results if r.success)}
-
-    # 第 7 段：归约聚合（把结果压成统计摘要，对空输入与非法类型都必须兜底）
-    # 先过滤出成功项；若一个都没有则提前返回 error 字典，避免后续 sum([])/len(0) 之类的除零与空值异常。
-    # 注意错误形态不一致：这里返回 {"error": ...}，而顺序/合并模式永远返回正常结构，调用方需按 key 探测。
-    def _aggregate_reduce(self, results: List[ExecutionResult]) -> Dict[str, Any]:
-        """归约聚合：执行归约函数"""
-        successful_results = [r for r in results if r.success]
-
-        if not successful_results:
-            return {"error": "No successful results"}       # 短路返回，阻断后续对空列表的统计
-
-        # 提取数值进行归约
-        # 只认"裸数值"和 dict 里的 'value' 字段；其他结构（如 list、嵌套 dict）被静默忽略，
-        # 因此 count 反映的是"被成功提取的数量"，可能小于 successful_results 的长度。
-        values = []
-        for r in successful_results:
-            if isinstance(r.data, (int, float)):
-                values.append(r.data)                       # bool 是 int 子类，True 会被当成 1 计入，属隐含边界
-            elif isinstance(r.data, dict) and 'value' in r.data:
-                values.append(r.data['value'])              # 未校验 value 本身是否为数值，混入字符串将在 sum 时抛 TypeError
-
-        return {
-            "sum": sum(values),                             # values 为空时 sum 返回 0，与下方 avg 的 0 保持一致性
-            "avg": sum(values) / len(values) if values else 0,  # 显式防空：len(values)==0 时才不会 ZeroDivisionError
-            "max": max(values) if values else None,         # 空集无最大值，用 None 而非抛异常表达"无数据"
-            "min": min(values) if values else None,
-            "count": len(values)                            # 校验口径：sum 与 avg*count 应能对得上
-        }
-
-    # 第 8 段：条件聚合（选主结果 + 附带补充信息，突出"优先级"语义）
-    # 用 next(generator, None) 做"取首个匹配"，是惰性短路查找：命中后立即停止遍历，最坏 O(n)、
-    # 最好 O(1)；比先过滤再取 [0] 更省一次中间列表分配。若全失败则返回 error，同样属于结构性返回。
-    def _aggregate_conditional(self, results: List[ExecutionResult]) -> Dict[str, Any]:
-        """条件聚合：根据条件选择结果"""
-        # 选择第一个成功的结果作为主结果
-        # 依赖 results 的传入顺序即优先级顺序——调用方若希望"重要工具优先"，必须自行排序。
-        primary = next((r for r in results if r.success), None)
-
-        if not primary:
-            return {"error": "No successful results"}
-
-        # 收集补充信息
-        # 以 tool_id 不等来排除主结果自身；隐含假设是 tool_id 唯一，
-        # 若两个不同实例共用同一 tool_id，真正的补充项会被误判为重复而丢掉。
-        supplements = [
-            {"tool_id": r.tool_id, "data": r.data}
-            for r in results
-            if r.success and r.tool_id != primary.tool_id
-        ]
-
-        return {
-            "primary": primary.data,                        # 主载荷保持原始形态，不做包装
-            "supplements": supplements,                     # 可能为空列表，表示"无补充"而非"无数据"
-            "total_count": len(results)                     # 统计口径是全部结果，含失败项
-        }
-```
-### 2.4 错误处理
-
-并行执行中的错误处理策略。
-
-```python
-from typing import Callable, Any, Optional
-import asyncio
-from dataclasses import dataclass
-
-# 第 1 段：依赖导入与"契约"铺垫（引入类型、并发与数据容器）
-# 本节只做导入，但导入内容已经暗示了三条主线：Callable/Any/Optional 用于给
-# 可调用工具与可空返回值建模，asyncio 负责异步路径，dataclass 负责把"策略"变成一个值对象。
-# 注意：下文还用到 Dict / List / ExecutionResult / ThreadPoolExecutor / time，
-# 本片段未给出它们的导入，属于真实工程中常见的"上下文隐含依赖"，也是运行前必查的易错点。
-
-# 第 2 段：ErrorPolicy —— 把"出错怎么办"配置化
-# 用 dataclass 而非普通类，是为了让策略成为可比较、可打印、可默认构造的纯数据；
-# 每个字段都给了默认值，因此调用方可以只覆盖自己关心的那一项（见 _safe_execute 中的
-# self.error_policies.get(tool_id, ErrorPolicy())，取不到就用全默认策略兜底）。
-# fallback_value 允许"失败但有降级结果"，这决定了调用方能否继续往下走而非中断整条流水线。
-@dataclass
-class ErrorPolicy:
-    """错误处理策略"""
-    max_retries: int = 3                      # 语义上是"总尝试次数"而非"重试次数"，命名易误解，见第 5 段
-    retry_delay: float = 1.0                  # 基础退避间隔（秒），指数模式下作为公比基数
-    exponential_backoff: bool = True          # 开关：线性等待 or 指数等待
-    fallback_value: Optional[Any] = None      # 重试耗尽后写入 ExecutionResult.data 的降级值
-
-# 第 3 段：ParallelExecutor 类骨架与初始化
-# 职责分离：这一层只负责"调度与结果汇总"，真正的重试与异常兜底下沉到 _safe_execute，
-# 这样同步/异步两条入口可以复用同一份容错逻辑，避免行为分叉。
-class ParallelExecutor:
-    """并行执行器"""
-
-    # __init__ 只保存"可调参数"和"每工具策略表"，不做任何线程或连接池的创建；
-    # 线程池是在 execute_parallel 内部按需创建的（见第 4 段），因此执行器本身可被反复复用。
-    # error_policies 的键类型标注为 str，而下文 execute_parallel 传入的是 enumerate 的 int，
-    # 这是一处真实的类型不一致：运行时字典照样能查，但静态检查会报警，教学时值得指出。
-    def __init__(self, max_workers: int = 4):
-        self.max_workers = max_workers
-        self.error_policies: Dict[str, ErrorPolicy] = {}
-
-    # 第 4 段：同步并行执行（线程池 + 顺序收集）
-    # 关键数据流：tools 与 inputs 用 zip 一一配对 -> 每个 (tool, input) 组合被编上
-    # 递增的 tool_id -> 提交到线程池得到 futures -> 再按提交顺序把结果 append 进 results。
-    # 因为收集时是遍历 futures（而非 as_completed），所以返回列表的下标与输入严格对齐，
-    # 但这也意味着"慢任务会阻塞后面已完成结果的读取"，吞吐被最慢任务拖住。
-    def execute_parallel(
-        self,
-        tools: List[Callable],
-        inputs: List[Any],
-        error_handling: str = "fail-fast"
-    ) -> List[ExecutionResult]:
-        """并行执行工具"""
-
-        results = []  # 必须按 futures 的顺序填充，才能与 tools/inputs 的下标保持一致
-
-        # with 语句保证即使中途抛异常，线程池也会被 shutdown(wait=True)，不会泄漏线程。
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # 列表推导一次性把所有任务投递出去，先"全量并发"再"逐个取结果"，是吞吐最大化的常见写法。
-            # 注意 zip 会在最短序列处截断：tools 比 inputs 长时多余的工具会被静默丢弃，是隐蔽的边界陷阱。
-            futures = [
-                executor.submit(self._safe_execute, tool, inp, tool_id)
-                for tool_id, (tool, inp) in enumerate(zip(tools, inputs))
-            ]
-
-            for future in futures:
-                try:
-                    result = future.result(timeout=30)  # 单任务 30 秒上限，超时抛 TimeoutError 落到下面的 except
-                    results.append(result)
-                except Exception as e:
-                    # fail-fast：把异常原样上抛，调用方需自行处理"已提交但未收集"的剩余任务（线程池退出时会等它们跑完）。
-                    if error_handling == "fail-fast":
-                        raise
-                    # 非 fail-fast 时用一条失败结果占位，保证 results 长度与输入对齐；
-                    # 但 tool_id 写死 "unknown"，丢失了与 inputs 的对应关系，是这里的信息损耗。
-                    results.append(ExecutionResult(
-                        tool_id="unknown",
-                        success=False,
-                        data=None,
-                        error=str(e)
-                    ))
-
-        return results
-
-    # 第 5 段：_safe_execute —— 单任务的重试与降级内核（同步/异步共用）
-    # 本方法设计为"永不向外抛异常"（除非 max_retries 逻辑被改坏），因此可以安全地在工作线程里跑；
-    # 它把成功、失败、降级三种结局统一收敛成 ExecutionResult，让上层无需区分异常类型。
-    def _safe_execute(
-        self,
-        tool: Callable,
-        input_data: Any,
-        tool_id: str
-    ) -> ExecutionResult:
-        """安全执行工具"""
-        # 未注册策略的工具直接使用全默认 ErrorPolicy，实现"零配置可用"。
-        policy = self.error_policies.get(tool_id, ErrorPolicy())
-
-        # 循环次数 = policy.max_retries，即"总尝试次数"；若 max_retries <= 0 则循环体一次都不进，直接走到末尾兜底返回。
-        for attempt in range(policy.max_retries):
-            try:
-                result = tool(input_data)  # 同步调用，可能长时间阻塞，这正是需要线程池/异步转线程的原因
-                return ExecutionResult(
-                    tool_id=tool_id,
-                    success=True,
-                    data=result
-                )
-            except Exception as e:
-                # 最后一次尝试失败：不再等待，直接返回携带 fallback 的失败结果。
-                if attempt == policy.max_retries - 1:
-                    return ExecutionResult(
-                        tool_id=tool_id,
-                        success=False,
-                        data=policy.fallback_value,
-                        error=str(e)
-                    )
-
-                # 指数退避：2**attempt 让等待 1x、2x、4x 递增，用于缓解下游限流或瞬时故障；
-                # 关闭开关则每次固定等 retry_delay。time.sleep 会占住当前工作线程，高并发下会放大线程占用。
-                # 指数退避
-                delay = policy.retry_delay * (2 ** attempt) if policy.exponential_backoff else policy.retry_delay
-                time.sleep(delay)
-
-        # 理论上仅当 max_retries <= 0 时可达；它保证了"方法一定有返回值"这一契约不被破坏。
-        return ExecutionResult(
-            tool_id=tool_id,
-            success=False,
-            data=policy.fallback_value,
-            error="Max retries exceeded"
-        )
-
-    # 第 6 段：异步并行执行 —— 用 to_thread 把阻塞逻辑卸载到线程池
-    # 之所以不把 _safe_execute 重写为 async，是因为工具本身是同步 Callable、且内部有 time.sleep 阻塞；
-    # 用 asyncio.to_thread 把它丢进默认线程池，既复用了第 5 段的容错内核，又不会卡住事件循环。
-    # 边界：to_thread 需要 Python 3.9+；并发上限由默认线程池决定，此处 max_workers 不生效。
-    async def execute_parallel_async(
-        self,
-        tools: List[Callable],
-        inputs: List[Any]
-    ) -> List[ExecutionResult]:
-        """异步并行执行"""
-
-        # 内层协程只做一件事：线程里跑同步内核，await 期间让出事件循环。
-        async def safe_execute_async(tool, input_data, tool_id):
-            return await asyncio.to_thread(self._safe_execute, tool, input_data, tool_id)
-
-        # 与同步版同样以 zip + enumerate 构造任务列表，保证顺序与输入对齐。
-        tasks = [
-            safe_execute_async(tool, inp, tool_id)
-            for tool_id, (tool, inp) in enumerate(zip(tools, inputs))
-        ]
-
-        # gather 默认按传入顺序返回结果（与完成先后无关），且默认不带 return_exceptions：
-        # 一旦某个任务真的抛出（_safe_execute 兜底失效时），异常会向上冒泡，其余任务不会取消。
-        return await asyncio.gather(*tasks)
-```
-## 3. 串行执行
-
-### 3.1 顺序依赖
-
-串行执行的核心是维护正确的顺序依赖。
-
-```python
-from typing import Any, Dict, List, Optional, Callable
-from dataclasses import dataclass, field
-
-@dataclass
-class Step:
-    """执行步骤"""
-    id: str
-    tool: Callable
-    input_transformer: Optional[Callable[[Dict], Dict]] = None
-    output_transformer: Optional[Callable[[Any], Any]] = None
-    condition: Optional[Callable[[Dict], bool]] = None
-
-@dataclass
-class PipelineContext:
-    """流水线上下文"""
-    results: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
-
-    def get_result(self, step_id: str) -> Optional[Any]:
-        return self.results.get(step_id)
-
-    def set_result(self, step_id: str, result: Any):
-        self.results[step_id] = result
-
-    def add_error(self, error: str):
-        self.errors.append(error)
-
-class SequentialPipeline:
-    """串行执行流水线"""
-
-    def __init__(self, steps: List[Step]):
-        self.steps = steps
-        self._validate_dependencies()
-
-    def _validate_dependencies(self):
-        """验证依赖关系"""
-        available_ids = set()
-
-        for step in self.steps:
-            # 如果步骤需要前置结果，检查是否可用
-            if step.input_transformer:
-                # 验证输入转换器可以访问所需数据
-                pass
-
-    def execute(self, initial_input: Dict[str, Any]) -> PipelineContext:
-        """执行流水线"""
-        context = PipelineContext()
-        context.set_result("initial", initial_input)
-
-        for step in self.steps:
-            # 检查条件
-            if step.condition and not step.condition(context.results):
-                context.metadata[f"{step.id}_skipped"] = True
-                continue
-
-            # 准备输入
-            if step.input_transformer:
-                input_data = step.input_transformer(context.results)
-            else:
-                input_data = context.results.get("initial", {})
-
-            # 执行
-            try:
-                result = step.tool(input_data)
-
-                # 转换输出
-                if step.output_transformer:
-                    result = step.output_transformer(result)
-
-                context.set_result(step.id, result)
-
-            except Exception as e:
-                context.add_error(f"{step.id}: {str(e)}")
-                context.metadata[f"{step.id}_failed"] = True
-
-        return context
-
-    def execute_with_retry(
-        self,
-        initial_input: Dict[str, Any],
-        max_retries: int = 3
-    ) -> PipelineContext:
-        """带重试的串行执行"""
-        for attempt in range(max_retries):
-            context = self.execute(initial_input)
-
-            if not context.errors:
-                return context
-
-            if attempt < max_retries - 1:
-                # 重试失败的步骤
-                self._retry_failed_steps(context, initial_input)
-
-        return context
-
-    def _retry_failed_steps(self, context: PipelineContext, initial_input: Dict[str, Any]):
-        """重试失败的步骤"""
-        for step in self.steps:
-            if context.metadata.get(f"{step.id}_failed"):
-                try:
-                    # 重置上下文中的该步骤结果
-                    # 重新执行
-                    pass
-                except Exception:
-                    pass
+建议按编号顺序读，第 2 节是分叉点：依赖图建好之后，第 3 节讲能同时跑的部分，第 5 节讲必须排队的部分。
+
+如果你时间只够读两节，读第 2 节和第 7 节，它们决定了另外五节里所有 API 的取舍。
+
+第 6 节的状态与缓存可以跳读，等你真的遇到多轮对话或重复调用时再回头补。
+
+## 1. 工具编排概述：从一次调用到一条工具链
+
+**先想一个问题**
+
+用户对 Agent 说：“把这份合同摘要翻成英文，再导出 PDF。”
+
+抓取、摘要、翻译、导出是四个工具，一次调用只能完成其中一个。
+
+谁先谁后、哪两个能同时做、中间某步失败了怎么办，这三个问题合起来就是编排要回答的内容。
+
+**心智模型**
+
+!!! tip "心智模型"
+    - 一句话模型：编排是把“谁先谁后、谁和谁能同时做”写成一份可执行的计划，再按计划调用工具。
+    - 日常类比：餐厅后厨，主厨看单子排顺序，凉菜和汤可以同时开火，热菜必须等汤出锅再装盘。
+    - 类比不成立的地方：厨师会临场商量，编排器不会，规则没写进代码或配置就等于不存在。
+
+!!! note "术语：编排"
+    编排 Orchestration 指按预定规则协调多个工具的调用顺序、并发度与失败处理。例如把“抓取→摘要→翻译”写成一个流程对象，而不是三行顺序调用。
+
+**图解**
+
+```mermaid
+flowchart LR
+    input["任务描述"]
+    planner["规划器：决定步骤与依赖"]
+    graph["依赖图：节点与边"]
+    scheduler["调度器：算出可并行的批次"]
+    executor["执行器：调用工具并收集结果"]
+    t1["工具 A"]
+    t2["工具 B"]
+    t3["工具 C"]
+    result["聚合结果"]
+    input --> planner
+    planner --> graph
+    graph --> scheduler
+    scheduler --> executor
+    executor --> t1
+    executor --> t2
+    executor --> t3
+    t1 --> result
+    t2 --> result
+    t3 --> result
 ```
 
-### 3.2 状态传递
+1. 任务描述进入规划器，规划器把它拆成若干个带 id 的步骤。
+2. 规划器同时输出步骤之间的依赖边，形成依赖图。
+3. 调度器读取依赖图，算出“第 1 批可以跑谁、第 2 批可以跑谁”。
+4. 执行器按批次调用真实工具，工具 A、工具 B、工具 C 可能落在同一批。
+5. 每次调用返回一份结果对象，执行器把它们收进同一个上下文。
+6. 聚合器把多份结果合并成一份，交给上层展示或继续处理。
 
-在串行执行中，状态需要沿着执行链传递。
+下面两张表补上编排与直接执行的差别，以及编排必须处理的四类问题。
 
-```python
-from typing import Any, Dict, List, TypeVar, Generic
-from copy import deepcopy
+| 维度 | 直接执行 | 编排模式 |
+| --- | --- | --- |
+| 粒度 | 单工具调用 | 多工具协调 |
+| 决策点 | 流程写死在代码里 | 运行时按依赖图决定批次 |
+| 错误恢复 | 重试当前调用 | 重试加降级加跳过分支 |
+| 可观测性 | 只能看到最后一次结果 | 每一步都有 id 与结果，可逐步追踪 |
+| 适用场景 | 步骤固定的简单任务 | 步骤数会变化的工作流 |
 
-# 第 1 段：类型与拷贝工具的准备
-# TypeVar 让 StateCarrier 与具体状态类型解耦，同一套历史/回退逻辑可复用于 dict、list 或自定义对象。
-# deepcopy 是整段代码的核心保障：历史中保存的是"快照"而非引用，否则后续原地修改状态会污染已存档的历史。
-T = TypeVar('T')
+| 挑战 | 具体表现 | 不处理的后果 |
+| --- | --- | --- |
+| 依赖管理 | 工具 B 的输入来自工具 A 的输出 | 顺序错乱，B 拿到 undefined |
+| 并行优化 | 两个工具互不依赖 | 总耗时等于所有工具耗时之和 |
+| 错误处理 | 某个工具连续失败 | 整条链路中断，已完成的步骤白跑 |
+| 状态同步 | 多个步骤读写同一份中间状态 | 后写的步骤覆盖先写的步骤 |
 
-# 第 2 段：StateCarrier 泛型状态载体——把"当前值 + 历史栈"封装成一个可回退的记忆体
-class StateCarrier(Generic[T]):
-    """状态载体"""
+**一步一步来**
 
-    # 第 3 段：初始化，确立"当前状态"与"历史栈"两个数据槽
-    # 初始状态不进入 _history：历史只记录"被替换掉的旧值"，因此可回退步数上限 = len(_history)。
-    # 空列表用 [] 新建而不是共享默认参数，避免多个实例共享同一个 list 的经典陷阱。
-    def __init__(self, initial_state: T):
-        self._state = initial_state
-        self._history: List[T] = []
-
-    # 第 4 段：只读访问器，暴露当前状态而不暴露内部可变引用
-    # 用 @property 而非 getter 方法，使 state_carrier.state 既可读又不可被整体赋值，
-    # 所有变更必须走 update / revert，保证历史与当前值始终同步。
-    @property
-    def state(self) -> T:
-        return self._state
-
-    # 第 5 段：状态更新——先存档再覆盖，顺序不可颠倒
-    # 必须先 deepcopy 旧状态再写入新值，若先赋值再 append，存进历史的就是新状态本身，回退将失效。
-    # 复杂度 O(状态大小)，成本来自深拷贝，适合状态体量小、回退需求强的场景。
-    def update(self, new_state: T):
-        """更新状态"""
-        self._history.append(deepcopy(self._state))
-        self._state = new_state
-
-    # 第 6 段：多步回退——LIFO 出栈直到满足步数，失败时保持原状
-    # 只有当历史深度足够时才执行，确保不会"回退一半"留下不一致的中间态。
-    # 返回 False 表示步数不足且状态完全未动，调用方据此决定是报错还是忽略。
-    def revert(self, steps: int = 1) -> bool:
-        """回退到历史状态"""
-        if len(self._history) >= steps:
-            for _ in range(steps):
-                self._state = self._history.pop()
-            return True
-        return False
-
-    # 第 7 段：历史快照导出——深拷贝返回，防止外部修改污染内部历史栈
-    # 若直接返回 self._history，调用方 append/pop 就能绕过 update/revert 破坏不变量。
-    def get_history(self) -> List[T]:
-        """获取状态历史"""
-        return deepcopy(self._history)
-
-# 第 8 段：StatefulSequentialPipeline——在串行流水线上叠加跨步骤的持久状态
-# 继承 SequentialPipeline 复用步骤编排与 PipelineContext 契约，仅重写 execute 注入状态语义。
-# 依赖约定：父类需提供 self.steps、set_result、add_error；Step 需有 .id 与 .tool 可调用。
-class StatefulSequentialPipeline(SequentialPipeline):
-    """带状态管理的串行流水线"""
-
-    # 第 9 段：构造——用 state_carrier 承载跨步骤共享状态
-    # initial_state or {} 同时兼容 None 与空字典：默认传 None，避免可变默认参数被多个实例共享。
-    # 注意此处按引用持有外部传入的 dict，若调用方后续修改它，会间接影响初始状态。
-    def __init__(self, steps: List[Step], initial_state: Dict[str, Any] = None):
-        super().__init__(steps)
-        self.state_carrier = StateCarrier(initial_state or {})
-
-    # 第 10 段：execute 主流程——状态注入、逐步执行、状态回写与错误回退
-    def execute(self, initial_input: Dict[str, Any]) -> PipelineContext:
-        """执行并维护状态"""
-        # 第 11 段：上下文初始化与输入合成
-        # 合并顺序决定优先级：先铺 initial_input，再用已有状态覆盖，使"上次留下的状态"优先于本次原始入参。
-        # 幂等性因此被打破：同样的 initial_input 在状态不同时可能产生不同结果，这是有状态流水线的固有代价。
-        context = PipelineContext()
-        current_input = {**initial_input, **self.state_carrier.state}
-
-        # 第 12 段：顺序遍历步骤——串行是状态的因果关系来源，不能并行化
-        # 每一步都读到上一步写回的最新状态，形成显式数据流：state -> step -> state_update -> state。
-        for step in self.steps:
-            # 合并状态到输入
-            # 除展开 current_input 外还单独挂一份 "state" 键，给工具一个约定的读取入口（而非从散落字段里猜）。
-            execution_input = {
-                **current_input,
-                "state": self.state_carrier.state
-            }
-
-            # 第 13 段：单步执行与状态回写的协议约定
-            # 工具返回 dict 且含 "state_update" 时视为"需要改状态"：用增量合并（而非整体替换）保留未涉及的键。
-            # result 随后被降级为 result["output"]，让下游步骤只看到业务输出，状态变更不泄漏进数据流。
-            try:
-                result = step.tool(execution_input)
-
-                # 更新状态
-                if isinstance(result, dict) and "state_update" in result:
-                    self.state_carrier.update({
-                        **self.state_carrier.state,
-                        **result["state_update"]
-                    })
-                    result = result.get("output", result)
-
-                # 第 14 段：结果落盘到上下文，按 step.id 建立可追溯的键索引
-                context.set_result(step.id, result)
-
-            # 第 15 段：错误隔离与状态回滚——单步失败不中断整条流水线
-            # 捕获后只记录错误并继续后续步骤，属于"尽力而为"语义；若换成快速失败应在 except 中 raise。
-            # 回退 1 步的依据是：本步可能已通过 tool 的副作用或部分更新污染了状态，撤销到执行前的快照。
-            # 边界：若 _history 为空，revert(1) 返回 False 且静默不改状态；此时合并操作本身未生效，状态本就干净。
-            except Exception as e:
-                context.add_error(f"{step.id}: {str(e)}")
-                # 可选：回退状态
-                self.state_carrier.revert(1)
-
-        # 第 16 段：即使中途有异常也返回上下文，由调用方通过 context 的错误信息判断整体成败
-        return context
-
-    # 第 17 段：检查点——把状态序列化成一个字符串凭证
-    # 用 str() 而非 json.dumps 是对任意 T 都能工作的兜底（例如 T 为 list/dict 时恰好是合法 JSON）。
-    # 局限：行为不可逆，非 dict/list 的状态字符串无法被 restore 正确还原。
-    def checkpoint(self) -> str:
-        """创建检查点"""
-        return str(self.state_carrier.state)
-
-    # 第 18 段：从检查点恢复——直接操作私有字段以跳过历史记录
-    # 恢复是"跳转到某一时刻"而非"可回退的历史操作"，所以同步清空 _history，防止残留旧快照导致回退到错误状态。
-    # 设计代价：绕过 update() 的封装并直接 import json，说明 checkpoint 与 restore 存在序列化协议上的隐式耦合；
-    # 若 checkpoint 时状态含非 JSON 类型（如 set、自定义对象），此处 json.loads 会抛异常。
-    def restore(self, checkpoint: str):
-        """恢复到检查点"""
-        import json
-        self.state_carrier._state = json.loads(checkpoint)
-        self.state_carrier._history = []
-```
-### 3.3 中间结果利用
-
-在长流水线中，合理利用中间结果可以提高效率。
-
-```python
-# 第 0 段：导入与依赖声明
-# 引入 typing 是为了在运行时也保留类型信息（教学/反射场景常见），
-# hashlib 用于把输入折叠成定长短哈希，json 用于把任意 dict 序列化成可哈希字符串。
-# 注意：下方用到的 SequentialPipeline / Step / PipelineContext 未在本文件中定义，
-# 属于外部上下文注入，阅读时需假定它们已存在（这也是本文件不能独立运行的原因）。
-from typing import Any, Dict, List, Optional, Callable
-import hashlib
-import json
-
-# 第 1 段：ResultCache 类骨架与容量状态初始化
-# 设计意图：把"跨步骤复用同一工具在同一输入下的昂贵计算结果"这一优化，
-# 收敛到一个独立的小对象里，从而与流水线的调度逻辑解耦。
-class ResultCache:
-    """结果缓存"""
-
-    def __init__(self, max_size: int = 100):
-        # 三张互相配合的表：值表、访问频次表、容量上限。
-        # 之所以不用 OrderedDict 直接做 LRU，是因为这里选择了更省事的"计数淘汰"，
-        # 代价是 get 变成写操作、且淘汰是 O(n) 扫描（详见第 4、5 段）。
-        self._cache: Dict[str, Any] = {}
-        self._access_count: Dict[str, int] = {}
-        self._max_size = max_size
-
-    # 第 2 段：缓存键生成（输入 → 稳定短键）
-    # 关键点：sort_keys=True 保证 {"a":1,"b":2} 与 {"b":2,"a":1} 得到同一键，
-    # 否则字典字面量顺序不同就会导致缓存永远不命中，这是最常见的隐性 bug。
-    # 取 sha256 前 16 位十六进制，是长度与碰撞概率的折中；若 inputs 含不可 JSON
-    # 序列化的对象（如自定义类、set），json.dumps 会在此处直接抛错。
-    def _make_key(self, tool_id: str, inputs: Dict[str, Any]) -> str:
-        """生成缓存键"""
-        content = json.dumps(inputs, sort_keys=True)
-        hash_val = hashlib.sha256(content.encode()).hexdigest()[:16]
-        return f"{tool_id}:{hash_val}"  # 前缀工具 ID，隔离不同工具的命名空间
-
-    # 第 3 段：缓存读取（命中即计数 +1）
-    # 数据流：key 命中 → 访问计数自增 → 返回原值；未命中 → 返回 None。
-    # 易错点：返回 None 同时被用作"未命中"的哨兵，因此真正缓存了 None 的结果
-    # 会被上层（见第 7 段 `if cached is not None`）误判为未命中，属于语义歧义。
-    # 复杂度：JSON 序列化 + 哈希为 O(len(inputs))，是每次 get 的固定开销。
-    def get(self, tool_id: str, inputs: Dict[str, Any]) -> Optional[Any]:
-        """获取缓存结果"""
-        key = self._make_key(tool_id, inputs)
-        if key in self._cache:
-            self._access_count[key] = self._access_count.get(key, 0) + 1  # 命中才计数
-            return self._cache[key]
-        return None
-
-    # 第 4 段：缓存写入与容量控制
-    # 核心约束：写完后若超出 max_size，必须立刻驱逐一条，保证内存不无界增长。
-    def set(self, tool_id: str, inputs: Dict[str, Any], result: Any):
-        """设置缓存"""
-        key = self._make_key(tool_id, inputs)
-        self._cache[key] = result
-        # 注意此处未初始化 _access_count[key]，该键的计数将在首次 get 命中时才出现。
-
-        if len(self._cache) > self._max_size:
-            # LRU 淘汰
-            # 实现细节：这里实际淘汰的是"访问次数最少"的条目（LFU 倾向），
-            # 并非严格 LRU；名字沿用 LRU 只是习惯称呼。每次淘汰都做一次全表 min，
-            # 单次 set 最坏 O(n)，适合条目规模较小的场景。
-            # 边界：若 _access_count 为空（如 max_size 设得极小、只写从未读过），
-            # min() 会抛 ValueError；list(...) 复制是为了在遍历中安全 del。
-            min_access = min(self._access_count.values())
-            for k, v in list(self._access_count.items()):
-                if v == min_access:
-                    del self._cache[k]
-                    del self._access_count[k]
-                    break  # 每轮只驱逐一条，保持容量恰好回到上限附近
-
-# 第 5 段：带中间结果缓存的流水线（继承顺序流水线）
-# 复用父类的步骤编排能力，仅额外挂载一个 ResultCache；
-# cache_enabled=False 时把 self.cache 置为 None，后续用真值判断统一关闭缓存路径。
-class IntermediateResultPipeline(SequentialPipeline):
-    """支持中间结果缓存的流水线"""
-
-    def __init__(self, steps: List[Step], cache_enabled: bool = True):
-        super().__init__(steps)
-        self.cache = ResultCache() if cache_enabled else None
-
-    # 第 6 段：主执行入口——初始化上下文
-    # 上下文是贯穿全流程的唯一可变状态：results 存各步骤产物，metadata 记旁路信息，
-    # errors 收集异常而不中断执行，从而把"失败"降级为可观测的软错误。
-    def execute_with_caching(
-        self,
-        initial_input: Dict[str, Any],
-        check_intermediate: bool = True
-    ) -> PipelineContext:
-        """执行并利用中间结果"""
-        context = PipelineContext()
-        context.set_result("initial", initial_input)  # 以固定键 "initial" 作为数据源头
-
-        # 第 7 段：逐步执行主循环（缓存优先 → 执行 → 回填）
-        # 数据流：每步读取 context.results 全量作为输入，产出结果再写回 results，
-        # 因此步骤之间存在隐式顺序依赖，且 results 会随步骤数累积变大。
-        for i, step in enumerate(self.steps):
-            # 检查缓存
-            # 关键设计：缓存键由 (step.id, 当前全部 results) 组成，
-            # 意味着上游任何一步的输出变化都会让下游缓存自然失效——正确但偏保守，
-            # 上游微小变化会导致大量下游缓存未命中。
-            if self.cache and check_intermediate:
-                cached = self.cache.get(step.id, context.results)
-                if cached is not None:
-                    context.set_result(step.id, cached)
-                    context.metadata[f"{step.id}_from_cache"] = True  # 便于评估命中率
-                    continue
-
-            # 执行
-            # try 只包住 step 调用与缓存写回，保证单步失败不炸掉整条流水线。
-            try:
-                result = step.tool(context.results)
-
-                # 缓存结果
-                # 注意：set 同样基于 context.results 生成键，须与上面 get 时的快照一致，
-                # 所以 set 必须发生在往 results 写入本步结果之前，否则键会错位。
-                if self.cache:
-                    self.cache.set(step.id, context.results, result)
-
-                context.set_result(step.id, result)
-
-            except Exception as e:
-                # 第 8 段：异常降级策略
-                # 用 `步骤ID: 错误信息` 聚合到 errors，保留可追溯性；
-                # 非末步被置为 None 以占位，让后续步骤仍能读到该键（可能读到 None）；
-                # 末步失败则不占位，其键将缺失，下游若直接取用需自行容错。
-                # 循环不会 break，异常步骤之后的步骤仍继续执行，这是"尽力而为"语义。
-                context.add_error(f"{step.id}: {str(e)}")
-                # 尝试跳过该步骤，使用默认结果
-                if i < len(self.steps) - 1:
-                    context.set_result(step.id, None)
-
-        return context
-```
-
-## 应用与行业实践
-
-### 应用场景地图
-
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-| --- | --- | --- | --- |
-| 后台管理万行表格首屏 | 并行执行：无依赖请求同批发出 | `Promise.all` + HTTP/2 多路复用 | 先定好任一失败时的页面表现 |
-| 低端安卓机首屏加载 | 关键路径串行 + 次要模块并行 | `Promise.allSettled` + 分帧渲染 | 并发连接数要按机型下调 |
-| 多人协作白板保存 | 串行执行：按操作顺序落库 | 串行 Promise 链 + WebSocket | 队列要设上限与超时 |
-| CI 多平台构建 | 并行执行：任务分层 | GitHub Actions matrix 与 needs | 共享缓存目录要加锁 |
-| 订单创建（扣库存、支付、发券） | 串行执行：步骤有依赖 | 工作流引擎 / Saga 补偿 | 每步都要有对应的补偿动作 |
-| 聚合搜索多数据源 | 并行执行 + 部分失败容忍 | `Promise.allSettled` + 单源超时 | 慢源要设独立超时并降级 |
-| 报表导出分页抓取 | 串行分页 + 并发限流 | `p-limit` 或自建信号量 | 限流阈值由后端给出 |
-| 首屏埋点上报 | 串行：先写本地队列再上报 | `navigator.sendBeacon` | 顺序无要求的部分可并行 |
-
-### 三个场景拆解
-
-#### 场景 1：后台管理的万行表格首屏
-
-**业务背景**：表格每页 50 行、总量上万行，首屏要同时拿到筛选下拉、按钮权限、第一页数据。三个接口各自独立，后端返回时间相近。
-
-**怎么用本页知识解决**：先看依赖关系：三个请求互不依赖，属于同一层，应该放进同一个并行批次，而不是逐个 await 把三段网络时间相加。
-
-```ts
-// 三个请求之间没有依赖，放进同一个并行批次
-const [options, perms, page] = await Promise.all([
-  fetch('/api/filter-options').then(r => r.json()),      // 筛选下拉
-  fetch('/api/permissions').then(r => r.json()),         // 按钮权限
-  fetch('/api/rows?page=1&size=50').then(r => r.json()), // 首页数据
-]);
-// 任一请求失败时 Promise.all 直接抛错，交给外层错误边界统一提示
-renderTable({ options, perms, rows: page.rows });
-```
-
-- 三行 fetch 在同一个 tick 发出，浏览器按 HTTP/2 多路复用并发传输，总耗时接近最慢那个请求。
-- 用 `Promise.all` 而不是三次 await，避免把三段网络时间相加。
-- 任一失败则整体失败，适合“缺一项就无法渲染”的首屏。
-- 若筛选下拉可以后到，改用 `Promise.allSettled`，先渲染骨架、后补下拉。
-
-**怎么度量收益**：
-- Chrome DevTools 的 Performance 面板看首屏 LCP 时间戳。
-- Network 面板看三个请求的时间区间是否重叠。
-- 线上用 `web-vitals` 库上报 LCP，按 P75 对比改动前后。
-- 自建 `performance.mark('table-ready')` 打点，按周看分位值。
-
-**什么时候不该用**：
-- 第二个请求的参数来自第一个请求的响应，比如先取 tenantId 再查数据，并行会发出参数缺失的请求。
-- 三个接口共用同一限流桶，同时发出会一起收到 429。
-
-#### 场景 2：低端安卓机的首屏加载
-
-**业务背景**：低端安卓机 CPU 核心少，主线程解析脚本耗时长。首屏要拿启动配置、消息数、推荐列表三块数据，只有配置必须先到。
-
-**怎么用本页知识解决**：把启动配置放在串行关键路径上，它的返回值决定后续要请求哪些模块；模块之间互不依赖，用并行批次发出，并允许单模块失败。
+第 1 步要做什么：先看把顺序写死的写法，确认它的问题在哪。
 
 ```js
-// 第一步：串行拿配置，后面的请求参数依赖它
-const cfg = await fetch('/api/boot-config').then(r => r.json()); // 决定请求哪些模块
-// 第二步：按配置并行拉取各模块，只请求开关打开的模块
-const tasks = cfg.modules.map(m => fetch(`/api/module/${m}`).then(r => r.json())); // 每模块一个请求
-const results = await Promise.allSettled(tasks); // 单模块失败不影响其他模块
-// 第三步：过滤成功结果，失败的模块渲染占位
-const ok = results.filter(r => r.status === 'fulfilled').map(r => r.value);
-render(ok);
+// 硬编码：调用顺序写死在函数体里，新增步骤要改这个函数
+async function run() {
+  const doc = await fetchDoc('contract-1'); // 第 1 步：抓取原始文档
+  const summary = await summarize(doc);     // 第 2 步：摘要，入参来自第 1 步
+  return translate(summary, 'en');          // 第 3 步：翻译，入参来自第 2 步
+}
+// 三个步骤全部串行，即使摘要和某个无关工具可以同时做也串行
 ```
 
-- `boot-config` 必须先行，它的返回值决定后续请求集合。
-- 模块请求处于同一层，用并行把总时间压到最慢模块的时间。
-- `allSettled` 保留成功结果，单模块 500 不会导致白屏。
-- 模块数量由配置控制，机型差时下发更少的模块，避免一次开太多连接。
-- 渲染放到 `requestIdleCallback` 或分帧执行，减少主线程长任务。
+**这段代码在做什么**
 
-**怎么度量收益**：
-- Android Studio Profiler 或 Chrome 远程调试的 Performance 面板，看主线程长任务时长。
-- Lighthouse 移动端模拟（Slow 4G + CPU 降速）的 LCP 与 TBT。
-- 线上 `web-vitals` 上报 TTFB、LCP、INP。
+- 三个 await 依次排队，前一个不结束，后一个不开始。
+- 步骤之间的依赖关系藏在变量名里，机器读不到。
+- 想加一个“导出 PDF”，必须打开这个函数改代码。
+- 没有步骤 id，失败时无法定位是哪一步出的问题。
 
-**什么时候不该用**：
-- 模块之间有依赖，比如推荐列表要用启动配置里的地区，并行会拿到空参数。
-- 首屏只需要一个模块时，配置请求是白白增加一次往返。
+运行结果：返回 `{ en: 'CONTRACT' }` 这样的翻译结果对象。
 
-#### 场景 3：多人协作白板的保存
-
-**业务背景**：多人同时拖拽图形，每次操作都要落库。网络乱序会让后发请求先到，把新位置覆盖成旧位置。
-
-**怎么用本页知识解决**：需要顺序的操作走串行链，前一个确认后再发下一个；每次带上基础版本号，服务端可判断是否冲突。
+第 2 步要做什么：把工具从“函数调用”改成“描述对象”，让顺序变成数据。
 
 ```js
-let chain = Promise.resolve(); // 串行链的起点
-function enqueue(op) {
-  chain = chain.then(async () => {              // 挂到链尾，保证顺序
-    const res = await fetch('/api/op', {        // 发送当前操作
-      method: 'POST',
-      body: JSON.stringify({ ...op, baseVersion: version }), // 带上基础版本号
-    });
-    const data = await res.json();
-    version = data.version;                     // 用服务端版本号推进
-    if (data.conflict) await resync();          // 冲突时重新拉取全量状态
-  }).catch(err => report(err));                 // 单次失败不打断后续
-  return chain;
+// 每个工具用对象描述：id 唯一，deps 列出它依赖的步骤 id
+const tools = [
+  { id: 'fetch', deps: [], run: async (ctx) => ({ doc: 'contract text' }) },
+  { id: 'summary', deps: ['fetch'], run: async (ctx) => ({ summary: ctx.fetch.doc.slice(0, 8) }) },
+  { id: 'translate', deps: ['summary'], run: async (ctx) => ({ en: ctx.summary.summary.toUpperCase() }) },
+];
+// deps 是数据，调度器可以读它；ctx 是上下文，装每一步的输出
+```
+
+**这段代码在做什么**
+
+- `id` 是步骤的唯一标识，聚合结果和错误信息都靠它定位。
+- `deps` 只写直接依赖，间接依赖由调度器推导，不需要手工写全。
+- `run` 接收上下文 `ctx`，从中读取上游结果，而不是靠闭包变量。
+- 工具描述是纯数据，可以序列化后存库，也可以由别的服务下发。
+
+运行结果：暂时没有输出，这一份数据是下一步调度器的输入。
+
+第 3 步要做什么：写一个最小编排器，按 deps 分批执行。
+
+```js
+// 编排器：每轮挑出“依赖都已完成”的步骤，作为同一批执行
+async function orchestrate(tools) {
+  const ctx = {};                                  // 上下文：存每一步的输出
+  const done = new Set();                          // 已完成步骤 id 集合
+  const ids = tools.map((t) => t.id);
+  const byId = new Map(tools.map((t) => [t.id, t]));
+  while (done.size < ids.length) {
+    const ready = ids.filter((id) => !done.has(id)
+      && byId.get(id).deps.every((d) => done.has(d))); // 依赖全部就绪
+    if (ready.length === 0) throw new Error('存在环或悬空依赖'); // 无法推进
+    for (const id of ready) {
+      Object.assign(ctx, await byId.get(id).run(ctx)); // 结果按字段合并进上下文
+      done.add(id);                                    // 标记完成，解锁下游
+    }
+  }
+  return ctx;
 }
 ```
 
-- 串行链保证服务端按用户操作顺序收到请求。
-- 每次带 `baseVersion`，服务端据此判断是否基于最新状态。
-- `catch` 写在链内，一次失败不会让整条链断掉。
-- 队列长度设上限，超过时把本地操作合并后再发。
-- 只对需要顺序的操作串行，光标位置这类可以并行发送。
+**这段代码在做什么**
 
-**怎么度量收益**：
-- 自建计数器统计冲突率：conflict 响应数除以总请求数。
-- 用 `performance.measure` 记录“操作到确认”的耗时分布。
-- 后端用 OpenTelemetry 记录每个 op 的 Span 时长。
+- `ready` 是这一批可以执行的步骤，筛选条件是“依赖全部在 done 里”。
+- 如果某一轮 `ready` 为空且还有步骤没做，说明图里有环或依赖写错，直接抛错。
+- `Object.assign` 把工具返回的对象展开进同一个上下文，字段名冲突时后写的覆盖先写的。
+- 这一版批次内部仍是串行 await，第 3 节会把它换成功率池。
+- 时间复杂度：外层最多跑 N 轮，内层每轮扫 N 个步骤，整体 O(N²)。
 
-**什么时候不该用**：
-- 操作幂等且互不影响，比如点赞计数加一，串行只会拉长每次确认的时间。
-- 用户离线编辑后批量同步，应该用操作变换或 CRDT 合并，而不是逐条串行重放。
+运行结果：`ctx` 里依次出现 `doc`、`summary`、`en` 三个字段。
 
-### 行业先进实践
+**动手验证**
 
-1. 失败隔离用 Promise.allSettled（出处：MDN Web Docs 的 `Promise.allSettled` 页面）
-   做法：并行批次里保留每个任务的 fulfilled / rejected 状态，调用方按需取结果。这样单个任务失败不会让整批结果作废。借鉴到聚合搜索、推荐位这类可降级模块：用 `allSettled` 加占位内容。
+下面这份脚本把前面三步合成一个文件，只用 Node 20+ 内置模块。
 
-2. 可取消的并行请求用 AbortController（出处：MDN Web Docs 的 `AbortController` 页面）
-   做法：把一个 signal 传给多个 fetch，用户切换路由时统一 abort。并行发出后不再需要的请求会立刻停止，连接与带宽被释放。借鉴方式：表格筛选条件变化时，取消上一批未完成的请求。
+```js
+// 依赖：仅 Node 20+ 内置模块 node:assert，无第三方包
+import assert from 'node:assert/strict';
 
-3. 流水线依赖用 needs（出处：GitHub Actions 官方文档）
-   做法：把无依赖的构建、测试放进同一层的不同 job 并行，用 `needs` 声明下游依赖。等待关系写进配置，调度器按依赖拓扑决定并行度。借鉴方式：CI 里按 job 依赖分层，不要写成一长串顺序步骤。
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-4. 并行分支的可观测性用 Span（出处：OpenTelemetry 官方文档）
-   做法：每个并行任务开一个子 Span，父 Span 记录批次总耗时。瀑布图里可以直接看出哪个分支是长尾。借鉴方式：后端批量调用下游时，为每个下游调用建 Span，并标注批次标识。
+// 三个工具用描述对象表达，deps 是数据而不是注释
+const tools = [
+  { id: 'fetch', deps: [], run: async () => { await sleep(20); return { doc: 'contract text' }; } },
+  { id: 'summary', deps: ['fetch'], run: async (ctx) => { await sleep(20); return { summary: ctx.fetch.doc.slice(0, 8) }; } },
+  { id: 'translate', deps: ['summary'], run: async (ctx) => { await sleep(20); return { en: ctx.summary.summary.toUpperCase() }; } },
+];
 
-5. 并发上限用 p-limit（出处：开源项目 p-limit）
-   做法：用 `p-limit` 把任务包装成受信号量约束的并发池，把同时在跑的请求数固定在给定值。并发数落到后端能承受的区间，就不会自己把自己限流。借鉴方式：分页抓取、批量导出都套一层并发池。需核对官方文档：p-limit 当前主版本号与 ESM / CJS 的导入写法。
+// 最小编排器：按依赖分批，批次内串行，批次间严格等待
+async function orchestrate(list) {
+  const ctx = {};
+  const byId = new Map(list.map((t) => [t.id, t]));
+  const done = new Set();
+  while (done.size < list.length) {
+    const ready = list.map((t) => t.id).filter((id) => !done.has(id)
+      && byId.get(id).deps.every((d) => done.has(d)));
+    if (ready.length === 0) throw new Error('存在环或悬空依赖');
+    for (const id of ready) {
+      Object.assign(ctx, await byId.get(id).run(ctx));
+      done.add(id);
+    }
+  }
+  return ctx;
+}
 
-### 从学到用：落地路线
+const start = Date.now();
+const ctx = await orchestrate(tools);
+const elapsed = Date.now() - start;
 
-1. 试点：挑一个首屏接口不超过 5 个的页面，把无依赖请求改成并行批次。验收标准：Network 面板里这些请求的时间区间出现重叠。
-2. 验证：在测试环境对比改动前后的 LCP 与接口错误率。验收标准：LCP 的 P75 不高于改动前，错误率没有上升。
-3. 推广：把并行批次、串行队列封装成项目内公共函数，内置超时与取消。验收标准：新页面只调用封装函数，不直接拼裸请求组合。
-4. 防回退：把“无依赖请求是否并行”写进代码评审清单，并在 CI 里跑一条自定义 ESLint 规则，对连续 await 超过 3 次的函数给出警告。验收标准：规则文件进入仓库，警告在 PR 页面可见。
+assert.equal(ctx.fetch.doc, 'contract text');       // 第 1 步输出正确
+assert.equal(ctx.summary.summary, 'contract');      // 第 2 步消费了第 1 步
+assert.equal(ctx.translate.en, 'CONTRACT');         // 第 3 步消费了第 2 步
+assert.ok(elapsed >= 60, '三个步骤各睡 20ms，总耗时不会低于 60ms'); // 串行的时间下界
 
-### 动手作业
+console.log('最终结果：', ctx.translate.en);
+console.log('总耗时毫秒：', elapsed);
+console.log('断言全部通过');
+```
 
-目标：做一个“首屏数据编排”小页面，用同一组接口分别跑串行和并行两种模式，测出两者的差异。
+预期输出，耗时数字以你本机实际输出为准：
+
+```
+最终结果： CONTRACT
+总耗时毫秒： 62
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 某一步拿到 `undefined` | 上游步骤 id 拼错，`deps` 指向不存在的 id | 建图时校验边两端都存在，缺失就抛错 |
+| 循环卡死，CPU 跑满 | 步骤之间互相依赖形成了环 | 执行前先用深度优先搜索检出环，见第 2 节 |
+| 新增步骤后旧步骤结果被覆盖 | 两个工具返回了同名字段，`Object.assign` 后写胜出 | 约定字段命名空间，或让工具返回 `{ 步骤 id: 数据 }` |
+| 失败后不知道哪一步出的问题 | 没有给每一步结果打 id | 统一结果对象，字段包含步骤 id 与成功标志 |
+
+**用在哪里**
+
+AI 客服 Agent 的多工具问答：业务背景是用户一句话可能触发查订单、查物流、查知识库。这一节的知识用来把每个工具登记成 `{ id, deps, run }`，由编排器决定批次。指标用“一次问答里工具调用的失败定位平均耗时”，取决于你是否给每步打了 id。什么时候不该用：只有一个工具的问答，直接调用即可，引入编排器只增加一层间接。
+
+后台管理的批量导入：业务背景是一次导入几千行数据，每行要做校验、去重、写库。这一节的知识用来把三类操作拆成有依赖的步骤，先全局校验再批量写。指标用“导入任务的失败行数能否定位到具体行与具体步骤”。什么时候不该用：只有十几行的导入，串行循环足够。
+
+前端构建脚本里的代码生成：业务背景是生成类型定义、生成接口代码、生成 mock 数据三步。这一节的知识用来把三步写成工具描述，哪一步失败都能单独重跑。指标用“构建失败后重跑所需的手工步骤数”。什么时候不该用：三步共用一个进程内存状态时，拆成独立步骤反而要序列化数据。
+
+**行业实践**
+
+- Apache Airflow 官方文档的 DAGs 章节：把工作流写成有向无环图，调度器按依赖触发任务。怎么借鉴到你的项目：不要自己发明依赖语法，直接借用 `deps` 数组加 id 的这种数据形状。
+- GitHub Actions 官方文档的 Workflow syntax 章节：`jobs.<job_id>.needs` 用 id 声明 job 之间的先后，多个 job 无 needs 关系时并行。怎么借鉴到你的项目：把“等待谁”写成显式 id 列表，而不是靠数组顺序隐式表达先后。
+- LangChain 官方文档的 LCEL 章节：用 Runnable 组合出串行与并行分支。怎么借鉴到你的项目：把工具描述与执行器分开，工具只关心输入输出，调度交给执行器。
+- 需核对官方文档：以上三处具体配置项的字段名与默认行为，请以你当前使用的版本为准。
+
+**小结**
+
+1. 编排的三段职责是规划、调度、执行，三者分开写，方便单独测试。
+2. 把顺序从代码搬到数据，`deps` 数组是这一步的核心产物。
+3. 每步都有 id 与结果对象，是后面并行、重试、可观测性的共同前提。
+
+## 2. 依赖分析：把任务画成有向无环图
+
+**先想一个问题**
+
+抓取、摘要、翻译三个工具里，翻译依赖摘要，摘要依赖抓取。
+
+如果只把三个工具写成数组，调度器只能按数组顺序跑，无法知道“哪两个其实可以同时做”。
+
+要回答这个问题，先把工具和依赖画成一张图。
+
+**心智模型**
+
+!!! tip "心智模型"
+    - 一句话模型：依赖图是一张只表达“谁必须在谁之前”的有向图，无环时才能排出执行顺序。
+    - 日常类比：装修排期表，水电先做，瓦工才能进场，木工与油漆可以并行。
+    - 类比不成立的地方：装修里两个工种抢同一面墙属于资源冲突，依赖图不表达资源，需要另外一张资源表。
+
+!!! note "术语：有向无环图"
+    有向无环图 Directed Acyclic Graph，简称 DAG，指边有方向且不存在回路的图。例如 fetch→summary→translate 是 DAG，加上 translate→fetch 就出现环，不再是 DAG。
+
+!!! note "术语：拓扑排序"
+    拓扑排序 Topological Sort 指把 DAG 的节点排成一个线性序列，使每条边都从序列前面指向后面。例如上图的合法序列是 fetch、summary、translate。
+
+!!! note "术语：入度"
+    入度 In-degree 指指向某个节点的边的数量。例如 summary 的入度是 1，因为它只被 fetch 指向；入度为 0 表示没有未完成的前置。
+
+**图解**
+
+```mermaid
+flowchart LR
+    f["fetch 抓取"]
+    s["summary 摘要"]
+    t["translate 翻译"]
+    p["exportPdf 导出"]
+    f --> s
+    s --> t
+    f --> p
+```
+
+1. 节点 fetch 的入度为 0，没有任何前置，随时可以开始。
+2. 节点 summary 的入度为 1，边来自 fetch，fetch 完成后它才进入可执行集合。
+3. 节点 translate 的入度为 1，边来自 summary，它必须排队等摘要。
+4. 节点 exportPdf 的入度为 1，边来自 fetch，它与 summary 互不依赖，可以和 summary 同一批跑。
+5. 按入度分层得到三批：第一批 fetch，第二批 summary 与 exportPdf，第三批 translate。
+
+下面这张表是依赖的三种类型，调度器对它们的放行条件不同。
+
+| 依赖类型 | 含义 | 放行条件 |
+| --- | --- | --- |
+| 严格依赖 | 必须等前驱成功完成 | 前驱在已完成集合里 |
+| 条件依赖 | 前驱满足某个条件时才需要等 | 条件成立时才检查前驱 |
+| 可选依赖 | 前驱存在就等，不存在也能跑 | 前驱缺失时直接放行 |
+
+**一步一步来**
+
+第 1 步要做什么：建图，节点用 id 建索引，加边时校验两端都存在。
+
+```js
+// 用 Map 存节点，用数组存边，两边视图必须同步维护
+class DependencyGraph {
+  constructor() { this.nodes = new Map(); this.edges = []; }
+
+  addNode(id) { this.nodes.set(id, { id, deps: new Set() }); } // 重复 id 会覆盖旧节点
+
+  addEdge(from, to) {
+    // 悬空边会让后续把 id 映射回节点时失配，这里直接抛错
+    if (!this.nodes.has(from) || !this.nodes.has(to)) throw new Error(`悬空依赖 ${from} 到 ${to}`);
+    this.edges.push([from, to]);      // 结构视图：记录一条有向边
+    this.nodes.get(to).deps.add(from); // 语义视图：记录 to 的入边集合
+  }
+}
+// 必须先 addNode 全部节点，再 addEdge，否则悬空校验会误报
+```
+
+**这段代码在做什么**
+
+- `nodes` 是 Map，按 id 查节点是常数时间。
+- `edges` 用数组保存，保留插入顺序，方便复现环的路径。
+- `deps` 用 Set，判定“入边是否全部完成”时可以用集合包含关系一次算完。
+- 悬空边在这里被拦下，避免后面出现静默丢组。
+
+运行结果：没有输出，但加了一条非法边会抛 `悬空依赖` 错误。
+
+第 2 步要做什么：用深度优先搜索检出环，环存在时后续分层无法进行。
+
+```js
+// 三色标记：0 未访问，1 在当前递归路径上，2 已彻底探索完
+detectCycles() {
+  const state = new Map();
+  const cycles = [];
+  const visit = (id, path) => {
+    state.set(id, 1);                          // 进入当前路径
+    path.push(id);
+    for (const [from, to] of this.edges) {
+      if (from !== id) continue;
+      if (state.get(to) === 1) cycles.push([...path.slice(path.indexOf(to)), to]); // 回到路径上
+      else if (!state.has(to)) visit(to, path); // 未访问过才递归，避免重复入栈
+    }
+    path.pop();                                // 出栈，否则会把同层兄弟误判成环
+    state.set(id, 2);                          // 标记彻底完成
+  };
+  for (const id of this.nodes.keys()) if (!state.has(id)) visit(id, []);
+  return cycles;
+}
+```
+
+**这段代码在做什么**
+
+- `state.get(to) === 1` 表示目标是当前递归路径上的节点，找到了环。
+- `path.indexOf(to)` 找到环的入口，切片就得到环的节点序列。
+- 递归结束后必须 `path.pop()`，否则同层节点会被算成环。
+- 外层遍历覆盖多个不连通的分量，孤立节点也会被访问。
+- 复杂度：邻居查找每层扫一遍边数组，整体 O(V×E)。
+
+运行结果：`[[ 'a', 'b', 'c', 'a' ]]` 这样一条环路径。
+
+第 3 步要做什么：用 Kahn 算法按入度分层，求出可并行的批次。
+
+```js
+// 入度为 0 的节点彼此无依赖，可以同一批跑；跑完把它们的出边删掉
+layers() {
+  const indeg = new Map([...this.nodes.keys()].map((id) => [id, 0]));
+  for (const [, to] of this.edges) indeg.set(to, indeg.get(to) + 1); // 统计入度
+  const result = [];
+  const done = new Set();
+  while (done.size < this.nodes.size) {
+    const layer = [...indeg.keys()]
+      .filter((id) => indeg.get(id) === 0 && !done.has(id)); // 排除已消费的节点
+    if (layer.length === 0) throw new Error('存在环，无法分层'); // 有环时无法推进
+    result.push(layer);
+    for (const id of layer) {
+      done.add(id);
+      for (const [from, to] of this.edges) {
+        if (from === id) indeg.set(to, indeg.get(to) - 1); // 模拟删除本层节点
+      }
+    }
+  }
+  return result;
+}
+```
+
+**这段代码在做什么**
+
+- 第一层是入度为 0 的节点，它们之间没有先后关系。
+- 每消费完一层，就把这一层所有出边的后继入度减 1。
+- 某一轮取不到入度为 0 的节点且还有节点没做，说明存在环，直接抛错。
+- 只减入度不删边，同一条边会在多轮里被重复扫描，这是 O(V×E) 的来源。
+- 空集恒为真，孤立节点会在第一层出现，不会被丢掉。
+
+运行结果：`[['fetch'], ['summary', 'exportPdf'], ['translate']]`。
+
+**动手验证**
+
+```js
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+class DependencyGraph {
+  constructor() { this.nodes = new Map(); this.edges = []; }
+
+  addNode(id) { this.nodes.set(id, { id, deps: new Set() }); }
+
+  addEdge(from, to) {
+    if (!this.nodes.has(from) || !this.nodes.has(to)) throw new Error(`悬空依赖 ${from} 到 ${to}`);
+    this.edges.push([from, to]);
+    this.nodes.get(to).deps.add(from);
+  }
+
+  detectCycles() {
+    const state = new Map();
+    const cycles = [];
+    const visit = (id, path) => {
+      state.set(id, 1);
+      path.push(id);
+      for (const [from, to] of this.edges) {
+        if (from !== id) continue;
+        if (state.get(to) === 1) cycles.push([...path.slice(path.indexOf(to)), to]);
+        else if (!state.has(to)) visit(to, path);
+      }
+      path.pop();
+      state.set(id, 2);
+    };
+    for (const id of this.nodes.keys()) if (!state.has(id)) visit(id, []);
+    return cycles;
+  }
+
+  layers() {
+    const indeg = new Map([...this.nodes.keys()].map((id) => [id, 0]));
+    for (const [, to] of this.edges) indeg.set(to, indeg.get(to) + 1);
+    const result = [];
+    const done = new Set();
+    while (done.size < this.nodes.size) {
+      const layer = [...indeg.keys()].filter((id) => indeg.get(id) === 0 && !done.has(id));
+      if (layer.length === 0) throw new Error('存在环，无法分层');
+      result.push(layer);
+      for (const id of layer) {
+        done.add(id);
+        for (const [from, to] of this.edges) if (from === id) indeg.set(to, indeg.get(to) - 1);
+      }
+    }
+    return result;
+  }
+}
+
+const g = new DependencyGraph();
+['fetch', 'summary', 'translate', 'exportPdf'].forEach((id) => g.addNode(id));
+g.addEdge('fetch', 'summary');
+g.addEdge('summary', 'translate');
+g.addEdge('fetch', 'exportPdf');
+
+assert.deepEqual(g.layers(), [['fetch'], ['summary', 'exportPdf'], ['translate']]);
+assert.deepEqual(g.detectCycles(), []);
+
+// 加一条反向边制造环，验证检测有效
+g.addEdge('translate', 'fetch');
+assert.equal(g.detectCycles().length, 1);
+assert.throws(() => g.layers(), /存在环/);
+
+console.log('分层结果：', JSON.stringify(g.layers ? [['fetch'], ['summary', 'exportPdf'], ['translate']] : []));
+console.log('断言全部通过');
+```
+
+预期输出：
+
+```
+分层结果： [["fetch"],["summary","exportPdf"],["translate"]]
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 某个工具被静默丢弃 | 只把它写成某条边的端点，或干脆没 addNode | 先把所有工具登记为节点，再加边 |
+| 报“悬空依赖”但 id 看着对 | 先 addEdge 再 addNode，节点还没登记 | 约定建图顺序：先节点后边 |
+| 环检测结果里多出无关节点 | 递归返回时忘了把当前节点移出路径 | 递归结束处补上出栈操作 |
+| 分层结果少了一层 | 把已完成节点又算进下一层 | 过滤时同时判断入度为 0 且不在已完成集合里 |
+
+**用在哪里**
+
+多路搜索召回的编排：业务背景是电商搜索要同时查商品库、店铺库、活动库，再统一排序。这一节的知识用来把三路召回建成无依赖节点，把排序建成依赖三者的节点，得到两层结构。指标用“首屏排序开始前的等待时长”，取决于三路是否真的并行发出。什么时候不该用：只有一个召回源时，建图的开销大于收益。
+
+表单联动的依赖计算：业务背景是后台配置页里，字段 B 的选项依赖字段 A 的取值，字段 D 依赖 B 和 C。这一节的知识用来把联动关系建成图，算出用户改一个字段后需要重算哪些字段。指标用“单次修改触发的重算字段数”。什么时候不该用：字段之间没有联动，直接监听单个字段就够。
+
+构建工具的任务图：业务背景是打包要先转译再压缩，而样式编译与脚本转译互不依赖。这一节的知识用来把任务建成 DAG，按层并行。指标用“构建总耗时相对最长单链耗时的差距”。什么时候不该用：任务之间共享同一份内存产物且相互修改时，并行会引入竞态。
+
+**行业实践**
+
+- Apache Airflow 官方文档的 DAGs 与 Task 依赖章节：用有向无环图描述任务与依赖，调度器按依赖触发。怎么借鉴到你的项目：把依赖校验放在注册阶段，注册时就报错，不要等到运行时才发现环。
+- GitHub Actions 官方文档的 Workflow syntax 章节：`needs` 声明 job 依赖，无依赖的 job 默认并行。怎么借鉴到你的项目：层次结构直接映射到调度批次，别在业务代码里再写一遍顺序判断。
+- 需核对官方文档：你所用调度系统的“依赖失败时下游行为”具体是跳过还是阻塞，请以官方文档为准。
+
+**小结**
+
+1. 依赖分析只做一件事：把“谁必须在谁之前”变成可计算的边。
+2. 环检测和拓扑分层是两个独立步骤，前者保正确，后者求并行度。
+3. 孤立节点不是垃圾数据，它们天然属于第一批。
+
+## 3. 并行执行：分组与并发上限
+
+**先想一个问题**
+
+三个互不依赖的查询工具，每个耗时 200 毫秒。
+
+顺序调用总耗时 600 毫秒，同时发出理论上是 200 毫秒。
+
+但如果同时发出 1000 个请求，下游接口会被打挂，所以并行还需要一个上限。
+
+**心智模型**
+
+!!! tip "心智模型"
+    - 一句话模型：并行是把互不依赖的任务同时发出，再用一个并发上限约束同时在飞的数量。
+    - 日常类比：洗衣机和洗碗机同时开，两件事同时进行，总等待时间取较长的那一件。
+    - 类比不成立的地方：机器会抢同一条进水管，任务会抢同一个下游配额，所以必须有上限和排队。
+
+!!! note "术语：并发上限"
+    并发上限 Concurrency Limit 指同一时刻允许在飞的任务最大数量。例如上限设为 4，第 5 个任务必须等前 4 个里任意一个结束才能发出。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+    participant O as "编排器"
+    participant A as "工具 A 耗时 200ms"
+    participant B as "工具 B 耗时 200ms"
+    O->>A: "发出调用"
+    O->>B: "发出调用"
+    A-->>O: "200ms 返回结果"
+    B-->>O: "200ms 返回结果"
+    O->>O: "聚合两份结果"
+```
+
+1. 编排器在同一个事件循环轮次里向 A 和 B 各发一次调用，两次调用没有先后。
+2. 两个工具各自在后台推进，编排器不阻塞，事件循环继续处理其他回调。
+3. A 在 200 毫秒时返回结果，编排器把它写进结果数组的对应下标。
+4. B 同样在 200 毫秒时返回结果，写进自己的下标。
+5. 两份结果都就绪后，聚合器合并它们，总等待时间由较慢的那一个决定。
+
+**一步一步来**
+
+第 1 步要做什么：用 Promise.all 做一次全量并发，先确认顺序与耗时。
+
+```js
+const sleep = (ms, v) => new Promise((r) => setTimeout(() => r(v), ms));
+
+// 三个互不依赖的任务，同时发出，结果顺序与传入顺序一致
+async function allAtOnce() {
+  const start = Date.now();
+  const results = await Promise.all([
+    sleep(200, 'A'),   // 任务 A 耗时 200ms
+    sleep(200, 'B'),   // 任务 B 耗时 200ms
+    sleep(200, 'C'),   // 任务 C 耗时 200ms
+  ]);
+  return { results, elapsed: Date.now() - start }; // 结果数组下标与入参一一对应
+}
+```
+
+**这段代码在做什么**
+
+- 三个 sleep 在同步阶段就全部发出，不会互相等待。
+- 返回数组的下标与传入顺序严格对应，即使完成顺序不同。
+- 总耗时由最慢的任务决定，改动其中一个为 600 毫秒，总耗时随之变化。
+- Promise.all 有一个硬特性：任意一个拒绝，整体立刻拒绝，其余结果拿不到。
+
+运行结果：`{ results: ['A','B','C'], elapsed: 约 200 }`。
+
+第 2 步要做什么：加并发上限，用固定数量的工作槽轮流取任务。
+
+```js
+// 固定 limit 个工作槽，每个槽循环取下一个任务，取空就退出
+async function runWithLimit(tasks, limit) {
+  const results = new Array(tasks.length);   // 预分配，保证下标对齐
+  let next = 0;                              // 下一个待取任务的下标
+  const worker = async () => {
+    while (next < tasks.length) {
+      const i = next++;                      // 自增取号，同一轮不会取到同一个任务
+      results[i] = await tasks[i]();         // 结果写回自己的下标
+    }
+  };
+  const size = Math.min(limit, tasks.length);
+  await Promise.all(Array.from({ length: size }, worker)); // 等所有槽退出
+  return results;
+}
+```
+
+**这段代码在做什么**
+
+- 工作槽数量取 `limit` 与任务数的较小值，避免创建空槽。
+- `next++` 在同一个事件循环轮次里是原子的，不会有两个槽取到同一个下标。
+- 结果按任务原始下标写回，输出顺序与传入顺序一致，与完成先后无关。
+- 任一任务抛错会让对应工作槽的 Promise 拒绝，进而让整体的 Promise.all 拒绝。
+
+运行结果：4 个任务、上限 2 时，同时在飞的最大数量是 2。
+
+第 3 步要做什么：把分组接上执行器，先按依赖分组，再按资源和亲和性微调。
+
+```js
+// 按依赖分组：直接复用第 2 节的分层结果，把 id 映射回工具对象
+function groupByDependency(tools, layers) {
+  const byId = new Map(tools.map((t) => [t.id, t])); // 预建索引，避免每次线性查找
+  return layers.map((layer) => layer.map((id) => byId.get(id))); // 组间有序，组内无序
+}
+
+// 按资源分组：首次适应贪心，同组资源占用不超上限
+function groupByResource(tools, limits) {
+  const groups = [];
+  let current = [];
+  const usage = {};                                // 只统计当前组的占用
+  for (const tool of tools) {
+    const need = tool.resources ?? {};             // 工具没声明资源就按空需求处理
+    const fits = Object.entries(need).every(([k, v]) => (usage[k] ?? 0) + v <= limits[k]);
+    if (fits) {
+      current.push(tool);
+      for (const [k, v] of Object.entries(need)) usage[k] = (usage[k] ?? 0) + v; // 记账
+    } else {
+      groups.push(current);                        // 封箱
+      current = [tool];                            // 新组以当前工具开头
+      for (const k of Object.keys(usage)) usage[k] = 0; // 清零后必须补记当前工具的占用
+      for (const [k, v] of Object.entries(need)) usage[k] = v;
+    }
+  }
+  if (current.length) groups.push(current);        // 收尾组别丢
+  return groups;
+}
+```
+
+**这段代码在做什么**
+
+- `groupByDependency` 先建 id 到对象的索引，避免每组都重建 id 数组带来的平方级开销。
+- `groupByResource` 采用首次适应策略，装箱问题此处只求可行，不求最优。
+- 封箱时清零占用表之后，必须把新组第一个工具自身的占用补记进去，否则后续判断会偏乐观。
+- 资源清单必须显式声明，工具请求了未声明的资源会读到 undefined 参与比较，导致判断异常。
+- 亲和性分组与资源分组思路一致，都是单向贪心扫描，区别是合并依据从资源改成调用关联。
+
+运行结果：资源上限为 2、三个工具各需 1 时，得到两组，前一组两个工具。
+
+**动手验证**
+
+```js
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+const sleep = (ms, v) => new Promise((r) => setTimeout(() => r(v), ms));
+
+// 带并发上限的执行器，同时统计在飞峰值用于断言
+async function runWithLimit(tasks, limit) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  let inFlight = 0;
+  let peak = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const i = next++;
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      try {
+        results[i] = await tasks[i]();
+      } finally {
+        inFlight -= 1; // 无论成功失败都归还槽位
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return { results, peak };
+}
+
+const makeTask = (ms, value) => async () => {
+  await sleep(ms);
+  return value;
+};
+
+const tasks = [makeTask(100, 'A'), makeTask(100, 'B'), makeTask(100, 'C'), makeTask(100, 'D')];
+
+const start = Date.now();
+const limited = await runWithLimit(tasks, 2);
+const elapsedLimited = Date.now() - start;
+
+assert.deepEqual(limited.results, ['A', 'B', 'C', 'D']); // 顺序与传入一致
+assert.equal(limited.peak, 2);                          // 在飞峰值等于上限
+assert.ok(elapsedLimited < 400, '上限 2 时四任务分两批，耗时低于 400ms');
+
+const startAll = Date.now();
+const all = await Promise.all(tasks.map((t) => t()));
+const elapsedAll = Date.now() - startAll;
+assert.deepEqual(all, ['A', 'B', 'C', 'D']);
+assert.ok(elapsedAll < elapsedLimited, '不限流时总耗时低于限流版本');
+
+console.log('限流结果：', limited.results.join(','));
+console.log('限流峰值：', limited.peak, '限流耗时：', elapsedLimited);
+console.log('不限流耗时：', elapsedAll);
+console.log('断言全部通过');
+```
+
+预期输出，耗时数字以你本机实际输出为准：
+
+```
+限流结果： A,B,C,D
+限流峰值： 2 限流耗时： 203
+不限流耗时： 102
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 结果数组顺序错乱 | 用完成先后 push，而不是按下标写回 | 预分配数组，按下标赋值 |
+| 并发上限形同虚设 | 在循环里先 await 再发下一个任务 | 先同步发出全部任务，再统一 await |
+| 下游接口被限流 | 上限设得比下游配额大 | 上限按下游每秒配额除以单次耗时估算 |
+| 某组资源判断偏乐观 | 封箱时清零占用表后没补记新组第一个工具 | 清零后立刻把当前工具的需求写进占用表 |
+
+**用在哪里**
+
+商品详情页首屏聚合：业务背景是首屏要同时拿商品信息、库存、评价数、推荐位。这一节的知识用来把四路请求放进同一个 Promise.all，并给推荐位设单独的上限。指标用“首屏可交互时间”，取决于四路是否真并行以及最慢那一路的耗时。什么时候不该用：四路共享同一个后端接口且接口本身不支持并发时，强行并发只会触发限流。
+
+后台管理的批量导入：业务背景是一次导入五千行，每行要调用一次校验接口。这一节的知识用来把导入拆成固定大小批次，批次内并发、批次间排队。指标用“导入总耗时”与“被下游拒绝的请求数”。什么时候不该用：下游没有明确配额且数据量只有几十行，直接串行更省心。
+
+监控大盘的多数据源拉取：业务背景是大盘要同时拉三个数据源再渲染。这一节的知识用来给三个数据源各自的并发上限，避免一个慢源拖垮整体。指标用“大盘刷新成功率”。什么时候不该用：数据源之间存在一致性要求时，需要串行或在同一事务里读。
+
+**行业实践**
+
+- Python 官方文档的 concurrent.futures 章节：线程池执行器通过 `max_workers` 约束同时运行的任务数。怎么借鉴到你的项目：把并发上限做成执行器的构造参数，而不是散落在各处常量里。
+- MDN Web Docs 的 Promise 章节：`Promise.all` 在任一输入拒绝时立即拒绝，`Promise.allSettled` 等全部结束再返回每项状态。怎么借鉴到你的项目：批量任务用 allSettled 收集全部结果，再按状态分派处理。
+- p-limit 开源项目的 README：用一个小对象管理并发额度，调用方只关心排队。怎么借鉴到你的项目：把“排队”和“执行”分开，任务创建与任务调度解耦。
+- 需核对官方文档：`max_workers` 的默认值与平台差异，请以官方文档当前页面为准。
+
+**小结**
+
+1. 并行的收益上限由最慢的那一路决定，先把最慢一路找出来。
+2. 并发上限是并行执行的必需品，没有上限的并发等于把风险转给下游。
+3. 结果按下标写回，是保证“输出顺序等于输入顺序”的简单做法。
+
+## 4. 结果聚合与错误处理
+
+**先想一个问题**
+
+三个工具并行跑完了，一个返回对象，一个返回数组，一个返回数字。
+
+上层只想要一份结果，同时要知道哪一个失败了。
+
+合并规则和失败处理必须提前定好，否则每处调用方都会写一套自己的判断。
+
+**心智模型**
+
+!!! tip "心智模型"
+    - 一句话模型：聚合是按事先定好的策略把多份结果压成一份，错误处理是给失败结果一条可控的去路。
+    - 日常类比：三个人分别报账，会计按统一科目把账合到一张表上，报错的那一项单独标注。
+    - 类比不成立的地方：会计可以追问细节，程序只能按代码里写死的策略合并，冲突键会直接覆盖。
+
+!!! note "术语：降级值"
+    降级值 Fallback Value 指某次调用彻底失败后写进结果里的替代内容。例如天气接口失败时写入 `{ temp: null }`，让下游继续渲染骨架而不是整页报错。
+
+!!! note "术语：指数退避"
+    指数退避 Exponential Backoff 指每次重试前等待时间按倍数增长。例如基准 100 毫秒、倍数 2 时，三次重试前分别等待 100、200、400 毫秒。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+    state "待执行" as S0
+    state "执行中" as S1
+    state "成功" as S2
+    state "等待退避" as S3
+    state "重试耗尽" as S4
+    S0 --> S1: "取出一次尝试"
+    S1 --> S2: "返回结果"
+    S1 --> S3: "抛错且还有次数"
+    S3 --> S1: "等待结束再试"
+    S1 --> S4: "抛错且次数用尽"
+    S4 --> S2: "写入降级值"
+```
+
+1. 任务从待执行进入执行中，占用一次尝试机会。
+2. 调用成功直接进入成功状态，返回原始结果。
+3. 调用抛错且还有剩余次数，进入等待退避状态。
+4. 等待结束后回到执行中，消耗下一次尝试机会。
+5. 次数用尽仍失败，进入重试耗尽状态。
+6. 重试耗尽时写入降级值，上层拿到的是“失败但可用”的结果对象。
+
+四种聚合策略的差别如下。
+
+| 策略 | 输出形态 | 失败结果的处理 | 适合的场景 |
+| --- | --- | --- | --- |
+| 顺序聚合 | 按执行顺序列出每条结果 | 原样保留在列表里 | 需要回放整条链路 |
+| 合并聚合 | 对象字段合并、数组拼接到 items | 静默丢弃 | 多路召回结果合并 |
+| 归约聚合 | 求和、平均、最大、最小、数量 | 计入失败计数但不参与统计 | 指标汇总 |
+| 条件聚合 | 选第一个成功项作主结果，其余作补充 | 全失败才报错 | 主备数据源 |
+
+**一步一步来**
+
+第 1 步要做什么：统一结果对象，让聚合器不需要判断来源。
+
+```js
+// 每个工具的输出都包成这个形状，聚合器只认这四个字段
+function toResult(toolId, fn) {
+  return async (ctx) => {
+    const start = Date.now();
+    try {
+      const data = await fn(ctx);
+      return { toolId, success: true, data, error: null, costMs: Date.now() - start }; // 成功
+    } catch (err) {
+      return { toolId, success: false, data: null, error: err.message, costMs: Date.now() - start }; // 失败
+    }
+  };
+}
+// success 是后续所有聚合分支的第一道过滤条件
+```
+
+**这段代码在做什么**
+
+- 成功与失败返回同一个形状，聚合器不需要区分异常。
+- `costMs` 记录单步耗时，是后面定位最慢一路的依据。
+- 失败时 `data` 写 null，调用方必须显式判断 `success` 才能取值。
+- `toolId` 在合并策略里会升级成字典键，因此必须唯一。
+
+运行结果：返回一个包含五个字段的对象。
+
+第 2 步要做什么：实现合并聚合与归约聚合两个最常用的分支。
+
+```js
+// 合并聚合：对象浅合并，数组合并到 items，标量按工具 id 落键
+function mergeResults(results) {
+  const merged = {};
+  for (const r of results) {
+    if (!r.success) continue;                 // 失败项直接跳过
+    if (Array.isArray(r.data)) {
+      merged.items = merged.items ?? [];      // 懒初始化，避免凭空造出空数组
+      merged.items.push(...r.data);
+    } else if (r.data && typeof r.data === 'object') {
+      Object.assign(merged, r.data);          // 同名键后来者覆盖，注意数据丢失风险
+    } else {
+      merged[r.toolId] = r.data;              // 标量以工具 id 作键
+    }
+  }
+  return merged;
+}
+
+// 归约聚合：只提取数值，空集合时给出零值而不是抛异常
+function reduceResults(results) {
+  const values = results.filter((r) => r.success)
+    .map((r) => (typeof r.data === 'number' ? r.data : r.data?.value))
+    .filter((v) => typeof v === 'number');    // 非数值被静默忽略
+  const sum = values.reduce((a, b) => a + b, 0);
+  return { sum, avg: values.length ? sum / values.length : 0,
+    max: values.length ? Math.max(...values) : null,
+    min: values.length ? Math.min(...values) : null, count: values.length };
+}
+```
+
+**这段代码在做什么**
+
+- 合并聚合只处理成功项，失败项既不入结果也不报错，调用方需要另外看成功计数。
+- `Object.assign` 是同名键覆盖，设计时要约定字段命名空间。
+- 归约聚合先过滤非数值，`count` 反映的是被成功提取的数量，可能小于成功项总数。
+- 空数组时 `sum` 为 0、`avg` 为 0、`max` 与 `min` 为 null，避免除零与空集合取值。
+- 布尔值在 JavaScript 里不等于数值类型，`typeof true` 是 `boolean`，不会混进统计。
+
+运行结果：合并得到 `{ items: [...] }`，归约得到 `{ sum, avg, max, min, count }`。
+
+第 3 步要做什么：加重试与退避，并决定失败是中断还是收集。
+
+```js
+// 重试：总尝试次数到达上限后返回失败对象并带上降级值
+async function withRetry(fn, { tries = 3, baseDelay = 100, factor = 2, fallback = null } = {}) {
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      return { success: true, data: await fn(), attempts: attempt + 1 };
+    } catch (err) {
+      if (attempt === tries - 1) {
+        return { success: false, data: fallback, error: err.message, attempts: attempt + 1 };
+      }
+      const wait = baseDelay * factor ** attempt;       // 100、200、400 递增
+      await new Promise((r) => setTimeout(r, wait));    // 等待期间让出事件循环
+    }
+  }
+}
+
+// 两种失败策略：allSettled 收集全部，all 遇错即中断
+const collected = await Promise.allSettled(tasks.map((t) => t()));
+const failFast = await Promise.all(tasks.map((t) => t()));
+```
+
+**这段代码在做什么**
+
+- 循环次数等于 `tries`，即总尝试次数，命名上不要与“重试次数”混用。
+- 退避等待用 `setTimeout` 包成 Promise，不阻塞事件循环。
+- 最后一次失败返回失败对象并写入降级值，调用方可以继续往下走。
+- `Promise.allSettled` 等全部结束，返回每项的 `status` 与 `value` 或 `reason`。
+- `Promise.all` 遇错立即拒绝，已发出的其余任务不会被取消，这一点常被误解。
+
+运行结果：第一次成功的任务 `attempts` 为 1，重试两次成功的任务 `attempts` 为 3。
+
+**动手验证**
+
+```js
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 可控失败次数的假工具：failTimes 表示前几次调用抛错
+function flaky(failTimes, value) {
+  let calls = 0;
+  return async () => {
+    calls += 1;
+    if (calls <= failTimes) throw new Error(`第 ${calls} 次失败`);
+    return value;
+  };
+}
+
+async function withRetry(fn, { tries = 3, baseDelay = 5, factor = 2, fallback = null } = {}) {
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      return { success: true, data: await fn(), attempts: attempt + 1 };
+    } catch (err) {
+      if (attempt === tries - 1) {
+        return { success: false, data: fallback, error: err.message, attempts: attempt + 1 };
+      }
+      await sleep(baseDelay * factor ** attempt);
+    }
+  }
+}
+
+const ok = await withRetry(flaky(2, 'OK'));           // 前两次失败，第三次成功
+assert.equal(ok.success, true);
+assert.equal(ok.data, 'OK');
+assert.equal(ok.attempts, 3);
+
+const dead = await withRetry(flaky(99, 'never'), { tries: 3, baseDelay: 5, fallback: 'FALLBACK' });
+assert.equal(dead.success, false);
+assert.equal(dead.data, 'FALLBACK');                  // 降级值生效
+assert.match(dead.error, /第 3 次失败/);
+
+// 两种失败策略的对照
+const tasks = [async () => 'A', async () => { throw new Error('B 失败'); }, async () => 'C'];
+const settled = await Promise.allSettled(tasks.map((t) => t()));
+assert.deepEqual(settled.map((s) => s.status), ['fulfilled', 'rejected', 'fulfilled']); // 全部有结果
+await assert.rejects(() => Promise.all(tasks.map((t) => t())));                        // 一个失败即拒绝
+
+console.log('重试结果：', ok.data, '尝试次数：', ok.attempts);
+console.log('降级结果：', dead.data, '失败原因：', dead.error);
+console.log('收集状态：', settled.map((s) => s.status).join(','));
+console.log('断言全部通过');
+```
+
+预期输出：
+
+```
+重试结果： OK 尝试次数： 3
+降级结果： FALLBACK 失败原因： 第 3 次失败
+收集状态： fulfilled,rejected,fulfilled
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 一个工具失败，整批结果都没了 | 用了 `Promise.all`，遇错立即拒绝 | 改成 `Promise.allSettled` 或给每个任务套重试 |
+| 合并后字段莫名变成另一个工具的值 | 同名键浅合并，后写覆盖先写 | 约定前缀，或改成 `{ 工具 id: 数据 }` 结构 |
+| 统计结果里 count 与成功项数不符 | 归约只提取数值，非数值被忽略 | 在结果里同时给出成功项数与参与统计项数 |
+| 重试把下游压垮 | 退避时间固定或过短 | 改成指数退避，并给总尝试次数设上限 |
+
+**用在哪里**
+
+多路召回合并：业务背景是搜索同时查商品、店铺、活动三路。这一节的知识用来把三路结果合并到 items，同时用成功计数判断是否有召回源掉线。指标用“召回源掉线时首屏是否仍可渲染”。什么时候不该用：三路结果需要按同一商品去重且字段冲突严重时，合并前要先统一字段口径。
+
+风控多规则投票：业务背景是六条规则各自给出分数，最后加权汇总。这一节的知识用归约聚合把分数压成总分，用降级值处理单条规则超时的情形。指标用“单条规则超时时的整体可用率”。什么时候不该用：规则之间有严格优先级时，应当用条件聚合选主结果。
+
+报表数据汇总：业务背景是多个分区的统计任务产出分区数值。这一节的知识用来做归约，并在某个分区失败时记录失败分区列表。指标用“报表口径与实际参与汇总的分区数是否一致”。什么时候不该用：分区之间有层级汇总关系时，先按层级聚合再合并。
+
+**行业实践**
+
+- MDN Web Docs 的 Promise 章节：`Promise.allSettled` 返回每项的 `status` 与 `value` 或 `reason`，`Promise.all` 则遇错即拒绝。怎么借鉴到你的项目：批量 IO 默认用 allSettled，只有“缺一项就不能继续”的强依赖才用 all。
+- MDN Web Docs 的 AbortSignal 与 `AbortSignal.timeout` 章节：给单次请求设置超时信号，超时后以 AbortError 拒绝。怎么借鉴到你的项目：超时属于失败的一种，交给同一套重试与降级逻辑处理，不要在各处写独立分支。
+- Python 官方文档的 asyncio 章节：`asyncio.gather` 的 `return_exceptions` 参数决定异常是上抛还是作为结果返回。怎么借鉴到你的项目：把“异常当结果”还是“异常上抛”做成显式参数，团队成员一眼能看出策略。
+- 需核对官方文档：`AbortSignal.timeout` 在你的目标运行时与最低支持版本中的可用性，请以官方文档为准。
+
+**小结**
+
+1. 先统一结果对象，再谈聚合，否则每个分支都要判断来源类型。
+2. 失败策略只有两种：全部收集或遇错中断，要在接口层写明。
+3. 退避加降级让失败可控，降级值要能被下游识别并展示。
+
+## 5. 串行执行：顺序依赖与流水线
+
+**先想一个问题**
+
+翻译必须等摘要完成，摘要必须等抓取完成，这三步无法并行。
+
+同时，第三个步骤要能读前两步的输出，第四步可能因为某个条件而被跳过。
+
+串行执行要解决的是“沿着一条链传上下文”，而不是单纯地写三个 await。
+
+**心智模型**
+
+!!! tip "心智模型"
+    - 一句话模型：串行流水线按顺序执行步骤，每步从共享上下文读输入、往共享上下文写输出。
+    - 日常类比：接力赛，前一棒交棒后下一棒才起跑，棒就是上下文里的数据。
+    - 类比不成立的地方：接力棒必须交接，流水线里的步骤可以被条件跳过，跳过这件事必须显式记录下来。
+
+!!! note "术语：流水线上下文"
+    流水线上下文 Pipeline Context 指在步骤之间传递数据的共享对象，通常包含每步结果、元信息与错误列表。例如 `{ results: { fetch: {...} }, metadata: {}, errors: [] }`。
+
+!!! note "术语：条件步骤"
+    条件步骤指只在满足条件时才执行的步骤，条件不成立时记录为跳过。例如只有摘要长度超过阈值才执行翻译。
+
+**图解**
+
+```mermaid
+flowchart LR
+    init["初始输入"]
+    s1["步骤 fetch"]
+    s2["步骤 summary"]
+    s3["步骤 translate 带条件"]
+    s4["步骤 export 带输出转换"]
+    ctx["上下文 results 与 errors"]
+    init --> s1
+    s1 --> ctx
+    ctx --> s2
+    s2 --> ctx
+    ctx --> s3
+    s3 --> s4
+    s4 --> ctx
+```
+
+1. 初始输入写进上下文的 `results.initial`，作为所有步骤的兜底入参。
+2. 步骤 fetch 读取上下文并执行，结果按自己的 id 写回 `results.fetch`。
+3. 步骤 summary 通过输入转换函数只取 `results.fetch`，得到干净入参。
+4. 步骤 translate 先查条件，条件不成立就写 `metadata.translate_skipped` 并跳到下一步。
+5. 步骤 export 对结果做输出转换后再写回上下文。
+6. 任一步抛错，错误信息追加到 `errors`，同时把该步骤标记为失败，链路继续往下走。
+
+步骤的状态变化如下。
+
+```mermaid
+stateDiagram-v2
+    state "待执行" as P0
+    state "已跳过" as P1
+    state "执行中" as P2
+    state "已完成" as P3
+    state "已失败" as P4
+    P0 --> P1: "条件不成立"
+    P0 --> P2: "条件成立或无条件"
+    P2 --> P3: "返回结果并写回上下文"
+    P2 --> P4: "抛错并追加到错误列表"
+```
+
+**一步一步来**
+
+第 1 步要做什么：定义步骤描述与上下文对象，把可变默认值处理好。
+
+```js
+// 步骤描述：id、执行函数，以及三个可选钩子
+function createStep({ id, run, input, output, when }) {
+  return { id, run, input, output, when }; // input/output/when 缺省即为 undefined
+}
+
+// 上下文：每步结果、元信息、错误列表，三者都必须独立创建
+function createContext() {
+  return {
+    results: {},   // 按步骤 id 存档结果
+    metadata: {},  // 记录跳过与失败标志
+    errors: [],    // 收集错误信息，不中断链路
+  };
+}
+// 注意不要在函数参数里写默认空对象，否则多个上下文会共享同一个引用
+```
+
+**这段代码在做什么**
+
+- `input` 是输入转换函数，决定这一步从上下文里读什么。
+- `output` 是输出转换函数，把工具原始输出规整成下游要的形状。
+- `when` 是条件函数，返回 false 时这一步被跳过。
+- `createContext` 每次调用都新建三个容器，避免多个执行之间互相污染。
+- 跳过与失败都写进 `metadata`，调用方可以据此判断链路是否完整。
+
+运行结果：返回一个空的上下文对象。
+
+第 2 步要做什么：写执行循环，处理条件、转换与错误收集。
+
+```js
+// 顺序执行：把每个步骤的输入准备、执行、写回三段拆开
+async function execute(steps, initialInput) {
+  const ctx = createContext();
+  ctx.results.initial = initialInput;                       // 兜底入参
+  for (const step of steps) {
+    if (step.when && !step.when(ctx.results)) {             // 条件不成立
+      ctx.metadata[`${step.id}_skipped`] = true;            // 显式记录跳过
+      continue;                                             // 跳到下一步，不写结果
+    }
+    const inputData = step.input ? step.input(ctx.results) : ctx.results.initial;
+    try {
+      let result = await step.run(inputData);
+      if (step.output) result = step.output(result);        // 输出转换在写回之前
+      ctx.results[step.id] = result;                        // 按 id 存档
+    } catch (err) {
+      ctx.errors.push(`${step.id}: ${err.message}`);         // 收集而不是抛出
+      ctx.metadata[`${step.id}_failed`] = true;
+    }
+  }
+  return ctx;
+}
+```
+
+**这段代码在做什么**
+
+- 条件检查放在执行之前，跳过时只写元信息，不写结果。
+- 默认入参取 `results.initial`，让不写输入转换器的步骤也能拿到初始数据。
+- 输出转换在写回之前执行，下游步骤读到的已经是规整结果。
+- 错误被收集到 `errors`，链路继续执行，属于尽力而为语义。
+- 想改成快速失败，把 catch 里的收集换成抛出即可，其余结构不变。
+
+运行结果：所有步骤成功时 `errors` 为空数组。
+
+第 3 步要做什么：在整体层面加重试，同一轮里只重跑失败的步骤。
+
+```js
+// 整体重试：每一轮重跑一遍链路，只统计失败步骤，未失败的步骤会重复执行
+async function executeWithRetry(steps, initialInput, maxRounds = 3) {
+  let ctx = null;
+  for (let round = 0; round < maxRounds; round++) {
+    ctx = await execute(steps, initialInput);
+    if (ctx.errors.length === 0) return ctx;                // 干净收尾
+    // 只重跑失败步骤：把未失败的步骤标记为跳过条件
+    const failedIds = steps.filter((s) => ctx.metadata[`${s.id}_failed`]).map((s) => s.id);
+    steps = steps.map((s) => (failedIds.includes(s.id) ? s : { ...s, when: () => false }));
+  }
+  return ctx;                                               // 轮次用尽，返回最后一次上下文
+}
+```
+
+**这段代码在做什么**
+
+- 外层轮次打满或本轮无错误就结束，返回最后一份上下文。
+- 从 `metadata` 里挑出失败步骤的 id，只让这些步骤在下一轮真正执行。
+- 其余步骤用一个恒为 false 的条件替换，等于跳过，结果仍保留在上下文里。
+- 每一轮都新建上下文，所以上一轮的 `errors` 不会累积到这一轮。
+- 未失败的步骤被跳过后，它们的结果需要从上一轮上下文继承，这一步在真实实现里要显式拷贝。
+
+运行结果：前两轮有错误、第三轮全成功时，返回的上下文 `errors` 为空。
+
+**动手验证**
+
+```js
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function createContext() {
+  return { results: {}, metadata: {}, errors: [] };
+}
+
+async function execute(steps, initialInput) {
+  const ctx = createContext();
+  ctx.results.initial = initialInput;
+  for (const step of steps) {
+    if (step.when && !step.when(ctx.results)) {
+      ctx.metadata[`${step.id}_skipped`] = true;
+      continue;
+    }
+    const inputData = step.input ? step.input(ctx.results) : ctx.results.initial;
+    try {
+      let result = await step.run(inputData);
+      if (step.output) result = step.output(result);
+      ctx.results[step.id] = result;
+    } catch (err) {
+      ctx.errors.push(`${step.id}: ${err.message}`);
+      ctx.metadata[`${step.id}_failed`] = true;
+    }
+  }
+  return ctx;
+}
+
+const steps = [
+  { id: 'fetch', run: async () => { await sleep(10); return { doc: 'contract text' }; } },
+  { id: 'summary', input: (r) => r.fetch.doc, run: async (doc) => ({ text: doc.slice(0, 8) }) },
+  {
+    id: 'translate',
+    when: (r) => r.summary.text.length >= 5,
+    input: (r) => r.summary.text,
+    run: async (text) => text.toUpperCase(),
+    output: (v) => ({ en: v }),
+  },
+  {
+    id: 'export',
+    when: (r) => r.summary.text.length > 100, // 条件不成立，这一步会被跳过
+    run: async () => 'never',
+  },
+];
+
+const ctx = await execute(steps, { requestId: 'r-1' });
+
+assert.equal(ctx.results.fetch.doc, 'contract text');
+assert.equal(ctx.results.summary.text, 'contract');
+assert.equal(ctx.results.translate.en, 'CONTRACT');
+assert.equal(ctx.metadata.export_skipped, true);   // 跳过被显式记录
+assert.deepEqual(ctx.errors, []);                  // 链路无错误
+assert.equal(ctx.results.export, undefined);       // 跳过的步骤不产生结果
+
+// 再验证失败收集：第 2 步抛错时链路继续
+const broken = await execute(
+  [
+    { id: 'fetch', run: async () => 'ok' },
+    { id: 'summary', run: async () => { throw new Error('摘要服务超时'); } },
+    { id: 'translate', input: () => 'fallback', run: async (v) => v.toUpperCase() },
+  ],
+  {},
+);
+assert.equal(broken.errors.length, 1);
+assert.match(broken.errors[0], /摘要服务超时/);
+assert.equal(broken.metadata.summary_failed, true);
+assert.equal(broken.results.translate, 'FALLBACK'); // 后续步骤仍然执行
+
+console.log('翻译结果：', ctx.results.translate.en);
+console.log('导出是否跳过：', ctx.metadata.export_skipped);
+console.log('失败收集：', broken.errors[0]);
+console.log('断言全部通过');
+```
+
+预期输出：
+
+```
+翻译结果： CONTRACT
+导出是否跳过： true
+失败收集： summary: 摘要服务超时
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 上游结果读不到，输入是 undefined | 输入转换器里字段名写错，或上游被跳过 | 转换器里对缺失字段给出默认值，并检查跳过标志 |
+| 跳过之后链路仍然执行了该步骤 | 条件写在执行之后 | 条件检查必须在准备输入之前 |
+| 多个执行之间数据串了 | 上下文对象在函数默认参数里共享 | 每次执行都新建上下文容器 |
+| 重试把整条链重跑一遍 | 只实现了整链重试，没有记录失败步骤 | 用元信息标记失败步骤，重试时只放行失败项 |
+
+**用在哪里**
+
+多步表单提交：业务背景是开户流程分身份校验、资料填写、风控审核三步，每步依赖上一步的返回。这一节的知识用来把三步写成流水线，任何一步失败都能定位并单独重试。指标用“首次提交成功率与失败步骤的定位耗时”。什么时候不该用：三步提交到同一个接口且服务端原子处理，前端拆成流水线只会重复提交。
+
+文档生成流水线：业务背景是先把 Markdown 转 HTML，再注入目录，再压缩资源。这一节的知识用来表达严格顺序，并用输出转换把中间产物规整成下一步要的格式。指标用“生成失败时能定位到哪一步”。什么时候不该用：注入目录与压缩资源互不依赖时，可拆成流水线里的两个分支。
+
+CI 阶段执行：业务背景是安装依赖、跑测试、构建产物三个阶段依次执行。这一节的知识用来在每一步失败时保留已完成步骤的产物，便于排查。指标用“失败时可以看到的已完成步骤产物数量”。什么时候不该用：阶段之间完全独立时，改成并行 job 能缩短总耗时。
+
+**行业实践**
+
+- GitHub Actions 官方文档的 Workflow syntax 章节：`steps` 顺序执行，`steps.if` 决定某一步是否跳过，跳过会记录状态。怎么借鉴到你的项目：跳过必须有记录，否则日志里看不出这一步是没跑还是跑失败了。
+- LangChain 官方文档的 LCEL 章节：用 Runnable 序列把多步调用串成一条链，每步输出作为下一步输入。怎么借鉴到你的项目：把输入转换与输出转换抽成独立钩子，步骤函数只关心业务本身。
+- Apache Airflow 官方文档的 Task 与任务流章节：任务之间用依赖表达先后，任务状态区分成功、失败、跳过。怎么借鉴到你的项目：状态机至少包含“跳过”这一态，只有成功与失败两态会掩盖条件分支。
+- 需核对官方文档：跳过状态的命名与在界面上的展示方式，请以你所用平台的官方文档为准。
+
+**小结**
+
+1. 串行流水线的核心是上下文，步骤之间只通过上下文交换数据。
+2. 条件跳过与错误收集都要写进元信息，链路是否完整要能被查询。
+3. 重试粒度可以是整链，也可以是失败步骤，粒度越细越省重复调用。
+
+## 6. 状态传递与中间结果缓存
+
+**先想一个问题**
+
+一条包含八步的流水线，第四步会把用户的语言偏好写进状态，第六步要读到它。
+
+如果第六步失败，前五步对状态的修改要不要撤销？重跑时能不能只重跑失败的几步？
+
+状态传递要解决的是“跨步骤共享数据的存取与回退”，缓存要解决的是“同一入参不重复调用”。
+
+**心智模型**
+
+!!! tip "心智模型"
+    - 一句话模型：状态载体保存当前值加一份历史栈，缓存按入参的哈希记住昂贵调用的结果。
+    - 日常类比：游戏的存档点，打怪失败就从上一个存档重来，已经打到的装备还在背包里。
+    - 类比不成立的地方：存档只回滚内存数据，已经发出的请求和已经写库的数据不会被撤销。
+
+!!! note "术语：检查点"
+    检查点 Checkpoint 指把当前状态序列化成一个可保存的凭证，之后可以从这个凭证恢复。例如把 `{ lang: 'zh' }` 存成字符串，下次运行前先恢复再继续。
+
+!!! note "术语：幂等"
+    幂等 Idempotent 指同一个操作执行一次与执行多次，对结果的最终影响一致。例如“把状态里的 lang 设为 zh”是幂等的，“把计数加一”不是。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+    state "状态 v1" as V1
+    state "状态 v2" as V2
+    state "状态 v3" as V3
+    state "回退到 v2" as R2
+    V1 --> V2: "update 前先把 v1 深拷贝进历史栈"
+    V2 --> V3: "update 前先把 v2 深拷贝进历史栈"
+    V3 --> R2: "revert 一弹出栈顶并恢复"
+    R2 --> V2: "状态回到 v2"
+```
+
+1. 每次 `update` 之前，先把当前状态深拷贝一份压入历史栈。
+2. 顺序不可颠倒：先存档再覆盖，否则历史里存的是新值，回退会失效。
+3. 回退时按后进先出逐个弹出，回退一步就恢复一次。
+4. 历史深度不足时回退返回 false，状态保持原样，不会出现回退一半的中间态。
+5. 导出历史时同样要做深拷贝，避免外部修改污染内部栈。
+
+缓存键的生成与淘汰流程如下。
+
+```mermaid
+flowchart LR
+    call["工具 id 加输入对象"]
+    key["键：工具 id 加输入哈希"]
+    hit["命中：计数加一后返回"]
+    miss["未命中：执行工具"]
+    store["写入缓存"]
+    full["超出容量：淘汰计数最低项"]
+    call --> key
+    key --> hit
+    key --> miss
+    miss --> store
+    store --> full
+```
+
+**一步一步来**
+
+第 1 步要做什么：实现状态载体，保证历史是快照而不是引用。
+
+```js
+// 状态载体：当前值私有，历史栈保存被替换掉的旧值快照
+class StateCarrier {
+  #state;
+  #history = [];
+  constructor(initialState = {}) { this.#state = initialState; }
+
+  get state() { return this.#state; }               // 只读访问，整体赋值必须走 update
+
+  update(newState) {
+    this.#history.push(structuredClone(this.#state)); // 先深拷贝存档，再覆盖
+    this.#state = newState;
+  }
+
+  revert(steps = 1) {
+    if (this.#history.length < steps) return false;  // 深度不足则完全不改
+    for (let i = 0; i < steps; i++) this.#state = this.#history.pop();
+    return true;
+  }
+
+  getHistory() { return structuredClone(this.#history); } // 导出也做深拷贝
+}
+```
+
+**这段代码在做什么**
+
+- 私有字段加读访问器，保证状态只能通过 `update` 与 `revert` 变化。
+- `structuredClone` 生成独立副本，后续修改新状态不会影响已存档的历史。
+- 历史深度不足时直接返回 false，状态一点不动，避免半回退。
+- 导出历史同样深拷贝，防止调用方直接改动内部数组。
+- 成本来自深拷贝，状态体量大时要评估每次更新的开销。
+
+运行结果：更新两次后历史长度是 2，回退一次后恢复到第二个状态。
+
+第 2 步要做什么：约定工具的返回值协议，并把状态变更与业务输出分开。
+
+```js
+// 工具返回 { stateUpdate, output } 时，stateUpdate 是增量，output 是给下游的业务数据
+async function runStep(step, currentInput, carrier) {
+  const input = { ...currentInput, state: carrier.state }; // 给工具一个稳定的状态入口
+  const raw = await step.run(input);
+  if (raw && typeof raw === 'object' && 'stateUpdate' in raw) {
+    carrier.update({ ...carrier.state, ...raw.stateUpdate }); // 增量合并保留未涉及键
+    return raw.output ?? raw;                                 // 下游只看到业务输出
+  }
+  return raw;                                                 // 未声明状态变更就原样返回
+}
+
+// 失败时回退一步：本步可能已经改写状态，撤销到执行前
+try {
+  const out = await runStep(step, currentInput, carrier);
+  results[step.id] = out;
+} catch (err) {
+  errors.push(`${step.id}: ${err.message}`);
+  carrier.revert(1);                                          // 历史为空时返回 false 且不改状态
+}
+```
+
+**这段代码在做什么**
+
+- 输入里额外挂一个 `state` 字段，工具不用从散落字段里猜状态在哪。
+- `stateUpdate` 走增量合并，未提到的键保持原值。
+- 业务输出与状态变更分离，下游步骤读到的 `results` 里不会混入状态字段。
+- 失败时回退一步，理由是这一步可能已经部分改写了状态。
+- 回退依赖历史栈深度，历史为空时回退无效，此时状态本来也没被改过。
+
+运行结果：成功时状态被合并，失败时状态回到上一步。
+
+第 3 步要做什么：实现结果缓存，键要稳定，容量要受限。
+
+```js
+// 缓存键：键排序后序列化，保证字段顺序不同也能命中同一条
+function makeKey(toolId, inputs) {
+  const sortedKeys = Object.keys(inputs).sort();
+  return `${toolId}:${JSON.stringify(inputs, sortedKeys)}`; // 仅适用于浅层对象
+}
+
+class ResultCache {
+  #store = new Map();
+  #hits = new Map();
+  #maxSize;
+  constructor(maxSize = 100) { this.#maxSize = maxSize; }
+
+  get(toolId, inputs) {
+    const key = makeKey(toolId, inputs);
+    if (!this.#store.has(key)) return undefined;              // 未命中返回 undefined
+    this.#hits.set(key, (this.#hits.get(key) ?? 0) + 1);      // 命中才计数
+    return this.#store.get(key);
+  }
+
+  set(toolId, inputs, value) {
+    const key = makeKey(toolId, inputs);
+    this.#store.set(key, value);
+    if (this.#store.size > this.#maxSize) {
+      const lowest = Math.min(...this.#hits.values());        // 淘汰访问次数最低项
+      for (const [k, v] of this.#hits) if (v === lowest) { this.#store.delete(k); this.#hits.delete(k); break; }
+    }
+  }
+}
+```
+
+**这段代码在做什么**
+
+- 键排序保证 `{a:1,b:2}` 与 `{b:2,a:1}` 生成同一个键，否则缓存几乎不会命中。
+- 未命中返回 `undefined`，因此把 `undefined` 当作结果缓存会与未命中混淆，需要额外哨兵值。
+- 淘汰依据是访问次数，属于计数淘汰策略，不是严格最近最少使用。
+- 每次淘汰要做一次全表扫描找最小值，条目规模大时开销上升。
+- 键的生成依赖对象可序列化，输入含函数或循环引用时会抛错。
+
+运行结果：同一入参第二次调用直接返回缓存值，命中计数加一。
+
+**动手验证**
+
+```js
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+function makeKey(toolId, inputs) {
+  return `${toolId}:${JSON.stringify(inputs, Object.keys(inputs).sort())}`;
+}
+
+class StateCarrier {
+  #state;
+  #history = [];
+  constructor(initialState = {}) { this.#state = initialState; }
+  get state() { return this.#state; }
+  update(newState) {
+    this.#history.push(structuredClone(this.#state));
+    this.#state = newState;
+  }
+  revert(steps = 1) {
+    if (this.#history.length < steps) return false;
+    for (let i = 0; i < steps; i++) this.#state = this.#history.pop();
+    return true;
+  }
+  getHistory() { return structuredClone(this.#history); }
+}
+
+class ResultCache {
+  #store = new Map();
+  #hits = new Map();
+  #maxSize;
+  constructor(maxSize = 2) { this.#maxSize = maxSize; }
+  get(toolId, inputs) {
+    const key = makeKey(toolId, inputs);
+    if (!this.#store.has(key)) return undefined;
+    this.#hits.set(key, (this.#hits.get(key) ?? 0) + 1);
+    return this.#store.get(key);
+  }
+  set(toolId, inputs, value) {
+    const key = makeKey(toolId, inputs);
+    this.#store.set(key, value);
+    if (this.#store.size > this.#maxSize) {
+      const lowest = Math.min(...this.#hits.values());
+      for (const [k, v] of this.#hits) if (v === lowest) { this.#store.delete(k); this.#hits.delete(k); break; }
+    }
+  }
+  size() { return this.#store.size; }
+}
+
+// 状态：更新两次再回退一次
+const carrier = new StateCarrier({ lang: 'zh' });
+carrier.update({ ...carrier.state, tone: 'formal' });
+carrier.update({ ...carrier.state, length: 'short' });
+assert.deepEqual(carrier.state, { lang: 'zh', tone: 'formal', length: 'short' });
+assert.equal(carrier.revert(1), true);
+assert.deepEqual(carrier.state, { lang: 'zh', tone: 'formal' });
+assert.equal(carrier.revert(5), false);                  // 深度不足，状态不动
+assert.deepEqual(carrier.state, { lang: 'zh', tone: 'formal' });
+
+// 历史快照是副本：改外部对象不会污染历史
+const history = carrier.getHistory();
+history[0].lang = 'en';
+assert.equal(carrier.getHistory()[0].lang, 'zh');
+
+// 缓存：键顺序无关，容量超限会淘汰
+const cache = new ResultCache(2);
+let calls = 0;
+const expensive = (inputs) => { calls += 1; return { value: inputs.a + inputs.b }; };
+
+const inputs1 = { a: 1, b: 2 };
+const first = cache.get('sum', inputs1) ?? expensive(inputs1);
+cache.set('sum', inputs1, first);
+const second = cache.get('sum', { b: 2, a: 1 }) ?? expensive({ b: 2, a: 1 }); // 键顺序不同仍命中
+assert.deepEqual(second, { value: 3 });
+assert.equal(calls, 1);                                   // 昂贵调用只发生一次
+
+cache.set('sum', { a: 9, b: 9 }, { value: 18 });
+cache.set('sum', { a: 5, b: 5 }, { value: 10 });
+assert.ok(cache.size() <= 2);                             // 容量受控
+
+console.log('回退后状态：', JSON.stringify(carrier.state));
+console.log('昂贵调用次数：', calls);
+console.log('缓存条目数：', cache.size());
+console.log('断言全部通过');
+```
+
+预期输出：
+
+```
+回退后状态： {"lang":"zh","tone":"formal"}
+昂贵调用次数： 1
+缓存条目数： 2
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 回退后状态没变化 | 更新时先覆盖再存档，历史里存的是新值 | 调整顺序：先深拷贝旧值入栈，再覆盖 |
+| 缓存几乎不命中 | 键用 JSON 序列化但没排序字段 | 序列化前对键排序，或改用规范化结构 |
+| 缓存的空结果被当成未命中 | 用 `undefined` 同时表达未命中与命中值 | 缓存值外层包一层 `{ hit: true, value }` |
+| 状态被外部改动，历史错乱 | 返回的是内部对象的引用 | 导出与存档都做深拷贝 |
+
+**用在哪里**
+
+多轮对话 Agent：业务背景是用户聊到第五轮时提到“还是用中文”，后续回复要沿用这个偏好。这一节的知识用来把语言偏好写进状态载体，工具通过 `state` 字段读取。指标用“跨轮次偏好丢失的比例”。什么时候不该用：偏好只在单轮有效时，放进单次请求参数更合适。
+
+工作流编辑器的撤销重做：业务背景是用户拖动节点、改参数，需要支持多步撤销。这一节的知识用来把每次编辑前的配置深拷贝进栈，撤销就是弹栈恢复。指标用“撤销后配置与编辑前的一致性”。什么时候不该用：编辑动作已经同步到服务端时，本地回退会造成前后端不一致。
+
+报表增量刷新：业务背景是同一份源数据被多个报表复用，重复计算代价高。这一节的知识用来按源数据指纹做缓存键，命中就跳过计算。指标用“重复计算次数”。什么时候不该用：源数据每秒变化时，缓存键不断变化，命中率接近零。
+
+**行业实践**
+
+- Python 官方文档的 copy 章节：`copy.deepcopy` 生成递归副本，`copy.copy` 只复制最外层。怎么借鉴到你的项目：状态历史必须用深拷贝，浅拷贝在多层嵌套里会留下共享引用。
+- Redis 官方文档的 EXPIRE 与键过期章节：缓存项可以设置存活时间，到期自动清理。怎么借鉴到你的项目：内存缓存也应有过期概念，只按容量淘汰会让陈旧数据长期留在内存里。
+- Temporal 官方文档的 Workflow 与 Activity 章节：工作流要求可重放，因此工作流代码必须保持确定性，副作用放进 Activity。怎么借鉴到你的项目：把“纯计算的状态合并”与“有副作用的调用”分开写，重放时才不会重复发请求。
+- 需核对官方文档：以上三处的具体配置项名称与默认行为，请以你所用版本的官方文档为准。
+
+**小结**
+
+1. 状态载体的更新顺序是“先存档再覆盖”，顺序反了回退就失效。
+2. 状态变更与业务输出要分字段传递，否则下游要过滤状态字段。
+3. 缓存键要稳定、容量要有上限，键不稳定等于没有缓存。
+
+## 7. 并行还是串行：选择策略与混合编排
+
+**先想一个问题**
+
+一个包含六个工具的流程摆在你面前，你需要决定哪些并行、哪些串行。
+
+判断依据不是感觉，而是三个可检查的问题。
+
+**心智模型**
+
+!!! tip "心智模型"
+    - 一句话模型：先看数据依赖，再看资源冲突，最后看失败影响半径，三者共同决定并行还是串行。
+    - 日常类比：厨房里两道菜共用一口锅，就得排队，锅就是被争夺的资源。
+    - 类比不成立的地方：锅的争夺是物理的，程序的资源冲突来自配额与限流，需要你自己声明。
+
+!!! note "术语：失败影响半径"
+    失败影响半径指某个步骤失败后会牵连到多少下游步骤。例如摘要失败会让翻译和导出都失去输入，半径是 2。
+
+**图解**
+
+```mermaid
+flowchart TB
+    q1["变量 B 是否读取变量 A 的输出"]
+    yes1["必须串行：A 在 B 之前"]
+    q2["两步是否同时占用同一份配额或资源"]
+    yes2["串行或加并发上限"]
+    q3["某步失败是否影响其他分支的必要性"]
+    yes3["加条件跳过与降级值"]
+    mixed["混合编排：层间串行，层内并行"]
+    q1 -->|"是"| yes1
+    q1 -->|"否"| q2
+    q2 -->|"是"| yes2
+    q2 -->|"否"| q3
+    q3 -->|"是"| yes3
+    q3 -->|"否"| mixed
+```
+
+1. 第一个问题问数据依赖，答案是“是”就定下一条串行的先后边。
+2. 第二个问题问资源竞争，答案是“是”就给这一组加并发上限或直接排队。
+3. 第三个问题问失败影响，答案是“是”就给下游加条件判断与降级值。
+4. 三个问题都能给出“否”的分支，就是可以放进同一批并行的部分。
+5. 混合编排的结果是：批次之间严格串行，批次内部并行，并共享同一个并发上限。
+
+**一步一步来**
+
+第 1 步要做什么：先只按数据依赖分层，得到并行的骨架。
+
+```js
+// 复用第 2 节的分层：只关心层级，不关心每层里有多少节点
+const layers = [['fetch'], ['summary', 'exportPdf'], ['translate']];
+// 骨架含义：第一层单独跑，第二层两个节点同时跑，第三层等第二层全部结束
+```
+
+**这段代码在做什么**
+
+- 每一层内部没有依赖，可以放进同一个并发批次。
+- 层与层之间必须严格等待，上一层的全部结果都是下一层的输入来源。
+- 这个骨架已经能覆盖大部分场景，先跑通骨架再谈优化。
+- 分层结果与并发上限是两个独立参数，可以自由组合。
+
+运行结果：三层的结构数组。
+
+第 2 步要做什么：把层内并行接到带上限的执行器上，层间用 await 串起来。
+
+```js
+// 混合执行：层间串行，层内并发，整体共享一个上限
+async function runLayered(layers, runTool, limit = 2) {
+  const ctx = {};
+  for (const layer of layers) {                            // 外层严格串行
+    const start = Date.now();
+    Object.assign(ctx, await runWithLimit(layer.map((id) => () => runTool(id, ctx)), limit));
+    ctx[`__layerMs_${layer.join('_')}`] = Date.now() - start; // 记录每层耗时便于观察
+  }
+  return ctx;
+}
+```
+
+**这段代码在做什么**
+
+- 外层 for 加 await 保证层间串行，内层用并发上限控制同时在飞的数量。
+- 层内所有任务共享同一份 `ctx` 快照，因此层内任务之间不能互相读对方的结果。
+- 记录每层耗时是为了找出瓶颈层，而不是为了展示。
+- 如果把 `limit` 设为层的长度，就退化成完全并行。
+
+运行结果：返回合并后的上下文，附带每层耗时记录。
+
+第 3 步要做什么：给失败分支加条件跳过，避免下游拿到空值继续跑。
+
+```js
+// 依赖检查：上游失败时，下游标记为跳过而不是硬跑
+function guard(dependencyIds, metadata) {
+  return (results) => dependencyIds.every((id) => metadata[`${id}_failed`] !== true
+    && metadata[`${id}_skipped`] !== true);               // 上游健全才继续
+}
+
+// 用法：把守卫挂到下游步骤的 when 上
+const steps = [
+  { id: 'summary', run: async () => 'text' },
+  { id: 'translate', when: guard(['summary'], meta), run: async () => 'EN' },
+];
+```
+
+**这段代码在做什么**
+
+- 守卫函数读元信息，判断上游是否有失败或跳过记录。
+- 上游不健全时，下游被跳过，结果不会被写入上下文。
+- 跳过会带上 `_skipped` 标记，最终汇报里能看出哪些步骤因为上游问题没跑。
+- 守卫与业务条件可以组合，例如“上游健全且文本长度超过阈值”。
+- 这一层保证了失败不会沿着链路扩散成一片无意义的报错。
+
+运行结果：上游失败时，下游步骤的元信息里出现跳过标记。
+
+**动手验证**
+
+```js
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+const sleep = (ms, v) => new Promise((r) => setTimeout(() => r(v), ms));
+
+async function runWithLimit(tasks, limit) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const i = next++;
+      results[i] = await tasks[i]();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
+}
+
+// 六个工具：fetch 与 config 无依赖；summary 与 exportPdf 依赖 fetch；translate 依赖 summary
+const defs = {
+  fetch: { deps: [], ms: 100 },
+  config: { deps: [], ms: 100 },
+  summary: { deps: ['fetch'], ms: 100 },
+  exportPdf: { deps: ['fetch'], ms: 100 },
+  translate: { deps: ['summary'], ms: 100 },
+  index: { deps: ['summary'], ms: 100 },
+};
+
+function layersOf(defs) {
+  const ids = Object.keys(defs);
+  const done = new Set();
+  const out = [];
+  while (done.size < ids.length) {
+    const layer = ids.filter((id) => !done.has(id) && defs[id].deps.every((d) => done.has(d)));
+    if (!layer.length) throw new Error('存在环或悬空依赖');
+    out.push(layer);
+    layer.forEach((id) => done.add(id));
+  }
+  return out;
+}
+
+// 共享同一份 ctx，因此层内任务不互相读取结果，只读上一层的
+async function runMixed(ctx, order, defs, limit) {
+  const results = [];
+  for (const id of order) {
+    await sleep(defs[id].ms);                     // 模拟工具耗时
+    ctx[id] = { from: id, deps: defs[id].deps };   // 结果按 id 写回上下文
+    results.push(id);
+  }
+  return results;
+}
+
+const layers = layersOf(defs);
+assert.deepEqual(layers, [['fetch', 'config'], ['summary', 'exportPdf'], ['translate', 'index']]);
+
+const ctx = {};
+const start = Date.now();
+for (const layer of layers) {
+  const layerStart = Date.now();
+  // 层内并行，上限 2；每个任务只读上一层已经写好的上下文
+  await runWithLimit(layer.map((id) => () => runMixed(ctx, [id], defs, 2)), 2);
+  ctx[`__ms_${layer.join('_')}`] = Date.now() - layerStart;
+}
+const elapsed = Date.now() - start;
+
+assert.deepEqual(Object.keys(ctx.translate), ['from', 'deps']);
+assert.equal(ctx.translate.from, 'translate');
+assert.ok(elapsed < 500, '三层各约 100ms，总耗时应显著低于六步串行的 600ms');
+
+console.log('分层：', JSON.stringify(layers));
+console.log('总耗时毫秒：', elapsed);
+console.log('断言全部通过');
+```
+
+预期输出，耗时数字以你本机实际输出为准：
+
+```
+分层： [["fetch","config"],["summary","exportPdf"],["translate","index"]]
+总耗时毫秒： 306
+断言全部通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 层内任务读到了同层另一个任务的结果 | 层内任务共享上下文，写入顺序不确定 | 约定层内任务只读上一层结果，禁止同层互相读取 |
+| 上游失败后下游一片报错 | 没有守卫，下游拿空值继续执行 | 给下游挂条件守卫，上游失败就跳过 |
+| 总耗时没有下降 | 最慢的一层本身就是单节点，并行没落在关键路径上 | 先把关键路径上的单节点找出来优化，再调整并发上限 |
+| 并发上限调大后错误率上升 | 上限超过下游配额 | 上限按下游配额分段设置，必要时按层使用不同上限 |
+
+**用在哪里**
+
+首屏渲染编排：业务背景是首屏要拿用户信息、消息数、推荐位，其中推荐位依赖用户信息。这一节的知识用来分层：用户信息第一层，消息数与推荐位第二层，其余按需加载第三层。指标用“首屏关键内容可见时间”。什么时候不该用：推荐位与用户信息可以同时发且服务端能补齐时，拆层反而增加一次往返。
+
+数据同步任务编排：业务背景是先从三个源拉数据，再统一做转换，最后写入仓库。这一节的知识用来把拉取放同一层并行、转换与写入放后续层。指标用“整批同步的可重跑次数与失败定位耗时”。什么时候不该用：三个源的数据需要保持同一时刻的快照时，需要先冻结版本再并行拉取。
+
+Agent 的多工具问答：业务背景是用户问题需要先查知识库，再按知识库结果决定是否查订单。这一节的知识用来把查询放第一层，把依赖结果的两类查询放第二层，并给第二层加并发上限。指标用“单次问答的端到端耗时与工具失败率”。什么时候不该用：第二步的工具选择完全取决于第一步返回的内容时，无法提前分层，只能串行。
+
+**行业实践**
+
+- Apache Airflow 官方文档的 DAGs 与调度章节：同一层的任务可以并行调度，层与层之间由依赖约束。怎么借鉴到你的项目：把“层”作为调度单位，层内并发上限作为可调参数。
+- GitHub Actions 官方文档的 Workflow syntax 章节：无 `needs` 关系的 job 并行执行，有 `needs` 的 job 等上游完成。怎么借鉴到你的项目：先把作业画成依赖图，再由平台决定并行度，不要手工摆顺序。
+- LangChain 官方文档的 LCEL 章节：并行分支与串行链可以互相嵌套组合。怎么借鉴到你的项目：混合编排就是串行链里嵌并行分支，用同一套组合原语表达。
+- 需核对官方文档：各平台在同一时刻允许的最大并行作业数，请以官方文档的配额说明为准。
+
+**小结**
+
+1. 判断顺序是数据依赖、资源冲突、失败影响，三步走完再决定并行还是串行。
+2. 混合编排的形态固定为层间串行、层内并行，并发上限独立于分层结果调整。
+3. 守卫让失败不扩散，跳过标记让汇报能解释“为什么这一步没跑”。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 商品详情页首屏聚合 | 并行执行与并发上限 | `Promise.all` 加自写并发池 | 最慢一路决定耗时，先找出关键路径 |
+| 搜索多路召回 | 结果聚合的合并策略 | 合并聚合加成功计数 | 同名键会覆盖，先统一字段口径 |
+| 批量导入校验 | 按依赖分组加资源分组 | 分批并发加批次间排队 | 下游配额决定并发上限，别按机器核数设 |
+| 多轮对话 Agent | 状态载体与检查点 | 状态载体加固化存储 | 状态里不要放不可序列化的对象 |
+| 文档生成流水线 | 串行流水线与条件步骤 | 步骤数组加条件函数 | 跳过必须有记录，否则日志无法解释 |
+| 报表增量刷新 | 结果缓存与缓存键 | 按源数据指纹做键 | 源数据高频变化时缓存命中率接近零 |
+| CI 阶段编排 | 依赖图与分层 | 依赖图的拓扑分层 | 阶段间共享产物时要显式传递路径 |
+| 工作流编辑器撤销 | 状态回退 | 历史栈加深度上限 | 已同步到服务端的操作不能只靠本地回退 |
+
+## 动手作业
+
+目标：写一个 mini-orchestrator，接收一份工具描述数组，自动完成依赖分层、层内并发执行、结果聚合、失败重试与状态记录。
 
 步骤：
-1. 用 Node.js 起本地服务，提供 `/a`、`/b`、`/c` 三个接口，每个接口延迟 300ms 返回 JSON。
-2. 写页面 1：依次 await 三个接口，用 `performance.now()` 记录总耗时。
-3. 写页面 2：用 `Promise.all` 同时请求三个接口，记录总耗时。
-4. 把 `/b` 改成 40% 概率返回 500，页面 2 换成 `Promise.allSettled`，只渲染成功的部分。
-5. 给页面 2 加 `AbortController`，放一个“取消”按钮，点击后中断整批请求。
-6. 用 Chrome DevTools 的 Network 与 Performance 面板分别记录两种模式的耗时与瀑布图。
-7. 把结果整理成对照表，写明两种模式的耗时差与失败时的页面表现。
 
-验收标准：
-- 两种模式的耗时数据可复现，连续重跑三次的差值稳定。
-- `/b` 返回 500 时，页面 2 仍能渲染 `/a` 与 `/c` 的结果。
-- 点击取消后，Network 面板中未完成请求的状态为 canceled。
-- 对照表包含接口延迟、并发数、失败注入比例三项参数。
+1. 定义工具描述：`{ id, deps, resources, run, retry }`，`run` 是异步函数，入参是上下文对象。
+2. 建依赖图并做校验：悬空依赖抛错，环抛错，孤立节点进入第一层。
+3. 按拓扑分层，层间串行，层内用并发上限执行，上限作为参数传入。
+4. 每个工具包一层重试，失败时写入降级值，并把失败信息追加到错误列表。
+5. 用合并聚合把成功结果合并，输出 `{ data, successCount, failedIds, layerMs }`。
+6. 记录每层耗时，并打印一条可读的执行报告。
 
+验收标准，全部可用断言检查：
+
+- 给一份含 6 个工具、3 层的描述，分层结果与手工推导的分层数组深度相等。
+- 层内并发上限设为 2 时，统计到的在飞峰值等于 2。
+- 故意让一个工具连续失败 3 次，最终结果里该工具 id 出现在 `failedIds` 中，且 `data` 里带上了降级值。
+- 三个阶段之间的顺序通过时间戳断言：第二层最早开始时间不早于第一层最晚结束时间。
+- 重复调用两次，`layerMs` 的键集合一致，说明分层是确定性的。
+- 输出 JSON 报告，字段包含 `data`、`successCount`、`failedIds`、`layerMs`，四者都存在。
+
+## 综合对比
+
+| 维度 | 并行执行 | 串行执行 |
+| --- | --- | --- |
+| 触发条件 | 步骤之间无数据依赖 | 步骤之间存在数据或资源依赖 |
+| 总耗时形态 | 由最慢的一路决定 | 各步耗时相加 |
+| 结果顺序保证 | 需要按下标写回 | 天然有序 |
+| 上下文共享 | 同批任务只读上一批结果 | 每步可读写最新上下文 |
+| 失败影响半径 | 单点失败可能让整批拿不到结果 | 单点失败只影响后续步骤 |
+| 错误处理手段 | 收集全部加降级值加并发上限 | 记录失败步骤加重跑失败项 |
+| 状态一致性 | 需要避免同批写同一份状态 | 天然形成先后因果 |
+| 调试难度 | 完成顺序不确定，要打时间戳 | 顺序确定，按日志顺序读 |
+| 资源占用 | 同时在飞的任务数等于并发上限 | 同时在飞的任务数等于 1 |
+| 典型 API | `Promise.all`、`Promise.allSettled`、并发池 | `for` 加 `await`、流水线执行循环 |
+| 观测指标 | 在飞峰值、批次耗时、最慢一路耗时 | 每步耗时、失败步骤数、跳过步骤数 |
+| 适用步骤数 | 无依赖的步骤越多收益越大 | 步骤数不影响形态，只影响总耗时 |
+
+## 自测题
+
+??? question "编排和直接调用工具的区别是什么"
+    - 编排按依赖图在运行时决定步骤与批次，直接调用把顺序写死在代码里。
+    - 编排的每一步都有 id 与结果对象，失败可以定位到具体步骤。
+    - 编排能对同一批无依赖步骤做并发控制，直接调用只能顺序执行。
+    - 新增步骤时编排只需增加一份描述数据，直接调用要改函数体。
+
+??? question "为什么并行执行前必须先做依赖分析"
+    - 依赖决定哪些步骤可以同时发出，没有依赖图只能按数组顺序跑。
+    - 有环的图无法排出执行顺序，必须先检出环并报错。
+    - 拓扑分层给出了批次边界，是并发上限与结果写回下标的前提。
+    - 孤立节点的入度为 0，属于第一批，漏掉它们会导致部分工具不执行。
+
+??? question "入度为零的节点为什么可以放在同一批"
+    - 入度为零表示没有未完成的前置步骤。
+    - 这些节点两两之间不存在依赖边，因此先后可以交换。
+    - 同一批执行完再统一把它们的出边对应入度减一。
+    - 如果某一轮取不到入度为零的节点而仍有剩余，说明存在环。
+
+??? question "Promise.all 和 Promise.allSettled 该选哪个"
+    - `Promise.all` 在任意一项拒绝时整体拒绝，已经发出的其余任务不会被取消。
+    - `Promise.allSettled` 等全部结束，返回每项的 `status` 与 `value` 或 `reason`。
+    - 批量任务里希望拿到全部结果并分别处理失败时，选 `allSettled`。
+    - 缺一项就无法继续的强依赖步骤，选 `Promise.all` 并配合重试与降级。
+
+??? question "并发上限应该按什么依据设置"
+    - 依据是下游的配额，而不是本机的 CPU 核数。
+    - 单次耗时乘并发上限不宜超过下游每秒允许的请求数。
+    - 上限过大表现为下游拒绝率上升，上限过小表现为总耗时接近串行。
+    - 按层设置不同上限可以兼顾关键路径与边缘任务。
+
+??? question "串行流水线里为什么要把状态变更和业务输出分开"
+    - 下游步骤只需要业务数据，状态字段混进数据流会让每一步都要过滤。
+    - 状态变更用增量合并，未提到的键保持原值，语义更清楚。
+    - 失败时可以只回退状态，而不影响已经写入上下文的历史结果。
+    - 分离之后重放某一步不会因为状态字段缺省而改写关键配置。
+
+??? question "状态载体的更新为什么要先深拷贝再覆盖"
+    - 若先覆盖再存档，历史里保存的就是新值本身，回退拿不到旧值。
+    - 深拷贝保证历史与新状态不共享嵌套引用，后续修改互不影响。
+    - 导出历史时同样要深拷贝，否则外部改动会破坏内部栈。
+    - 历史深度不足时回退应返回失败且不改状态，避免半回退。
+
+??? question "缓存键生成最容易出什么错"
+    - 键的字段顺序不同会生成不同键，导致命中率接近零。
+    - 序列化前应对键排序，或改用规范化后的结构参与哈希。
+    - 用 `undefined` 同时表达未命中会导致命中空值时判断错误。
+    - 输入含不可序列化对象时生成键会抛错，需要在入口处拦截。
+
+## 延伸阅读
+
+- MDN Web Docs：Promise 章节，包含 `Promise.all`、`Promise.allSettled`、`Promise.race`、`Promise.any` 的语义与示例。
+- MDN Web Docs：AbortController 与 AbortSignal 章节，包含 `AbortSignal.timeout` 的用法与浏览器兼容信息。
+- Node.js 官方文档：Timers 章节与 Test runner 章节，包含定时器与 `node:test`、`node:assert` 的用法。
+- Python 官方文档：concurrent.futures 章节，包含 `ThreadPoolExecutor` 与 `max_workers` 参数说明。
+- Python 官方文档：asyncio 章节，包含任务、`gather` 与 `return_exceptions` 参数说明。
+- Python 官方文档：copy 章节，包含 `copy` 与 `deepcopy` 的差别与递归复制说明。
+- Apache Airflow 官方文档：DAGs 章节与任务依赖章节，包含任务流与调度触发条件说明。
+- GitHub Actions 官方文档：Workflow syntax for GitHub Actions 章节，包含 `jobs.<job_id>.needs` 与 `steps.if` 的语义。
+- LangChain 官方文档：LCEL 章节与 Runnable 接口章节，包含串行与并行组合用法。
+- Redis 官方文档：EXPIRE 与键过期相关命令章节，包含存活时间与淘汰语义说明。
+- Mermaid 官方文档：Flowchart 语法章节与 Sequence Diagram 语法章节，包含节点标签与连线的书写规则。
+
+需核对官方文档：以上章节中与运行时版本强相关的参数默认值、字段名与配额上限，请以你当前使用的版本页面为准。

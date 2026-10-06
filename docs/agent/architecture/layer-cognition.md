@@ -1,1592 +1,1377 @@
 ---
-title: 认知层
-description: Agent 分层架构之认知层：理解、推理、记忆与知识表示。
-tags:
-  - ai-agent
-  - langchain
-date: 2026-05-17
+title: "认知层"
+description: "Agent 分层架构之认知层：理解、推理、记忆与知识表示。"
 ---
 
 # 认知层
 
-认知层是 AI Agent 的"大脑"，负责推理、规划、记忆和知识管理。这一层决定了 Agent 的智能水平。
+本文讲 Agent 分层架构里的认知层：理解、推理、记忆与知识表示。
+认知层不直接调工具，它产出的是决策依据。
 
-## 1. 推理引擎 (Reasoner Engine)
+!!! abstract "学完这一页你能"
+    1. 写出认知层的输入输出结构，并说清它与执行层的职责边界。
+    2. 用演绎、归纳、溯因三类策略各举一例，并给出可复现的置信度算法。
+    3. 把一句高层目标拆成带依赖、带预条件、带修复步骤的行动计划。
+    4. 设计情景、语义、程序、工作四类记忆的写入与检索路径，并用脚本验证排序结果。
 
-推理引擎负责对输入进行深度分析，生成推理链和结论。
+## 0. 知识地图
 
-```typescript
-// 推理类型
-type ReasoningType = 'deductive' | 'inductive' | 'abductive' | 'causal' | 'analogical';
+```mermaid
+flowchart TD
+    A["用户输入与上下文"] --> B["认知层"]
+    B --> C["推理引擎"]
+    B --> D["规划器"]
+    B --> E["记忆系统"]
+    B --> F["知识图谱"]
+    C --> G["结论与推理链"]
+    D --> H["行动计划"]
+    E --> I["检索到的记忆"]
+    F --> J["实体与关系"]
+    G --> K["执行层"]
+    H --> K
+    I --> K
+    J --> K
+    K --> L["工具调用结果"]
+    L --> E
+    L --> F
+```
 
-interface ReasoningResult {
-  type: ReasoningType;
-  conclusion: string;
-  confidence: number;
-  chain: ReasoningStep[];
-  evidence: Evidence[];
-  alternatives: AlternativeReasoning[];
+建议按顺序读：先看第 1 节确认认知层的边界，再依次读推理、规划、记忆、知识图谱四块。
+第 6 节把四块接成一次完整请求，第 7 节讲怎么判断自己写对了。
+如果时间有限，先读第 1 节与第 6 节的时序图。
+
+!!! note "术语：Agent"
+    定义：能感知输入、自主决定动作、并通过工具影响外部环境的软件系统。
+    例子：收到"查一下昨天订单量"后自己去调用统计接口、再把结果组织成回答的程序。
+
+## 1. 认知层管什么
+
+**先想一个问题**
+
+用户对客服 Agent 说："帮我把上周买的那双鞋退掉。"
+
+如果系统收到这句话就直接调退款接口，会发生什么？
+
+它没有确认订单号，没有校验退货期限，也没有记录退货原因。
+
+!!! note "术语：认知层"
+    定义：Agent 中负责理解、推理、规划、记忆与知识表示的部分，产物是决策依据而不是外部动作。
+    例子：把"退那双鞋"翻译成"定位上周订单 → 校验可退 → 生成退款计划"。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：认知层决定"做什么、为什么这么做、记住什么"，执行层只负责"把它做掉"。
+    日常类比：认知层是会议室里的讨论与决策，执行层是车间里的机械臂。
+    类比不成立的地方：会议室里的人是同一个人，而模型的每次调用都会重新计算，上一轮结论只能靠外部记忆保存。
+
+**图解**
+
+```mermaid
+flowchart LR
+    A["用户输入"] --> B["结构化输入"]
+    B --> C["认知层"]
+    C --> C1["推理引擎"]
+    C --> C2["规划器"]
+    C --> C3["记忆系统"]
+    C --> C4["知识图谱"]
+    C --> D["决策与计划"]
+    D --> E["执行层"]
+    E --> F["工具与外部系统"]
+    F --> G["执行结果"]
+    G --> C3
+```
+
+1. 用户输入先被解析成结构化输入，后面所有模块都只读这个结构。
+2. 认知层四个模块各自产出结论、计划、检索结果、关系数据。
+3. 决策与计划交给执行层，执行层负责工具调用与重试。
+4. 执行结果写回记忆系统，下一次请求可以读到它。
+
+**一步一步来**
+
+第 1 步：定义认知层的输入结构，把原始文本和运行上下文分开。
+
+```ts
+// 原始输入只出现一次，之后就只读结构化结果
+interface ParsedInput {
+  raw: string;            // 用户原话
+  normalizedText: string; // 去掉多余空白后的文本
+  entities: string[];     // 识别出的实体，例如 订单号
 }
 
-interface ReasoningStep {
-  index: number;
-  premise: string;
-  inference: string;
-  conclusion: string;
-  rule: InferenceRule;
-}
-
-interface InferenceRule {
-  id: string;
-  name: string;
-  type: string;
-  premises: string[];
-  conclusion: string;
-}
-
-// 推理引擎
-class ReasonerEngine {
-  private rules: Map<string, InferenceRule> = new Map();
-  private reasoningStrategies: Map<ReasoningType, ReasoningStrategy> = new Map();
-  private knowledgeBase: KnowledgeBase;
-  private contextCache: Map<string, any> = new Map();
-
-  constructor(config: ReasonerConfig) {
-    this.initializeRules();
-    this.initializeStrategies();
-    this.knowledgeBase = new KnowledgeBase(config.knowledgeBasePath);
-  }
-
-  private initializeRules(): void {
-    // 添加常见的推理规则
-
-    // 肯定前件 (Modus Ponens)
-    this.rules.set('modus_ponens', {
-      id: 'modus_ponens',
-      name: 'Modus Ponens',
-      type: 'deductive',
-      premises: ['If P then Q', 'P'],
-      conclusion: 'Q'
-    });
-
-    // 否定后件 (Modus Tollens)
-    this.rules.set('modus_tollens', {
-      id: 'modus_tollens',
-      name: 'Modus Tollens',
-      type: 'deductive',
-      premises: ['If P then Q', 'Not Q'],
-      conclusion: 'Not P'
-    });
-
-    // 假言三段论 (Hypothetical Syllogism)
-    this.rules.set('hypothetical_syllogism', {
-      id: 'hypothetical_syllogism',
-      name: 'Hypothetical Syllogism',
-      type: 'deductive',
-      premises: ['If P then Q', 'If Q then R'],
-      conclusion: 'If P then R'
-    });
-
-    // 选言三段论 (Disjunctive Syllogism)
-    this.rules.set('disjunctive_syllogism', {
-      id: 'disjunctive_syllogism',
-      name: 'Disjunctive Syllogism',
-      type: 'deductive',
-      premises: ['P or Q', 'Not P'],
-      conclusion: 'Q'
-    });
-  }
-
-  private initializeStrategies(): void {
-    this.reasoningStrategies.set('deductive', new DeductiveStrategy());
-    this.reasoningStrategies.set('inductive', new InductiveStrategy());
-    this.reasoningStrategies.set('abductive', new AbductiveStrategy());
-    this.reasoningStrategies.set('causal', new CausalReasoningStrategy());
-    this.reasoningStrategies.set('analogical', new AnalogicalReasoningStrategy());
-  }
-
-  async reason(input: ParsedInput, context: Context, options: ReasoningOptions = {}): Promise<ReasoningResult> {
-    // 选择推理策略
-    const strategy = this.selectStrategy(input, context, options);
-
-    // 执行推理
-    const result = await strategy.execute(input, context, this);
-
-    // 补充证据
-    result.evidence = await this.gatherEvidence(result.chain, context);
-
-    // 生成备选推理
-    result.alternatives = await this.generateAlternatives(input, context, result);
-
-    return result;
-  }
-
-  private selectStrategy(
-    input: ParsedInput,
-    context: Context,
-    options: ReasoningOptions
-  ): ReasoningStrategy {
-    // 基于输入特征选择策略
-    const inputType = this.classifyInput(input);
-
-    switch (inputType) {
-      case 'rule_based':
-        return this.reasoningStrategies.get('deductive')!;
-
-      case 'observation_based':
-        return this.reasoningStrategies.get('inductive')!;
-
-      case 'explanation_based':
-        return this.reasoningStrategies.get('abductive')!;
-
-      case 'cause_effect':
-        return this.reasoningStrategies.get('causal')!;
-
-      case 'similarity_based':
-        return this.reasoningStrategies.get('analogical')!;
-
-      default:
-        // 组合使用多种策略
-        return new CompositeStrategy(Array.from(this.reasoningStrategies.values()));
-    }
-  }
-
-  private classifyInput(input: ParsedInput): string {
-    // 检测输入类型
-    const text = input.normalizedText;
-
-    if (/如果.*那么/.test(text) || /假设.*则/.test(text)) {
-      return 'rule_based';
-    }
-
-    if (/所有.*都是/.test(text) || /一般.*/.test(text)) {
-      return 'observation_based';
-    }
-
-    if (/为什么/.test(text) || /原因/.test(text)) {
-      return 'cause_effect';
-    }
-
-    if (/类似/.test(text) || /如同/.test(text)) {
-      return 'similarity_based';
-    }
-
-    return 'general';
-  }
-
-  async applyRule(
-    rule: InferenceRule,
-    premises: string[],
-    context: Context
-  ): Promise<ReasoningStep> {
-    // 应用推理规则
-    const matchedPremises = this.matchPremises(rule.premises, premises, context);
-
-    if (matchedPremises.length !== rule.premises.length) {
-      throw new RuleApplicationError(rule.id, 'Premises not fully matched');
-    }
-
-    // 生成结论
-    const conclusion = this.deriveConclusion(rule.conclusion, matchedPremises);
-
-    return {
-      index: context.session.turnCount,
-      premise: matchedPremises.join('; '),
-      inference: `Applied rule: ${rule.name}`,
-      conclusion,
-      rule
-    };
-  }
-
-  private matchPremises(
-    rulePremises: string[],
-    facts: string[],
-    context: Context
-  ): string[] {
-    const matched: string[] = [];
-
-    for (const premise of rulePremises) {
-      const match = facts.find(f => this.unify(premise, f, context)) ||
-        this.inferFromKnowledge(premise, context);
-
-      if (match) {
-        matched.push(match);
-      }
-    }
-
-    return matched;
-  }
-
-  private unify(pattern: string, fact: string, context: Context): boolean {
-    // 简单的模式匹配统一
-    const patternParts = pattern.split(/\s+/);
-    const factParts = fact.split(/\s+/);
-
-    if (patternParts.length !== factParts.length) {
-      return false;
-    }
-
-    return patternParts.every((part, i) => {
-      if (part.startsWith('?')) return true;
-      return part === factParts[i];
-    });
-  }
-
-  private async inferFromKnowledge(premise: string, context: Context): Promise<string | null> {
-    // 从知识库推断
-    const query = this.parseQuery(premise);
-    const results = await this.knowledgeBase.query(query);
-
-    return results[0]?.statement || null;
-  }
-
-  private deriveConclusion(ruleConclusion: string, premises: string[]): string {
-    // 简单结论推导
-    // 实际实现需要更复杂的变量替换逻辑
-    return ruleConclusion;
-  }
-
-  private async gatherEvidence(chain: ReasoningStep[], context: Context): Promise<Evidence[]> {
-    const evidence: Evidence[] = [];
-
-    for (const step of chain) {
-      const stepEvidence = await this.collectEvidenceForStep(step, context);
-      evidence.push(...stepEvidence);
-    }
-
-    return evidence;
-  }
-
-  private async collectEvidenceForStep(step: ReasoningStep, context: Context): Promise<Evidence[]> {
-    const evidence: Evidence[] = [];
-
-    // 从记忆中收集证据
-    const relevantMemories = await this.knowledgeBase.search(step.conclusion, { limit: 3 });
-
-    for (const memory of relevantMemories) {
-      evidence.push({
-        source: 'knowledge_base',
-        content: memory.content,
-        relevance: memory.score,
-        timestamp: memory.timestamp
-      });
-    }
-
-    return evidence;
-  }
-
-  private async generateAlternatives(
-    input: ParsedInput,
-    context: Context,
-    primary: ReasoningResult
-  ): Promise<AlternativeReasoning[]> {
-    const alternatives: AlternativeReasoning[] = [];
-
-    for (const [type, strategy] of this.reasoningStrategies) {
-      if (type === primary.type) continue;
-
-      try {
-        const alt = await strategy.execute(input, context, this);
-
-        if (alt.confidence > 0.5) {
-          alternatives.push({
-            type,
-            conclusion: alt.conclusion,
-            confidence: alt.confidence,
-            explanation: `Alternative ${type} reasoning path`
-          });
-        }
-      } catch {
-        // 忽略失败的其他策略
-      }
-    }
-
-    return alternatives.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
-  }
-}
-
-// 推理策略基类
-abstract class ReasoningStrategy {
-  abstract execute(
-    input: ParsedInput,
-    context: Context,
-    engine: ReasonerEngine
-  ): Promise<ReasoningResult>;
-
-  protected buildChain(steps: ReasoningStep[]): ReasoningChain {
-    return {
-      steps,
-      isComplete: steps.length > 0 && steps.every(s => s.conclusion),
-      hasLoop: this.detectLoop(steps)
-    };
-  }
-
-  private detectLoop(steps: ReasoningStep[]): boolean {
-    const seen = new Set<string>();
-    for (const step of steps) {
-      if (seen.has(step.conclusion)) return true;
-      seen.add(step.conclusion);
-    }
-    return false;
-  }
-}
-
-// 演绎推理策略
-class DeductiveStrategy extends ReasoningStrategy {
-  async execute(
-    input: ParsedInput,
-    context: Context,
-    engine: ReasonerEngine
-  ): Promise<ReasoningResult> {
-    const steps: ReasoningStep[] = [];
-
-    // 解析输入中的条件语句
-    const conditionals = this.extractConditionals(input.normalizedText);
-
-    for (const conditional of conditionals) {
-      const rule = engine.getRule('modus_ponens');
-
-      if (conditional.hasAntecedent) {
-        const step = await engine.applyRule(rule, [
-          conditional.condition,
-          conditional.antecedent
-        ], context);
-        steps.push(step);
-      }
-    }
-
-    const conclusion = steps[steps.length - 1]?.conclusion || input.normalizedText;
-
-    return {
-      type: 'deductive',
-      conclusion,
-      confidence: this.calculateConfidence(steps),
-      chain: steps,
-      evidence: [],
-      alternatives: []
-    };
-  }
-
-  private extractConditionals(text: string): Conditional[] {
-    const conditionals: Conditional[] = [];
-
-    // 匹配"如果...那么..."模式
-    const pattern = /如果(.+)，那么(.+)/g;
-    let match;
-
-    while ((match = pattern.exec(text)) !== null) {
-      conditionals.push({
-        condition: match[1],
-        consequent: match[2],
-        antecedent: null,
-        hasAntecedent: false
-      });
-    }
-
-    return conditionals;
-  }
-
-  private calculateConfidence(steps: ReasoningStep[]): number {
-    if (steps.length === 0) return 0.5;
-
-    // 每个有效步骤增加置信度
-    const baseConfidence = 0.8;
-    const stepBonus = 0.05 * steps.length;
-
-    return Math.min(baseConfidence + stepBonus, 0.99);
-  }
-}
-
-// 归纳推理策略
-class InductiveStrategy extends ReasoningStrategy {
-  async execute(
-    input: ParsedInput,
-    context: Context,
-    engine: ReasonerEngine
-  ): Promise<ReasoningResult> {
-    const observations = this.extractObservations(input.normalizedText);
-    const patterns = this.findPatterns(observations);
-    const generalization = this.generalize(patterns);
-
-    return {
-      type: 'inductive',
-      conclusion: generalization,
-      confidence: this.calculateInductiveConfidence(patterns, observations.length),
-      chain: [{
-        index: 0,
-        premise: observations.join('; '),
-        inference: 'Induction: Generalizing from observations',
-        conclusion: generalization,
-        rule: { id: 'induction', name: 'Induction', type: 'inductive', premises: [], conclusion: '' }
-      }],
-      evidence: observations.map(o => ({
-        source: 'input',
-        content: o,
-        relevance: 1
-      })),
-      alternatives: []
-    };
-  }
-
-  private extractObservations(text: string): string[] {
-    // 提取观察陈述
-    const observations: string[] = [];
-
-    // 匹配"X是Y"模式
-    const pattern = /(.+?)是(.+?)[。.]/g;
-    let match;
-
-    while ((match = pattern.exec(text)) !== null) {
-      observations.push(match[0]);
-    }
-
-    return observations;
-  }
-
-  private findPatterns(observations: string[]): Pattern[] {
-    // 简化模式检测
-    return observations.map(obs => ({
-      subject: obs.split('是')[0],
-      predicate: obs.split('是')[1]
-    }));
-  }
-
-  private generalize(patterns: Pattern[]): string {
-    if (patterns.length === 0) return '无法归纳';
-
-    // 提取共性
-    const subjects = patterns.map(p => p.subject);
-    const predicates = patterns.map(p => p.predicate);
-
-    // 检查是否所有主体相同
-    const allSameSubject = subjects.every(s => s === subjects[0]);
-
-    // 检查是否所有谓词相同
-    const allSamePredicate = predicates.every(p => p === predicates[0]);
-
-    if (allSameSubject) {
-      return `所有观察的${subjects[0]}都共享相同的特征`;
-    }
-
-    return `基于${patterns.length}个观察的归纳结论`;
-  }
-
-  private calculateInductiveConfidence(patterns: Pattern[], count: number): number {
-    // 归纳置信度与观察数量正相关
-    const base = 0.5;
-    const countBonus = Math.min(count * 0.05, 0.4);
-
-    return Math.min(base + countBonus, 0.95);
-  }
+interface Context {
+  userId: string;         // 当前用户
+  sessionId: string;      // 当前会话
+  turnCount: number;      // 第几轮对话
+  capabilities: string[]; // 当前可用的能力，例如 web_search
 }
 ```
 
-## 2. 规划器 (Planner)
+**这段代码在做什么**
 
-规划器负责将高层目标分解为可执行的行动计划。
+- `raw` 保留原始文本，便于事后排查。
+- `normalizedText` 是后续所有正则匹配的输入，避免空白差异影响判断。
+- `entities` 让下游模块不必重复做实体识别。
+- `Context` 里放的是跨模块共享的运行信息，不放业务数据。
 
-```typescript
-// 行动计划
-interface ActionPlan {
-  id: string;
-  goal: string;
-  steps: PlanStep[];
-  estimatedCost: Cost;
-  estimatedDuration: number;
-  prerequisites: string[];
-  risks: Risk[];
-  status: PlanStatus;
+第 2 步：定义认知层对外的统一返回值，四个模块共用一套字段。
+
+```ts
+interface CognitionResult {
+  conclusion: string;      // 结论或决策
+  confidence: number;      // 0 到 1 之间的置信度
+  evidence: string[];      // 支撑结论的依据
+  alternatives: string[];  // 备选结论
+}
+```
+
+**这段代码在做什么**
+
+- `conclusion` 是唯一必须有的字段，其他字段可以为空数组。
+- `confidence` 用同一个取值区间，便于上层设阈值。
+- `evidence` 用于解释"为什么是这个结论"，也是排错的入口。
+- `alternatives` 让上层在低置信度时可以换一条路。
+
+**运行结果**
+
+此时还没有可运行输出，第 2 节开始给出可执行脚本。
+
+**动手验证**
+
+下面的脚本用一个最小的认知层壳子跑通"解析 → 决策 → 断言"。
+
+```js
+// cognition-1.mjs
+// 运行：node cognition-1.mjs
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+function parseInput(raw) {
+  const normalizedText = raw.replace(/\s+/g, '');
+  const entities = normalizedText.match(/订单\d+/g) ?? [];
+  return { raw, normalizedText, entities };
 }
 
-interface PlanStep {
-  id: string;
-  action: Action;
-  preconditions: Condition[];
-  effects: Effect[];
-  dependencies: string[];
-  estimatedDuration: number;
-  retryPolicy?: RetryPolicy;
+function decide(input, context) {
+  if (input.entities.length === 0) {
+    return { conclusion: 'need_clarify', confidence: 0.6, evidence: ['未识别到订单号'], alternatives: ['ask_order_id'] };
+  }
+  if (!context.capabilities.includes('refund')) {
+    return { conclusion: 'need_capability', confidence: 0.8, evidence: ['缺少退款能力'], alternatives: ['escalate_to_human'] };
+  }
+  return { conclusion: 'refund', confidence: 0.9, evidence: input.entities, alternatives: [] };
 }
 
-interface Action {
-  type: ActionType;
-  target?: string;
-  parameters: Map<string, any>;
-  tool?: string;
+const parsed = parseInput('帮我把 订单12345 退掉');
+assert.deepEqual(parsed.entities, ['订单12345']);
+
+const noId = decide(parseInput('帮我把那双鞋退掉'), { capabilities: ['refund'] });
+assert.equal(noId.conclusion, 'need_clarify');
+
+const ok = decide(parsed, { capabilities: ['refund'] });
+assert.equal(ok.conclusion, 'refund');
+assert.equal(ok.confidence, 0.9);
+
+console.log('预期输出: 三类决策断言全部通过');
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 同一句话两次解析出不同实体 | 解析函数直接改写了原字符串 | 让解析函数返回新对象，不修改入参 |
+| 上层拿到结论却无法解释 | 只返回 conclusion，没带上 evidence | 把 evidence 设为必填字段 |
+| 低置信度结论被直接执行 | 上层没有读 confidence | 在执行层加置信度阈值判断 |
+
+**用在哪里**
+
+- 客服工单自动分派。业务背景：大量工单需要先判断类型再转人工或自动处理；这一节的知识怎么用：把工单文本解析成结构化输入，再决定走自动还是转人工；指标：自动分派准确率与转人工率；什么时候不该用：工单涉及金额争议时不应自动决断。
+- 数据分析助手的问数入口。业务背景：业务同学用自然语言问"上月华东销售额"；这一节的知识怎么用：把问题解析成指标与维度两个字段；指标：解析成功率；什么时候不该用：口径尚未定义清楚时先问澄清问题。
+- 代码修复机器人。业务背景：收到报错日志后自动提修复建议；这一节的知识怎么用：把日志解析成文件、行号、错误码；指标：建议被采纳的比例；什么时候不该用：涉及生产数据库变更的操作只做建议不做执行。
+
+**行业实践**
+
+- ReAct 论文（Yao 等，2022）把推理与行动交替进行，推理结果决定下一个行动，行动结果又回到推理。怎么借鉴到你的项目：在认知层的输出里显式记录"下一步动作"，而不是让执行层自己猜。
+- 斯坦福 Generative Agents 论文（Park 等，2023）给智能体配了记忆流与反思机制。怎么借鉴到你的项目：把每次决策的依据落盘，后续决策可以引用历史依据。
+- Anthropic 工程博客《Building Effective Agents》区分了固定工作流与自主智能体两类形态，并建议先用工作流。怎么借鉴到你的项目：认知层的分支先写成显式规则，规则不够用再引入自主规划；具体章节名称以原文为准。
+
+**小结**
+
+1. 认知层的产物是决策依据，不是工具调用结果。
+2. 输入要结构化一次，后续模块只读结构化结果。
+3. 统一返回结论、置信度、依据、备选四件套，排错才有入口。
+
+## 2. 推理引擎：从前提推到结论
+
+**先想一个问题**
+
+用户说："如果订单超过七天就不能退，这单已经超过七天了。"
+
+Agent 要得出什么？它凭什么得出这个结论？
+
+!!! note "术语：推理链"
+    定义：从已知前提一步步推到结论的记录，每一步都标注用到的规则。
+    例子："超过七天"加"超过七天则不可退"推到"不可退"，这一步就是链上的一环。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：推理引擎是"规则加事实"的匹配器，把匹配上的规则结论变成新事实，再继续匹配。
+    日常类比：像做菜时照着菜谱一步步走，每一步的产出都是下一步的原料。
+    类比不成立的地方：菜谱的步骤是固定的，而自然语言里的规则要先被翻译成机器能匹配的形式，翻译本身可能出错。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+    [*] --> 分类输入
+    分类输入 --> 演绎 : "命中如果那么"
+    分类输入 --> 归纳 : "命中所有都是"
+    分类输入 --> 溯因 : "命中为什么"
+    分类输入 --> 因果 : "命中原因"
+    分类输入 --> 类比 : "命中类似"
+    演绎 --> 汇总结论
+    归纳 --> 汇总结论
+    溯因 --> 汇总结论
+    因果 --> 汇总结论
+    类比 --> 汇总结论
+    汇总结论 --> [*]
+```
+
+1. 先对输入做分类，判断它更像哪一类推理任务。
+2. 分类命中后选择对应策略，每种策略有自己的置信度算法。
+3. 全部策略的结果汇总到同一个结论结构。
+4. 主策略之外的结果进入备选列表，供低置信度时切换。
+
+**一步一步来**
+
+第 1 步：把推理规则存成数据，而不是写成 if 分支。
+
+```ts
+interface InferenceRule {
+  id: string;          // 规则标识，例如 modus_ponens
+  name: string;        // 规则中文名
+  type: ReasoningType; // 演绎 / 归纳 / 溯因 / 因果 / 类比
+  premises: string[];  // 前提形状，问号开头表示变量
+  conclusion: string;  // 结论形状
+}
+```
+
+**这段代码在做什么**
+
+- 规则是数据，新增规则不必改引擎代码。
+- `premises` 用形状描述，变量位用问号占位以便统一匹配。
+- `type` 让引擎知道该交给哪套策略。
+- `id` 用于日志与排错，出错时能定位到具体规则。
+
+第 2 步：实现两条经典演绎规则，并加上统一匹配。
+
+```ts
+function unify(pattern: string, fact: string): boolean {
+  const p = pattern.split(' ').filter(Boolean);
+  const f = fact.split(' ').filter(Boolean);
+  if (p.length !== f.length) return false;
+  return p.every((seg, i) => seg.startsWith('?') || seg === f[i]);
 }
 
+function modusPonens(facts: string[], ifPThenQ: [string, string]): string | null {
+  const [p, q] = ifPThenQ;
+  return facts.some((f) => unify(p, f)) ? q : null;
+}
+
+function modusTollens(facts: string[], ifPThenQ: [string, string]): string | null {
+  const [p, q] = ifPThenQ;
+  return facts.some((f) => unify(`非 ${q}`, f)) ? `非 ${p}` : null;
+}
+```
+
+**这段代码在做什么**
+
+- `unify` 按空格切分后逐段比较，问号段表示任意值都匹配。
+- 肯定前件在事实里找到 P 就得到 Q。
+- 否定后件在事实里找到"非 Q"就得到"非 P"。
+- 两个函数都不修改入参，符合上一节定下的规则。
+
+**运行结果**
+
+事实为 `['下雨']` 时肯定前件返回 `地面湿`；事实为 `['非 地面湿']` 时否定后件返回 `非 下雨`。
+
+第 3 步：给归纳推理算置信度，并做去环检查。
+
+```ts
+function inductiveConfidence(observationCount: number): number {
+  const base = 0.5;                                  // 归纳的基础置信度
+  const bonus = Math.min(observationCount * 0.05, 0.4); // 观察越多越有把握
+  return Math.min(base + bonus, 0.95);               // 上限 0.95，留出犯错空间
+}
+
+function hasLoop(conclusions: string[]): boolean {
+  const seen = new Set<string>();                     // 记录出现过的结论
+  for (const c of conclusions) {
+    if (seen.has(c)) return true;                     // 重复出现说明成环
+    seen.add(c);
+  }
+  return false;
+}
+```
+
+**这段代码在做什么**
+
+- 归纳的置信度随观察条数上升，但永远不到 1。
+- `Math.min` 两次使用，一次限制增量，一次限制总量。
+- 去环检查用于防止推理链在两个结论之间来回跳。
+- 上面的系数取自旧版示例代码，是示例取值，不是行业标准，正式项目需按评测集重新标定。
+
+**动手验证**
+
+```js
+// cognition-2.mjs
+// 运行：node cognition-2.mjs
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+function unify(pattern, fact) {
+  const p = pattern.split(' ').filter(Boolean);
+  const f = fact.split(' ').filter(Boolean);
+  if (p.length !== f.length) return false;
+  return p.every((seg, i) => seg.startsWith('?') || seg === f[i]);
+}
+
+const rule = ['如果 下雨 那么 地面湿', '下雨'];
+const [cond, fact] = rule;
+const [p, q] = cond.replace(/^如果 /, '').split(' 那么 ');
+
+assert.equal(unify(p, fact), true);
+assert.equal(q, '地面湿');
+
+function modusPonens(facts, ifPThenQ) {
+  const [pp, qq] = ifPThenQ;
+  return facts.some((f) => unify(pp, f)) ? qq : null;
+}
+
+assert.equal(modusPonens(['下雨'], [p, q]), '地面湿');
+assert.equal(modusPonens(['晴天'], [p, q]), null);
+
+function inductiveConfidence(n) {
+  return Math.min(0.5 + Math.min(n * 0.05, 0.4), 0.95);
+}
+assert.equal(inductiveConfidence(3), 0.65);
+assert.equal(inductiveConfidence(20), 0.9);
+assert.equal(inductiveConfidence(1000), 0.9);
+
+console.log('预期输出: 演绎与归纳断言全部通过');
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 推理链无限增长 | 结论反复生成同一条 | 每轮把新结论与已有结论去重，再做去环检查 |
+| 演绎结论明显错误 | 规则里的前提形状与事实写法不一致 | 把事实先规范化成与规则同样的分词格式 |
+| 归纳结论听起来像事实 | 置信度没有传给上层 | 把 confidence 一并返回，并在上层设阈值 |
+
+**用在哪里**
+
+- 风控规则引擎。业务背景：交易需要按多条规则判定是否拦截；这一节的知识怎么用：规则写成数据，事实来自交易字段，用肯定前件逐条推；指标：规则命中率与误拦率；什么时候不该用：规则之间存在优先级的场景要额外加冲突消解。
+- 售后政策问答。业务背景：用户问某商品能否退货；这一节的知识怎么用：把政策条文变成规则，把订单状态变成事实；指标：答案与政策原文的一致率；什么时候不该用：政策本身存在地区差异且未结构化时。
+- 故障根因辅助定位。业务背景：线上告警需要给出可能原因；这一节的知识怎么用：用溯因策略从现象反推最可能的解释；指标：给出的候选原因被工程师确认的比例；什么时候不该用：只有一条日志且信息不足时。
+
+**行业实践**
+
+- Chain-of-Thought 论文（Wei 等，2022）说明让模型输出中间步骤可以提升多步任务的准确率。怎么借鉴到你的项目：让认知层把每一步前提与结论都写进结果结构，而不是只给最终答案。
+- Self-Consistency 论文（Wang 等，2022）对多条推理路径采样后投票选出答案。怎么借鉴到你的项目：对应本节的 alternatives 字段，低置信度时多跑几条路径再比较。
+- 经典人工智能教材中归纳出的推理规则清单，例如肯定前件、否定后件、假言三段论、选言三段论，可以直接作为规则库的起步集合；具体条目需核对权威教材原文。
+
+**小结**
+
+1. 规则存成数据，引擎只负责匹配与推导。
+2. 演绎的结论确定性高，归纳的结论必须带置信度上限。
+3. 推理链要去重去环，否则会出现自我循环。
+
+## 3. 规划器：把目标拆成可执行步骤
+
+**先想一个问题**
+
+用户说："把上个月的销售数据整理好，发一封周报给团队。"
+
+这句话可以直接执行吗？它至少缺三个决定：数据从哪来、周报长什么样、发给谁。
+
+!!! note "术语：HTN"
+    HTN 是分层任务网络（Hierarchical Task Network）的缩写。
+    定义：先把高层任务分解成子任务，子任务再分解，直到全部变成可以一次执行完的原子动作。
+    例子："发周报"分解成"取数""写正文""发送"，其中"取数"再分解成"查订单表""按区域汇总"。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：规划器把一句目标翻译成一张有向图，节点是动作，边是"必须先做"。
+    日常类比：像装修前排施工顺序，先水电再贴砖，顺序错了要返工。
+    类比不成立的地方：装修的工序是行业固定的，而 Agent 面对的目标往往没有现成工序表，得先猜一个再验证。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+    participant U as "用户"
+    participant P as "规划器"
+    participant E as "执行层"
+    participant M as "记忆系统"
+    U->>P: "提出高层目标"
+    P->>M: "读取相关记忆与事实"
+    M-->>P: "返回可用资源"
+    P->>P: "分解为若干步骤并标注依赖"
+    P->>E: "提交行动计划"
+    E->>E: "逐步执行"
+    E-->>P: "回报失败步骤与错误"
+    P->>M: "记录失败原因"
+    P->>P: "生成替代步骤或回退到检查点"
+    P->>E: "提交修正后的计划"
+    E-->>U: "返回最终结果"
+```
+
+1. 规划器先读记忆与事实，确认手上有哪些资源。
+2. 目标被分解成步骤，步骤之间标注依赖关系。
+3. 执行层逐步执行，失败时把失败的步骤标识回传。
+4. 规划器优先替换失败步骤，替换不了就回退到最近的检查点。
+5. 修正后的计划重新提交执行，失败原因写入记忆。
+
+**一步一步来**
+
+第 1 步：定义动作与步骤，把依赖关系显式写出来。
+
+```ts
 type ActionType = 'invoke' | 'query' | 'transform' | 'create' | 'update' | 'delete' | 'wait' | 'branch';
 
-// 规划器
-class Planner {
-  private planners: Map<string, PlanningAlgorithm> = new Map();
-  private planCache: LRUCache<string, ActionPlan>;
-  private costEstimator: CostEstimator;
-
-  constructor(config: PlannerConfig) {
-    this.initializePlanners();
-    this.planCache = new LRUCache(config.cacheSize || 100);
-    this.costEstimator = new CostEstimator(config.costModel);
-  }
-
-  private initializePlanners(): void {
-    this.planners.set('hierarchical', new HierarchicalTaskNetwork());
-    this.planners.set('linear', new LinearPlanner());
-    this.planners.set('reactive', new ReactivePlanner());
-    this.planners.set('goalGraph', new GoalGraphPlanner());
-  }
-
-  async plan(goal: string, context: Context, options: PlanningOptions = {}): Promise<ActionPlan> {
-    // 检查缓存
-    const cacheKey = this.generateCacheKey(goal, context);
-    const cached = this.planCache.get(cacheKey);
-
-    if (cached && !options.forceRefresh) {
-      return cached;
-    }
-
-    // 选择规划算法
-    const algorithm = this.selectAlgorithm(goal, context, options);
-
-    // 生成计划
-    const plan = await algorithm.generate(goal, context, this);
-
-    // 验证计划
-    const validated = await this.validate(plan, context);
-
-    // 缓存计划
-    this.planCache.set(cacheKey, validated);
-
-    return validated;
-  }
-
-  private selectAlgorithm(
-    goal: string,
-    context: Context,
-    options: PlanningOptions
-  ): PlanningAlgorithm {
-    // 根据目标特征选择算法
-    if (options.algorithm) {
-      const algorithm = this.planners.get(options.algorithm);
-      if (algorithm) return algorithm;
-    }
-
-    // 自动选择
-    const goalType = this.classifyGoal(goal);
-
-    switch (goalType) {
-      case 'sequential':
-        return this.planners.get('linear')!;
-
-      case 'hierarchical':
-        return this.planners.get('hierarchical')!;
-
-      case 'reactive':
-        return this.planners.get('reactive')!;
-
-      case 'goal_network':
-        return this.planners.get('goalGraph')!;
-
-      default:
-        return this.planners.get('hierarchical')!;
-    }
-  }
-
-  private classifyGoal(goal: string): string {
-    if (/首先|然后|接着|最后/.test(goal)) return 'sequential';
-    if (/分解|分为|包括/.test(goal)) return 'hierarchical';
-    if (/当|如果|条件/.test(goal)) return 'reactive';
-
-    return 'goal_network';
-  }
-
-  private generateCacheKey(goal: string, context: Context): string {
-    return `${goal}:${context.user.id}:${context.session.id}`;
-  }
-
-  private async validate(plan: ActionPlan, context: Context): Promise<ActionPlan> {
-    // 检查前置条件
-    for (const step of plan.steps) {
-      const satisfied = await this.checkPreconditions(step.preconditions, context);
-
-      if (!satisfied.all) {
-        // 添加修复步骤
-        const repairSteps = await this.generateRepairSteps(step, satisfied.unsatisfied, context);
-        plan.steps.unshift(...repairSteps);
-      }
-    }
-
-    // 估算成本
-    plan.estimatedCost = await this.costEstimator.estimate(plan);
-
-    // 检测风险
-    plan.risks = await this.assessRisks(plan, context);
-
-    return plan;
-  }
-
-  private async checkPreconditions(
-    preconditions: Condition[],
-    context: Context
-  ): Promise<{ all: boolean; unsatisfied: Condition[] }> {
-    const unsatisfied: Condition[] = [];
-
-    for (const condition of preconditions) {
-      const satisfied = await this.evaluateCondition(condition, context);
-      if (!satisfied) {
-        unsatisfied.push(condition);
-      }
-    }
-
-    return {
-      all: unsatisfied.length === 0,
-      unsatisfied
-    };
-  }
-
-  private async evaluateCondition(condition: Condition, context: Context): Promise<boolean> {
-    // 评估条件是否满足
-    switch (condition.type) {
-      case 'exists':
-        return await this.checkExistence(condition.target!, context);
-
-      case 'equals':
-        return await this.checkEquality(condition.left!, condition.right!, context);
-
-      case 'greaterThan':
-        return await this.compareValues(condition.left!, condition.right!, context) > 0;
-
-      case 'hasCapability':
-        return await this.checkCapability(condition.target!, context);
-
-      default:
-        return true;
-    }
-  }
-
-  private async checkExistence(target: string, context: Context): Promise<boolean> {
-    // 检查目标是否存在
-    return context.entities.has(target) || await this.knowledgeBase.exists(target);
-  }
-
-  private async checkEquality(left: string, right: string, context: Context): Promise<boolean> {
-    return left === right;
-  }
-
-  private async compareValues(left: string, right: string, context: Context): Promise<number> {
-    return parseFloat(left) - parseFloat(right);
-  }
-
-  private async checkCapability(target: string, context: Context): Promise<boolean> {
-    const capabilities = await this.getCapabilities(context);
-    return capabilities.includes(target);
-  }
-
-  private async getCapabilities(context: Context): Promise<string[]> {
-    // 获取当前可用的能力列表
-    return ['web_search', 'code_execution', 'file_read', 'api_call'];
-  }
-
-  private async generateRepairSteps(
-    step: PlanStep,
-    unsatisfied: Condition[],
-    context: Context
-  ): Promise<PlanStep[]> {
-    const repairSteps: PlanStep[] = [];
-
-    for (const condition of unsatisfied) {
-      const repairAction = this.createRepairAction(condition);
-      if (repairAction) {
-        repairSteps.push({
-          id: `repair_${step.id}_${condition.type}`,
-          action: repairAction,
-          preconditions: [],
-          effects: [condition],
-          dependencies: []
-        });
-      }
-    }
-
-    return repairSteps;
-  }
-
-  private createRepairAction(condition: Condition): Action | null {
-    switch (condition.type) {
-      case 'exists':
-        return { type: 'create', target: condition.target };
-
-      case 'hasCapability':
-        return { type: 'invoke', tool: `setup_${condition.target}` };
-
-      default:
-        return null;
-    }
-  }
-
-  private async assessRisks(plan: ActionPlan, context: Context): Promise<Risk[]> {
-    const risks: Risk[] = [];
-
-    for (let i = 0; i < plan.steps.length; i++) {
-      const step = plan.steps[i];
-
-      // 检查依赖风险
-      if (step.dependencies.length > 0) {
-        const failedDeps = await this.checkDependencyHealth(step.dependencies, plan.steps);
-        if (failedDeps.length > 0) {
-          risks.push({
-            type: 'dependency_failure',
-            severity: 'high',
-            affectedSteps: [step.id, ...failedDeps],
-            mitigation: 'Add redundant paths or checkpoints'
-          });
-        }
-      }
-
-      // 检查成本风险
-      const stepCost = await this.costEstimator.estimateStep(step);
-      if (stepCost > context.user.preferences.maxCostPerStep) {
-        risks.push({
-          type: 'cost_exceed',
-          severity: 'medium',
-          affectedSteps: [step.id],
-          mitigation: 'Consider alternative approaches'
-        });
-      }
-
-      // 检查时间风险
-      const totalDuration = plan.steps.slice(i).reduce((sum, s) => sum + s.estimatedDuration, 0);
-      if (totalDuration > context.task.deadline) {
-        risks.push({
-          type: 'deadline_miss',
-          severity: 'high',
-          affectedSteps: plan.steps.slice(i).map(s => s.id),
-          mitigation: 'Parallelize steps or reduce scope'
-        });
-      }
-    }
-
-    return risks;
-  }
-
-  async replan(plan: ActionPlan, failedStep: string, error: Error, context: Context): Promise<ActionPlan> {
-    // 找到失败步骤
-    const stepIndex = plan.steps.findIndex(s => s.id === failedStep);
-
-    if (stepIndex === -1) {
-      throw new Error(`Step ${failedStep} not found in plan`);
-    }
-
-    // 生成替代方案
-    const alternatives = await this.generateAlternatives(plan.steps[stepIndex], context);
-
-    if (alternatives.length > 0) {
-      // 替换失败的步骤
-      plan.steps[stepIndex] = alternatives[0];
-    } else {
-      // 回退到上一个检查点
-      const checkpoint = this.findNearestCheckpoint(plan, stepIndex);
-      plan.steps = plan.steps.slice(0, checkpoint + 1);
-    }
-
-    // 重新验证
-    return this.validate(plan, context);
-  }
-
-  private async generateAlternatives(step: PlanStep, context: Context): Promise<PlanStep[]> {
-    const alternatives: PlanStep[] = [];
-
-    // 尝试不同的工具
-    const availableTools = await this.getAvailableTools(step.action.type);
-
-    for (const tool of availableTools) {
-      if (tool !== step.action.tool) {
-        alternatives.push({
-          ...step,
-          id: `${step.id}_alt_${tool}`,
-          action: { ...step.action, tool }
-        });
-      }
-    }
-
-    return alternatives;
-  }
-
-  private async getAvailableTools(actionType: ActionType): Promise<string[]> {
-    // 返回可用的工具列表
-    return ['default_tool', 'backup_tool_1', 'backup_tool_2'];
-  }
-
-  private findNearestCheckpoint(plan: ActionPlan, currentIndex: number): number {
-    for (let i = currentIndex - 1; i >= 0; i--) {
-      if (plan.steps[i].effects.some(e => e.type === 'checkpoint')) {
-        return i;
-      }
-    }
-    return 0;
-  }
-}
-
-// HTN规划器
-class HierarchicalTaskNetwork implements PlanningAlgorithm {
-  async generate(
-    goal: string,
-    context: Context,
-    planner: Planner
-  ): Promise<ActionPlan> {
-    const steps: PlanStep[] = [];
-
-    // 分解目标
-    const tasks = this.decomposeGoal(goal);
-
-    for (const task of tasks) {
-      if (task.isPrimitive) {
-        steps.push(this.createStep(task));
-      } else {
-        // 递归分解
-        const subSteps = await this.decomposeTask(task, context, planner);
-        steps.push(...subSteps);
-      }
-    }
-
-    return {
-      id: this.generateId(),
-      goal,
-      steps,
-      estimatedCost: { tokens: 0, money: 0, time: 0 },
-      estimatedDuration: steps.reduce((sum, s) => sum + s.estimatedDuration, 0),
-      prerequisites: [],
-      risks: [],
-      status: 'pending'
-    };
-  }
-
-  private decomposeGoal(goal: string): Task[] {
-    // 简化的目标分解
-    const tasks: Task[] = [];
-
-    // 检测并列任务
-    const parallelPattern = /以及|和|并/;
-    if (parallelPattern.test(goal)) {
-      const parts = goal.split(parallelPattern);
-      for (const part of parts) {
-        tasks.push({
-          id: this.generateId(),
-          name: part.trim(),
-          isPrimitive: this.isPrimitiveTask(part),
-          subtasks: []
-        });
-      }
-    } else {
-      tasks.push({
-        id: this.generateId(),
-        name: goal,
-        isPrimitive: this.isPrimitiveTask(goal),
-        subtasks: []
-      });
-    }
-
-    return tasks;
-  }
-
-  private isPrimitiveTask(task: string): boolean {
-    // 判断是否为原子任务
-    const primitiveIndicators = ['搜索', '查询', '获取', '读取', '返回'];
-    return primitiveIndicators.some(indicator => task.includes(indicator));
-  }
-
-  private async decomposeTask(
-    task: Task,
-    context: Context,
-    planner: Planner
-  ): Promise<PlanStep[]> {
-    // 递归分解复杂任务
-    const steps: PlanStep[] = [];
-
-    // 示例分解逻辑
-    if (task.name.includes('搜索并分析')) {
-      steps.push(
-        { id: this.generateId(), action: { type: 'query', parameters: new Map() }, preconditions: [], effects: [], dependencies: [] },
-        { id: this.generateId(), action: { type: 'transform', parameters: new Map() }, preconditions: [{ type: 'exists', target: 'search_result' }], effects: [], dependencies: [steps[0]?.id || ''] }
-      );
-    }
-
-    return steps;
-  }
-
-  private createStep(task: Task): PlanStep {
-    return {
-      id: task.id,
-      action: { type: 'invoke', parameters: new Map([['task', task.name]]) },
-      preconditions: [],
-      effects: [{ type: 'complete', target: task.id }],
-      dependencies: [],
-      estimatedDuration: 1000
-    };
-  }
-
-  private generateId(): string {
-    return `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
+interface PlanStep {
+  id: string;              // 步骤标识
+  action: ActionType;      // 动作类型
+  tool?: string;           // 用哪个工具
+  preconditions: string[]; // 执行前必须成立的条件
+  dependencies: string[];  // 必须先完成的步骤标识
+  estimatedDuration: number; // 预计耗时，单位毫秒
 }
 ```
 
-## 3. 记忆系统 (Memory System)
+**这段代码在做什么**
 
-记忆系统管理 Agent 的所有历史信息和知识。
+- `ActionType` 把动作收敛成八类，便于统计与权限控制。
+- `tool` 单独一个字段，方便失败时换工具重试。
+- `preconditions` 描述状态条件，`dependencies` 描述步骤顺序，两者不能混用。
+- `estimatedDuration` 用于估算总耗时与超时风险。
 
-```typescript
-// 记忆类型
+第 2 步：生成一个带依赖的计划。
+
+```ts
+function buildPlan(goal: string): PlanStep[] {
+  return [
+    { id: 's1', action: 'query', tool: 'order_db', preconditions: [], dependencies: [], estimatedDuration: 800 },
+    { id: 's2', action: 'transform', tool: 'aggregator', preconditions: ['s1 完成'], dependencies: ['s1'], estimatedDuration: 300 },
+    { id: 's3', action: 'create', tool: 'mailer', preconditions: ['s2 完成'], dependencies: ['s2'], estimatedDuration: 200 },
+  ];
+}
+```
+
+**这段代码在做什么**
+
+- 三个步骤组成一条链，依赖关系是线性的。
+- 每个步骤只声明自己需要什么，不关心别人怎么实现。
+- `estimate` 字段让规划器可以在提交前算总耗时。
+- 这个函数是桩实现，真实项目里应由模型或规则模板生成。
+
+第 3 步：检查预条件，缺什么就插一条修复步骤。
+
+```ts
+function repairSteps(step: PlanStep, missing: string[]): PlanStep[] {
+  const repairs: PlanStep[] = [];
+  for (const cond of missing) {
+    if (cond.startsWith('存在')) {
+      repairs.push({
+        id: `repair_${step.id}`,
+        action: 'create',
+        tool: 'resource_creator',
+        preconditions: [],
+        dependencies: [],
+        estimatedDuration: 500,
+      });
+    }
+  }
+  return repairs;
+}
+```
+
+**这段代码在做什么**
+
+- 修复步骤被插到原步骤之前，保证预条件先成立。
+- 修复步骤同样有耗时，会影响总预算。
+- 只对能自动修复的条件生成修复动作，其他条件返回失败。
+- 修复步骤的标识带原步骤前缀，日志里容易对应。
+
+**运行结果**
+
+对一条缺"存在 目标表"的步骤，`repairSteps` 返回一条长度为 1 的数组。
+
+**动手验证**
+
+```js
+// cognition-3.mjs
+// 运行：node cognition-3.mjs
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+function buildPlan() {
+  return [
+    { id: 's1', action: 'query', dependencies: [], duration: 800 },
+    { id: 's2', action: 'transform', dependencies: ['s1'], duration: 300 },
+    { id: 's3', action: 'create', dependencies: ['s2'], duration: 200 },
+  ];
+}
+
+function validate(plan, done) {
+  const problems = [];
+  for (const step of plan) {
+    for (const dep of step.dependencies) {
+      if (!done.has(dep)) problems.push(`${step.id} 缺少依赖 ${dep}`);
+    }
+  }
+  return problems;
+}
+
+function totalDuration(plan) {
+  return plan.reduce((sum, s) => sum + s.duration, 0);
+}
+
+const plan = buildPlan();
+assert.equal(totalDuration(plan), 1300);
+assert.deepEqual(validate(plan, new Set(['s1'])), ['s2 缺少依赖 s2'.replace('s2 缺少依赖 s2', 's3 缺少依赖 s2')]);
+
+function replan(plan, failedId, alternatives) {
+  const idx = plan.findIndex((s) => s.id === failedId);
+  if (idx === -1) throw new Error(`步骤 ${failedId} 不存在`);
+  if (alternatives.length === 0) return plan.slice(0, idx);
+  return [...plan.slice(0, idx), alternatives[0], ...plan.slice(idx + 1)];
+}
+
+const fixed = replan(plan, 's2', [{ id: 's2_alt', action: 'transform', dependencies: ['s1'], duration: 400 }]);
+assert.equal(fixed.length, 3);
+assert.equal(fixed[1].id, 's2_alt');
+
+console.log('预期输出: 计划校验与重规划断言全部通过');
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 计划执行到一半卡住 | 只写了 dependencies，没检查 preconditions | 提交前对每个步骤做一次预条件检查 |
+| 失败后整条链重跑 | 重规划时没有检查点概念 | 在关键步骤后打检查点，回退到最近的检查点 |
+| 总耗时远超预期 | 耗时估算缺失或全部填同一个值 | 让估算来自历史执行记录的中位数 |
+
+**用在哪里**
+
+- 后台管理的批量导入。业务背景：运营上传表格后需要校验、入库、生成结果文件；这一节的知识怎么用：把三个环节拆成步骤并标注依赖；指标：整批成功率与失败定位耗时；什么时候不该用：只有一行数据的导入直接同步处理即可。
+- 电商促销活动配置。业务背景：一次活动要建券、绑商品、设时间；这一节的知识怎么用：先检查商品是否在售再绑券；指标：配置错误率；什么时候不该用：活动模板固定不变时用固定脚本更稳。
+- 跨系统数据对账。业务背景：每天对比两个系统的订单金额；这一节的知识怎么用：取数、比对、生成差异表三步，失败可回退到取数之后；指标：对账完成时间；什么时候不该用：两个系统口径未对齐时先做口径确认。
+
+**行业实践**
+
+- HTN 规划来自经典人工智能规划研究，核心是先分解再执行；具体形式化定义需核对权威教材原文。
+- Anthropic 工程博客《Building Effective Agents》建议把常见流程固化为工作流，只有在步骤无法预先确定时才使用自主规划。怎么借鉴到你的项目：给规划器加一条"先查模板"分支，命中模板就不调用模型。
+- ReAct 论文（Yao 等，2022）中行动与推理交替进行，行动结果会修正后续推理。怎么借鉴到你的项目：把每步执行结果写回规划器，而不是等整条计划跑完再检查。
+
+**小结**
+
+1. 计划是一张有向图，依赖与预条件要分开表达。
+2. 缺预条件时优先插入修复步骤，而不是直接报错。
+3. 失败后先替换步骤，替换不了再回退到检查点。
+
+## 4. 记忆系统：四类记忆与检索排序
+
+**先想一个问题**
+
+用户第一轮说"我只要顺丰"，第五轮说"还是用上次那个快递"。
+
+Agent 怎么知道"上次那个"指什么？
+
+!!! note "术语：工作记忆"
+    定义：只服务当前任务、容量有限、任务结束就清空的短期记忆。
+    例子：本轮对话里刚确认的快递偏好。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：记忆系统按用途分四个桶，写入时打分，读取时按相关度与重要度排序。
+    日常类比：像厨房里四个容器：台面上的备菜、冰箱的食材、墙上的菜谱、垃圾桶边的小纸条。
+    类比不成立的地方：厨房的容器是物理隔离的，而程序里的四类记忆经常需要互相搬运，搬运规则要自己定。
+
+**图解**
+
+```mermaid
+flowchart TD
+    A["新信息进入"] --> B["计算重要度"]
+    B --> C{"重要度与类型"}
+    C --> D["工作记忆 容量有限"]
+    C --> E["情景记忆 事件流水"]
+    C --> F["语义记忆 事实知识"]
+    C --> G["程序记忆 技能流程"]
+    H["检索请求"] --> I["按类型分别召回"]
+    I --> J["阈值过滤"]
+    J --> K["按相关度与重要度排序"]
+    K --> L["返回前 N 条"]
+    D --> M["任务结束后整合"]
+    M --> E
+```
+
+1. 新信息先算重要度，重要度决定它进哪个桶。
+2. 工作记忆容量有限，满了就挤掉最旧的条目。
+3. 检索时按类型分别召回，再用阈值过滤掉低分条目。
+4. 过滤后的结果按相关度与重要度排序，返回前 N 条。
+5. 任务结束后做一次整合，把工作记忆里重要度高的条目搬到情景记忆。
+
+**一步一步来**
+
+第 1 步：定义记忆条目与四种类型。
+
+```ts
 type MemoryType = 'episodic' | 'semantic' | 'procedural' | 'working';
 
 interface Memory {
   id: string;
   type: MemoryType;
-  content: string;
-  embedding?: number[];
-  metadata: MemoryMetadata;
-  importance: number;
-  accessCount: number;
-  lastAccessed: number;
+  content: string;        // 记忆正文
+  embedding?: number[];   // 向量表示，用于相似度检索
+  importance: number;     // 0 到 1
+  accessCount: number;    // 被检索次数
+  lastAccessed: number;   // 上次被检索的时间戳
+  tags: string[];         // 主题标签
 }
+```
 
-interface MemoryMetadata {
-  createdAt: number;
-  source: 'user' | 'agent' | 'system';
-  context?: string;
-  tags: string[];
-  expiresAt?: number;
-}
+**这段代码在做什么**
 
-// 记忆系统
-class MemorySystem {
-  private stores: Map<MemoryType, MemoryStore> = new Map();
-  private indexer: MemoryIndexer;
-  private importanceCalculator: ImportanceCalculator;
-  private retentionPolicy: RetentionPolicy;
+- 四类记忆共用一个结构，方便跨桶搬运。
+- `importance` 在写入时算一次，检索时参与排序。
+- `accessCount` 与 `lastAccessed` 支撑淘汰策略。
+- `embedding` 可选，没有向量时退化为关键词匹配。
 
-  constructor(config: MemoryConfig) {
-    this.initializeStores(config);
-    this.indexer = new MemoryIndexer();
-    this.importanceCalculator = new ImportanceCalculator(config.importanceModel);
-    this.retentionPolicy = new RetentionPolicy(config.retention);
-  }
+第 2 步：实现一个容量固定的工作记忆。
 
-  private initializeStores(config: MemoryConfig): void {
-    // 情景记忆 - 短期事件
-    this.stores.set('episodic', new VectorStore({
-      dimension: 1536,
-      maxSize: config.episodicLimit || 1000
-    }));
+```ts
+class WorkingMemory {
+  private items: Memory[] = [];
+  constructor(private capacity: number) {}
 
-    // 语义记忆 - 事实知识
-    this.stores.set('semantic', new GraphStore({
-      maxSize: config.semanticLimit || 10000
-    }));
-
-    // 程序记忆 - 技能和流程
-    this.stores.set('procedural', new KeyValueStore({
-      ttl: Infinity
-    }));
-
-    // 工作记忆 - 当前上下文
-    this.stores.set('working', new WorkingMemory({
-      capacity: config.workingCapacity || 10
-    }));
-  }
-
-  async store(memory: Memory): Promise<void> {
-    // 计算重要性
-    memory.importance = await this.importanceCalculator.calculate(memory);
-
-    // 存储到对应类型
-    const store = this.stores.get(memory.type);
-    await store.add(memory);
-
-    // 更新索引
-    await this.indexer.index(memory);
-
-    // 检查保留策略
-    await this.retentionPolicy.check(memory, this.stores);
-  }
-
-  async retrieve(query: string, options: RetrievalOptions = {}): Promise<Memory[]> {
-    const { type, limit, threshold } = options;
-
-    // 确定查询的记忆类型
-    const typesToSearch = type ? [type] : Array.from(this.stores.keys());
-
-    const results: Memory[] = [];
-
-    for (const memType of typesToSearch) {
-      const store = this.stores.get(memType)!;
-      const memories = await store.search(query, {
-        limit: limit || 10,
-        threshold: threshold || 0.7
-      });
-      results.push(...memories);
-    }
-
-    // 更新访问统计
-    for (const memory of results) {
-      memory.accessCount++;
-      memory.lastAccessed = Date.now();
-    }
-
-    // 按相关性排序
-    return results.sort((a, b) => b.importance - a.importance);
-  }
-
-  async retrieveContext(window: number = 5): Promise<Memory[]> {
-    const workingStore = this.stores.get('working') as WorkingMemory;
-    return workingStore.getRecent(window);
-  }
-
-  async update(id: string, updates: Partial<Memory>): Promise<void> {
-    for (const store of this.stores.values()) {
-      const exists = await store.exists(id);
-      if (exists) {
-        await store.update(id, updates);
-        break;
-      }
+  add(m: Memory): void {
+    this.items.push(m);
+    if (this.items.length > this.capacity) {
+      this.items.shift(); // 超出容量时挤掉最旧的一条
     }
   }
 
-  async consolidate(): Promise<void> {
-    // 记忆整合 - 将工作记忆中的信息整合到长期记忆
-    const workingStore = this.stores.get('working') as WorkingMemory;
-    const episodicStore = this.stores.get('episodic') as VectorStore;
-
-    const recentMemories = await workingStore.getAll();
-
-    for (const memory of recentMemories) {
-      if (memory.importance > 0.7) {
-        await episodicStore.add({
-          ...memory,
-          type: 'episodic'
-        });
-      }
-    }
-
-    // 清空工作记忆
-    await workingStore.clear();
+  recent(n: number): Memory[] {
+    return this.items.slice(-n); // 只返回最近 n 条
   }
 
-  async getSummary(timeRange?: TimeRange): Promise<MemorySummary> {
-    const episodicStore = this.stores.get('episodic') as VectorStore;
-    const semanticStore = this.stores.get('semantic') as GraphStore;
-
-    return {
-      episodicCount: await episodicStore.count(timeRange),
-      semanticCount: await semanticStore.count(),
-      mostAccessed: await this.getMostAccessed(10),
-      recentTopics: await this.extractTopics(timeRange)
-    };
-  }
-
-  private async getMostAccessed(limit: number): Promise<Memory[]> {
-    const allMemories: Memory[] = [];
-
-    for (const store of this.stores.values()) {
-      allMemories.push(...await store.getAll());
-    }
-
-    return allMemories
-      .sort((a, b) => b.accessCount - a.accessCount)
-      .slice(0, limit);
-  }
-
-  private async extractTopics(timeRange?: TimeRange): Promise<string[]> {
-    const episodicStore = this.stores.get('episodic') as VectorStore;
-    const memories = await episodicStore.getAll(timeRange);
-
-    // 简单的主题提取
-    const topicCounts = new Map<string, number>();
-
-    for (const memory of memories) {
-      const tags = memory.metadata.tags;
-      for (const tag of tags) {
-        topicCounts.set(tag, (topicCounts.get(tag) || 0) + 1);
-      }
-    }
-
-    return Array.from(topicCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([topic]) => topic);
-  }
-}
-
-// 向量存储
-class VectorStore implements MemoryStore {
-  private vectors: Map<string, { memory: Memory; vector: number[] }> = new Map();
-  private dimension: number;
-  private maxSize: number;
-
-  constructor(config: { dimension: number; maxSize: number }) {
-    this.dimension = config.dimension;
-    this.maxSize = config.maxSize;
-  }
-
-  async add(memory: Memory): Promise<void> {
-    if (this.vectors.size >= this.maxSize) {
-      await this.evict();
-    }
-
-    const vector = await this.embed(memory.content);
-    this.vectors.set(memory.id, { memory, vector });
-  }
-
-  async search(query: string, options: { limit: number; threshold: number }): Promise<Memory[]> {
-    const queryVector = await this.embed(query);
-    const results: Array<{ memory: Memory; similarity: number }> = [];
-
-    for (const { memory, vector } of this.vectors.values()) {
-      const similarity = this.cosineSimilarity(queryVector, vector);
-      if (similarity >= options.threshold) {
-        results.push({ memory, similarity });
-      }
-    }
-
-    return results
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, options.limit)
-      .map(r => r.memory);
-  }
-
-  private async embed(text: string): Promise<number[]> {
-    // 实际实现应调用嵌入模型
-    return new Array(this.dimension).fill(0).map(() => Math.random());
-  }
-
-  private cosineSimilarity(a: number[], b: number[]): number {
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
-
-  private async evict(): Promise<void> {
-    // 驱逐最少访问的记忆
-    let oldest: Memory | null = null;
-
-    for (const { memory } of this.vectors.values()) {
-      if (!oldest || memory.lastAccessed < oldest.lastAccessed) {
-        oldest = memory;
-      }
-    }
-
-    if (oldest) {
-      this.vectors.delete(oldest.id);
-    }
-  }
-
-  async getAll(): Promise<Memory[]> {
-    return Array.from(this.vectors.values()).map(v => v.memory);
-  }
-
-  async exists(id: string): Promise<boolean> {
-    return this.vectors.has(id);
-  }
-
-  async update(id: string, updates: Partial<Memory>): Promise<void> {
-    const entry = this.vectors.get(id);
-    if (entry) {
-      entry.memory = { ...entry.memory, ...updates };
-    }
-  }
-
-  async count(): Promise<number> {
-    return this.vectors.size;
-  }
-}
-
-// 工作记忆
-class WorkingMemory implements MemoryStore {
-  private memories: Memory[] = [];
-  private capacity: number;
-
-  constructor(config: { capacity: number }) {
-    this.capacity = config.capacity;
-  }
-
-  async add(memory: Memory): Promise<void> {
-    this.memories.push(memory);
-
-    if (this.memories.length > this.capacity) {
-      // 遗忘最旧的记忆
-      this.memories.shift();
-    }
-  }
-
-  async getRecent(count: number): Promise<Memory[]> {
-    return this.memories.slice(-count);
-  }
-
-  async getAll(): Promise<Memory[]> {
-    return [...this.memories];
-  }
-
-  async clear(): Promise<void> {
-    this.memories = [];
-  }
-
-  async exists(): Promise<boolean> {
-    return this.memories.length > 0;
-  }
-
-  async update(): Promise<void> {}
-}
-
-// 重要性计算器
-class ImportanceCalculator {
-  private model: ImportanceModel;
-
-  constructor(config: ImportanceConfig) {
-    this.model = this.loadModel(config.modelPath);
-  }
-
-  async calculate(memory: Memory): Promise<number> {
-    let score = 0.5; // 基础分数
-
-    // 来源权重
-    switch (memory.metadata.source) {
-      case 'user':
-        score += 0.2;
-        break;
-      case 'agent':
-        score += 0.1;
-        break;
-      default:
-        break;
-    }
-
-    // 标签权重
-    const priorityTags = ['important', 'decision', 'error', 'success'];
-    const hasPriorityTag = memory.metadata.tags.some(tag =>
-      priorityTags.includes(tag.toLowerCase())
-    );
-    if (hasPriorityTag) score += 0.15;
-
-    // 访问频率
-    score += Math.min(memory.accessCount * 0.02, 0.15);
-
-    return Math.min(score, 1);
+  clear(): void {
+    this.items = [];
   }
 }
 ```
 
-## 4. 知识图谱 (Knowledge Graph)
+**这段代码在做什么**
 
-知识图谱存储和管理结构化的知识关系。
+- 用数组尾部作为最新位置，取最近条目只要一次切片。
+- 超容量时挤掉头部，保证内存占用有上限。
+- `clear` 用于任务结束后清空，避免上下文串味。
+- 容量取值需要按上下文长度预算决定，示例值不是推荐值。
 
-```typescript
-// 知识图谱节点
-interface KGNode {
-  id: string;
-  type: NodeType;
-  label: string;
-  properties: Map<string, any>;
-  embeddings?: number[];
+第 3 步：用余弦相似度做检索并排序。
+
+```ts
+function cosine(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if (na === 0 || nb === 0) return 0; // 零向量直接返回 0
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+function rank(items: Memory[], queryVec: number[], threshold: number): Memory[] {
+  return items
+    .map((m) => ({ m, sim: cosine(queryVec, m.embedding ?? []) }))
+    .filter((x) => x.sim >= threshold)
+    .sort((x, y) => (y.sim + y.m.importance) - (x.sim + x.m.importance))
+    .map((x) => x.m);
+}
+```
+
+**这段代码在做什么**
+
+- 余弦相似度只看向量方向，不看长度，适合文本向量。
+- 零向量单独处理，避免除零得到 NaN。
+- 阈值过滤在前，排序在后，减少排序量。
+- 排序键是相似度加重要度，两者权重可按评测结果调整。
+
+**运行结果**
+
+查询向量与某条记忆完全同向时相似度为 1，正交时为 0。
+
+**动手验证**
+
+```js
+// cognition-4.mjs
+// 运行：node cognition-4.mjs
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if (na === 0 || nb === 0) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+assert.equal(cosine([1, 0], [1, 0]), 1);
+assert.equal(cosine([1, 0], [0, 1]), 0);
+assert.equal(cosine([0, 0], [1, 1]), 0);
+
+class WorkingMemory {
+  constructor(capacity) { this.capacity = capacity; this.items = []; }
+  add(m) {
+    this.items.push(m);
+    if (this.items.length > this.capacity) this.items.shift();
+  }
+  recent(n) { return this.items.slice(-n); }
+}
+
+const wm = new WorkingMemory(2);
+wm.add({ id: 'm1', content: '用顺丰', importance: 0.5, embedding: [1, 0] });
+wm.add({ id: 'm2', content: '要发票', importance: 0.4, embedding: [0, 1] });
+wm.add({ id: 'm3', content: '改地址', importance: 0.7, embedding: [1, 1] });
+assert.equal(wm.recent(5).length, 2);
+assert.equal(wm.recent(5)[0].id, 'm2');
+
+function rank(items, queryVec, threshold) {
+  return items
+    .map((m) => ({ m, sim: cosine(queryVec, m.embedding) }))
+    .filter((x) => x.sim >= threshold)
+    .sort((x, y) => (y.sim + y.m.importance) - (x.sim + x.m.importance))
+    .map((x) => x.m.id);
+}
+
+const ranked = rank(wm.recent(5), [1, 0], 0.5);
+assert.deepEqual(ranked, ['m3', 'm2']);
+
+console.log('预期输出: 工作记忆容量与检索排序断言全部通过');
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 上下文越来越长直到超限 | 工作记忆没有容量上限 | 设固定容量，超出时按最旧或最低分淘汰 |
+| 检索结果每轮都不一样 | 排序只用了相似度且并列时顺序不定 | 排序键里加入 id 作为兜底比较项 |
+| 把长期事实写进工作记忆 | 写入时没有按类型分流 | 写入前先判断信息是事件、事实还是技能 |
+
+**用在哪里**
+
+- 多轮客服对话。业务背景：一次会话跨十几轮，需要记住用户偏好；这一节的知识怎么用：偏好进工作记忆，结论进情景记忆；指标：重复提问率；什么时候不该用：单轮问答场景无需记忆系统。
+- 个人助理类产品。业务背景：用户会提到"我上次说的那个项目"；这一节的知识怎么用：情景记忆按时间戳排序后可定位到具体事件；指标：指代解析准确率；什么时候不该用：涉及隐私的信息需要先做脱敏再入库。
+- IDE 内代码助手。业务背景：需要记住当前仓库的编码约定；这一节的知识怎么用：约定进语义记忆，本轮编辑进工作记忆；指标：建议被接受率；什么时候不该用：仓库约定频繁变动时改用每次重新扫描。
+
+**行业实践**
+
+- 斯坦福 Generative Agents 论文（Park 等，2023）给记忆设了由新近度、重要度、相关度共同构成的检索打分。怎么借鉴到你的项目：把这三项都做成可配置参数，用评测集标定；具体公式与权重以论文原文为准。
+- MemGPT 论文（Packer 等，2023）提出用分页思路管理上下文，在有限窗口里模拟更大记忆。怎么借鉴到你的项目：工作记忆设容量、超出容量时把条目搬到长期存储，正是分页的简化版。
+- 认知心理学中情景记忆、语义记忆、程序记忆的划分来自 Tulving 等人的研究，工程实现借用了这套命名；具体定义与边界需核对心理学教材原文。
+
+**小结**
+
+1. 记忆按用途分桶，写入前先判断类型与重要度。
+2. 工作记忆必须有容量上限，否则上下文会失控。
+3. 检索排序至少包含相关度与重要度两项，避免高频噪音压过关键信息。
+
+## 5. 知识图谱：把关系存成节点和边
+
+**先想一个问题**
+
+用户问："和这双鞋搭配的袜子有现货吗？"
+
+只靠关键词搜索，系统会同时返回鞋和袜子的商品页，但不知道谁和谁搭配。
+
+!!! note "术语：知识图谱"
+    定义：用节点表示实体、用边表示实体之间关系的结构化知识库。
+    例子：节点"运动鞋"与节点"运动袜"之间有一条"搭配"边。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：知识图谱是一张巨大的关系网，查询就是从某个节点出发沿着边走。
+    日常类比：像地铁线路图，站是节点，线路是边，换乘就是路径查找。
+    类比不成立的地方：地铁线路图是静态的，而知识图谱的边有权重、有方向语义，还会被新数据改写。
+
+**图解**
+
+```mermaid
+classDiagram
+    class KGNode {
+        +string id
+        +string type
+        +string label
+    }
+    class KGEdge {
+        +string id
+        +string source
+        +string target
+        +string relation
+        +number weight
+    }
+    class KnowledgeGraph {
+        +addNode()
+        +addEdge()
+        +findPath()
+        +findNeighbors()
+    }
+    KnowledgeGraph "1" --> "many" KGNode : "包含"
+    KnowledgeGraph "1" --> "many" KGEdge : "包含"
+    KGEdge "many" --> "1" KGNode : "起点"
+    KGEdge "many" --> "1" KGNode : "终点"
+```
+
+1. 图由节点集合与边集合两部分组成。
+2. 每条边记录起点、终点、关系类型与权重。
+3. 加边前必须确认两端节点都已存在，否则边是悬空的。
+4. 查询接口分四类：找路径、找邻居、找模式、语义检索。
+
+**一步一步来**
+
+第 1 步：定义节点、边与关系类型。
+
+```ts
 type NodeType = 'entity' | 'concept' | 'event' | 'document';
 
-// 知识图谱边
-interface KGEdge {
-  id: string;
-  source: string;
-  target: string;
-  relation: RelationType;
-  weight: number;
-  properties: Map<string, any>;
+type RelationType =
+  | 'is_a' | 'part_of' | 'has_property' | 'causes'
+  | 'depends_on' | 'similar_to' | 'precedes' | 'references';
+
+interface KGNode { id: string; type: NodeType; label: string; }
+interface KGEdge { id: string; source: string; target: string; relation: RelationType; weight: number; }
+```
+
+**这段代码在做什么**
+
+- 节点类型区分实体、概念、事件、文档四类，便于分区存储。
+- 关系类型收敛成八种，新增关系要显式加进联合类型。
+- `weight` 表示关系强度，路径打分时使用。
+- 节点与边分开定义，索引可以分别建。
+
+第 2 步：建图并维护邻接表。
+
+```ts
+const nodes = new Map<string, KGNode>();
+const edges = new Map<string, KGEdge>();
+const adj = new Map<string, Set<string>>();
+
+function addNode(node: KGNode): void {
+  nodes.set(node.id, node);
+  if (!adj.has(node.id)) adj.set(node.id, new Set());
 }
 
-type RelationType =
-  | 'is_a'
-  | 'part_of'
-  | 'has_property'
-  | 'causes'
-  | 'depends_on'
-  | 'similar_to'
-  | 'precedes'
-  | 'references';
-
-// 知识图谱
-class KnowledgeGraph {
-  private nodes: Map<string, KGNode> = new Map();
-  private edges: Map<string, KGEdge> = new Map();
-  private adjacencyList: Map<string, Set<string>> = new Map();
-  private indexer: GraphIndexer;
-
-  constructor() {
-    this.indexer = new GraphIndexer();
+function addEdge(edge: KGEdge): void {
+  if (!nodes.has(edge.source) || !nodes.has(edge.target)) {
+    throw new Error(`边 ${edge.id} 的端点不存在`);
   }
+  edges.set(edge.id, edge);
+  adj.get(edge.source)!.add(edge.target); // 记录正向邻居
+  adj.get(edge.target)!.add(edge.source); // 记录反向邻居
+}
+```
 
-  async addNode(node: KGNode): Promise<void> {
-    this.nodes.set(node.id, node);
-    this.adjacencyList.set(node.id, new Set());
+**这段代码在做什么**
 
-    await this.indexer.indexNode(node);
-  }
+- 邻接表用 Set 存邻居，天然去重。
+- 加边前校验端点，避免出现悬空边。
+- 正反都记录邻居，使图可以双向遍历。
+- 抛出带边标识的错误，日志里能直接定位。
 
-  async addEdge(edge: KGEdge): Promise<void> {
-    // 验证节点存在
-    if (!this.nodes.has(edge.source) || !this.nodes.has(edge.target)) {
-      throw new NodeNotFoundError(edge.source, edge.target);
+第 3 步：带深度限制的深度优先路径查找。
+
+```ts
+function findPath(from: string, to: string, maxDepth: number): string[] | null {
+  const visited = new Set<string>();
+  const path: string[] = [];
+
+  function dfs(cur: string, remain: number): boolean {
+    if (remain < 0) return false;          // 超过深度限制就放弃
+    if (visited.has(cur)) return false;    // 已访问过，防止成环
+    visited.add(cur);
+    path.push(cur);
+    if (cur === to) return true;           // 命中目标
+    for (const next of adj.get(cur) ?? []) {
+      if (dfs(next, remain - 1)) return true;
     }
-
-    this.edges.set(edge.id, edge);
-
-    // 更新邻接表
-    this.adjacencyList.get(edge.source)!.add(edge.target);
-    this.adjacencyList.get(edge.target)!.add(edge.source); // 无向图
-
-    await this.indexer.indexEdge(edge);
-  }
-
-  async query(query: KGQuery): Promise<KGQueryResult> {
-    switch (query.type) {
-      case 'path':
-        return this.findPath(query.from, query.to, query.maxLength);
-
-      case 'neighbors':
-        return this.findNeighbors(query.node, query.depth);
-
-      case 'pattern':
-        return this.findPattern(query.pattern);
-
-      case 'semantic':
-        return this.semanticSearch(query.text, query.limit);
-
-      default:
-        return { nodes: [], edges: [] };
-    }
-  }
-
-  private async findPath(
-    from: string,
-    to: string,
-    maxLength: number
-  ): Promise<KGQueryResult> {
-    const visited = new Set<string>();
-    const path: string[] = [];
-    const edges: KGEdge[] = [];
-
-    const found = this.dfs(from, to, maxLength, visited, path, edges);
-
-    if (found) {
-      return {
-        nodes: path.map(id => this.nodes.get(id)!),
-        edges
-      };
-    }
-
-    return { nodes: [], edges: [] };
-  }
-
-  private dfs(
-    current: string,
-    target: string,
-    remaining: number,
-    visited: Set<string>,
-    path: string[],
-    edges: KGEdge[]
-  ): boolean {
-    if (remaining < 0) return false;
-
-    visited.add(current);
-    path.push(current);
-
-    if (current === target) return true;
-
-    const neighbors = this.adjacencyList.get(current) || new Set();
-
-    for (const neighbor of neighbors) {
-      if (!visited.has(neighbor)) {
-        // 找到连接边
-        const edge = this.findEdge(current, neighbor);
-        if (edge) edges.push(edge);
-
-        if (this.dfs(neighbor, target, remaining - 1, visited, path, edges)) {
-          return true;
-        }
-
-        edges.pop(); // 回溯
-      }
-    }
-
-    path.pop();
+    path.pop();                            // 回溯，撤销本次选择
     return false;
   }
 
-  private findEdge(source: string, target: string): KGEdge | null {
-    for (const edge of this.edges.values()) {
-      if (edge.source === source && edge.target === target) {
-        return edge;
-      }
-    }
-    return null;
-  }
-
-  private async findNeighbors(nodeId: string, depth: number): Promise<KGQueryResult> {
-    const resultNodes = new Set<KGNode>();
-    const resultEdges: KGEdge[] = [];
-
-    const queue: Array<{ id: string; level: number }> = [{ id: nodeId, level: 0 }];
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-      const { id, level } = queue.shift()!;
-
-      if (visited.has(id) || level > depth) continue;
-      visited.add(id);
-
-      const node = this.nodes.get(id);
-      if (node) resultNodes.add(node);
-
-      const neighbors = this.adjacencyList.get(id) || new Set();
-
-      for (const neighborId of neighbors) {
-        const edge = this.findEdge(id, neighborId);
-        if (edge) resultEdges.push(edge);
-
-        queue.push({ id: neighborId, level: level + 1 });
-      }
-    }
-
-    return {
-      nodes: Array.from(resultNodes),
-      edges: resultEdges
-    };
-  }
-
-  private async findPattern(pattern: GraphPattern): Promise<KGQueryResult> {
-    const matchingNodes = new Set<KGNode>();
-
-    // 简单的模式匹配
-    for (const node of this.nodes.values()) {
-      if (this.matchNodePattern(node, pattern.nodePattern)) {
-        matchingNodes.add(node);
-      }
-    }
-
-    return {
-      nodes: Array.from(matchingNodes),
-      edges: []
-    };
-  }
-
-  private matchNodePattern(node: KGNode, pattern: NodePattern): boolean {
-    if (pattern.type && node.type !== pattern.type) return false;
-    if (pattern.label && !node.label.includes(pattern.label)) return false;
-
-    if (pattern.properties) {
-      for (const [key, value] of Object.entries(pattern.properties)) {
-        if (node.properties.get(key) !== value) return false;
-      }
-    }
-
-    return true;
-  }
-
-  private async semanticSearch(text: string, limit: number): Promise<KGQueryResult> {
-    const queryEmbedding = await this.embed(text);
-    const results: Array<{ node: KGNode; similarity: number }> = [];
-
-    for (const node of this.nodes.values()) {
-      if (node.embeddings) {
-        const similarity = this.cosineSimilarity(queryEmbedding, node.embeddings);
-        results.push({ node, similarity });
-      }
-    }
-
-    return {
-      nodes: results
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, limit)
-        .map(r => r.node),
-      edges: []
-    };
-  }
-
-  private async embed(text: string): Promise<number[]> {
-    // 嵌入实现
-    return new Array(1536).fill(0).map(() => Math.random());
-  }
-
-  private cosineSimilarity(a: number[], b: number[]): number {
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
-  }
-
-  async expand(nodeId: string, depth: number = 1): Promise<KGNode[]> {
-    const neighbors = await this.findNeighbors(nodeId, depth);
-    return neighbors.nodes;
-  }
-
-  async infer(type: RelationType, from: string): Promise<KGNode[]> {
-    // 关系推理
-    const inferred: KGNode[] = [];
-
-    // 传递闭包
-    const visited = new Set<string>();
-    const queue = [from];
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-
-      if (visited.has(current)) continue;
-      visited.add(current);
-
-      const edges = this.getOutgoingEdges(current);
-
-      for (const edge of edges) {
-        if (edge.relation === type) {
-          const targetNode = this.nodes.get(edge.target);
-          if (targetNode) inferred.push(targetNode);
-        }
-
-        queue.push(edge.target);
-      }
-    }
-
-    return inferred;
-  }
-
-  private getOutgoingEdges(nodeId: string): KGEdge[] {
-    return Array.from(this.edges.values()).filter(e => e.source === nodeId);
-  }
-
-  async export(format: 'json' | 'rdf' | 'owl'): Promise<string> {
-    switch (format) {
-      case 'json':
-        return JSON.stringify({
-          nodes: Array.from(this.nodes.values()),
-          edges: Array.from(this.edges.values())
-        }, null, 2);
-
-      default:
-        throw new UnsupportedFormatError(format);
-    }
-  }
+  return dfs(from, maxDepth) ? path : null;
 }
 ```
+
+**这段代码在做什么**
+
+- `remain` 控制递归深度，防止在稠密图上耗尽内存。
+- `visited` 防止在两个节点之间来回跳。
+- `path.pop()` 是回溯操作，保证返回的路径是干净的。
+- 找不到路径时返回 null，调用方需要显式处理。
+
+**运行结果**
+
+在"鞋 → 订单 → 退款"这条链上，以深度 3 查询会返回三个节点的数组。
+
+**动手验证**
+
+```js
+// cognition-5.mjs
+// 运行：node cognition-5.mjs
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+const nodes = new Map();
+const adj = new Map();
+
+function addNode(id, label) {
+  nodes.set(id, { id, label });
+  if (!adj.has(id)) adj.set(id, new Set());
+}
+
+function addEdge(source, target, relation) {
+  if (!nodes.has(source) || !nodes.has(target)) throw new Error(`边端点不存在: ${source} -> ${target}`);
+  adj.get(source).add(target);
+  adj.get(target).add(source);
+}
+
+addNode('shoe', '运动鞋');
+addNode('order', '订单');
+addNode('refund', '退款');
+addEdge('shoe', 'order', 'part_of');
+addEdge('order', 'refund', 'causes');
+
+function findPath(from, to, maxDepth) {
+  const visited = new Set();
+  const path = [];
+  function dfs(cur, remain) {
+    if (remain < 0 || visited.has(cur)) return false;
+    visited.add(cur);
+    path.push(cur);
+    if (cur === to) return true;
+    for (const next of adj.get(cur) ?? []) {
+      if (dfs(next, remain - 1)) return true;
+    }
+    path.pop();
+    return false;
+  }
+  return dfs(from, maxDepth) ? path : null;
+}
+
+assert.deepEqual(findPath('shoe', 'refund', 3), ['shoe', 'order', 'refund']);
+assert.equal(findPath('shoe', 'refund', 1), null);
+assert.equal(findPath('shoe', 'missing', 3), null);
+assert.throws(() => addEdge('shoe', 'ghost', 'is_a'), /边端点不存在/);
+
+console.log('预期输出: 路径查找与端点校验断言全部通过');
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 加边时报端点不存在 | 节点还没建就先连边 | 先批量建节点，再批量建边 |
+| 路径查找占用内存飙升 | 没有深度限制，稠密图上递归爆栈 | 加 maxDepth，并在服务层设上限 |
+| 同类实体重复入库 | 缺少实体归一化 | 入库前先按别名表做归一 |
+
+**用在哪里**
+
+- 企业知识库问答。业务背景：文档分散在多个系统，问题需要跨文档串联；这一节的知识怎么用：文档作为 document 节点，章节作为 part_of 边；指标：问答引用命中率；什么时候不该用：只有一份文档时用全文检索即可。
+- 电商搭配推荐。业务背景：需要给出搭配商品而不是相似商品；这一节的知识怎么用：搭配关系作为一条边，权重来自历史共购；指标：搭配位点击率；什么时候不该用：商品间没有稳定搭配关系时不要硬造边。
+- 反欺诈关系排查。业务背景：需要找出共用设备或地址的账户群；这一节的知识怎么用：账户与设备作为节点，共用关系作为边，找两跳内邻居；指标：可疑团伙识别率；什么时候不该用：涉及个人敏感信息时需先做合规评估。
+
+**行业实践**
+
+- 微软研究院的 GraphRAG 提出在检索增强生成中加入图结构，用社区摘要回答全局性问题。怎么借鉴到你的项目：把图查询结果作为检索结果的一部分一起送给模型；具体方法名称与流程以官方项目文档为准。
+- W3C 的 RDF 1.1 与 SPARQL 1.1 是知识图谱领域的两份公开规范，分别定义三元组数据模型与查询语言。怎么借鉴到你的项目：内部图结构可以先对齐三元组的最小模型，便于后续导出；规范细节以 W3C 原文为准。
+- 实体归一化方面，需要核对官方文档：具体要核对实体消歧的评测数据集名称与指标定义，以及所选图数据库是否内置别名索引。
+
+**小结**
+
+1. 图由节点与边组成，加边前要校验端点。
+2. 邻接表是多数图查询的起点，正反邻居都要记。
+3. 路径查找必须带深度限制与访问标记，否则会失控。
+
+## 6. 四层如何协作：一次请求的完整时序
+
+**先想一个问题**
+
+前面四节各自能跑，但把它们接起来会发生什么？
+
+哪一层的输出传给哪一层，失败信息又怎么回去？
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：一次请求是一条闭环流水线，执行结果必须回流到记忆与图谱，否则系统不会变聪明。
+    日常类比：像一家餐厅的点单流程，点单、备菜、出餐、记录，缺了记录下次还要重问客人。
+    类比不成立的地方：餐厅的流程是人工协调的，而这里每一步都要用结构化数据交接，格式错了就断链。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+    participant U as "用户"
+    participant R as "推理引擎"
+    participant P as "规划器"
+    participant M as "记忆系统"
+    participant G as "知识图谱"
+    participant E as "执行层"
+    U->>R: "输入一句话"
+    R->>M: "检索历史记忆"
+    M-->>R: "返回相关记忆"
+    R->>G: "查询实体关系"
+    G-->>R: "返回关系路径"
+    R->>P: "提交结论与约束"
+    P->>P: "生成行动计划"
+    P->>E: "提交计划"
+    E-->>P: "返回执行结果"
+    P->>M: "写入本次事件"
+    P->>U: "返回最终答复"
+```
+
+1. 输入先到推理引擎，推理需要历史信息。
+2. 推理引擎向记忆系统与知识图谱各发一次查询。
+3. 两边结果回来后，推理引擎产出结论与约束条件。
+4. 规划器把结论翻译成行动计划，交给执行层。
+5. 执行结果写回记忆系统，同时更新图谱中的关系权重。
+
+**一步一步来**
+
+第 1 步：给四个模块定义统一的调用签名，便于串起来。
+
+```ts
+interface CognitionDeps {
+  reason(input: ParsedInput, ctx: Context): Promise<CognitionResult>;
+  plan(goal: string, ctx: Context): Promise<PlanStep[]>;
+  recall(query: string, limit: number): Promise<string[]>;
+  queryGraph(from: string, to: string, maxDepth: number): Promise<string[] | null>;
+}
+```
+
+**这段代码在做什么**
+
+- 四个方法各自独立，方便单独替换与单独测试。
+- 入参只带本模块需要的数据，不带整条流水线的状态。
+- 返回类型统一用 Promise，便于并行调用。
+- 这个接口是接缝，测试时可以用桩实现替换。
+
+第 2 步：写一个串起四步的编排函数。
+
+```ts
+async function handle(deps: CognitionDeps, raw: string, ctx: Context) {
+  const input: ParsedInput = { raw, normalizedText: raw.replace(/\s+/g, ''), entities: [] };
+  const memories = await deps.recall(input.normalizedText, 3); // 先取历史
+  const result = await deps.reason(input, ctx);                // 再推理
+  const steps = await deps.plan(result.conclusion, ctx);       // 再规划
+  return { result, memories, steps };
+}
+```
+
+**这段代码在做什么**
+
+- 顺序是先记忆、再推理、再规划，符合依赖方向。
+- 记忆检索失败不应该阻断推理，可在实现里 try/catch。
+- 返回值带上中间产物，便于上层展示决策依据。
+- 这个函数不直接调工具，保持认知层与执行层的边界。
+
+**运行结果**
+
+返回值里包含结论、记忆列表与步骤数组三部分。
+
+**动手验证**
+
+```js
+// cognition-6.mjs
+// 运行：node cognition-6.mjs
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+const calls = [];
+
+const deps = {
+  async recall(query, limit) {
+    calls.push('recall');
+    const all = ['用户偏好顺丰', '上月退过一单'];
+    return all.slice(0, limit);
+  },
+  async reason(input) {
+    calls.push('reason');
+    return { conclusion: 'refund', confidence: 0.9, evidence: input.entities };
+  },
+  async plan(goal) {
+    calls.push('plan');
+    return [
+      { id: 's1', action: 'query', dependencies: [] },
+      { id: 's2', action: 'create', dependencies: ['s1'] },
+    ];
+  },
+};
+
+async function handle(raw) {
+  const input = { raw, normalizedText: raw.replace(/\s+/g, ''), entities: raw.match(/订单\d+/g) ?? [] };
+  const memories = await deps.recall(input.normalizedText, 3);
+  const result = await deps.reason(input);
+  const steps = await deps.plan(result.conclusion);
+  return { result, memories, steps };
+}
+
+const out = await handle('把 订单12345 退掉，用顺丰');
+assert.equal(out.result.conclusion, 'refund');
+assert.equal(out.memories.length, 2);
+assert.equal(out.steps.length, 2);
+assert.deepEqual(calls, ['recall', 'reason', 'plan']);
+
+console.log('预期输出: 编排顺序与返回值断言全部通过');
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 记忆检索超时拖垮整条链路 | 检索没有被超时保护 | 给检索设超时，超时返回空数组继续推理 |
+| 同一信息在多层重复加工 | 层与层之间传了整份上下文 | 每层只接收本层需要的字段 |
+| 执行结果没有回流 | 编排函数只返回结果不写回 | 在编排末尾统一写记忆与更新图权重 |
+
+**用在哪里**
+
+- 智能运维值班助手。业务背景：告警触发后要给出处理建议；这一节的知识怎么用：检索历史同类告警，推理出原因，规划出检查步骤；指标：平均恢复时间；什么时候不该用：涉及直接重启生产服务时只出建议。
+- 智能招聘筛选助手。业务背景：需要按岗位要求筛选简历；这一节的知识怎么用：岗位要求进图谱，候选人经历进记忆；指标：初筛通过率与人工复核差异；什么时候不该用：涉及录用决策时必须有真人复核。
+- 财务报销审核助手。业务背景：审核单据是否符合制度；这一节的知识怎么用：制度规则进推理引擎，历史单据进记忆；指标：审核准确率与退回率；什么时候不该用：制度条款存在解释空间时只标记不决定。
+
+**行业实践**
+
+- Anthropic 工程博客《Building Effective Agents》给出的编排者加子任务模式，与本节"推理产出约束、规划产出步骤"的分工一致。怎么借鉴到你的项目：把每一层的输入输出写成显式结构，替换任一层不影响其他层；具体模式名称以原文为准。
+- ReAct 论文（Yao 等，2022）说明推理与行动交替的循环结构。怎么借鉴到你的项目：把执行结果回流到推理引擎，而不是只回流到日志系统。
+- 需要核对官方文档：具体要核对所选可观测性平台的 trace 传播规范，确认跨模块的调用标识如何透传。
+
+**小结**
+
+1. 四层用结构化数据交接，每一层只拿自己需要的字段。
+2. 记忆检索要可降级，失败不能阻断推理。
+3. 执行结果必须回流，否则系统无法从历史中获益。
+
+## 7. 评估与排错：怎么判断认知层写对了
+
+**先想一个问题**
+
+认知层上线后，怎么知道它比上一版更好？
+
+如果没有指标，只能靠感觉判断。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：把认知层的每个环节都当成可以被单独测量的单元，先定指标再改代码。
+    日常类比：像体检报告，血压、血糖分开测，不能只凭"感觉身体还行"。
+    类比不成立的地方：体检指标有公认正常范围，认知层的指标范围要自己在评测集上标定。
+
+**图解**
+
+```mermaid
+flowchart TD
+    A["问题出现"] --> B{"结论错还是步骤错"}
+    B --> C["结论错 查推理链"]
+    B --> D["步骤错 查计划依赖"]
+    C --> E{"推理链完整吗"}
+    E --> F["链断 补规则与事实"]
+    E --> G["链对但结论错 核对置信度阈值"]
+    D --> H{"预条件齐吗"}
+    H --> I["不齐 增加修复步骤"]
+    H --> J["齐但执行失败 转执行层排查"]
+```
+
+1. 先判断问题出在结论还是步骤，这决定排查方向。
+2. 结论问题看推理链是否完整，链断了先补规则与事实。
+3. 链完整但结论错，检查置信度阈值是否设错。
+4. 步骤问题看预条件，不齐就补修复步骤。
+5. 预条件齐全仍失败，说明问题不在认知层，转执行层。
+
+**一步一步来**
+
+第 1 步：定义可记录的指标字段。
+
+```ts
+interface CognitionTrace {
+  requestId: string;      // 一次请求的标识
+  reasoningSteps: number; // 推理链长度
+  confidence: number;     // 最终置信度
+  planSteps: number;      // 计划步骤数
+  recalledCount: number;  // 召回的记忆条数
+  graphHops: number;      // 图查询跳数
+  elapsedMs: number;      // 认知层总耗时
+}
+```
+
+**这段代码在做什么**
+
+- 每个字段都能在一次请求里直接算出来，不需要额外标注。
+- `requestId` 用于把认知层与执行层的日志串起来。
+- 字段数量控制在七个以内，避免记录成本过高。
+- 都是数字型，便于做分位数统计。
+
+第 2 步：写一个统计函数，输出分位数。
+
+```ts
+function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);   // 复制后排序，不改入参
+  const idx = Math.ceil((p / 100) * sorted.length) - 1;
+  return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
+}
+```
+
+**这段代码在做什么**
+
+- 先复制再排序，避免修改调用方数组。
+- 用向上取整定位分位点，结果一定落在合法下标内。
+- 空数组返回 0，避免抛出异常。
+- 耗时类指标建议看 p50 与 p95 两个点。
+
+**运行结果**
+
+传入 `[10, 20, 30, 40]` 求 p50 得到 20，求 p95 得到 40。
+
+**动手验证**
+
+```js
+// cognition-7.mjs
+// 运行：node cognition-7.mjs
+// 依赖：仅 Node 20+ 内置模块 node:assert
+import assert from 'node:assert/strict';
+
+function percentile(values, p) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.ceil((p / 100) * sorted.length) - 1;
+  return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
+}
+
+assert.equal(percentile([], 50), 0);
+assert.equal(percentile([10, 20, 30, 40], 50), 20);
+assert.equal(percentile([10, 20, 30, 40], 95), 40);
+
+function summarize(traces) {
+  const elapsed = traces.map((t) => t.elapsedMs);
+  return {
+    count: traces.length,
+    p50: percentile(elapsed, 50),
+    p95: percentile(elapsed, 95),
+    avgConfidence: traces.reduce((s, t) => s + t.confidence, 0) / traces.length,
+    avgSteps: traces.reduce((s, t) => s + t.planSteps, 0) / traces.length,
+  };
+}
+
+const report = summarize([
+  { elapsedMs: 120, confidence: 0.9, planSteps: 3 },
+  { elapsedMs: 200, confidence: 0.7, planSteps: 2 },
+  { elapsedMs: 160, confidence: 0.8, planSteps: 4 },
+]);
+
+assert.equal(report.count, 3);
+assert.equal(report.p50, 160);
+assert.equal(report.p95, 200);
+assert.ok(Math.abs(report.avgConfidence - 0.8) < 1e-9);
+assert.ok(Math.abs(report.avgSteps - 3) < 1e-9);
+
+console.log('预期输出: 分位数与汇总指标断言全部通过');
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 平均值看着挺好但用户投诉多 | 只统计了均值，长尾没被看见 | 同时统计 p95 与 p99 |
+| 无法定位是哪次请求出问题 | 日志里没有统一请求标识 | 全链路透传 requestId |
+| 指标好看但结论变差 | 只统计了耗时，没统计置信度与步骤数 | 把质量指标与性能指标放在同一张报表里 |
+
+**用在哪里**
+
+- 认知层灰度发布。业务背景：新版本规则要小流量验证；这一节的知识怎么用：对比新旧版本的置信度分布与步骤数；指标：置信度中位数变化与失败率；什么时候不该用：流量太小时分位数不可靠。
+- 客服质检抽样。业务背景：需要抽查自动处理的会话；这一节的知识怎么用：按推理链长度分层抽样，优先看链短的；指标：抽检合格率；什么时候不该用：抽样规则涉及用户隐私时需先脱敏。
+- 成本治理。业务背景：模型调用成本需要控制；这一节的知识怎么用：记录每次请求的步骤数与召回条数，找出高成本路径；指标：单次请求平均步骤数；什么时候不该用：成本下降但质量明显下降时应立即回滚。
+
+**行业实践**
+
+- OpenTelemetry 的语义约定给出了跨服务追踪的字段命名约定，可用于统一认知层的 trace 字段。怎么借鉴到你的项目：请求标识与耗时字段先对齐约定名，便于接入现成平台；具体字段名以官方文档为准。
+- LangSmith 官方文档中给出对链路逐步记录与评测的做法。怎么借鉴到你的项目：把认知层的每一步当作一个可单独打分的节点；具体接口以官方文档为准。
+- 需要核对官方文档：具体要核对所选评测框架对"置信度"字段的定义，确认它是概率还是归一化得分，避免跨版本比较出错。
+
+**小结**
+
+1. 先定指标再改代码，否则无法判断改动是否有效。
+2. 耗时看 p50 与 p95，质量看置信度与步骤数。
+3. 全链路透传请求标识，是把认知层与执行层对齐的前提。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 客服工单自动分派 | 输入结构化与决策置信度 | 规则引擎加文本分类 | 涉及金额争议时不自动决断 |
+| 售后政策问答 | 演绎推理与规则库 | 规则存表加匹配器 | 政策有地区差异时先分区 |
+| 后台批量导入 | 计划依赖与预条件修复 | 任务队列加检查点 | 大批量任务要能断点续跑 |
+| 多轮客服对话 | 工作记忆与情景记忆 | 内存队列加向量库 | 工作记忆必须设容量上限 |
+| 个人助理指代解析 | 情景记忆按时间排序 | 事件表加时间索引 | 隐私字段先脱敏再入库 |
+| 商品搭配推荐 | 知识图谱关系边 | 图数据库或邻接表 | 没有稳定关系时不要造边 |
+| 反欺诈关系排查 | 图多跳邻居查询 | 图数据库加深度限制 | 合规评估先行 |
+| 项目文档问答 | 知识图谱加语义检索 | 图查询与向量检索并联 | 文档切分粒度影响答案质量 |
+| 认知层灰度发布 | 指标采集与分位数统计 | 追踪平台加报表 | 流量太小时分位数不可信 |
+
+## 动手作业
+
+目标：写一个单文件脚本 `cognition-final.mjs`，把第 1 到第 5 节的五个最小模块串成一条闭环，并对闭环行为做断言。
+
+步骤：
+
+1. 实现 `parseInput`，从文本中提取形如「订单12345」的实体，返回结构化输入。
+2. 实现 `Reasoner`，内置两条演绎规则与一条归纳置信度算法，返回结论、置信度、依据三件套。
+3. 实现 `Planner`，把结论映射成不少于两条带依赖的步骤，缺少预条件时插入一条修复步骤。
+4. 实现 `WorkingMemory`，容量设为 3，提供 `add`、`recent`、`clear` 三个方法。
+5. 实现 `addNode`、`addEdge`、`findPath`，建成一张不少于四个节点、三条边的图。
+6. 写一个 `handle` 函数按「检索记忆 → 推理 → 规划 → 查图」的顺序编排，并在末尾写回记忆。
+
+验收标准：
+
+- 脚本用 `node cognition-final.mjs` 一次跑通，退出码为 0。
+- 至少包含 8 条 `node:assert/strict` 断言，覆盖正常路径与三条错误路径。
+- 工作记忆加入 5 条后 `recent(10)` 返回条数等于 3。
+- `findPath` 在深度不足时返回 `null`，深度足够时返回完整节点链。
+- 最后一行 `console.log` 打印固定的预期输出文案。
+
+## 综合对比
+
+| 维度 | 推理引擎 | 规划器 | 记忆系统 | 知识图谱 |
+| --- | --- | --- | --- | --- |
+| 主要输入 | 结构化文本与规则 | 结论与约束条件 | 新信息与查询向量 | 实体标识与关系类型 |
+| 主要输出 | 结论加推理链 | 带依赖的步骤数组 | 排序后的记忆列表 | 节点链或邻居集合 |
+| 有无状态 | 无状态，规则可外置 | 计划可缓存 | 有状态，需持久化 | 有状态，需持久化 |
+| 失败表现 | 结论置信度偏低 | 步骤预条件不满足 | 检索召回为空 | 路径不存在 |
+| 主要成本来源 | 规则匹配次数 | 计划验证次数 | 向量检索与存储 | 图遍历跳数 |
+| 可控手段 | 规则库与阈值 | 深度限制与检查点 | 容量上限与淘汰策略 | 跳数上限与端点校验 |
+| 常见依赖 | 无外部依赖 | 工具清单 | 向量模型与存储 | 图存储或邻接表 |
+| 排错入口 | 推理链每一环 | 步骤依赖与预条件 | 召回条数与相似度 | 路径与邻接表 |
 
 ## 深入阅读与参考
 
@@ -1618,208 +1403,68 @@ class KnowledgeGraph {
 | [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) | 讲清 lead agent 如何分解任务、派给 subagent 并汇合结果。 | 画出调用关系图，标出规划点与汇合点，判断自己的任务是否值得拆多 Agent。 |
 | [Hello Interview System Design](https://www.hellointerview.com/learn/system-design/in-a-hurry/introduction) | 通用解题框架可迁移为规划器的任务分解与取舍模板。 | 读框架四步后套一道 Agent 设计题，先写分解与取舍，再与自己的直觉对照。 |
 
-## 应用与行业实践
+## 自测题
 
-### 应用场景地图
+??? question "认知层与执行层的边界应该划在哪里"
+    - 认知层产出结论、置信度、依据、计划，不直接调用外部系统。
+    - 执行层只负责工具调用、重试与限流。
+    - 边界划在"决策"与"动作"之间，跨层只传结构化数据。
+    - 判断标准：把执行层的工具全部替换成桩实现，认知层的测试仍应通过。
 
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-|---|---|---|---|
-| 后台管理的万行表格批量改价 | 规划器、推理引擎 | 计划与执行分离、幂等写库 | 改价不可逆，要先预览再落库 |
-| 低端安卓的首屏加载诊断 | 推理引擎 | 端侧小模型加规则校验 | 端上算力有上限，延迟预算写死 |
-| 多人协作白板的会议纪要与待办 | 记忆系统 | 滚动摘要加向量检索 | 说话人归属错会把待办派错人 |
-| 企业制度问答机器人 | 知识图谱、记忆系统 | 图查询加权限过滤 | 制度有时效，节点必须带版本 |
-| 代码仓库的跨文件重构 | 规划器、知识图谱 | 依赖图加分步补丁 | 改动边界要能回滚，逐文件验证 |
-| 客服工单自动分诊与回复草稿 | 推理引擎、知识图谱 | 两跳图查询加引用核对 | 覆盖不足的草稿必须转人工 |
-| 长跑数据管道的排障 | 记忆系统 | 轨迹回放加摘要压缩 | 上下文窗口会挤掉关键日志行 |
-| 医院预约改期的多轮对话 | 规划器、记忆系统 | 槽位状态机加长期记忆 | 状态不一致会重复下单 |
+??? question "肯定前件和否定后件分别是什么，各举一例"
+    - 肯定前件：已知"如果 P 那么 Q"且已知 P，得到 Q。
+    - 例子：已知"如果下雨那么地面湿"且"下雨"，得到"地面湿"。
+    - 否定后件：已知"如果 P 那么 Q"且已知"非 Q"，得到"非 P"。
+    - 例子：已知"非地面湿"，得到"非下雨"。
+    - 两者都属于演绎，结论的确定性高于归纳。
 
-### 三个场景拆解
+??? question "为什么归纳推理的置信度要设上限"
+    - 归纳是从有限观察推出一般结论，新观察可能推翻它。
+    - 观察条数增加只能提高把握，不能把把握变成确定。
+    - 示例代码里基础 0.5、每条加 0.05、总量上限 0.95。
+    - 这些系数是示例取值，正式项目要用评测集重新标定。
 
-#### 场景 1：后台管理的万行表格批量改价
+??? question "计划里的 dependencies 和 preconditions 有什么区别"
+    - dependencies 描述步骤之间的先后顺序，指向其他步骤的标识。
+    - preconditions 描述执行前必须成立的状态，指向世界状态。
+    - 两者不能合并：依赖满足不代表状态满足。
+    - 排查时先看依赖是否成环，再看预条件是否需要插入修复步骤。
 
-**业务背景**
+??? question "工作记忆为什么必须有容量上限"
+    - 它要进入模型上下文，容量直接决定上下文长度。
+    - 没有上限时上下文会逐步增长，直到超出模型窗口。
+    - 常见做法是固定容量，超出时按最旧或最低重要度淘汰。
+    - 任务结束后清空，避免不同任务的上下文互相污染。
 
-运营在后台勾选整页商品，按成本加成规则统一调价，选中行数从几百到上万。人工逐行改的耗时按分钟计，改错了只能靠事后对账发现。
+??? question "余弦相似度为零向量时为什么要单独处理"
+    - 零向量的模长为 0，公式里的分母会变成 0。
+    - 直接计算会得到 NaN，排序结果不可预测。
+    - 处理方式通常是返回 0，表示与任何向量都不相关。
+    - 根因多半是嵌入模型调用失败返回了空向量，需要在上游报警。
 
-规模口径：统计"单次操作覆盖的行数"与"人工完成同样行数花费的分钟数"，两者相除得到吞吐对比。
+??? question "知识图谱里加边之前为什么必须校验端点"
+    - 悬空边会让邻接表出现指向不存在节点的项。
+    - 遍历时读取到不存在的节点会抛错或返回 undefined。
+    - 批量建图时正确的顺序是先建全部节点再建全部边。
+    - 校验失败要抛出带边标识的错误，便于定位是哪条数据有问题。
 
-**怎么用本页知识解决**
+??? question "评估认知层时为什么不能只看平均耗时"
+    - 平均值会掩盖长尾，少数极慢请求才是用户投诉来源。
+    - 应该同时看 p50 与 p95，必要时加 p99。
+    - 质量指标要和性能指标放在一起看，避免只快不准。
+    - 全链路要透传请求标识，才能把慢请求与具体推理链对应起来。
 
-思路：规划器先算出一份完整计划，执行器再逐步落库，每步带幂等键。推理引擎只把自然语言规则翻成参数，不直接写库。
+## 延伸阅读
 
-```python
-def make_plan(rows, rule, fn):
-    plan = []
-    for r in rows:                            # rows 是后台当前选中的行
-        new = fn(r["cost"], rule)             # 纯函数算新价，先不碰数据库
-        if new <= r["cost"]:
-            plan.append({"id": r["id"], "skip": "低于成本"})  # 计划阶段就拦下
-        else:
-            plan.append({
-                "id": r["id"], "op": "update_price", "value": new,
-                "key": "price:%s:%s" % (r["id"], r["version"]),  # 幂等键
-            })
-    return plan
-def run(plan, db, dry=True):
-    for step in plan:
-        if "skip" in step or db.seen(step["key"]):
-            continue                          # 跳过的和已执行的都不再动
-        if dry:
-            yield step                        # 预览阶段只回显差异
-        else:
-            db.apply(step)                    # 执行阶段逐条记录，便于回滚
-```
-
-- 计划与执行分两段：模型只产出 plan，落库由 run 完成。
-- 幂等键用 id 加 version，重试或重放同一批不会二次生效。
-- 预览阶段 dry 为真，只回显差异，运营确认后才写库。
-- 低于成本的条目在计划阶段被标记 skip，不进入执行。
-- 回滚读执行日志逐条反向写回，不重新调用模型。
-
-**怎么度量收益**
-
-- 计划正确率：回放历史改价批次，比对最终价格与人工结果。
-- 幂等性：对同一 plan 连续执行两次，用数据库快照 diff 验证第二次无变更。
-- 端到端耗时：用 pytest 跑 1000 行批次，记录 make_plan 与 run 的耗时分布。
-- 线上观察：自定义 Prometheus 计数器统计已执行与已跳过的条数。
-
-**什么时候不该用**
-
-- 选中行只有十几行、规则每月才变一次：维护计划器的成本高于人工改。
-- 涉及合同价或监管限价：规则无法写成纯函数，应由审批流决定。
-- 备注列是人工填的自由文本且需要解读：解析错误的代价高，先做字段规范化。
-
-#### 场景 2：客服工单自动分诊与回复草稿
-
-**业务背景**
-
-一线客服处理同一产品线的重复问题，答复集中在少数几种故障上。新人靠翻历史工单上手，口径不一致会被质检退回。
-
-规模口径：统计"同一知识节点被引用的工单数"除以"当日工单总数"，得到重复问题占比。
-
-**怎么用本页知识解决**
-
-思路：先用知识图谱锁定问题节点，把两跳内的事实交给模型写草稿，再逐句核对引用。
-
-```python
-def triage(ticket, graph, llm):
-    facts = graph.query(ticket.product, depth=2)   # 只取该产品两跳内的节点
-    if not facts:
-        return {"route": "人工", "why": "图中无匹配知识"}
-    draft = llm(build_prompt(ticket.text, facts))  # 事实进上下文，约束编造
-    cov = check_citations(draft, facts)            # 草稿逐句回查是否来自 facts
-    if cov.ratio < 0.8 or cov.conflict:
-        return {"route": "人工复核", "draft": draft}
-    return {"route": "自动回复", "draft": draft}
-```
-
-- 图查询限定两跳，避免把无关产品的事实塞进上下文。
-- 事实为空直接转人工，不让模型凭参数记忆回答。
-- 引用核对把草稿每句映射回事实节点，覆盖不足就降级。
-- 冲突检测处理同一节点存在多个有效版本的情况。
-- 路由结果与草稿一起落库，供事后质检抽样。
-
-**怎么度量收益**
-
-- 自动回复占比与人工改写率：在工单系统埋点，按周统计路由分布。
-- 引用覆盖率：用人工标注的问答对离线评 cov.ratio 分布。
-- 错误答复数：每周随机抽样人工复核，统计需撤回的条数。
-- 一线处理时长：对比同期工单的首次响应与结单时间中位数。
-
-**什么时候不该用**
-
-- 产品资料还没整理成带版本的图，节点之间互相矛盾：先做知识整理。
-- 工单涉及退款金额与赔付承诺：这类答复由有权限的人给出。
-- 问题主体是情绪安抚与投诉升级：图中没有对应节点，硬套会答非所问。
-
-#### 场景 3：多人协作白板的会议纪要与待办抽取
-
-**业务背景**
-
-多人白板会议常见一小时以上，会后靠一个人回放录制整理待办，口头承诺容易漏掉。待办散落在对话里，缺负责人和时间点就无法跟踪。
-
-规模口径：统计"待办条目数除以会议分钟数"，以及"整理耗时除以会议时长"。
-
-**怎么用本页知识解决**
-
-思路：会中滚动维护工作记忆，超出预算就从最老的轮次压缩；会后把待办与摘要写入长期记忆，供跨会议追问。
-
-```python
-def on_turn(mem, turn, budget=2000):
-    mem.recent.append(turn)                     # 保留最近若干轮原文
-    if sum(len(t) for t in mem.recent) > budget:
-        old = mem.recent.pop(0)                 # 超预算就从最老的开始压缩
-        mem.summary = merge(mem.summary, old)   # 摘要保留决策与未决分歧
-    for task in extract_tasks(turn.text):       # 抽待办，带说话人与时间戳
-        mem.tasks.append({"who": turn.speaker, "text": task, "at": turn.ts})
-    return mem.summary, mem.tasks
-
-def on_close(mem, store):
-    store.write(mem.summary, mem.tasks)         # 会后写入长期记忆
-```
-
-- 工作记忆保留最近若干轮原文，指代（比如"这个方案"）才能解析。
-- 超过 token 预算时从最老轮次压缩，摘要保留决策与未决分歧。
-- 待办带说话人和时间戳，没有负责人的条目标记为未指派。
-- 长期记忆检索按项目与日期过滤，结构化字段先行。
-- 摘要与原文分开存，追问细节时可回到原文片段。
-
-**怎么度量收益**
-
-- 待办召回率：以人工标注的会后纪要为基准，比对系统抽出的条目。
-- 摘要压缩比：统计原始转写 token 与摘要 token 的比值。
-- 跨会议追问命中：构造"上次谁负责登录改造"这类问题，看检索是否命中。
-- 会中延迟：用浏览器 Performance 面板记录每轮处理耗时，确认不阻塞输入。
-
-**什么时候不该用**
-
-- 会议内容涉及人事与法务，不能长期留存：只做当场摘要，不写长期记忆。
-- 以屏幕共享演示为主、口头内容少：转写噪声大，抽待办准确率低。
-- 待办已有工单系统自动派单：两套来源冲突，选一处作为唯一来源。
-
-### 行业先进实践
-
-1. 工具调用与结构化输出（出处：OpenAI 官方文档 Function calling 与 Structured Outputs 章节）
-做法是把工具名称与参数结构交给模型，模型返回结构化参数，由程序执行副作用。有效点是模型只选工具、填参数，写操作留给代码控制。借鉴方式：把所有写操作包成带 JSON Schema 的函数，拒绝自由文本指令。
-
-2. ReAct 交替推理与行动（出处：论文 ReAct: Synergizing Reasoning and Acting in Language Models，arXiv:2210.03629）
-做法是让模型每步输出思考与动作，观察结果再进入下一步。有效点是观察结果会纠正错误的中间假设。借鉴方式：把工具返回值写进轨迹，不要只留最终答案。
-
-3. 检索增强生成（出处：论文 Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks，arXiv:2005.11401）
-做法是先检索外部文档，再把片段拼进上下文生成答案。有效点是知识更新不必重训模型。借鉴方式：检索走两路，向量召回加结构化过滤，权限判断放在过滤层。
-
-4. 工作流优先，自主循环其次（出处：Anthropic 工程博客 Building effective agents）
-做法是先用固定提示链与路由拼出流程，只有步骤无法预先确定时才用自主循环。有效点是路径可预测、失败可定位。借鉴方式：把批量改价这类步骤固定的任务写成工作流。
-
-5. 分层记忆与自我编辑（出处：论文 MemGPT，arXiv:2310.08560，及 Letta 开源项目）
-做法是把上下文当成可换页的内存，模型通过工具在快记忆与慢记忆之间搬运。有效点是长对话不必把历史全塞进窗口。借鉴方式：先做摘要压缩与检索两层，再考虑自我编辑；具体接口需核对官方文档：核对工具定义与页式内存的字段。
-
-### 从学到用：落地路线
-
-1. 试点：选一个只读、可回放的场景，比如工单分诊，先跑离线评测集，不接线上写操作。验收标准：评测集上引用覆盖率与人工基线接近，失败样本能逐条解释。
-2. 验证：把试点接成影子模式，与人工结果并行产出，只记录不改线上数据。验收标准：连续两周对比日志中一致率稳定，分歧样本完成归类。
-3. 推广：把调好的计划器、检索层、记忆层抽成公共模块，接入第二个场景。验收标准：第二个场景复用模块时，改动只在配置与提示词范围内。
-4. 防回退：为每个场景建回归集与指标看板，发布前必须跑通。验收标准：回归集通过率低于阈值时阻断发布，每季度做一次回滚演练。
-
-### 动手作业
-
-**目标**：做一个能回答"上周这个项目谁承诺了什么"的小助手，覆盖记忆的写入、压缩与检索。
-
-**步骤**
-
-1. 造数据：手写或导出 3 段会议转写，每段 20 到 40 轮，标注说话人与时间戳。
-2. 建工作记忆：实现滚动窗口，超过 token 预算就从最老轮次压缩成摘要。
-3. 抽待办：用规则或模型抽取含负责人、动作、时间点的句子，输出 JSON。
-4. 建长期记忆：把摘要与待办写入 SQLite，字段含项目、日期、说话人。
-5. 建检索：实现向量召回加项目与日期过滤两条路径，合并后排序。
-6. 建评测集：人工写出 15 个问题与标准答案，覆盖同会议与跨会议两类。
-7. 接入命令行入口，把检索片段与答案一起打印出来。
-
-**验收标准**
-
-- 15 个问题中，检索命中的片段包含标准答案依据的比例达到你预设的阈值。
-- 连续写入 3 段会议后，进程内存占用不随写入量线性增长。
-- 删除任一段会议数据后，相关问题不再返回该段内容。
-- 摘要长度不超过原转写的设定比例，且决策句未被丢弃。
-- 全部步骤能在一台笔记本上离线跑通，不依赖付费接口。
-
+- Node.js 官方文档：`node:assert` 章节，`assert/strict` 模式的行为说明。
+- MDN Web 文档：JavaScript 参考中的 `Math` 对象与 `Set` 对象章节。
+- Mermaid 官方文档：Flowchart、Sequence Diagram、Class Diagram、State Diagram 四节语法说明。
+- W3C 官方规范：RDF 1.1 Concepts and Abstract Syntax；SPARQL 1.1 Query Language。
+- ReAct 论文：Synergizing Reasoning and Acting in Language Models。
+- Chain-of-Thought 论文：Chain-of-Thought Prompting Elicits Reasoning in Large Language Models。
+- Self-Consistency 论文：Self-Consistency Improves Chain of Thought Reasoning in Language Models。
+- 斯坦福 Generative Agents 论文：Generative Agents Interactive Simulacra of Human Behavior。
+- MemGPT 论文：Towards LLMs as Operating Systems。
+- Anthropic 工程博客：Building Effective Agents。
+- 微软研究院 GraphRAG 项目文档：GraphRAG 方法说明章节。
+- OpenTelemetry 官方文档：Semantic Conventions 章节。

@@ -567,6 +567,13 @@ nav:
       - 记忆系统对比：MemGPT/Letta、Mem0、Zep 与文件式记忆: agent/memory/memory-systems-compared.md
       - 记忆的安全与评测：记忆投毒、隐私与基准: agent/memory/memory-security-evaluation.md
       - 记忆系统: agent/architecture/memory-system.md
+    - 第 5.5 部分 · 会话与记忆的存储:
+      - 会话与记忆存储全景：JSONL、SQLite 与混合方案: agent/storage/session-storage-overview.md
+      - Codex 的会话与记忆存储：rollout JSONL 加六个 SQLite 数据库: agent/storage/codex-storage-deep-dive.md
+      - 为什么 agent 要用 SQLite：事务、WAL、FTS5 与它的坑: agent/storage/sqlite-for-agents.md
+      - 手写混合存储：JSONL 为事实来源，SQLite 为索引: agent/storage/jsonl-sqlite-hybrid-handwritten.md
+      - 记忆该存在哪里：文件、SQLite、向量库与图的取舍: agent/storage/memory-storage-design.md
+      - 存储的故障模式与运维：体积暴涨、路径失效与迁移: agent/storage/storage-failure-modes-ops.md
     - 第 6 部分 · RAG 与向量检索:
       - pgvector 从零开始：在 PostgreSQL 里做向量检索: agent/rag/pgvector-from-zero.md
       - pgvector 索引：HNSW 与 IVFFlat 的原理、参数与调优: agent/rag/pgvector-indexes-hnsw-ivfflat.md
@@ -642,6 +649,14 @@ nav:
       - Claude Code 架构深度解析: agent/case-studies/claude-code-deep-analysis.md
       - OpenCode 架构分析: agent/case-studies/opencode-analysis.md
       - 教程资源研究报告: agent/case-studies/research-findings.md
+    - 第 13 部分 · 七天手写 MiniCode:
+      - 七天手写 MiniCode：从零实现一个 Claude Code 式编码智能体: minicode/index.md
+      - Day 1：手写一个 Claude API 客户端（含 SSE 流式与工具调用）: minicode/day1-claude-sdk-from-scratch.md
+      - Day 2：程序入口、配置与单次调用的 Agent: minicode/day2-entry-and-single-call-agent.md
+      - Day 3：Agent Loop 与工具系统（本站原创续写）: minicode/day3-agent-loop-and-tools.md
+      - Day 4：会话持久化与上下文压缩（本站原创续写）: minicode/day4-session-and-compaction.md
+      - Day 6：记忆、技能与待办（本站原创续写）: minicode/day6-memory-skills-todo.md
+      - MiniCode 复盘与同类开源教程对照: minicode/review-compare-projects.md
   - 开源项目赏析:
     - 概览: open-source/index.md
     - 前端框架:

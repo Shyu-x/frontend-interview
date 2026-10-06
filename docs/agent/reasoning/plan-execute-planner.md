@@ -1,1469 +1,1547 @@
 ---
-title: 规划-执行：原理与规划器
-description: 规划-执行模式的基本原理与规划器（Planner）设计：任务分解、计划表示与动态重规划。
-tags:
-  - ai-agent
-  - langchain
-date: 2026-05-17
+title: "规划-执行：原理与规划器"
+description: "规划-执行模式的基本原理与规划器（Planner）设计：任务分解、计划表示与动态重规划。"
 ---
 
 # 规划-执行：原理与规划器
 
-> 本文是「规划-执行模式」系列第 1 篇（共 3 篇）。下一篇：[规划-执行：执行器与完整实现](plan-execute-executor.md)
+!!! abstract "学完这一页你能"
 
-## 1. 概述
+- 用自己的话讲清 Plan-and-Execute 与 ReAct 在"什么时候做决策"上的差别，并按任务特征选型。
+- 把一句自然语言任务拆成含 id、依赖、预估耗时的步骤数组，并写进一个可校验的计划对象。
+- 用依赖图检测循环依赖，算出可并行批次与关键路径。
+- 给规划器加上校验规则，并在执行偏差超过阈值时触发重规划。
 
-Plan-and-Execute（规划-执行）模式是一种将任务分解为规划阶段和执行阶段分离的 Agent 架构模式。这种模式的核心思想是：在执行任何操作之前，先通过一个专门的规划器（Planner）分析任务、分解步骤、验证计划的可行性，然后再由执行器（Executor）按照计划逐步完成任务。
+## 0. 知识地图
 
-与传统的 ReAct（Reasoning + Acting）模式相比，Plan-and-Execute 模式更适合处理复杂的多步骤任务，特别是在需要全局视角、长周期执行、以及失败恢复能力的场景中。
-
-## 2. Plan-and-Execute 模式原理
-
-### 2.1 为什么要先规划
-
-在 Agent 系统中，"先规划后执行" 的设计哲学源于以下几个核心考量：
-
-#### 2.1.1 全局视角与局部优化的矛盾
-
-传统的反应式 Agent（如 ReAct）在每一步都会根据当前状态做出决策。这种方式在简单任务中表现良好，但在复杂任务中容易陷入"局部最优陷阱"——每一步的看似合理决策，最终可能导致整体方案的低效或不可行。
-
-```javascript
-// ReAct 模式的困境示例
-// 假设任务：重构一个包含 50 个文件的模块架构
-
-// ReAct 方式：每一步都基于当前状态决策
-while (!taskComplete) {
-  const state = getCurrentState();      // 获取当前状态
-  const reasoning = await think(state); // 推理下一步
-  const action = await act(reasoning);  // 执行动作
-  
-  // 问题：没有全局视角，可能走回头路
-  // 第 5 步可能撤销第 3 步的工作
-}
+```mermaid
+flowchart TD
+  U["用户任务"] --> P["规划器 Planner"]
+  P --> A1["阶段一 任务分解"]
+  A1 --> A2["阶段二 计划表示 步骤与依赖"]
+  A2 --> A3["阶段三 依赖分析 拓扑排序与并行批次"]
+  A3 --> A4["阶段四 优先级排序与计划验证"]
+  A4 -->|"验证通过"| E["执行器 Executor"]
+  A4 -->|"验证失败"| A1
+  E --> R["执行结果汇总"]
+  R -->|"偏差超过阈值"| A1
+  R --> F["最终答案"]
 ```
 
-规划器模式的优势在于，它会在执行前构建完整的任务图：
+建议按两条线读。第一条是原理线：第 1 节讲为什么要先规划，第 2 节讲它和 ReAct 的取舍。
+第二条是构造线：第 3 到第 6 节按规划器内部的四个阶段依次展开，第 7 节收尾处理计划失效。
 
-```javascript
-// Plan-and-Execute 模式
-class Planner {
-  async plan(task) {
-    // 1. 分析任务需求
-    const goal = this.analyzeGoal(task);
-    
-    // 2. 生成完整的任务序列
-    const taskGraph = this.decompose(goal);
-    
-    // 3. 验证计划可行性
-    const validatedPlan = this.validate(taskGraph);
-    
-    // 4. 返回可执行的计划
-    return validatedPlan;
-  }
-}
+!!! note "术语：Agent（智能体）"
+    一个能自己决定调用哪些工具、并循环执行直到任务完成的程序。例子：收到"查一下昨天的订单量"后，自己决定先调数据库工具、再调图表工具。
 
-// 执行器按照计划执行，无需重新决策
-const plan = await planner.plan(complexTask);
-await executor.execute(plan);
+!!! note "术语：Plan-and-Execute（规划-执行）"
+    把一次任务拆成两个阶段：规划阶段集中产出完整步骤列表，执行阶段按列表逐步做，不再重新决策。例子：批量改 50 个文件前先列出"搜调用点、改接口、跑测试"三步。
+
+## 1. 为什么要先规划
+
+**先想一个问题**
+
+你要让程序重构一个包含 50 个文件的模块（来源：本站该页面的旧版内容，以原文为准）。
+如果它每改完一个文件就重新看一遍当前状态再决定下一个改谁，第 5 步有可能把第 3 步的改动撤销掉。
+原因是每步决策只看当前状态，看不到整条路径。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：用一次完整推理换一张全局地图，之后每一步都在这张地图上走。
+    日常类比：出差前先排行程单，把机票、酒店、会议时间一次性对齐，到了现场照单子走。
+    类比不成立：行程单排好后基本不用改；程序排出的计划来自模型自估，执行时会遇到单子上没写的状况，所以必须保留重规划通道。
+
+**图解**
+
+```mermaid
+flowchart TD
+  L1["读取当前状态"] --> L2["决定下一步动作"]
+  L2 --> L3["执行动作"]
+  L3 --> L4["观察结果"]
+  L4 --> L1
+  G1["读取整体目标"] --> G2["拆出全部步骤"]
+  G2 --> G3["排依赖与并行批次"]
+  G3 --> G4["按批次执行"]
+  G4 --> G5["汇总结果"]
 ```
 
-#### 2.1.2 资源分配与时间优化
+1. 左侧循环是 ReAct 的形态：状态到动作再到观察，然后回到状态，循环次数由任务难度决定。
+2. 右侧链路是规划-执行的形态：先一次性走到"排依赖与并行批次"。
+3. 右侧从 G3 到 G4 是单向的，执行阶段不再回到 G2 重新拆步骤。
+4. 只有当执行结果与计划偏差超过阈值时，才会跳回 G2 重排，这一步在第 7 节展开。
 
-规划阶段可以提前识别资源需求，从而实现更优的资源分配和时间规划：
+**一步一步来**
 
-```typescript
+第 1 步：这一步要做什么——定义步骤与计划的数据形状，让后面的所有算法有统一的输入。
+```ts
 interface TaskStep {
-  id: string;
-  name: string;
-  estimatedTime: number;    // 预估耗时
-  requiredCapabilities: string[]; // 所需能力
-  parallelizable: boolean;   // 是否可并行
-  dependencies: string[];     // 依赖项
+  id: string;                    // 步骤唯一标识，依赖关系靠它引用
+  name: string;                  // 人类可读的动作名，用于日志与展示
+  estimatedTime: number;         // 预估耗时，单位由调用方约定，本页统一用分钟
+  requiredCapabilities: string[];// 该步骤需要的能力名，用于匹配工具
+  parallelizable: boolean;       // 是否允许与其他步骤同时执行
+  dependencies: string[];        // 前置步骤 id，本步骤必须等它们完成
 }
 
 interface ExecutionPlan {
-  steps: TaskStep[];
-  totalEstimatedTime: number;
-  criticalPath: string[];    // 关键路径
-  parallelBatches: TaskStep[][]; // 可并行的批次
-}
-
-// 规划器可以分析并行机会
-function optimizeExecutionPlan(steps: TaskStep[]): ExecutionPlan {
-  // 识别可并行的步骤
-  const parallelBatches = groupParallelizable(steps);
-  
-  // 计算关键路径
-  const criticalPath = findCriticalPath(steps);
-  
-  // 计算总预估时间（考虑并行）
-  const totalTime = calculateTotalTime(steps, parallelBatches);
-  
-  return { steps, totalEstimatedTime: totalTime, criticalPath, parallelBatches };
+  targetGoals: string[];         // 计划要覆盖的目标，验证阶段用它查缺口
+  steps: TaskStep[];             // 全部步骤
+  criticalPath: string[];        // 关键路径上的步骤 id，决定总耗时下限
+  parallelBatches: TaskStep[][]; // 分批结果，同批内互不依赖
 }
 ```
+**这段代码在做什么**
+- `id` 是所有图算法的钥匙，拓扑排序与批次划分都只认它。
+- `dependencies` 存前置步骤的 id，而不是存对象引用，这样计划可以直接序列化落盘。
+- `requiredCapabilities` 存能力名而非工具名，换工具实现时计划不用改。
+- `criticalPath` 与 `parallelBatches` 是派生字段，可以由 `steps` 重算，存下来是为了便于调试对比。
 
-#### 2.1.3 失败预判与容错设计
-
-规划阶段可以提前识别潜在的失败点，并设计相应的恢复策略：
-
-```typescript
-// 第 1 段：定义风险评估的数据契约（RiskAssessment）
-// 用接口而非 class，是为了让"风险报告"成为可序列化的纯数据（Durable/passable），
-// 便于在规划器各阶段之间传递、落盘或日志化；rollbackPlan 内嵌而非引用 id，
-// 保证一条评估记录自包含，回滚时无需再回查其他结构。
-interface RiskAssessment {
-  stepId: string;
-  riskLevel: 'low' | 'medium' | 'high';
-  potentialFailures: string[];
-  mitigationStrategy: string;
-  rollbackPlan: RollbackPlan;
-}
-
-// 第 2 段：定义回滚计划（RollbackPlan），它是"高风险步骤"的安全网
-// checkpointSteps 记录可回退的检查点；rollbackActions 用 Map 建立
-// "步骤 id -> 异步补偿动作"的映射，函数类型 () => Promise<void> 保证回滚可 await；
-// statePreservation 单独抽出策略，是因为"回滚"往往难在状态如何保留/恢复，
-// 这块逻辑易变，独立成策略便于替换而不动主干。
-interface RollbackPlan {
-  checkpointSteps: string[];
-  rollbackActions: Map<string, () => Promise<void>>;
-  statePreservation: StatePreservationStrategy;
-}
-
-// 第 3 段：规划器进行风险评估
-// 串行 for-await 而非 Promise.all：每一步的风险分析可能依赖前一步结果（如共享状态、
-// 资源配额），且串行能让评估顺序与 plan.steps 一致，输出可预测。
-// 复杂度 O(n) 次异步调用；若 analyzeStepRisks 抛错，整个函数会中断——
-// 这里刻意不吞异常，让上层决定是降级还是终止规划。
-async function assessRisks(plan: ExecutionPlan): Promise<RiskAssessment[]> {
-  const assessments: RiskAssessment[] = [];  // 结果累积器，顺序与 plan.steps 严格对应
-  
-  for (const step of plan.steps) {
-    const risks = await analyzeStepRisks(step);  // 每步单独分析，返回原始风险清单供后续派生多项字段
-    
-    // 由同一份 risks 派生出五个字段：保证 riskLevel、潜在失败、缓解与回滚
-    // 都基于同一证据快照，不会各自重新分析导致不一致（易错点：勿多次调用 analyzeStepRisks）。
-    assessments.push({
-      stepId: step.id,
-      riskLevel: calculateRiskLevel(risks),        // 归并风险等级，通常是最高危项决定整体等级
-      potentialFailures: risks.map(r => r.description),  // 只留人类可读描述，丢弃内部结构，便于展示与存储
-      mitigationStrategy: designMitigation(risks),  // 预防性策略：如何在执行前降低发生概率
-      rollbackPlan: designRollback(risks)           // 兜底策略：失败后如何安全回退到检查点
-    });
-  }
-  
-  return assessments;  // 边界条件：plan.steps 为空时返回空数组，调用方需能处理"无评估"情形
-}
-```
-### 2.2 与 ReAct 的区别
-
-Plan-and-Execute 模式与 ReAct 模式代表了两种不同的 Agent 设计哲学。下表详细对比了两种模式的差异：
-
-| 维度 | ReAct 模式 | Plan-and-Execute 模式 |
-|------|-----------|----------------------|
-| **决策时机** | 每步决策（Reactive） | 规划阶段集中决策（Deliberative） |
-| **状态依赖** | 高度依赖当前状态 | 规划不依赖中间状态 |
-| **执行灵活性** | 高（可随时调整） | 低（按计划执行） |
-| **规划开销** | 低（无显式规划） | 高（需要额外规划时间） |
-| **适用场景** | 简单、探索性任务 | 复杂、结构化任务 |
-| **失败恢复** | 自然重新规划 | 需要显式回滚机制 |
-| **全局优化** | 无（贪心策略） | 支持（基于完整计划） |
-| **调试难度** | 低（步骤清晰） | 高（规划逻辑复杂） |
-
-#### 2.2.1 决策流程对比图
-
-```
-ReAct 模式流程：
-┌─────────────────────────────────────────────────────────┐
-│                                                         │
-│   ┌─────┐    ┌──────┐    ┌──────┐    ┌──────┐    ┌─────┐│
-│   │Start│───▶│Think │───▶│ Act  │───▶│Observe│───▶│End? ││
-│   └─────┘    └──────┘    └──────┘    └──────┘    └─────┘│
-│                    ▲            │           │           │
-│                    │            │           │           │
-│                    └────────────┴───────────┘           │
-│                         循环决策                         │
-└─────────────────────────────────────────────────────────┘
-
-Plan-and-Execute 模式流程：
-┌─────────────────────────────────────────────────────────┐
-│                                                         │
-│   ┌─────────────────────────────────────────────────────┐│
-│   │                    规划阶段                          ││
-│   │  ┌───────┐   ┌─────────┐   ┌────────┐   ┌────────┐ ││
-│   │  │Analyze│──▶│Decompose│──▶│Validate│──▶│Optimize│ ││
-│   │  └───────┘   └─────────┘   └────────┘   └────────┘ ││
-│   └─────────────────────────────────────────────────────┘│
-│                          │                              │
-│                          ▼                              │
-│   ┌─────────────────────────────────────────────────────┐│
-│   │                    执行阶段                          ││
-│   │  ┌───────┐   ┌─────────┐   ┌────────┐   ┌────────┐ ││
-│   │  │ Check │──▶│ Execute │──▶│ Verify │──▶│Commit? │ ││
-│   │  └───────┘   └─────────┘   └────────┘   └────────┘ ││
-│   │                                     │              ││
-│   │                                     ▼              ││
-│   │                              ┌──────────┐            ││
-│   │                              │ Rollback │ (if fail) ││
-│   │                              └──────────┘            ││
-│   └─────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────┘
-```
-
-#### 2.2.2 代码层面的具体差异
-
-```typescript
-// ReAct Agent 实现
-class ReActAgent {
-  async run(task: string, tools: Tool[]) {
-    let state = { task, history: [], currentStep: 0 };
-    
-    while (!this.isComplete(state)) {
-      // 1. 思考：基于当前状态推理下一步
-      const context = this.buildContext(state);
-      const reasoning = await this.llm.reason(context, tools);
-      
-      // 2. 行动：根据推理结果选择工具
-      const action = reasoning.action;
-      const result = await this.executeTool(action, tools);
-      
-      // 3. 观察：更新状态
-      state.history.push({ reasoning, action, result });
-      state.currentStep++;
+第 2 步：这一步要做什么——按依赖算出每个步骤的层级，层级相同且互不依赖的步骤可以放进同一批。
+```js
+/** 用递归求每个步骤的层级，层级等于最长前置链的边数 */
+function computeLevels(steps) {
+  const byId = new Map(steps.map((s) => [s.id, s])); // id 到步骤的索引，避免线性查找
+  const level = new Map();                           // 缓存：步骤 id 到层级
+  const visit = (s, path) => {
+    if (level.has(s.id)) return level.get(s.id);     // 已经算过就直接返回
+    if (path.has(s.id)) throw new Error(`循环依赖：${s.id}`); // 同一条路径上重复出现即为环
+    path.add(s.id);
+    let maxDep = -1;
+    for (const dep of s.dependencies) {
+      maxDep = Math.max(maxDep, visit(byId.get(dep), path)); // 取所有前置里最大层级
     }
-    
-    return this.extractAnswer(state);
-  }
+    path.delete(s.id);                               // 回溯：离开路径时移除标记
+    level.set(s.id, maxDep + 1);
+    return maxDep + 1;
+  };
+  for (const s of steps) visit(s, new Set());        // 每个步骤都当一次起点，覆盖非连通图
+  return level;
+}
+```
+**这段代码在做什么**
+- 无前置的步骤 `maxDep` 保持 -1，加一后层级为 0，也就是第一批。
+- 有前置的步骤，层级等于所有前置层级最大值加一，保证前置一定在更小的层级里。
+- `path` 是当前递归路径上的节点集合，只用来判环，不是全局已访问集合。
+- `path.delete` 是必要的回溯，不删会让同层兄弟步骤被误判成环。
+- 复杂度是 O(步骤数 + 依赖边数)，每个步骤只被真正计算一次。
+
+运行结果（取本页后面动手验证里的四条步骤）：层级依次为 `s1=0, s2=1, s3=1, s4=2`。
+
+**动手验证**
+
+```js
+// 依赖：无。运行环境：Node 20+，保存为 plan-levels.mjs 后执行 node plan-levels.mjs
+import assert from 'node:assert/strict';
+
+/** 创建一个步骤对象，dependencies 存前置步骤 id */
+function makeStep(id, name, minutes, dependencies = []) {
+  return { id, name, estimatedTime: minutes, dependencies };
 }
 
-// Plan-and-Execute Agent 实现
-class PlanExecuteAgent {
-  async run(task: string, tools: Tool[]) {
-    // 阶段 1：规划（一次性完成所有决策）
-    const plan = await this.planner.createPlan(task, tools);
-    
-    // 阶段 2：执行（按计划执行，不重新决策）
-    let executionState = { plan, completedSteps: [], checkpoint: null };
-    
-    for (const step of plan.steps) {
-      const result = await this.executor.executeStep(step);
-      
-      if (result.success) {
-        executionState.completedSteps.push(step);
-        executionState.checkpoint = this.saveCheckpoint(step, result);
-      } else {
-        // 失败时按预设策略处理
-        const recovery = await this.handleFailure(step, result, executionState);
-        // 可能的回滚或重规划
-      }
+/** 用递归求每个步骤的层级，层级等于最长前置链的边数 */
+function computeLevels(steps) {
+  const byId = new Map(steps.map((s) => [s.id, s])); // id 到步骤的索引，避免线性查找
+  const level = new Map();                           // 缓存：步骤 id 到层级
+  const visit = (s, path) => {
+    if (level.has(s.id)) return level.get(s.id);     // 已经算过就直接返回
+    if (path.has(s.id)) throw new Error(`循环依赖：${s.id}`); // 同一条路径上重复出现即为环
+    path.add(s.id);
+    let maxDep = -1;
+    for (const dep of s.dependencies) {
+      maxDep = Math.max(maxDep, visit(byId.get(dep), path)); // 取所有前置里最大层级
     }
-    
-    return this.compileResults(executionState);
+    path.delete(s.id);                               // 回溯：离开路径时移除标记
+    level.set(s.id, maxDep + 1);
+    return maxDep + 1;
+  };
+  for (const s of steps) visit(s, new Set());        // 每个步骤都当一次起点，覆盖非连通图
+  return level;
+}
+
+/** 把同一层级的步骤放进同一批，同批内步骤互不依赖 */
+function toBatches(steps) {
+  const level = computeLevels(steps);
+  const buckets = [];
+  for (const s of steps) {
+    const l = level.get(s.id);
+    if (!buckets[l]) buckets[l] = [];
+    buckets[l].push(s.id);                           // 按层级归桶，桶内顺序即登记顺序
   }
+  return buckets;
+}
+
+const plan = [
+  makeStep('s1', '拉取源数据', 2),
+  makeStep('s2', '清洗数据', 3, ['s1']),
+  makeStep('s3', '生成校验报告', 1, ['s1']),
+  makeStep('s4', '写入目标库', 4, ['s2', 's3']),
+];
+
+assert.deepEqual(toBatches(plan), [['s1'], ['s2', 's3'], ['s4']]); // 第 2 批两个步骤可并行
+assert.deepEqual([...computeLevels(plan).values()], [0, 1, 1, 2]); // 层级与批次对应
+
+const cyclic = [makeStep('a', 'A', 1, ['b']), makeStep('b', 'B', 1, ['a'])];
+assert.throws(() => computeLevels(cyclic), /循环依赖/);            // 成环时必须抛错，不能静默
+
+console.log('批次：', JSON.stringify(toBatches(plan)));
+console.log('全部断言通过');
+```
+
+预期输出：
+```
+批次： [["s1"],["s2","s3"],["s4"]]
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 递归算层级时爆栈 | 步骤链过长，递归深度等于链长 | 改成显式的栈或按拓扑序迭代计算 |
+| 明明有环却没有报错 | 只用了全局 visited 集合，没有维护当前路径集合 | 增加 recursionStack，离开节点时把它删掉 |
+| 同批步骤互相有依赖 | 只用层级分批，没有检查同层之间的边 | 分批前先跑一次循环检测，或在批次内再做一次子图校验 |
+| 计划重算后顺序变了 | 依赖 Map 或 Set 的遍历顺序受插入顺序影响 | 固定输入数组顺序，或在输出前按 id 排序 |
+
+**用在哪里**
+
+- 后台管理的批量导入。业务背景：运营上传一份万行商品表格，需要先校验再写库。这一节的知识怎么用：把导入拆成扫描校验、冲突合并、分批写入三步，算清哪几步能并行。指标衡量收益：单次导入的端到端耗时，以及中途失败后需要重跑的批次数。什么时候不该用：只有 3 到 5 行数据、单表写入的导入，跳过规划直接顺序执行。
+- CI 流水线的多阶段构建。业务背景：仓库有 lint、单测、构建、镜像推送四个阶段。这一节的知识怎么用：按依赖排批，lint 与单测同批并行，构建等它们结束。指标衡量收益：流水线从提交到产物的墙钟时间。什么时候不该用：只有一个步骤的流水线，分层本身没有收益。
+- 代码仓库批量重构助手。业务背景：把一个接口改名，涉及多个目录。这一节的知识怎么用：先算层级，同层文件可并行改写，跨层必须等前一层改完再跑测试。指标衡量收益：完成一次重构的步骤数与中途回滚次数。什么时候不该用：只改一个文件、调用点全在文件内部的情况。
+
+**行业实践**
+
+- ReAct 的原始论文（Yao 等人，出处名称：ReAct 论文，需核对官方文档确认 arXiv 编号）。它把推理与行动交替进行，正是第 1 节左侧循环的形态。怎么借鉴到你的项目：先把每一步的推理与观察单独打日志，再判断你的任务是否真的需要一次全局规划。
+- 本站该页面的旧版内容中给出的自适应规划深度分级——NONE、LIGHT、MODERATE、DEEP 四档（来源：本站该页面的旧版内容，以原文为准）。怎么借鉴到你的项目：给规划器加一个深度参数，先只实现 LIGHT 与 DEEP 两档，用真实任务跑够样本后再细分。
+- LangChain 官方文档的 Plan-and-Execute agents 章节。它把规划器与执行器拆成两个可替换组件。怎么借鉴到你的项目：把规划与执行拆成两个函数，规划函数只返回纯数据，执行函数只消费数据，这样两者可以分别测试。
+
+**小结**
+
+- 先规划换来的是全局视角，代价是多一次集中推理的开销。
+- 计划的数据形状要能序列化，id 与依赖数组是最小的必要字段。
+- 层级相同的步骤只说明前置更少，还要确认同层之间没有边，才能放进同一个并行批次。
+
+## 2. ReAct 与 Plan-and-Execute 的对照与选型
+
+**先想一个问题**
+
+同一个"整理季度销售报表"任务，交给两种模式会得到什么不同的中间产物。
+ReAct 的中间产物是一串思考-动作-观察记录，Plan-and-Execute 的中间产物是一张步骤表。
+你更关心哪一个，决定了你该选哪种模式。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：ReAct 是边走边问路，Plan-and-Execute 是先看地图再上路。
+    日常类比：前者像在陌生城市里每到一个路口就打开手机查一次方向，后者像出发前把整条路线截图存下来。
+    类比不成立：地图不会因为走错而失效，计划会——一旦某个步骤的真实结果与预估值差得远，整张步骤表都要重排。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant U as "用户"
+  participant R as "ReAct Agent"
+  participant P as "规划器 Planner"
+  participant E as "执行器 Executor"
+  participant T as "工具集"
+  U->>R: "提交任务"
+  loop "每一步都重新推理"
+    R->>T: "调用一个工具"
+    T-->>R: "返回观察结果"
+  end
+  R-->>U: "给出答案"
+  U->>P: "提交同一任务"
+  P->>P: "一次性拆出全部步骤"
+  P->>E: "交付计划"
+  loop "按计划逐步执行"
+    E->>T: "调用计划中指定的工具"
+    T-->>E: "返回执行结果"
+  end
+  E-->>U: "汇总结果"
+```
+
+1. 上半段是 ReAct：工具调用在循环内部，每次调用前都要重新推理一次。
+2. 下半段是规划-执行：规划器只出现一次，产出一份计划。
+3. 执行器在循环里按计划指定的顺序调工具，不重新决定调哪个。
+4. 两段共享同一个工具集，差别只在"谁决定调用哪一个"。
+
+**一步一步来**
+
+第 1 步：这一步要做什么——把两种模式写成两段可计数的循环，用模型调用次数把差别量化。
+```js
+// 反应式：每走一步都要问一次模型
+function reactCalls(stepCount) {
+  return stepCount;                 // 决策次数等于执行步数
+}
+
+// 规划式：只在规划阶段问一次模型，执行阶段照计划走
+function plannedCalls(stepCount) {
+  return stepCount > 0 ? 1 : 0;     // 决策次数恒为 1，与步数无关
+}
+
+console.log(reactCalls(6));         // 6
+console.log(plannedCalls(6));       // 1
+```
+**这段代码在做什么**
+- `reactCalls` 把"每步都要重新决策"这件事写成了线性关系。
+- `plannedCalls` 把"决策集中在规划阶段"写成了常数关系。
+- 两个函数都不关心步长，只关心调用次数，便于先做成本估算。
+- 真实系统里规划那一次调用本身耗时会比单步推理长，公式没有体现这部分。
+
+运行结果：
+```
+6
+1
+```
+
+第 2 步：这一步要做什么——把旧版内容里的选型打分函数落到代码，得到一个可解释的档位。
+
+```js
+/** 按任务特征算出"是否值得规划"的分数，权重来源见下方说明 */
+function planningMerit(task) {
+  const complexity = Math.min(task.stepsCount / 10, 1) * 0.3; // 步骤越多越值得规划
+  const dependency = task.stepDependencies * 0.3;             // 依赖越密越值得规划
+  const exploration = (1 - task.explorationFactor) * 0.2;     // 探索性越低越值得规划
+  const reversibility = (1 - task.reversibility) * 0.1;       // 越不可逆越值得规划
+  const timeSensitivity = (1 - task.timeSensitivity) * 0.1;   // 越不着急越值得规划
+  return complexity + dependency + exploration + reversibility + timeSensitivity;
+}
+
+/** 0.7 以上走规划-执行，0.3 以下走 ReAct，中间走混合 */
+function recommend(task) {
+  const s = planningMerit(task);
+  if (s > 0.7) return 'plan-execute';
+  if (s < 0.3) return 'react';
+  return 'hybrid';
 }
 ```
 
-### 2.3 执行 vs 计划权衡
+**这段代码在做什么**
+- 五个因子各自的权重加总为 1.0，写法来源是本站旧版内容中给出的权重表（以原文为准）。
+- `stepsCount / 10` 用 10 作为饱和点，超过 10 步不再增加复杂度得分。
+- `1 - explorationFactor` 表示探索性越低、分数越高，因为探索任务里的计划很快会过期。
+- 两个阈值 0.7 与 0.3 来自同一处旧版内容，属于经验值而非实验结论，改动前建议先用真实样本回归。
+- 返回值只有三个字符串，方便在配置里直接映射到具体实现。
 
-#### 2.3.1 何时选择 Plan-and-Execute
+**动手验证**
 
-规划的开销是真实存在的。在某些场景下，详细的规划反而是累赘：
+```js
+// 依赖：无。运行环境：Node 20+，保存为 select-mode.mjs 后执行 node select-mode.mjs
+import assert from 'node:assert/strict';
 
-```typescript
-// 决策矩阵：根据任务特征选择模式
-
-interface TaskCharacteristics {
-  stepsCount: number;        // 预估步骤数
-  stepDependencies: number;  // 步骤间依赖度
-  explorationFactor: number;  // 探索性程度 (0-1)
-  reversibility: number;       // 可逆性程度 (0-1)
-  timeSensitivity: number;    // 时间敏感度 (0-1)
+/** 按任务特征算出"是否值得规划"的分数 */
+function planningMerit(task) {
+  const complexity = Math.min(task.stepsCount / 10, 1) * 0.3; // 步骤越多越值得规划
+  const dependency = task.stepDependencies * 0.3;             // 依赖越密越值得规划
+  const exploration = (1 - task.explorationFactor) * 0.2;     // 探索性越低越值得规划
+  const reversibility = (1 - task.reversibility) * 0.1;       // 越不可逆越值得规划
+  const timeSensitivity = (1 - task.timeSensitivity) * 0.1;   // 越不着急越值得规划
+  return complexity + dependency + exploration + reversibility + timeSensitivity;
 }
 
-function recommendPattern(task: TaskCharacteristics): 'react' | 'plan-execute' | 'hybrid' {
-  const score = calculatePlanningMerit(task);
-  
-  if (score > 0.7) return 'plan-execute';
-  if (score < 0.3) return 'react';
+/** 0.7 以上走规划-执行，0.3 以下走 ReAct，中间走混合 */
+function recommend(task) {
+  const s = planningMerit(task);
+  if (s > 0.7) return 'plan-execute';
+  if (s < 0.3) return 'react';
   return 'hybrid';
 }
 
-function calculatePlanningMerit(task: TaskCharacteristics): number {
-  // 更多步骤、更高依赖、更低探索性 = 更需要规划
-  const complexityFactor = Math.min(task.stepsCount / 10, 1) * 0.3;
-  const dependencyFactor = task.stepDependencies * 0.3;
-  const explorationFactor = (1 - task.explorationFactor) * 0.2;
-  const reversibilityFactor = (1 - task.reversibility) * 0.1;
-  const timeSensitivityFactor = (1 - task.timeSensitivity) * 0.1;
-  
-  return complexityFactor + dependencyFactor + explorationFactor + 
-         reversibilityFactor + timeSensitivityFactor;
-}
+const structured = { stepsCount: 12, stepDependencies: 1, explorationFactor: 0, reversibility: 0, timeSensitivity: 0 };
+const exploratory = { stepsCount: 2, stepDependencies: 0, explorationFactor: 1, reversibility: 1, timeSensitivity: 1 };
+
+assert.equal(recommend(structured), 'plan-execute'); // 12 步、全依赖、不可逆 -> 深度规划
+assert.equal(recommend(exploratory), 'react');       // 2 步、全探索、可逆 -> 不规划
+assert.ok(planningMerit(structured) > planningMerit(exploratory)); // 分数大小关系必须成立
+
+console.log('结构化任务得分：', planningMerit(structured).toFixed(2));
+console.log('探索式任务得分：', planningMerit(exploratory).toFixed(2));
+console.log('全部断言通过');
 ```
 
-#### 2.3.2 自适应规划开销
-
-真正的系统需要能够自适应地选择规划深度：
-
-```typescript
-enum PlanningDepth {
-  NONE = 0,           // 无规划（ReAct 模式）
-  LIGHT = 1,          // 轻量规划（粗略步骤列表）
-  MODERATE = 2,       // 中等规划（包含依赖分析）
-  DEEP = 3,           // 深度规划（完整风险评估与优化）
-}
-
-class AdaptivePlanner {
-  async plan(task: string, context: PlanningContext): Promise<ExecutionPlan> {
-    const depth = this.determinePlanningDepth(task, context);
-    
-    switch (depth) {
-      case PlanningDepth.NONE:
-        return this.createEmptyPlan(task); // 直接执行，ReAct 模式
-        
-      case PlanningDepth.LIGHT:
-        return this.createRoughPlan(task);
-        
-      case PlanningDepth.MODERATE:
-        return this.createModeratePlan(task);
-        
-      case PlanningDepth.DEEP:
-        return this.createDeepPlan(task);
-    }
-  }
-  
-  private determinePlanningDepth(task: string, context: PlanningContext): PlanningDepth {
-    const complexity = this.estimateComplexity(task);
-    const availableTime = context.timeBudget;
-    const taskUrgency = context.urgency;
-    
-    // 时间紧迫且任务简单：用轻量规划
-    if (taskUrgency > 0.8 && complexity < 0.3) {
-      return PlanningDepth.LIGHT;
-    }
-    
-    // 复杂任务且时间充足：用深度规划
-    if (complexity > 0.7 && availableTime > 5000) {
-      return PlanningDepth.DEEP;
-    }
-    
-    return PlanningDepth.MODERATE;
-  }
-}
+预期输出（小数部分由浮点计算得到，请以你本地实际输出为准）：
+```
+结构化任务得分： 1.00
+探索式任务得分： 0.00
+全部断言通过
 ```
 
-## 3. 规划器设计
+**常见坑**
 
-### 3.1 任务分解算法
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 打分函数永远返回 hybrid | 各因子取值都落在中间区间，阈值没被触发 | 先用真实任务统计因子分布，再决定阈值是否需要按业务调整 |
+| 简单任务也走了深度规划 | 复杂度估计用了步骤数，而简单任务的步骤数被模型报高 | 复杂度估计改成对步骤做去重后再计数 |
+| ReAct 反复走回头路 | 每步只看当前状态，没有记录已走过的路径 | 在状态里加已访问集合，或在循环里加重复动作检测 |
+| 混用两种模式时状态打架 | 规划器持有的计划与执行器持有的状态是两份数据 | 让执行器只读计划，把运行状态写在另一个对象里 |
 
-任务分解是规划器的核心功能。一个好的分解算法需要能够：
+**用在哪里**
 
-1. 将复杂任务拆分为可执行的原子步骤
-2. 确保步骤间的逻辑连贯性
-3. 处理抽象级别的不一致性
-4. 识别隐式依赖关系
+- 客服工单自动分类归档。业务背景：每天上万条工单，需要分派到不同队列。这一节的知识怎么用：工单分派步骤少、可逆、变化快，打分偏低，走 ReAct 式逐条处理。指标衡量收益：单条工单从进入到分派的耗时，以及误分派后被人工改回的条数。什么时候不该用：工单需要跨多个系统核对数据时，步骤数与依赖度都会上升，此时该切到规划-执行。
+- 数据仓库的日常同步任务。业务背景：每天凌晨同步十几张表，表之间有外键顺序。这一节的知识怎么用：步骤多、依赖密、不可逆，打分高，走规划-执行并把计划落盘。指标衡量收益：同步窗口的总时长与失败后的重跑范围。什么时候不该用：只有一张表、且同步逻辑固定为一条 SQL 的场景。
+- 交互式数据探索助手。业务背景：分析师连续追问"再按地区拆一下"。这一节的知识怎么用：每一轮目标都会被上一轮答案改写，属于探索性任务，走 ReAct。指标衡量收益：从提问到可用答案的轮数。什么时候不该用：已经确定要跑固定的四张报表，此时直接固化成步骤表。
 
-#### 3.1.1 层次化任务分解
+**行业实践**
 
-```typescript
-interface TaskNode {
-  id: string;
-  description: string;
-  abstractionLevel: 'high' | 'medium' | 'low';
-  children?: TaskNode[];
-  estimatedComplexity: number;
-  requiredCapabilities: string[];
-}
+- ReAct 的原始论文（出处名称：ReAct 论文，需核对官方文档确认具体 arXiv 编号与作者列表）。它主张推理与行动交替，不预先产出完整计划。怎么借鉴到你的项目：把 ReAct 当成默认兜底路径，只在打分函数给出高值时启用规划。
+- LangGraph 官方文档的规划-执行教程章节。它演示了规划器产出步骤列表后由执行器逐步消费的结构。怎么借鉴到你的项目：按文档里的两组件拆分，但把"步骤列表"定义成你自己的类型，避免被框架类型绑死。
+- 本站该页面的旧版内容中给出的自适应规划深度分级（来源：本站该页面的旧版内容，以原文为准）：时间紧迫且复杂度低于 0.3 时用 LIGHT 档，复杂度高于 0.7 且可用时间超过 5000 毫秒时用 DEEP 档。怎么借鉴到你的项目：把这两个判据做成可配置项，先在灰度流量上观察，再决定是否放宽。
 
-// 层次化分解算法
-class HierarchicalTaskDecomposer {
-  private llm: LLM;
-  
-  async decompose(task: string, targetLevel: 'medium' | 'low'): Promise<TaskNode> {
-    const root: TaskNode = {
-      id: generateId(),
-      description: task,
-      abstractionLevel: 'high',
-      estimatedComplexity: await this.estimateComplexity(task),
-      requiredCapabilities: []
-    };
-    
-    // 递归分解直到达到目标抽象级别
-    await this.decomposeNode(root, targetLevel);
-    
-    return root;
-  }
-  
-  private async decomposeNode(node: TaskNode, targetLevel: 'medium' | 'low'): Promise<void> {
-    if (node.abstractionLevel === targetLevel) {
-      return; // 达到目标级别，停止分解
-    }
-    
-    // 调用 LLM 生成子任务
-    const subtasks = await this.llm.decomposeTask(node.description);
-    
-    node.children = subtasks.map((subtask: string) => ({
-      id: generateId(),
-      description: subtask,
-      abstractionLevel: this.elevateLevel(node.abstractionLevel),
-      estimatedComplexity: this.estimateLocalComplexity(subtask),
-      requiredCapabilities: this.inferCapabilities(subtask)
-    }));
-    
-    // 递归分解子任务
-    for (const child of node.children) {
-      await this.decomposeNode(child, targetLevel);
-    }
-  }
-  
-  private elevateLevel(current: 'high' | 'medium' | 'low'): 'high' | 'medium' | 'low' {
-    const levels: Array<'high' | 'medium' | 'low'> = ['high', 'medium', 'low'];
-    const currentIndex = levels.indexOf(current);
-    return levels[Math.min(currentIndex + 1, levels.length - 1)];
-  }
-}
+**小结**
+
+- 两种模式的差别落在"决策次数"上，ReAct 与步数线性相关，规划-执行是常数。
+- 选型不能拍脑袋，用一组可解释的因子算分，再把阈值当配置而不是常量。
+- 规划本身有开销，步骤少、可逆、探索性强的任务不该付这笔开销。
+
+## 3. 计划的表示：步骤、依赖与依赖图
+
+**先想一个问题**
+
+规划器把任务拆成了七步，执行器怎么知道第 4 步必须等第 2 步。
+如果只给执行器一个数组，那执行顺序就由数组下标决定，可并行的地方会被压成串行。
+要给执行器传递的信息至少有三种：做什么、依赖谁、能不能同时做。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：计划是一张有向无环图，数组只是它的一种序列化写法。
+    日常类比：装修施工顺序表，水电必须先于墙面，墙面必须先于家具，但灯具和窗帘可以同一天装。
+    类比不成立：装修顺序是固定的工种经验，程序里的依赖是模型推断出来的，模型可能漏掉一条边，导致本应串行的两步被并行执行。
+
+!!! note "术语：DAG（Directed Acyclic Graph，有向无环图）"
+    由带方向的边连接、且沿边一直走不会回到起点的图。例子：s1 指向 s2、s2 指向 s4、s1 指向 s3，不存在任何一条回到 s1 的路径。
+
+**图解**
+
+```mermaid
+flowchart LR
+  S1["s1 拉取源数据"] -->|"数据"| S2["s2 清洗数据"]
+  S1 -->|"数据"| S3["s3 生成校验报告"]
+  S2 -->|"数据"| S4["s4 写入目标库"]
+  S3 -->|"数据"| S4
+  S5["s5 发送通知"] -->|"时序"| S4
 ```
 
-#### 3.1.2 基于工具的任务映射
+1. s1 是入口，没有任何入边，可以立刻开始。
+2. s2 与 s3 都只依赖 s1，它们之间没有边，所以能并行。
+3. s4 依赖 s2 与 s3 两条边，必须等两者都完成。
+4. s5 到 s4 的边类型是时序依赖，含义是"通知必须在写入之后"，与数据流无关。
+5. 整张图没有回路，所以存在合法的执行顺序；一旦出现回路，第 5 节的检测会拦下来。
 
-```typescript
-// 第 1 段：能力描述契约——把"工具能做什么"抽象成可比对的结构
-// 分解决策的核心是把任务需求与工具能力做匹配，而非直接猜工具名。
-// 因此先定义能力画像：schema 用于校验参数/返回值，applicableActions 描述
-// 该能力适用的动作语义，examples 既是给 LLM 的少样本提示，也是人工审计依据。
-interface ToolCapability {
-  name: string;
-  inputSchema: z.ZodSchema;
-  outputSchema: z.ZodSchema;
-  applicableActions: string[];
-  examples: string[];
-}
+**一步一步来**
 
-// 第 2 段：分解器主体——持有原始工具集与"能力 → 工具"索引
-// 两级结构（tools 与 capabilityIndex）是刻意的冗余：tools 保留完整对象供执行期使用，
-// capabilityIndex 是 O(1) 的能力反查表，避免每次分解都线性扫全部工具。
-class ToolBasedDecomposer {
-  private tools: Tool[];
-  private capabilityIndex: Map<string, ToolCapability>;
-  
-  // 构造函数即完成索引构建：索引是不可变派生数据，提前算好可避免
-  // 把构建成本摊到每次 decompose 调用上（分解常被高频调用）。
-  constructor(tools: Tool[]) {
-    this.tools = tools;
-    this.capabilityIndex = this.buildCapabilityIndex(tools);
-  }
-  
-  // 第 3 段：分解主流程——"意图 → 能力 → 工具 → 有序步骤"的三级映射
-  // 关键数据流：自然语言任务先被语义化为 TaskIntent，再映射为抽象能力序列，
-  // 最后落地为具体工具调用步骤。分两跳（意图→能力→工具）而非一步到位，
-  // 是为了让能力匹配可复用、可缓存，且与具体工具实现解耦。
-  async decompose(task: string): Promise<TaskStep[]> {
-    // 1. 理解任务意图
-    // 先做语义归一化：后续匹配只依赖结构化 intent，不再碰原始文本，
-    // 这样换词表/换模型时只需重跑这一步。
-    const intent = await this.extractIntent(task);
-    
-    // 2. 识别所需能力
-    // 让 LLM 只负责"选能力并排序"，不直接选工具，缩小其决策空间、降低幻觉。
-    const requiredCapabilities = await this.matchCapabilities(intent);
-    
-    // 3. 按能力排序并分组
-    // orderedSteps 顺序即执行顺序；usedTools 做去重，防止同一工具被多个
-    // 能力重复选中（例如通用 shell 工具可能同时匹配多个能力）。
-    const orderedSteps: TaskStep[] = [];
-    const usedTools = new Set<string>();
-    
-    // 外层遍历保证能力顺序（LLM 给出的执行序）不被打破，
-    // 内层再挑具体工具，做到"顺序由能力定，实现由工具定"。
-    for (const capability of requiredCapabilities) {
-      const compatibleTools = this.findCompatibleTools(capability, usedTools);
-      
-      // 同一能力可展开为多个步骤（如分页抓取），因此是内层循环而非单点赋值。
-      for (const tool of compatibleTools) {
-        const step = this.createStepFromTool(tool, capability);
-        orderedSteps.push(step);
-        usedTools.add(tool.name);
-      }
-    }
-    
-    return orderedSteps;
-  }
-  
-  // 第 4 段：意图抽取——非结构化文本 → 结构化 TaskIntent
-  // 用 structuredOutput + Schema 强约束输出，把"尽力而为的解析"变成
-  // 可校验的契约，下游就不必再做防御式字段检查。
-  private async extractIntent(task: string): Promise<TaskIntent> {
-    // 提示词显式索要目标/约束/成功标准四要素：约束与成功标准常被忽略，
-    // 但它们是后续步骤排序与终止判断的依据。模板变量直接内插 task，
-    // 注意生产环境需防提示注入（用户文本可能含指令性内容）。
-    const prompt = `
-      分析以下任务的意图和目标：
-      任务：${task}
-      
-      请提取：
-      1. 主要目标
-      2. 次要目标
-      3. 约束条件
-      4. 成功标准
-    `;
-    
-    return await this.llm.structuredOutput(prompt, TaskIntentSchema);
-  }
-  
-  // 第 5 段：能力匹配——意图 + 能力目录 → 有序能力名列表
-  // 只投喂能力名称而非完整 schema，是为了压缩提示长度、聚焦语义匹配；
-  // 代价是匹配不感知参数细节，故把参数校验推迟到建步骤/执行阶段。
-  private async matchCapabilities(intent: TaskIntent): Promise<string[]> {
-    // 从 Map 取 values 得能力全集；顺序即工具注册顺序，作为 LLM 的稳定输入，
-    // 避免因顺序抖动导致同一任务分解结果不可复现。
-    const allCapabilities = Array.from(this.capabilityIndex.values());
-    
-    // 依赖 LLM 的 reason 做组合与排序：单能力选择易，难在多能力间的先后依赖，
-    // 交给模型推理再以 OutputSchema 收敛格式，返回 orderedCapabilities 数组。
-    const matches = await this.llm.reason(
-      `任务意图：${JSON.stringify(intent)}
-       可用能力：${JSON.stringify(allCapabilities.map(c => c.name))}
-       
-       请匹配最合适的能力组合，按执行顺序排列。`,
-      OutputSchema
-    );
-    
-    return matches.orderedCapabilities;
-  }
-}
-```
-#### 3.1.3 图搜索式分解
+第 1 步：这一步要做什么——把计划写成可序列化的纯数据，并把校验规则一并定义好。
 
-将任务分解建模为图搜索问题：
+```ts
+type Criticality = 'required' | 'preferred' | 'optional'; // 依赖强度：必须、建议、可选
 
-```typescript
-interface DecompositionNode {
-  task: string;
-  gScore: number;  // 已消耗的"分解代价"
-  fScore: number;  // f(n) = g(n) + h(n)
-  parent: DecompositionNode | null;
-}
-
-class GraphSearchDecomposer {
-  private goalTest: (task: string) => Promise<boolean>;
-  private successorFn: (task: string) => Promise<string[]>;
-  private heuristicFn: (task: string) => number;
-  
-  constructor(config: DecomposerConfig) {
-    this.goalTest = config.goalTest;
-    this.successorFn = config.successorFn;
-    this.heuristicFn = config.heuristicFn;
-  }
-  
-  // A* 搜索风格的分解
-  async decompose(startTask: string): Promise<TaskStep[]> {
-    const openSet: DecompositionNode[] = [{
-      task: startTask,
-      gScore: 0,
-      fScore: this.heuristicFn(startTask),
-      parent: null
-    }];
-    
-    const closedSet = new Set<string>();
-    const goalNodes: DecompositionNode[] = [];
-    
-    while (openSet.length > 0) {
-      // 取出 f(n) 最小的节点
-      openSet.sort((a, b) => a.fScore - b.fScore);
-      const current = openSet.shift()!;
-      
-      // 检查是否达到目标
-      if (await this.goalTest(current.task)) {
-        goalNodes.push(current);
-        continue; // 继续找其他解
-      }
-      
-      closedSet.add(current.task);
-      
-      // 扩展子节点
-      const successors = await this.successorFn(current.task);
-      
-      for (const successor of successors) {
-        if (closedSet.has(successor)) continue;
-        
-        const gScore = current.gScore + 1;
-        const hScore = this.heuristicFn(successor);
-        
-        const existingNode = openSet.find(n => n.task === successor);
-        
-        if (!existingNode) {
-          openSet.push({
-            task: successor,
-            gScore,
-            fScore: gScore + hScore,
-            parent: current
-          });
-        } else if (gScore < existingNode.gScore) {
-          existingNode.gScore = gScore;
-          existingNode.fScore = gScore + hScore;
-          existingNode.parent = current;
-        }
-      }
-    }
-    
-    // 重建最优解路径
-    return this.reconstructPath(goalNodes[0]);
-  }
-  
-  private reconstructPath(node: DecompositionNode): TaskStep[] {
-    const steps: TaskStep[] = [];
-    let current: DecompositionNode | null = node;
-    
-    while (current) {
-      steps.unshift({
-        id: generateId(),
-        name: current.task,
-        action: this.inferAction(current.task),
-        estimatedTime: current.gScore * UNIT_TIME
-      });
-      current = current.parent;
-    }
-    
-    return steps;
-  }
-}
-```
-
-### 3.2 依赖分析
-
-#### 3.2.1 显式依赖 vs 隐式依赖
-
-```typescript
 interface Dependency {
-  type: 'explicit' | 'implicit' | 'data' | 'temporal';
-  source: string;  // 依赖方步骤 ID
-  target: string; // 被依赖方步骤 ID
-  description: string;
-  criticality: 'required' | 'preferred' | 'optional';
+  source: string;        // 依赖方的步骤 id
+  target: string;        // 被依赖方的步骤 id，语义为 source 需要 target 先完成
+  type: 'explicit' | 'implicit' | 'data' | 'temporal'; // 依赖来源分类
+  criticality: Criticality;
+  description: string;   // 人类可读说明，出问题时用于定位
 }
 
-// 依赖分析器
-class DependencyAnalyzer {
-  // 检测隐式依赖（数据流依赖）
-  async detectImplicitDependencies(steps: TaskStep[]): Promise<Dependency[]> {
-    const dependencies: Dependency[] = [];
-    const variableTracker = new VariableTracker();
-    
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      
-      // 提取步骤产生和消费的变量
-      const outputs = this.extractOutputs(step);
-      const inputs = this.extractInputs(step);
-      
-      // 检查数据流依赖
-      for (const input of inputs) {
-        const producerStep = variableTracker.findProducer(input);
-        
-        if (producerStep && producerStep !== step.id) {
-          dependencies.push({
-            type: 'data',
-            source: step.id,
-            target: producerStep,
-            description: `${step.name} 需要 ${input}，由 ${producerStep} 提供`,
-            criticality: 'required'
-          });
-        }
-      }
-      
-      // 更新变量追踪器
-      variableTracker.recordStep(step.id, outputs);
-    }
-    
-    return dependencies;
-  }
-  
-  // 语义依赖分析
-  async detectSemanticDependencies(steps: TaskStep[]): Promise<Dependency[]> {
-    const dependencies: Dependency[] = [];
-    
-    for (let i = 0; i < steps.length; i++) {
-      for (let j = i + 1; j < steps.length; j++) {
-        const dependency = await this.checkSemanticDependency(steps[i], steps[j]);
-        
-        if (dependency) {
-          dependencies.push(dependency);
-        }
-      }
-    }
-    
-    return dependencies;
-  }
-  
-  private async checkSemanticDependency(
-    earlier: TaskStep, 
-    later: TaskStep
-  ): Promise<Dependency | null> {
-    const prompt = `
-      判断以下两个任务步骤之间是否存在语义上的依赖关系：
-      
-      步骤 A：${earlier.description}
-      步骤 B：${later.description}
-      
-      检查维度：
-      1. B 是否需要 A 的输出作为输入？
-      2. B 是否依赖于 A 产生的副作用？
-      3. A 和 B 的执行顺序是否有语义要求？
-      4. 是否存在资源共享或冲突？
-      
-      如果存在依赖，说明依赖类型和原因。
-    `;
-    
-    const result = await this.llm.structuredOutput(prompt, DependencySchema);
-    
-    if (result.hasDependency) {
-      return {
-        type: result.dependencyType,
-        source: later.id,
-        target: earlier.id,
-        description: result.explanation,
-        criticality: result.criticality
-      };
-    }
-    
-    return null;
-  }
+interface PlanDraft {
+  targetGoals: string[];   // 目标清单，验证阶段用来查缺口
+  steps: TaskStep[];       // 步骤列表
+  dependencies: Dependency[]; // 边列表
 }
 ```
+**这段代码在做什么**
+- `type` 把依赖分成四类：显式声明的、模型推断的、数据流产生的、时间顺序要求的。
+- `criticality` 分三档，其中 `required` 会参与入度计算，决定拓扑排序结果。
+- `description` 是排障用的，没有它时循环依赖报错只能给出两个 id。
+- `PlanDraft` 是规划阶段的产物，加上 `criticalPath` 与 `parallelBatches` 之后才是完整的 `ExecutionPlan`。
 
-#### 3.2.2 依赖图的构建与分析
+第 2 步：这一步要做什么——写一个最小校验器，检查 id 唯一、依赖两端都存在。
 
-```typescript
+```js
+/** 校验计划的引用完整性，返回错误消息数组，空数组表示通过 */
+function validateRefs(draft) {
+  const errors = [];
+  const ids = new Set();
+  for (const s of draft.steps) {
+    if (ids.has(s.id)) errors.push(`重复的步骤 id：${s.id}`); // id 重复会让图索引互相覆盖
+    ids.add(s.id);
+  }
+  for (const d of draft.dependencies) {
+    if (!ids.has(d.source)) errors.push(`依赖的源步骤不存在：${d.source}`);
+    if (!ids.has(d.target)) errors.push(`依赖的目标步骤不存在：${d.target}`);
+  }
+  return errors; // 返回数组而不是抛错，便于一次暴露全部问题
+}
+```
+**这段代码在做什么**
+- 第一轮遍历步骤，用 Set 检测 id 重复，复杂度 O(步骤数)。
+- 第二轮遍历依赖边，两端分别判断，一条边可能同时报出两条错误。
+- 返回数组而不是抛异常，因为规划阶段希望一次看到全部问题再重排。
+- 这个函数只查引用完整性，循环依赖留给第 5 节的图算法处理。
+
+运行结果（一个缺目标端的输入）：`["依赖的目标步骤不存在：s9"]`。
+
+**动手验证**
+
+```js
+// 依赖：无。运行环境：Node 20+，保存为 plan-refs.mjs 后执行 node plan-refs.mjs
+import assert from 'node:assert/strict';
+
+/** 校验计划的引用完整性，返回错误消息数组，空数组表示通过 */
+function validateRefs(draft) {
+  const errors = [];
+  const ids = new Set();
+  for (const s of draft.steps) {
+    if (ids.has(s.id)) errors.push(`重复的步骤 id：${s.id}`); // id 重复会让图索引互相覆盖
+    ids.add(s.id);
+  }
+  for (const d of draft.dependencies) {
+    if (!ids.has(d.source)) errors.push(`依赖的源步骤不存在：${d.source}`);
+    if (!ids.has(d.target)) errors.push(`依赖的目标步骤不存在：${d.target}`);
+  }
+  return errors; // 返回数组而不是抛错，便于一次暴露全部问题
+}
+
+/** 统计每种 criticality 的边数，用于判断计划是否过度串行 */
+function countByCriticality(draft) {
+  const counter = { required: 0, preferred: 0, optional: 0 };
+  for (const d of draft.dependencies) counter[d.criticality] += 1;
+  return counter;
+}
+
+const steps = [
+  { id: 's1', name: '拉取源数据' },
+  { id: 's2', name: '清洗数据' },
+  { id: 's3', name: '写入目标库' },
+];
+
+const good = {
+  targetGoals: ['完成同步'],
+  steps,
+  dependencies: [
+    { source: 's2', target: 's1', type: 'data', criticality: 'required', description: '清洗需要源数据' },
+    { source: 's3', target: 's2', type: 'data', criticality: 'required', description: '写入需要清洗结果' },
+  ],
+};
+assert.deepEqual(validateRefs(good), []);                          // 合法计划不应有错误
+assert.deepEqual(countByCriticality(good), { required: 2, preferred: 0, optional: 0 });
+
+const duplicated = { ...good, steps: [...steps, { id: 's1', name: '重复的 s1' }] };
+assert.deepEqual(validateRefs(duplicated), ['重复的步骤 id：s1']); // 重复 id 必须被抓到
+
+const dangling = { ...good, dependencies: [...good.dependencies,
+  { source: 's3', target: 's9', type: 'data', criticality: 'required', description: '引用了不存在的步骤' }] };
+assert.deepEqual(validateRefs(dangling), ['依赖的目标步骤不存在：s9']);
+
+console.log('引用校验通过，required 边数：', countByCriticality(good).required);
+console.log('全部断言通过');
+```
+
+预期输出：
+```
+引用校验通过，required 边数： 2
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 执行器把两步并行了，结果错乱 | 依赖表漏了一条边，图上看不出顺序要求 | 在规划阶段让模型显式输出边列表，再用数据流分析补边 |
+| 计划换机器后读不出来 | 依赖里存了对象引用或函数 | 只存 id 字符串，把函数放在执行器侧用字符串映射 |
+| 校验过了但执行时找不到步骤 | 校验器只查了 steps，没有查 dependencies 两端 | 补齐两端检查，并把错误一次返回 |
+| 同一条依赖被重复添加 | 多轮分解各自推断出了同一条边 | 依赖入图前用 source 与 target 组合去重 |
+
+**用在哪里**
+
+- 财务系统月末结账。业务背景：先关子账、再汇总、再对账、最后出报表。这一节的知识怎么用：把每一步写成步骤对象，依赖用 required 边表示，确保不会先出报表再对账。指标衡量收益：结账批次被人工打断的次数，以及出现顺序错误后需要整批回滚的次数。什么时候不该用：单表对账、没有跨模块顺序要求的场景。
+- 批量图片处理流水线。业务背景：上传 2000 张图，需要压缩、加水印、生成缩略图。这一节的知识怎么用：压缩是前置，加水印与生成缩略图同层可并行，用依赖边把它们挂到同一个前驱上。指标衡量收益：每秒处理张数，以及失败重试时被重复处理的图片数。什么时候不该用：图片数少于 20 张的批量任务，规划开销高于收益。
+- 多步骤表单的提交编排。业务背景：下单需要校验库存、冻结额度、生成订单三个动作。这一节的知识怎么用：三者用 required 边串起来，任一步失败都要回到校验阶段重排。指标衡量收益：下单接口的失败率，以及库存与额度不一致的订单数。什么时候不该用：三个动作在同一个数据库事务里能原子完成的场景。
+
+**行业实践**
+
+- 本站该页面的旧版内容中给出的依赖分类（来源：本站该页面的旧版内容，以原文为准）：显式依赖、隐式依赖、数据依赖、时序依赖四类，以及 required、preferred、optional 三档强度。怎么借鉴到你的项目：先只落 required 一档，跑通后再引入 preferred，避免一开始就处理软约束。
+- 本站该页面的旧版内容中关于数据流依赖的做法（来源：本站该页面的旧版内容，以原文为准）：用变量追踪器记录每个步骤产生和消费的变量，消费方找不到生产者时建立数据边。怎么借鉴到你的项目：在步骤对象里加 outputs 与 inputs 两个字符串数组，让建图阶段自动补边。资料未覆盖变量命名冲突的处理细节，需核对官方文档或自行设计。
+- Mermaid 官方文档的 Flowchart 语法章节。它支持用带引号的标签描述节点与连线，适合把计划图直接写进文档。怎么借鉴到你的项目：把依赖图导出成 Mermaid 文本放进评审文档，让业务方核对顺序。
+
+**小结**
+
+- 计划的核心是边列表，而不是步骤数组的顺序。
+- 依赖要分类也要分强度，否则调度器无法区分硬约束与软约束。
+- 引用完整性校验放在建图之前，能拦掉大部分低级错误。
+
+## 4. 任务分解：层次化与基于工具的两条路
+
+**先想一个问题**
+
+用户说"把上季度的销售数据整理成报表"，这是一个步骤还是十个步骤。
+直接执行会卡在"整理"这个词上，因为它同时包含取数、清洗、汇总、排版四件事。
+任务分解要做的，就是把这四件事拆到每件都能对应一个具体动作。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：分解就是不断问"这件事由哪几件事组成"，直到每一件都能直接对应一个工具调用。
+    日常类比：把"办一场年会"拆成定场地、定餐、定节目，再把定节目拆成选主持、排流程。
+    类比不成立：年会的拆法是行业惯例，程序面对的每个任务都需要重新拆，拆出来的层级数也不固定。
+
+!!! note "术语：任务分解（Task Decomposition）"
+    把一句高层任务描述递归展开成若干可执行原子步骤的过程。例子：把"生成月报"展开成"拉数、清洗、聚合、渲染"四步。
+
+!!! note "术语：原子步骤（Atomic Step）"
+    能用一个工具调用、或一次模型调用直接完成的步骤，不再需要继续拆分。例子："调用 SQL 工具查询订单表"。
+
+**图解**
+
+```mermaid
+flowchart TD
+  R["根任务 重构模块接口"] --> C1["子任务 定位全部调用点"]
+  R --> C2["子任务 替换接口签名"]
+  C1 --> D1["原子步骤 全仓搜索旧接口名"]
+  C1 --> D2["原子步骤 记录命中文件清单"]
+  C2 --> D3["原子步骤 改写调用处"]
+  C2 --> D4["原子步骤 运行测试套件"]
+```
+
+1. 根任务在一层里被拆成两个子任务，分别对应"找"和"改"。
+2. 每个子任务继续下探一层，直到拆出可以直接调用工具的原子步骤。
+3. 四个原子步骤都挂在叶子位置，它们的层级由第 1 节的层级算法决定。
+4. 若某个原子步骤仍然含混，比如"改写调用处"没有指定文件，就要再拆一层。
+
+**一步一步来**
+
+第 1 步：这一步要做什么——写一个递归分解函数，用一个可替换的分解器来决定每个节点怎么展开。
+
+```ts
+interface TaskNode {
+  id: string;                 // 节点标识
+  description: string;        // 该节点的任务描述
+  abstractionLevel: 'high' | 'medium' | 'low'; // 抽象层级，low 即原子步骤
+  children?: TaskNode[];      // 子节点，叶子节点此字段为空
+  requiredCapabilities: string[]; // 完成该节点所需的能力名
+}
+
+/** 递归分解，直到全部叶子达到目标层级 */
+async function decompose(node, targetLevel, expand) {
+  if (node.abstractionLevel === targetLevel) return node;   // 到达目标层级就停
+  const children = await expand(node.description);          // expand 可由模型或规则实现
+  node.children = children.map((text) => ({
+    id: `${node.id}-${hash(text)}`,                         // 用父 id 拼接，保证全局唯一
+    description: text,
+    abstractionLevel: nextLevel(node.abstractionLevel),     // 同时只下沉一级
+    requiredCapabilities: inferCapabilities(text),
+  }));
+  for (const child of node.children) {
+    await decompose(child, targetLevel, expand);            // 逐个子节点继续下探
+  }
+  return node;
+}
+```
+**这段代码在做什么**
+- 终止条件是抽象层级相等，而不是子节点数量，避免无限递归。
+- `expand` 被抽成参数，模型实现与规则实现可以互换，测试时传一个固定返回值的假函数即可。
+- 子节点 id 由父 id 与描述哈希拼接，父节点相同时不会与别的分支撞名。
+- 每次只下沉一级，层级从 high 到 medium 再到 low，最多递归两层。
+- `requiredCapabilities` 在分解阶段就推断出来，供第 5 节做依赖与工具匹配。
+
+第 2 步：这一步要做什么——把分解结果与可用工具做匹配，落到具体步骤。
+
+```js
+/** 把能力名列表映射到具体工具，一个能力可能对应多个工具 */
+function matchTools(capabilities, tools) {
+  const picked = [];
+  const used = new Set();                       // 去重：同一个工具不要被两个能力重复选中
+  for (const cap of capabilities) {             // 外层保证能力的顺序不被打破
+    for (const tool of tools) {
+      if (used.has(tool.name)) continue;
+      if (tool.capabilities.includes(cap)) {    // 能力命中即视为兼容
+        picked.push({ capability: cap, tool: tool.name });
+        used.add(tool.name);
+      }
+    }
+  }
+  return picked;
+}
+```
+**这段代码在做什么**
+- 外层遍历能力，保证 LLM 给出的执行顺序不被打破。
+- 内层遍历工具，逐个检查能力命中，命中即选中。
+- `used` 集合防止一个通用工具被多个能力重复占用。
+- 返回结构同时保留能力名与工具名，便于在执行日志里追溯"当时为什么选它"。
+
+运行结果（三个能力、两个工具）：`[{"capability":"search","tool":"grep"},{"capability":"edit","tool":"patcher"}]`。
+
+**动手验证**
+
+```js
+// 依赖：无。运行环境：Node 20+，保存为 decompose.mjs 后执行 node decompose.mjs
+import assert from 'node:assert/strict';
+
+/** 用关键词规则模拟一个分解器，真实项目里换成模型调用 */
+function ruleBasedExpand(text) {
+  if (text.includes('重构')) return ['定位全部调用点', '替换接口签名'];
+  if (text.includes('调用点')) return ['全仓搜索旧接口名', '记录命中文件清单'];
+  if (text.includes('接口签名')) return ['改写调用处', '运行测试套件'];
+  return []; // 无法继续拆分时返回空数组，递归到此终止
+}
+
+/** 推断任务描述需要哪些能力，规则同上，仅为演示 */
+function inferCapabilities(text) {
+  if (text.includes('搜索')) return ['search'];
+  if (text.includes('改写')) return ['edit'];
+  if (text.includes('测试')) return ['run-tests'];
+  return ['plan']; // 兜底能力名，避免空数组让调度器无工具可用
+}
+
+const LEVELS = ['high', 'medium', 'low']; // 层级递增顺序
+const nextLevel = (l) => LEVELS[Math.min(LEVELS.indexOf(l) + 1, LEVELS.length - 1)];
+
+/** 递归分解，直到全部叶子达到目标层级 */
+function decompose(node, targetLevel) {
+  if (node.abstractionLevel === targetLevel) return node; // 到达目标层级就停
+  const children = ruleBasedExpand(node.description);
+  node.children = children.length === 0 ? [] : children.map((text, i) => ({
+    id: `${node.id}-${i}`,                                // 用父 id 加序号，保证全局唯一
+    description: text,
+    abstractionLevel: nextLevel(node.abstractionLevel),    // 同时只下沉一级
+    requiredCapabilities: inferCapabilities(text),
+    children: [],
+  }));
+  for (const child of node.children) decompose(child, targetLevel); // 逐个子节点继续下探
+  return node;
+}
+
+const root = { id: 'root', description: '重构模块接口', abstractionLevel: 'high', requiredCapabilities: [], children: [] };
+decompose(root, 'low');
+
+assert.equal(root.children.length, 2);                       // 第一层拆出两个子任务
+assert.equal(root.children[0].abstractionLevel, 'medium');
+assert.equal(root.children[0].children.length, 2);            // 第二层继续拆
+assert.equal(root.children[0].children[0].abstractionLevel, 'low');
+assert.deepEqual(root.children[0].children[0].requiredCapabilities, ['search']);
+
+const leaves = (n) => (n.children.length === 0 ? [n] : n.children.flatMap(leaves));
+const leafList = leaves(root);
+assert.ok(leafList.every((n) => n.abstractionLevel === 'low')); // 全部叶子都在 low 层
+
+console.log('原子步骤数：', leafList.length);
+console.log('原子步骤：', leafList.map((n) => n.description).join(' | '));
+console.log('全部断言通过');
+```
+
+预期输出：
+```
+原子步骤数： 4
+原子步骤： 全仓搜索旧接口名 | 记录命中文件清单 | 改写调用处 | 运行测试套件
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 分解停不下来 | 终止条件写成"没有子节点"，而模型总能返回子节点 | 改成按抽象层级终止，并加一个最大深度兜底 |
+| 拆出来的步骤没有工具可用 | 只做了分解，没做能力与工具的匹配 | 分解完立刻跑一次匹配，无匹配的步骤回炉重拆 |
+| 步骤描述含混，执行器无法落地 | 分解层级不够，还停在"整理数据"这种粒度 | 定义原子步骤判据：能对应一次工具调用才算原子 |
+| 同一个工具被排进两次 | 通用工具同时命中多个能力名 | 建步骤时维护已用工具集合，命中即跳过 |
+| 父节点 id 与子节点撞名 | id 只用自增序号，不同分支会重复 | 用父 id 加分隔符再加序号拼接 |
+
+**用在哪里**
+
+- 后台管理的批量导入。业务背景：一份商品表格要导入，含必填校验、类目映射、库存初始化。这一节的知识怎么用：先用规则把导入拆成三个原子步骤，再给每步匹配能力。指标衡量收益：单次导入的步骤数，以及导入失败时定位到具体哪一步所需的时间。什么时候不该用：表格只有单一字段、直接写库的场景。
+- 代码仓库批量重构助手。业务背景：一个接口改名涉及多个目录。这一节的知识怎么用：搜索与改写拆成两组原子步骤，搜索用 grep 能力，改写用 patch 能力。指标衡量收益：一次重构涉及的原子步骤数，以及因粒度太粗导致重跑的文件数。什么时候不该用：只改一个文件、调用点都在文件内部的情况。
+- 跨系统数据核对机器人。业务背景：核对订单系统与结算系统的金额差异。这一节的知识怎么用：拆成"拉订单侧数据、拉结算侧数据、比对、输出差异清单"四步，前两步同层可并行。指标衡量收益：一次核对的端到端耗时，以及差异清单的误报条数。什么时候不该用：两边数据在同一个库、一条 SQL 就能比对的情况。
+
+**行业实践**
+
+- 本站该页面的旧版内容中给出的三级抽象层级（来源：本站该页面的旧版内容，以原文为准）：high、medium、low，递归分解直到叶子达到目标层级。怎么借鉴到你的项目：把目标层级做成配置，调试期设为 low 看清全部细节，上线期设为 medium 减少步骤数。
+- 本站该页面的旧版内容中关于工具能力画像的做法（来源：本站该页面的旧版内容，以原文为准）：工具带有输入输出 schema、适用动作列表与示例。怎么借鉴到你的项目：在工具注册表里为每个工具补上 capabilities 字段，让匹配逻辑只读这一个字段。
+- LangChain 官方文档的 Plan-and-Execute agents 章节。它的规划器输出一组字符串步骤，执行器逐个消费。怎么借鉴到你的项目：先照字符串步骤跑通端到端，再逐步把字符串升级成带 id 与依赖的对象，避免一次性引入过多结构。
+
+**小结**
+
+- 分解的终止条件应该是抽象层级，而不是子节点数量。
+- 分解与工具匹配是两跳，中间隔着"能力"这一层，方便两端各自替换。
+- 原子步骤的判据要写进团队文档，否则每个人拆出的粒度不一致。
+
+## 5. 依赖分析与并行批次
+
+**先想一个问题**
+
+计划里有七步，其中两步必须等另外两步做完。
+如果调度器按数组顺序一步接一步执行，本可以同时跑的两步就被压成了串行。
+要发现并行机会，得先把边聚成图，再按"前置是否全部完成"分批剥离。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：并行批次是把图中没有前置的节点一层层剥下来，剥一层就是一批。
+    日常类比：排队洗澡，谁的前置都做完了谁就进去，一批可以同时进两个人。
+    类比不成立：浴室的容量是物理限制，程序的批次大小只受依赖约束，能真正并行多少还要看下游的并发上限与工具配额。
+
+!!! note "术语：拓扑排序（Topological Sort）"
+    把有向无环图的节点排成一个线性序列，使得每条边的起点都排在终点之前。例子：s1、s2、s3、s4 就是上图中一个合法的拓扑序。
+
+**图解**
+
+```mermaid
+flowchart LR
+  B1["第 1 批 s1"] --> B2["第 2 批 s2 与 s3"]
+  B2 --> B3["第 3 批 s4"]
+  B3 --> B4["第 4 批 s5"]
+  C1["反向表 记录每个节点的全部前置"] -.->|"用于判断前置是否完成"| B2
+  C2["入度表 只统计 required 边"] -.->|"用于启动剥离"| B1
+```
+
+1. 第 1 批只有 s1，它是整张图里唯一没有 required 前置的节点。
+2. s1 完成后，s2 与 s3 的前置都满足了，它们进入第 2 批，可以同时执行。
+3. s4 有两个前置，必须等 s2 与 s3 都完成，所以落在第 3 批。
+4. 反向表是每个节点的前置集合，分批时靠它判断"前置是否全部完成"。
+5. 入度表只统计 required 边，preferred 边不阻塞剥离，但会被分批逻辑尊重。
+
+**一步一步来**
+
+第 1 步：这一步要做什么——建立三张索引表，把步骤与依赖一次性物化成图结构。
+
+```js
 class DependencyGraph {
-  // 第 1 段：三个索引表——同一张依赖图的三份冗余"视图"
-  // adjacencyList 存正向边（前置 → 后继），供 DFS/拓扑排序顺流而下；reverseList[node] 是 node 的全部前置集合，
-  // 供并行分批时回答"我的依赖是否都已完成"；inDegree 是 Kahn 算法的启动条件。
-  // 易错点：inDegree 只统计 required 边，而 reverseList 把 required 与 preferred 一并记入，
-  // 二者对"依赖"的定义并不一致，导致第 5、6 段对同一张图给出不同强度的约束（见第 6 段的说明）。
-  private adjacencyList: Map<string, Set<string>> = new Map();
-  private reverseList: Map<string, Set<string>> = new Map();
-  private inDegree: Map<string, number> = new Map();
-  
-  // 第 2 段：构造函数——把入参一次性物化成图结构
-  // 只在构造期读取 steps/dependencies，之后不再持有它们的引用；这样即使外部改动原数组，图也不会"半更新"而自相矛盾。
-  // 代价是新增步骤必须重建实例，属于典型的以可预知性换灵活性。
-  constructor(steps: TaskStep[], dependencies: Dependency[]) {
-    this.buildGraph(steps, dependencies);
-  }
-  
-  // 第 3 段：建图——两轮遍历，先铺点、后连边
-  // 整体 O(V + E)。刻意拆成两轮是为了防止"边引用了未登记节点的 id"：若边先于点处理，get(...) 会返回 undefined，
-  // 后面的 !.add 会直接抛错；先铺满所有点可让依赖数据里的脏 id 无害地落成一个新 Set 分支。
-  private buildGraph(steps: TaskStep[], dependencies: Dependency[]): void {
-    // 初始化
-    // 给每个步骤占位（哪怕它是毫无依赖的孤立点）：后续拓扑排序与分批算法都靠遍历 Map 的 keys 发现节点。
-    // 同时利用 Map/Set 的插入序，让之后同层节点的输出顺序稳定可复现。
-    for (const step of steps) {
-      this.adjacencyList.set(step.id, new Set());
-      this.reverseList.set(step.id, new Set());
-      this.inDegree.set(step.id, 0);
+  constructor(steps, dependencies) {
+    this.adjacency = new Map();  // 正向边：前置 -> 后继，供剥离时顺流而下
+    this.reverse = new Map();    // 反向边：节点 -> 全部前置，供判断是否可执行
+    this.inDegree = new Map();   // 入度：只统计 required 边
+    for (const s of steps) {     // 第一轮先铺满所有节点，避免脏边引用未登记 id
+      this.adjacency.set(s.id, new Set());
+      this.reverse.set(s.id, new Set());
+      this.inDegree.set(s.id, 0);
     }
-    
-    // 添加依赖边（source 依赖 target，即 source -> target）
-    // 实际落库方向与这行描述相反：代码是 adjacencyList[target].add(source)，即边由"被依赖者指向依赖者"。
-    // 这样拓扑序天然是前置先出，Kahn 的出队顺序就直接是可执行顺序；只需反转语义理解，不需要反转图。
-    // criticality 的门槛：required 与 preferred 都连边（都会参与判环与分批），但只有 required 加到入度上——
-    // preferred 是"软顺序"，不阻塞拓扑排序，却仍会被第 6 段的批划分尊重。
-    for (const dep of dependencies) {
-      if (dep.criticality === 'required' || dep.criticality === 'preferred') {
-        this.adjacencyList.get(dep.target)!.add(dep.source);
-        this.reverseList.get(dep.source)!.add(dep.target);
-        
-        if (dep.criticality === 'required') {
-          this.inDegree.set(dep.source, this.inDegree.get(dep.source)! + 1);
-        }
+    for (const d of dependencies) { // 第二轮再连边
+      if (d.criticality !== 'required' && d.criticality !== 'preferred') continue;
+      this.adjacency.get(d.target).add(d.source);  // 边由被依赖者指向依赖者
+      this.reverse.get(d.source).add(d.target);
+      if (d.criticality === 'required') {          // 只有硬约束计入入度
+        this.inDegree.set(d.source, this.inDegree.get(d.source) + 1);
       }
     }
   }
-  
-  // 第 4 段：循环依赖检测——带"当前路径"标记的 DFS
-  // 判别依据是回边：只有指向 recursionStack（本次 DFS 路径上尚未回溯的节点）的边才成环；
-  // 指向已 visited 但不在栈上的节点，说明那条支路已经走完，不可能再回到自己，忽略即可。
-  // 复杂度：节点/边各访问一次是 O(V + E)；但 [...path] 每次递归都复制整条路径，最坏退化为 O(V * E) 级别的复制开销。
-  // 检测循环依赖
-  detectCycles(): string[][] {
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-    const cycles: string[][] = [];
-    
-    const dfs = (nodeId: string, path: string[]): void => {
-      visited.add(nodeId);
-      recursionStack.add(nodeId);
-      path.push(nodeId);
-      
-      for (const neighbor of this.adjacencyList.get(nodeId) || []) {
-        if (!visited.has(neighbor)) {
-          dfs(neighbor, [...path]);   // 传副本：让每条支路拿到独立的路径快照，从而无需在回溯时手写 pop 也能保证 path 正确
-        } else if (recursionStack.has(neighbor)) {
-          // 发现循环
-          // indexOf 定位环的入口节点，slice 出环体后再追加一个 neighbor，使返回值首尾同节点，
-          // 调用方能一眼看出闭环的起点；自环（source === target）在这里会得到形如 [x, x] 的结果。
-          const cycleStart = path.indexOf(neighbor);
-          cycles.push([...path.slice(cycleStart), neighbor]);
+}
+```
+**这段代码在做什么**
+- 两张表加一张入度表看似冗余，实际是同一张图的三份视图，各自服务一种查询。
+- 第一轮先铺点，让依赖数据里引用了不存在的 id 时不会把 `undefined` 传进 `get`。
+- 边的方向是"被依赖者指向依赖者"，这样剥离时先出队的天然是前置步骤。
+- `preferred` 边连进反向表但不计入入度，所以它不阻塞剥离，却会被分批逻辑尊重。
+- `optional` 边完全不进图，属于展示用的建议。
+
+第 2 步：这一步要做什么——用 Kahn 算法按入度剥离，得到拓扑序并顺带判环。
+
+```js
+/** Kahn 入度法拓扑排序，返回 null 表示存在环 */
+topologicalSort() {
+  const result = [];
+  const queue = [];
+  for (const [id, degree] of this.inDegree) {
+    if (degree === 0) queue.push(id);       // 入度为 0 的节点就是天然起点
+  }
+  while (queue.length > 0) {
+    const id = queue.shift();               // 出队即视为可执行
+    result.push(id);
+    for (const next of this.adjacency.get(id) || []) {
+      const d = this.inDegree.get(next) - 1; // 摘掉当前节点，后继入度减一
+      this.inDegree.set(next, d);
+      if (d === 0) queue.push(next);        // 减到 0 说明约束全满足
+    }
+  }
+  return result.length === this.adjacency.size ? result : null; // 排不完说明有环
+}
+```
+**这段代码在做什么**
+- 初始队列由入度为 0 的节点组成，迭代顺序也就是步骤登记顺序。
+- 每出队一个节点就把它当作已完成，所有后继的入度减一。
+- 减到 0 的后继立即入队，这保证了同一层的节点会连续出队。
+- 结尾用出队数量与节点总数比较判环，比单独跑一次深度优先搜索省一遍遍历。
+- 这个方法会改写 `this.inDegree`，实例因此变成一次性的，重复调用会拿到错误结果。
+
+运行结果（第 1 节那四步）：`["s1","s2","s3","s4"]`，其中 s2 与 s3 的先后由登记顺序决定。
+
+**动手验证**
+
+```js
+// 依赖：无。运行环境：Node 20+，保存为 dep-graph.mjs 后执行 node dep-graph.mjs
+import assert from 'node:assert/strict';
+
+class DependencyGraph {
+  constructor(steps, dependencies) {
+    this.adjacency = new Map();  // 正向边：前置 -> 后继，供剥离时顺流而下
+    this.reverse = new Map();    // 反向边：节点 -> 全部前置，供判断是否可执行
+    this.inDegree = new Map();   // 入度：只统计 required 边
+    for (const s of steps) {     // 第一轮先铺满所有节点，避免脏边引用未登记 id
+      this.adjacency.set(s.id, new Set());
+      this.reverse.set(s.id, new Set());
+      this.inDegree.set(s.id, 0);
+    }
+    for (const d of dependencies) { // 第二轮再连边
+      if (d.criticality !== 'required' && d.criticality !== 'preferred') continue;
+      this.adjacency.get(d.target).add(d.source);  // 边由被依赖者指向依赖者
+      this.reverse.get(d.source).add(d.target);
+      if (d.criticality === 'required') {          // 只有硬约束计入入度
+        this.inDegree.set(d.source, this.inDegree.get(d.source) + 1);
+      }
+    }
+  }
+
+  /** 带路径标记的深度优先搜索，返回所有环 */
+  detectCycles() {
+    const visited = new Set();
+    const stack = new Set();   // 当前递归路径上的节点
+    const cycles = [];
+    const dfs = (id, path) => {
+      visited.add(id);
+      stack.add(id);
+      path.push(id);
+      for (const next of this.adjacency.get(id) || []) {
+        if (!visited.has(next)) dfs(next, [...path]);      // 传副本，每条支路拿到独立路径
+        else if (stack.has(next)) {                        // 指向栈上节点即为回边
+          cycles.push([...path.slice(path.indexOf(next)), next]);
         }
       }
-      
-      recursionStack.delete(nodeId);   // 关键回溯：离开节点必须出栈，否则已完成的节点会被误判为回边端点，凭空造出环
+      stack.delete(id);        // 关键回溯：离开节点必须出栈
     };
-    
-    // 外层循环兜住非连通图：每个未访问节点都作为新 DFS 的根，保证所有弱连通分量（以及入度非 0 却被孤立的环）都被覆盖。
-    for (const nodeId of this.adjacencyList.keys()) {
-      if (!visited.has(nodeId)) {
-        dfs(nodeId, []);
-      }
-    }
-    
-    return cycles;   // 空数组即无环；同一个环可能被不同起点重复报告，调用方不要假设各元素互不重复
+    for (const id of this.adjacency.keys()) if (!visited.has(id)) dfs(id, []);
+    return cycles;
   }
-  
-  // 第 5 段：拓扑排序——Kahn 入度法（BFS 剥离）
-  // 思路：反复取出入度为 0 的节点，把它从图中摘掉（其后继入度减一），能全部摘完说明无环。
-  // 复杂度 O(V + E)；queue 用数组 + shift() 时出队是 O(V)，V 大时建议改指针下标或真双端队列（此处不修改实现）。
-  // 重大副作用：本方法原地改写 this.inDegree，实例因此变成"一次性"的——重复调用，或先调用本方法再调用第 6 段，
-  // 都会因入度已被扣减而得到错误结果。需要多次排序应重新 buildGraph，或先复制一份入度表。
-  // 拓扑排序
-  topologicalSort(): string[] | null {
-    // 先显式判环：把"有环"这一失败原因和"图不连通"彻底区分开，有环时统一以 null 上报，
-    // 逼迫调用方在类型层面处理这个空值分支，而不是拿到一个缺斤少两的数组继续用。
-    const cycles = this.detectCycles();
-    if (cycles.length > 0) {
-      console.error('存在循环依赖，无法拓扑排序:', cycles);
-      return null;
-    }
-    
-    const result: string[] = [];
-    const queue: string[] = [];
-    
-    // 入度为 0 的节点入队
-    // 这些是没有任何 required 前置的步骤，也是天然的并行起点；迭代 Map 相当于按 steps 的登记顺序入队，
-    // 使同层节点的输出次序稳定，便于测试断言与结果 diff。
-    for (const [nodeId, degree] of this.inDegree) {
-      if (degree === 0) {
-        queue.push(nodeId);
-      }
-    }
-    
+
+  /** 用局部入度副本做剥离，避免污染实例状态 */
+  topologicalSort() {
+    const degree = new Map(this.inDegree);
+    const result = [];
+    const queue = [...degree.entries()].filter(([, d]) => d === 0).map(([id]) => id);
     while (queue.length > 0) {
-      const nodeId = queue.shift()!;   // 非空判断由循环条件保证，! 只是为了让 TS 接受
-      result.push(nodeId);
-      
-      // 摘除当前节点：每个后继的 required 前置数减一，减到 0 就意味着它的约束全部满足，可以入队了
-      for (const neighbor of this.adjacencyList.get(nodeId) || []) {
-        const newDegree = this.inDegree.get(neighbor)! - 1;
-        this.inDegree.set(neighbor, newDegree);
-        
-        if (newDegree === 0) {
-          queue.push(neighbor);
-        }
+      const id = queue.shift();               // 出队即视为可执行
+      result.push(id);
+      for (const next of this.adjacency.get(id) || []) {
+        const d = degree.get(next) - 1;       // 摘掉当前节点，后继入度减一
+        degree.set(next, d);
+        if (d === 0) queue.push(next);        // 减到 0 说明约束全满足
       }
     }
-    
-    // 前面已判过环，正常情况下队列必然排空所有节点；这里不做长度校验属于隐式信任，
-    // 若日后 inDegree 与邻接表被外部改动，此处可能静默返回残缺序列，是值得留意的边界。
-    return result;
+    return result.length === this.adjacency.size ? result : null; // 排不完说明有环
   }
-  
-  // 第 6 段：并行批次识别——按"层"剥离的贪心分组
-  // 与 Kahn 的关键差异：这里用 reverseList 判断前置是否全部完成，而 reverseList 含 preferred 边，
-  // 所以 preferred 会真实影响批次划分（比拓扑排序更严格）——这是两段逻辑对 criticality 处理不对称之处，也是本类最易被误解的语义。
-  // 复杂度：最坏 O(V^2 + E)，每轮都要全量扫描 remaining 及其前置集合；批次数等于依赖图的关键路径长度。
-  // 识别可并行的批次
-  identifyParallelBatches(): string[][] {
-    const batches: string[][] = [];
-    const completed = new Set<string>();
-    const remaining = new Set(this.adjacencyList.keys());   // 用 Set 而非数组，是为了在 O(1) 里删除已完成节点，避免每轮重建列表
-    
+
+  /** 按前置是否全部完成做分层剥离，得到并行批次 */
+  identifyParallelBatches() {
+    const batches = [];
+    const done = new Set();
+    const remaining = new Set(this.adjacency.keys());
     while (remaining.size > 0) {
-      // 找出所有依赖都已完成的步骤
-      // 下面的 || new Set() 只是防御性兜底：节点在构造阶段已全部登记，正常情况下不会走到这里。
-      const ready: string[] = [];
-      
-      for (const nodeId of remaining) {
-        const dependencies = this.reverseList.get(nodeId) || new Set();
-        const allDependenciesMet = [...dependencies].every(dep => completed.has(dep));
-        
-        if (allDependenciesMet) {
-          ready.push(nodeId);
-        }
-      }
-      
-      // 一轮下来无法推进任何节点，只能是环：无前置的节点理论上早该被摘走了。
-      // 注意这里用 throw，而第 5 段的失败是返回 null——两种失败契约不一致，调用方必须分场景处理（catch vs 判空）。
-      if (ready.length === 0 && remaining.size > 0) {
-        throw new Error('依赖图中存在循环');
-      }
-      
-      batches.push(ready);   // ready 内部两两无依赖，可完全并行；批内顺序不影响调度语义，只影响展示
-      
-      for (const nodeId of ready) {
-        completed.add(nodeId);
-        remaining.delete(nodeId);
-      }
+      const ready = [...remaining].filter((id) =>
+        [...(this.reverse.get(id) || [])].every((dep) => done.has(dep))); // 前置是否都完成
+      if (ready.length === 0) throw new Error('依赖图中存在循环');          // 一轮推不动即存在环
+      batches.push(ready);                                                  // 批内两两无依赖
+      for (const id of ready) { done.add(id); remaining.delete(id); }
     }
-    
-    return batches;   // 批次数即并行调度的最少"轮数"；空图返回 []，调用方无需特判
+    return batches;
+  }
+}
+
+const steps = ['s1', 's2', 's3', 's4'].map((id) => ({ id }));
+const deps = [
+  { source: 's2', target: 's1', criticality: 'required' },
+  { source: 's3', target: 's1', criticality: 'required' },
+  { source: 's4', target: 's2', criticality: 'required' },
+  { source: 's4', target: 's3', criticality: 'required' },
+];
+
+const g = new DependencyGraph(steps, deps);
+assert.deepEqual(g.detectCycles(), []);                                          // 无环
+assert.deepEqual(g.topologicalSort(), ['s1', 's2', 's3', 's4']);                 // 前置一定在前
+assert.deepEqual(g.identifyParallelBatches(), [['s1'], ['s2', 's3'], ['s4']]);   // 三层批次
+assert.deepEqual(g.topologicalSort(), ['s1', 's2', 's3', 's4']);                 // 可重复调用
+
+const cyclic = new DependencyGraph(
+  ['a', 'b'].map((id) => ({ id })),
+  [{ source: 'a', target: 'b', criticality: 'required' }, { source: 'b', target: 'a', criticality: 'required' }],
+);
+assert.equal(cyclic.detectCycles().length, 1);    // 恰好报出一个环
+assert.equal(cyclic.topologicalSort(), null);     // 有环时必须返回 null
+assert.throws(() => cyclic.identifyParallelBatches(), /循环/);
+
+console.log('批次：', JSON.stringify(g.identifyParallelBatches()));
+console.log('全部断言通过');
+```
+
+预期输出：
+```
+批次： [["s1"],["s2","s3"],["s4"]]
+全部断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 拓扑排序把节点漏掉了 | 入度表被上一次调用改过，实例不是一次性的 | 每次排序用入度副本，或排完重建图 |
+| preferred 边阻塞了执行 | 连边时把 preferred 也计入了入度 | 只有 required 进 inDegree，preferred 只进反向表 |
+| 分批函数一直不返回 | 图里有环，ready 永远为空且代码没有兜底 | 一轮推不动就抛错，并在外面先跑一次判环 |
+| 同一个环被报告多次 | 判环用了全局 visited，不同起点各报一次 | 判环结果去重，或在文档里写明返回可能重复 |
+| 悬空依赖让建图报错 | 边先于点处理，`get` 返回 undefined | 先铺满所有节点，再连边 |
+
+**用在哪里**
+
+- 数据仓库的每日调度。业务背景：几十张表按外键顺序刷新，希望窗口期内跑完。这一节的知识怎么用：把表建成图，用分批函数算出最少轮数，同批并行下发。指标衡量收益：调度窗口的总墙钟时间，以及一轮中实际的并发任务数。什么时候不该用：单表刷新或依赖全为线性链条时，分批结果与顺序执行没有差别。
+- 微服务发布编排。业务背景：一次发布涉及网关、用户服务、订单服务、配置中心。这一节的知识怎么用：配置中心必须是所有服务的前置，网关等三个服务可同批发布。指标衡量收益：一次发布的墙钟时间与回滚次数。什么时候不该用：单服务发布，没有跨服务依赖。
+- 构建系统的增量编译。业务背景：几百个包之间有依赖，希望并行编译。这一节的知识怎么用：用 required 边表示编译依赖，用 preferred 边表示"建议先编译核心包"。指标衡量收益：一次增量构建的耗时与并发核数利用率。什么时候不该用：只有一个包、构建耗时低于规划开销的场景。
+
+**行业实践**
+
+- 本站该页面的旧版内容中给出的 Kahn 入度法与批次剥离两套算法（来源：本站该页面的旧版内容，以原文为准）。前者返回线性序列，后者返回可并行批次，两者对 preferred 边的处理并不一致。怎么借鉴到你的项目：在文档里明确写出这个不一致，并为两套结果分别写测试，避免调用方误以为它们等价。
+- 本站该页面的旧版内容中关于循环依赖检测的做法（来源：本站该页面的旧版内容，以原文为准）：用递归栈区分回边与已完成的支路，离开节点时出栈。怎么借鉴到你的项目：把判环做成建图后的第一步，失败时直接拒绝计划，不要留到执行期。
+- LangGraph 官方文档关于图式编排的章节。它把节点与边作为一等概念，支持条件边与并行分支。怎么借鉴到你的项目：如果你的计划需要动态改写边，参考它的条件边设计，而不是自己造一套。
+
+**小结**
+
+- 图的三份视图各管一件事：正向边顺流、反向边判断就绪、入度启动剥离。
+- 判环要早于调度，返回契约要统一，不要一处返回 null 一处抛异常。
+- 批次数就是并行调度的最少轮数，是衡量计划质量的可比指标。
+
+## 6. 优先级排序
+
+**先想一个问题**
+
+同一批里有五个步骤，它们互不依赖，执行器只有一个并发槽位。
+先跑哪个，直接决定了后面的步骤能不能尽早开始。
+如果先跑那个"是很多人前置"的步骤，整条流水线会提前解锁。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：优先级等于若干因子加权求和，权重反映业务更看重哪一类。
+    日常类比：待办清单上同时写着急事、要事、顺手就能做完的小事，你按三者的比重决定先做哪件。
+    类比不成立：人对权重的判断是模糊的，程序必须写成确定的数字，而且这些数字要能被测试和被回滚。
+
+!!! note "术语：关键路径（Critical Path）"
+    依赖图中耗时最长的那条链，它决定了整个计划的最短完成时间。例子：s1 花 2 分钟、s2 花 3 分钟、s4 花 4 分钟，这条链共 9 分钟，压缩其他步骤不会让总时间低于 9 分钟。
+
+**图解**
+
+```mermaid
+flowchart TD
+  P["待排序的一批步骤"] --> F1["紧迫程度 权重 0.25"]
+  P --> F2["重要程度 权重 0.25"]
+  P --> F3["阻塞因子 权重 0.20"]
+  P --> F4["被依赖数 权重 0.10"]
+  P --> F5["资源可用性 权重 0.10"]
+  P --> F6["工作量的倒数 权重 0.10"]
+  F1 --> S["加权求和"]
+  F2 --> S
+  F3 --> S
+  F4 --> S
+  F5 --> S
+  F6 --> S
+  S --> R["归一化后的优先级分数"]
+  R --> O["批内按分数降序排列"]
+```
+
+1. 六个因子各自取值在 0 到 1 之间，权重之和为 1.0。
+2. 权重来源是本站旧版内容中给出的优先级权重表（以原文为准），紧迫与重要各占 0.25。
+3. 阻塞因子占 0.20，它衡量"这个步骤卡住了多少其他步骤"。
+4. 工作量的倒数是唯一一个需要换算的因子，工作量越大这个因子越小。
+5. 加权求和后再归一化，得到 0 到 1 之间的分数，批内降序排列。
+
+**一步一步来**
+
+第 1 步：这一步要做什么——按权重表算出单个步骤的优先级分数。
+
+```js
+/** 按六个因子加权算优先级，权重来源见下方说明 */
+function priorityScore(factors) {
+  const weights = {                     // 六个权重之和为 1.0
+    urgency: 0.25,                      // 紧迫程度
+    importance: 0.25,                   // 重要程度
+    blocking: 0.20,                     // 阻塞因子：卡住了多少后续步骤
+    dependency: 0.10,                   // 被依赖数量
+    resource: 0.10,                     // 资源可用性
+    effortEfficiency: 0.10,             // 工作量效率：越小越快做完
+  };
+  const effortEfficiency = 1 / (1 + factors.effort); // 工作量越大，该因子越小
+  const score =
+    factors.urgency * weights.urgency +
+    factors.importance * weights.importance +
+    factors.blocking * weights.blocking +
+    factors.dependency * weights.dependency +
+    factors.resource * weights.resource +
+    effortEfficiency * weights.effortEfficiency;
+  return Math.min(Math.max(score, 0), 1); // 归一化到 0 到 1
+}
+```
+**这段代码在做什么**
+- 六个因子都要求调用方先归一到 0 到 1，函数本身不做量纲转换。
+- `effortEfficiency` 用 `1 / (1 + effort)`，工作量 0 时因子为 1，工作量 9 时因子为 0.1。
+- 权重表来自本站旧版内容（以原文为准），属于经验值，改动前应先用真实数据回归。
+- 结尾的裁剪防止调用方传入越界值导致分数跑出 0 到 1。
+- 函数是纯函数，同样的输入永远得到同样的输出，便于写断言。
+
+运行结果（紧迫 0.9、重要 0.8、阻塞 0.5、被依赖 0.3、资源 1、工作量 1）：约 0.73。
+
+第 2 步：这一步要做什么——执行中根据事件动态调整优先级。
+
+```js
+/** 根据执行事件调整优先级，返回值范围 0.1 到 1.0 */
+function adjust(base, runtime, event) {
+  switch (event.type) {
+    case 'retry':
+      runtime.retryCount += 1;
+      return Math.max(0.1, base - runtime.retryCount * 0.1); // 重试降权，但有下限
+    case 'resource_wait':
+      runtime.waitTime += event.duration;
+      return runtime.waitTime > 30000 ? base * 1.2 : base;   // 等待超过 30 秒则升权
+    case 'deadline':
+      return event.deadline - Date.now() < 60000             // 截止时间不足 1 分钟
+        ? Math.min(1.0, base + 0.3)
+        : base;
+    default:
+      return base;
   }
 }
 ```
-### 3.3 优先级排序
+**这段代码在做什么**
+- `retry` 每次把优先级降 0.1，最低降到 0.1，防止失败步骤被永久雪藏。
+- `resource_wait` 累计等待时长，超过 30000 毫秒后把分数乘以 1.2。
+- `deadline` 在距截止不足 60000 毫秒时加 0.3，上限为 1.0。
+- 三个阈值都来自本站旧版内容（以原文为准），属于经验值。
+- 函数只返回新分数，不改动传入对象以外的状态，`runtime` 除外。
 
-#### 3.3.1 多维度优先级评估
+**动手验证**
 
-```typescript
-interface PriorityFactors {
-  urgency: number;           // 紧急程度 (0-1)
-  importance: number;        // 重要程度 (0-1)
-  dependency: number;         // 依赖度（被多少其他步骤依赖）
-  blockingFactor: number;    // 阻塞因子（是否是其他步骤的前置条件）
-  resourceAvailability: number; // 资源可用性 (0-1)
-  estimatedEffort: number;   // 预估工作量
+```js
+// 依赖：无。运行环境：Node 20+，保存为 priority.mjs 后执行 node priority.mjs
+import assert from 'node:assert/strict';
+
+/** 按六个因子加权算优先级，权重之和为 1.0 */
+function priorityScore(factors) {
+  const weights = { urgency: 0.25, importance: 0.25, blocking: 0.20, dependency: 0.10, resource: 0.10, effortEfficiency: 0.10 };
+  const effortEfficiency = 1 / (1 + factors.effort); // 工作量越大，该因子越小
+  const score =
+    factors.urgency * weights.urgency +
+    factors.importance * weights.importance +
+    factors.blocking * weights.blocking +
+    factors.dependency * weights.dependency +
+    factors.resource * weights.resource +
+    effortEfficiency * weights.effortEfficiency;
+  return Math.min(Math.max(score, 0), 1); // 归一化到 0 到 1
 }
 
-class PriorityCalculator {
-  calculatePriority(step: TaskStep, context: PlanningContext): number {
-    const factors = this.computeFactors(step, context);
-    
-    // 加权计算优先级
-    const weights = {
-      urgency: 0.25,
-      importance: 0.25,
-      blockingFactor: 0.20,
-      dependency: 0.10,
-      resourceAvailability: 0.10,
-      effortEfficiency: 0.10
-    };
-    
-    // 努力效率：越小的工作越优先
-    const effortEfficiency = 1 / (1 + factors.estimatedEffort);
-    
-    const score = 
-      factors.urgency * weights.urgency +
-      factors.importance * weights.importance +
-      factors.blockingFactor * weights.blockingFactor +
-      factors.dependency * weights.dependency +
-      factors.resourceAvailability * weights.resourceAvailability +
-      effortEfficiency * weights.effortEfficiency;
-    
-    return this.normalizeScore(score);
-  }
-  
-  sortByPriority(steps: TaskStep[], context: PlanningContext): TaskStep[] {
-    return steps.sort((a, b) => {
-      const priorityA = this.calculatePriority(a, context);
-      const priorityB = this.calculatePriority(b, context);
-      return priorityB - priorityA; // 降序排列
-    });
-  }
-  
-  // 生成执行顺序建议（考虑依赖约束）
-  generateExecutionOrder(
-    steps: TaskStep[], 
-    dependencies: Dependency[]
-  ): TaskStep[] {
-    const graph = new DependencyGraph(steps, dependencies);
-    const topologicalOrder = graph.topologicalSort();
-    
-    if (!topologicalOrder) {
-      throw new Error('无法生成执行顺序：存在循环依赖');
-    }
-    
-    // 按照拓扑排序的顺序，但在每个批次内按优先级排序
-    const batches = graph.identifyParallelBatches();
-    const result: TaskStep[] = [];
-    const stepMap = new Map(steps.map(s => [s.id, s]));
-    
-    for (const batch of batches) {
-      const batchSteps = batch.map(id => stepMap.get(id)!);
-      const sortedBatch = this.sortByPriority(batchSteps, this.context);
-      result.push(...sortedBatch);
-    }
-    
-    return result;
+/** 根据执行事件调整优先级，返回值不低于 0.1 */
+function adjust(base, runtime, event) {
+  switch (event.type) {
+    case 'retry':
+      runtime.retryCount += 1;
+      return Math.max(0.1, base - runtime.retryCount * 0.1); // 重试降权，但有下限
+    case 'resource_wait':
+      runtime.waitTime += event.duration;
+      return runtime.waitTime > 30000 ? base * 1.2 : base;   // 等待超过 30 秒则升权
+    case 'deadline':
+      return event.deadline - Date.now() < 60000             // 截止时间不足 1 分钟
+        ? Math.min(1.0, base + 0.3)
+        : base;
+    default:
+      return base;
   }
 }
+
+const blocking = { urgency: 0.9, importance: 0.8, blocking: 0.5, dependency: 0.3, resource: 1, effort: 1 };
+const trivial = { urgency: 0.2, importance: 0.1, blocking: 0, dependency: 0, resource: 0.5, effort: 9 };
+
+const sBlocking = priorityScore(blocking);
+const sTrivial = priorityScore(trivial);
+assert.ok(sBlocking > sTrivial);                        // 阻塞别人的步骤应当排在前面
+assert.ok(sBlocking <= 1 && sBlocking >= 0);            // 分数必须落在 0 到 1
+assert.equal(priorityScore({ ...blocking, urgency: 99 }), 1); // 越界输入被裁剪到上界
+
+const runtime = { retryCount: 0, waitTime: 0 };
+assert.equal(adjust(0.5, runtime, { type: 'retry' }), 0.4);           // 一次重试降 0.1
+assert.equal(adjust(0.15, runtime, { type: 'retry' }), 0.1);          // 触达下限 0.1
+assert.equal(adjust(0.5, runtime, { type: 'resource_wait', duration: 31000 }), 0.6); // 超阈值升权
+assert.equal(adjust(0.5, runtime, { type: 'deadline', deadline: Date.now() + 10000 }), 0.8); // 临近截止加 0.3
+
+console.log('阻塞型步骤分数：', sBlocking.toFixed(2));
+console.log('轻量步骤分数：', sTrivial.toFixed(2));
+console.log('全部断言通过');
 ```
 
-#### 3.3.2 动态优先级调整
-
-```typescript
-class DynamicPriorityManager {
-  private basePriorities: Map<string, number> = new Map();
-  private runtimeFactors: Map<string, RuntimeFactor> = new Map();
-  
-  updatePriority(stepId: string, event: ExecutionEvent): number {
-    const basePriority = this.basePriorities.get(stepId) || 0.5;
-    const runtime = this.runtimeFactors.get(stepId) || {
-      retryCount: 0,
-      waitTime: 0,
-      resourceContention: 0
-    };
-    
-    switch (event.type) {
-      case 'retry':
-        // 重试降低优先级，但有下限
-        runtime.retryCount++;
-        return Math.max(0.1, basePriority - runtime.retryCount * 0.1);
-        
-      case 'resource_wait':
-        // 等待资源超过阈值时提升优先级
-        runtime.waitTime += event.duration;
-        if (runtime.waitTime > 30000) { // 30秒
-          return basePriority * 1.2;
-        }
-        return basePriority;
-        
-      case 'dependency_completed':
-        // 依赖完成后，检查是否有任务在等待这个任务
-        const waiters = this.findWaitingTasks(stepId);
-        if (waiters.length > 0) {
-          return basePriority * 1.1; // 稍微提升
-        }
-        return basePriority;
-        
-      case 'external_deadline':
-        // 外部截止时间临近，大幅提升优先级
-        const timeToDeadline = event.deadline - Date.now();
-        if (timeToDeadline < 60000) { // 1分钟内
-          return Math.min(1.0, basePriority + 0.3);
-        }
-        return basePriority;
-        
-      default:
-        return basePriority;
-    }
-  }
-}
+预期输出（浮点结果请以本地实际输出为准）：
+```
+阻塞型步骤分数： 0.73
+轻量步骤分数： 0.11
+全部断言通过
 ```
 
-### 3.4 计划验证
+**常见坑**
 
-#### 3.4.1 计划完整性检查
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 权重调了以后行为完全变了 | 权重是硬编码常量，改动没有回归测试 | 把权重提到配置里，为典型输入写好断言再改 |
+| 失败步骤永远排最后 | 重试降权没有设下限，多次重试后接近 0 | 用 `Math.max` 设下限，或限制重试次数上限 |
+| 同分步骤顺序每次不同 | 排序算法不稳定，或输入来自 Set 遍历 | 排序时加第二排序键，比如步骤 id 升序 |
+| 优先级覆盖了依赖约束 | 只按分数排序，没有先做分批 | 先分批，再在批内按分数排序 |
 
-```typescript
-interface ValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-  suggestions: string[];
-}
+**用在哪里**
 
-class PlanValidator {
-  // 第 1 段：校验入口——按固定顺序串联各专项检查
-  // 设计意图：把"目标→依赖→资源→时间"四类检查串成一条流水线，前方检查产生的问题
-  // 记录进 errors/warnings 后不中断流程，最终统一汇总，保证一次调用暴露尽可能多的缺陷。
-  // 关键数据流：三个累积数组（errors/warnings/suggestions）作为贯穿全流程的可变状态，
-  // valid 只在结尾由 errors.length 推导，避免中途提前判定导致漏报。
-  async validate(plan: ExecutionPlan): Promise<ValidationResult> {
-    const errors: ValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
-    const suggestions: string[] = [];
-    
-    // 1. 检查目标覆盖
-    const goalCoverage = this.checkGoalCoverage(plan);
-    if (!goalCoverage.complete) {
-      errors.push({
-        code: 'INCOMPLETE_GOAL',
-        message: `目标未完全覆盖: ${goalCoverage.missingGoals.join(', ')}`,
-        severity: 'error'
-      });
-    }
-    
-    // 2. 检查依赖完整性
-    const dependencyCheck = this.checkDependencies(plan);
-    errors.push(...dependencyCheck.errors);   // 用展开合并多错误，避免覆盖已有 errors
-    warnings.push(...dependencyCheck.warnings);
-    
-    // 3. 检查资源需求
-    const resourceCheck = this.checkResources(plan);
-    if (!resourceCheck.satisfiable) {
-      errors.push({
-        code: 'INSUFFICIENT_RESOURCES',
-        message: `资源不足: ${resourceCheck.insufficient.join(', ')}`,
-        severity: 'error'
-      });
-    }
-    
-    // 4. 检查时间约束
-    const timeCheck = this.checkTimeConstraints(plan);
-    if (!timeCheck.feasible) {
-      // 时间超限只降级为 warning：计划仍可能通过人工调整执行，不构成硬性阻断
-      warnings.push({
-        code: 'TIME_CONSTRAINT_VIOLATION',
-        message: `预计耗时 ${timeCheck.estimated} 超过限制 ${timeCheck.limit}`,
-        severity: 'warning'
-      });
-    }
-    
-    // 5. 生成优化建议
-    // 放在最后执行：建议生成依赖前四步累积的 errors/warnings，作为上下文化输入
-    suggestions.push(...this.generateSuggestions(plan, errors, warnings));
-    
-    // 6. 汇总结果——valid 是 errors 的纯函数，任何一处 error 都会使计划整体无效
-    return {
-      valid: errors.length === 0,
-      errors,
-      warnings,
-      suggestions
-    };
-  }
-  
-  // 第 2 段：目标覆盖度检查——集合求差
-  // 原理：把每个步骤声明的 achievesGoals 扁平化后装入 Set，用 O(1) 查找替代
-  // 对 targetGoals 的双重遍历；整体复杂度 O(步骤数 × 每步目标数 + 目标数)。
-  // 边界：achievesGoals 可能为 undefined，用 `|| []` 兜底防止 flatMap 抛错。
-  private checkGoalCoverage(plan: ExecutionPlan): { complete: boolean; missingGoals: string[] } {
-    const targetGoals = plan.targetGoals;
-    const coveredGoals = new Set(
-      plan.steps.flatMap(s => s.achievesGoals || [])
-    );
-    
-    // 反向筛选出"声明了但没有任何步骤覆盖"的目标，即缺口
-    const missingGoals = targetGoals.filter(g => !coveredGoals.has(g));
-    
-    return {
-      complete: missingGoals.length === 0,
-      missingGoals
-    };
-  }
-  
-  // 第 3 段：依赖完整性检查——图分析 + 引用完整性两层校验
-  // 返回结构区分 errors/warnings 两类：循环依赖、悬空引用属结构性错误；
-  // warnings 目前预留未产出，为后续"软性依赖告警"留扩展点。
-  private checkDependencies(plan: ExecutionPlan): { 
-    errors: ValidationError[]; 
-    warnings: ValidationWarning[] 
-  } {
-    const errors: ValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
-    
-    // 将步骤与依赖边一次性构建成图，后续检测复用同一份邻接结构
-    const graph = new DependencyGraph(plan.steps, plan.dependencies);
-    
-    // 检查循环依赖
-    // 前置条件：DAG 是调度可行的基础，存在环则任何拓扑排序都会失败
-    const cycles = graph.detectCycles();
-    if (cycles.length > 0) {
-      // 每个环用 ' -> ' 还原可读路径、环之间用 '; ' 分隔，便于定位问题节点
-      errors.push({
-        code: 'CIRCULAR_DEPENDENCY',
-        message: `检测到循环依赖: ${cycles.map(c => c.join(' -> ')).join('; ')}`,
-        severity: 'error'
-      });
-    }
-    
-    // 检查缺失依赖
-    // 逐条依赖验证两端 id 是否落在 steps 集合内，防止悬空引用在调度期才爆雷。
-    // 复杂度：对每条依赖各做一次 O(步数) 的 some 扫描，整体 O(依赖数 × 步数)；
-    // 若规模增大，可先把步骤 id 预建为 Set 降到 O(依赖数)。
-    for (const dep of plan.dependencies) {
-      const sourceExists = plan.steps.some(s => s.id === dep.source);
-      const targetExists = plan.steps.some(s => s.id === dep.target);
-      
-      if (!sourceExists) {
-        errors.push({
-          code: 'MISSING_DEPENDENCY_SOURCE',
-          message: `依赖引用的源步骤不存在: ${dep.source}`,
-          severity: 'error'
-        });
-      }
-      
-      // 源、目标分别独立判错：一条依赖可能两端同时失效，需各自成条上报
-      if (!targetExists) {
-        errors.push({
-          code: 'MISSING_DEPENDENCY_TARGET',
-          message: `依赖引用的目标步骤不存在: ${dep.target}`,
-          severity: 'error'
-        });
-      }
-    }
-    
-    return { errors, warnings };
-  }
-}
-```
-#### 3.4.2 计划可执行性模拟
+- 后台管理的批量导入。业务背景：导入过程中部分行校验失败需要重试，同时还有新行进入。这一节的知识怎么用：失败行降权放到队尾，超过等待阈值的行升权避免饿死。指标衡量收益：整批导入的完成时间，以及单行被无限推迟的条数。什么时候不该用：导入行数低于 50、总耗时在秒级的场景。
+- 构建系统的任务调度。业务背景：增量构建里有些包被大量其他包依赖。这一节的知识怎么用：把阻塞因子调到高值，让被依赖多的包先编译。指标衡量收益：构建的墙钟时间与并行核数的占用率。什么时候不该用：包之间没有依赖的平坦构建图。
+- 工单处理系统。业务背景：工单有 SLA（Service Level Agreement，服务等级协议）截止时间。这一节的知识怎么用：用截止时间事件动态加 0.3，让临近超时的工单插队。指标衡量收益：SLA 超时工单占比与平均处理时长。什么时候不该用：工单量小、人工排期的团队。
 
-```typescript
-class PlanSimulator {
-  async simulate(plan: ExecutionPlan): Promise<SimulationResult> {
-    const state = this.initializeState(plan);
-    const executionLog: SimulatedStep[] = [];
-    
-    for (const step of plan.steps) {
-      // 检查前置条件
-      const preconditionsMet = await this.checkPreconditions(step, state);
-      
-      if (!preconditionsMet.satisfied) {
-        executionLog.push({
-          stepId: step.id,
-          status: 'blocked',
-          reason: preconditionsMet.reason
-        });
-        
-        // 记录阻塞但不停止模拟
-        continue;
-      }
-      
-      // 模拟执行
-      const result = await this.simulateStep(step, state);
-      executionLog.push(result);
-      
-      // 更新状态
-      if (result.status === 'success') {
-        state = this.applyStateChanges(state, step, result);
-      } else if (result.status === 'failure') {
-        // 模拟失败处理
-        const recovery = await this.simulateRecovery(step, result, state);
-        executionLog.push(...recovery);
-      }
-    }
-    
-    return this.compileSimulationResult(executionLog, state);
-  }
-  
-  private async checkPreconditions(
-    step: TaskStep, 
-    state: SimulationState
-  ): Promise<{ satisfied: boolean; reason?: string }> {
-    for (const dep of step.dependencies) {
-      if (!state.completedSteps.has(dep)) {
-        const depStep = state.plan.steps.find(s => s.id === dep);
-        return {
-          satisfied: false,
-          reason: `前置步骤 ${depStep?.name || dep} 未完成`
-        };
-      }
-    }
-    
-    for (const req of step.requiredResources) {
-      if (!this.checkResourceAvailability(req, state)) {
-        return {
-          satisfied: false,
-          reason: `所需资源 ${req} 不可用`
-        };
-      }
-    }
-    
-    return { satisfied: true };
-  }
-  
-  private async simulateStep(
-    step: TaskStep, 
-    state: SimulationState
-  ): Promise<SimulatedStep> {
-    // 模拟可能的失败（基于历史数据和统计）
-    const failureProbability = this.estimateFailureProbability(step);
-    const random = Math.random();
-    
-    if (random < failureProbability) {
-      return {
-        stepId: step.id,
-        status: 'failure',
-        simulatedError: this.generateRealisticError(step)
-      };
-    }
-    
-    // 模拟执行时间
-    const executionTime = this.estimateExecutionTime(step);
-    
-    return {
-      stepId: step.id,
-      status: 'success',
-      simulatedOutput: this.generateSimulatedOutput(step),
-      executionTime
-    };
-  }
-}
+**行业实践**
+
+- 本站该页面的旧版内容中给出的六因子权重（来源：本站该页面的旧版内容，以原文为准）：紧迫 0.25、重要 0.25、阻塞 0.20、被依赖 0.10、资源 0.10、工作量效率 0.10。怎么借鉴到你的项目：把这六个数字放进配置中心，为每次调整记录一条变更日志。
+- 本站该页面的旧版内容中给出的动态调整规则（来源：本站该页面的旧版内容，以原文为准）：重试每次减 0.1 且下限 0.1，等待超过 30000 毫秒乘 1.2，距截止不足 60000 毫秒加 0.3 且上限 1.0。怎么借鉴到你的项目：先把这三条规则写进单元测试，再接入真实调度器。
+- LangGraph 官方文档关于中断与恢复的章节。它讨论了在执行中途插入人工审批与状态恢复的做法，与优先级动态调整的诉求相邻。怎么借鉴到你的项目：把人工审批当作一次"外部事件"，用同一套 adjust 函数处理，而不是另起一套流程。
+
+**小结**
+
+- 优先级是一组可解释的权重，不是一个黑盒分数，改权重必须先有回归。
+- 初次排序只解决同一批内部的顺序，跨批的顺序由依赖图决定。
+- 动态调整必须设上下限，否则失败步骤会被永久推迟。
+
+## 7. 计划验证与动态重规划
+
+**先想一个问题**
+
+规划器排出的计划看起来完整，执行到第三步才发现第二步的目标没有覆盖到。
+如果等到执行完才报错，前面两步的工作都要作废。
+所以计划在交付执行器之前，要先跑一遍校验和模拟。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：验证是执行前的静态检查加沙盘推演，重规划是发现偏差后的局部改写。
+    日常类比：出门前检查证件、钥匙、钱包，再看一眼路况预估到达时间。
+    类比不成立：证件是确定的，计划的验证依赖模型对步骤语义的判断，可能误报也可能漏报，所以验证结果要给人工复核留通道。
+
+!!! note "术语：动态重规划（Replanning）"
+    执行过程中发现实际结果与计划不匹配时，用当前真实状态重新生成剩余步骤的过程。例子：第三步写入失败，保留前两步成果，只重排第三到第五步。
+
+!!! note "术语：检查点（Checkpoint）"
+    执行过程中保存的可恢复状态快照，回滚时从这里重新开始。例子：每完成一步就把已完成步骤 id 与中间产物路径写进一份 JSON。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+  state "待规划" as Idle
+  state "规划中" as Planning
+  state "已校验" as Validated
+  state "执行中" as Running
+  state "已完成" as Done
+  state "已回滚" as Rolled
+  [*] --> Idle
+  Idle --> Planning: "收到任务"
+  Planning --> Validated: "生成计划并通过校验"
+  Planning --> Planning: "校验失败 重新分解"
+  Validated --> Running: "开始执行"
+  Running --> Validated: "步骤完成 计划仍有效"
+  Running --> Planning: "偏差超过阈值 触发重规划"
+  Running --> Done: "全部步骤成功"
+  Running --> Rolled: "失败且无法恢复"
+  Rolled --> Planning: "保留检查点后重排"
+  Done --> [*]
 ```
 
-## 应用与行业实践
+1. 从 Planning 回到自己的那条边表示校验失败后原地重排，不进入执行阶段。
+2. Validated 到 Running 是单向的，只有校验通过才会开始执行。
+3. Running 回到 Validated 表示某一步完成后计划仍然成立，继续下一步。
+4. Running 直接回到 Planning 是关键路径：偏差超过阈值时丢弃未执行部分，保留已完成部分。
+5. 走到 Rolled 说明失败无法恢复，此时先回退到最近的检查点，再重新规划。
 
-### 应用场景地图
+**一步一步来**
 
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-|------|-------------------|-------------|----------|
-| 后台管理的万行表格导出 | 规划器拆分任务、执行器并行处理 | 按行数分片，每 2000 行一个子任务，Node.js worker_threads | 分片边界要对齐表头，避免导出文件缺列 |
-| 低端安卓手机的首屏加载 | 规划器静态分析资源依赖，生成加载计划 | 按路由拆包，首屏只加载关键 chunk | 低内存设备上并行解压可能触发 OOM，需限制并发为 1 |
-| 多人协作白板的增量同步 | 规划器把用户操作合并为批量任务 | CRDT 合并后按 50ms 窗口批量广播 | 合并不当会导致操作顺序错乱，需要版本号校验 |
-| 电商大促的库存扣减 | 规划器预计算扣减顺序与回滚步骤 | Redis Lua 脚本执行原子扣减，失败时逆向回滚 | 回滚步骤要独立于正向步骤，避免部分成功卡死 |
-| 视频转码流水线 | 规划器按分辨率生成有依赖关系的任务图 | ffmpeg 多路输出，按关键帧切分片段 | 依赖关系要写成 DAG，不能出现环 |
-| 数据迁移的批量导入 | 规划器拆分批次并生成校验任务 | 按主键区间分 5000 行一批，每批后跑 COUNT 校验 | 校验任务要与导入任务分离，否则脏数据会中断全流程 |
-| CI 流水线的测试调度 | 规划器按文件变更范围决定跑哪些测试 | 用依赖图分析，只跑受影响模块的测试 | 依赖图过老会漏跑测试，需要每次构建前更新 |
+第 1 步：这一步要做什么——把目标覆盖、依赖完整性、资源与时间四类检查串成一条流水线。
 
-### 三个场景拆解
+```js
+/** 依次跑四类检查，最后汇总，errors 非空即判定计划无效 */
+function validatePlan(plan) {
+  const errors = [];
+  const warnings = [];
 
-#### 场景 1：后台管理的万行表格导出
+  // 一、目标覆盖：哪些目标没有任何步骤声明覆盖
+  const covered = new Set(plan.steps.flatMap((s) => s.achievesGoals || []));
+  const missing = plan.targetGoals.filter((g) => !covered.has(g));
+  if (missing.length > 0) {
+    errors.push({ code: 'INCOMPLETE_GOAL', message: `目标未覆盖：${missing.join('、')}` });
+  }
 
-- **业务背景**：运营人员需要从后台导出十万行订单数据做月末对账。一次性导出会占用 API 进程内存 2GB 以上，导致其他请求超时。用"能跑通"的同步导出，平均一次导出耗时 180 秒，期间页面无响应。
+  // 二、循环依赖：交给依赖图判定
+  const cycles = new DependencyGraph(plan.steps, plan.dependencies).detectCycles();
+  if (cycles.length > 0) {
+    errors.push({ code: 'CIRCULAR_DEPENDENCY', message: `发现环：${cycles.map((c) => c.join('->')).join('；')}` });
+  }
 
-- **怎么用本页知识解决**：思路是把导出任务交给规划器，规划器按行数把十万行拆成 20 个 5000 行的子任务，每个子任务独立生成一份 CSV 分片，最后合并成一个 zip 文件。执行器控制并发为 3，避免数据库连接池被打满。
+  // 三、时间约束：超时只降级为警告，不阻断执行
+  const estimated = plan.steps.reduce((sum, s) => sum + s.estimatedTime, 0);
+  if (plan.timeLimit && estimated > plan.timeLimit) {
+    warnings.push({ code: 'TIME_CONSTRAINT_VIOLATION', message: `预计 ${estimated} 超过限制 ${plan.timeLimit}` });
+  }
 
-```javascript
-// 规划器：生成子任务列表
-const totalRows = await db.count({ status: 'paid' });      // 先查总行数，避免盲目拆分
-const BATCH_SIZE = 5000;                                     // 每个子任务处理的行数
-const tasks = [];
-for (let offset = 0; offset < totalRows; offset += BATCH_SIZE) {
-  tasks.push({ offset, limit: BATCH_SIZE });                 // 每个子任务带偏移量和行数
+  return { valid: errors.length === 0, errors, warnings }; // valid 是 errors 的纯函数
 }
-
-// 执行器：并发执行子任务，并发上限 3
-const results = [];
-const pool = new WorkerPool(3);                              // 并发 3 个 worker，防止连接池耗尽
-for (const task of tasks) {
-  pool.run(async () => {
-    const rows = await db.find({ status: 'paid' })
-      .skip(task.offset).limit(task.limit).toArray();         // 按偏移量取这一批
-    const csv = toCsv(rows);                                 // 转成 CSV 字符串
-    await fs.writeFile(`/tmp/export/part-${task.offset}.csv`, csv); // 写独立分片
-  });
-}
-await pool.drain();                                          // 等所有子任务完成
-await zipParts('/tmp/export');                               // 合并成 zip，释放内存
 ```
+**这段代码在做什么**
+- 目标覆盖用集合求差，把每步声明的 `achievesGoals` 扁平化后装进 Set 做 O(1) 查找。
+- 循环依赖复用第 5 节的图算法，不重复实现。
+- 时间超限只记为警告，因为人工调整后计划仍可能执行。
+- `valid` 在最后统一由 `errors.length` 推导，中途不提前返回，保证一次暴露尽可能多的问题。
+- `achievesGoals` 可能为空，用 `|| []` 兜底防止 `flatMap` 抛错。
 
-- 拆分粒度要按"单批内存峰值"反推：5000 行 CSV 在内存中约 5MB，3 个并发峰值 15MB，远低于 2GB 的风险线。
-- `pool.drain()` 是关键：只有全部子任务落盘后才进入合并阶段，否则合并进程会读到半截文件。
-- 合并用 zip 而不是单文件 CSV，因为 20 个分片并行写同一文件会产生交错内容。
-- 每个子任务的 offset 和 limit 存在任务对象里，执行器不关心总行数，方便单独重跑失败分片。
+第 2 步：这一步要做什么——写重规划触发条件，按偏差大小选择局部改写还是整体重排。
 
-- **怎么度量收益**：用 `time` 命令记录导出总耗时，对比改造前后从 180 秒降到多少。用 `process.memoryUsage().rss` 在导出期间每 5 秒采样一次，记录内存峰值。用 Grafana 看 API 进程的 p99 响应时间，确认导出期间其他请求不再超时。
-
-- **什么时候不该用**：如果导出总行数小于 2000 行，拆分反而增加文件合并和进程调度的固定开销，直接同步查询并返回单个 CSV 更简单。如果数据库本身不支持按偏移量高效分页（例如深度 offset 扫描极慢），需要先改造成基于游标或主键范围的分批方式，否则子任务会越跑越慢。
-
-#### 场景 2：多人协作白板的增量同步
-
-- **业务背景**：白板上有 5000 个图形对象，5 个用户同时编辑，每次拖动会产生高频的坐标更新。如果每次更新都直接广播，单用户一秒拖动可以产生 60 条消息，5 人就是 300 条/秒，服务端需要处理 300 次广播，网络和 CPU 都扛不住。
-
-- **怎么用本页知识解决**：思路是引入规划器，把 50ms 时间窗口内的多个坐标更新合并成一个批量任务，规划器先对操作做冲突检测和合并，再生成一个"批量广播"子任务交给执行器。用户在窗口内的连续拖动变成一次批量下发。
-
-```go
-// 规划器：收集 50ms 窗口内的操作并合并
-type Planner struct {
-    buffer map[string][]Op        // 按对象 ID 缓存操作
-    ticker *time.Ticker           // 50ms 定时器触发合并
+```js
+/** 判断是否需要重规划，返回处理策略 */
+function decideReplan(step, result, plan) {
+  if (result.success) {
+    // 成功但产出与预期结构不符，说明后续步骤的输入假设不成立
+    const shapeChanged = !matchesExpectedShape(result.value, step.expectedShape);
+    return shapeChanged ? 'replan-remaining' : 'continue';
+  }
+  const isLastStep = step.id === plan.steps[plan.steps.length - 1].id;
+  if (isLastStep) return 'abort';             // 最后一步失败且没有可重排的剩余步骤
+  if (result.retryable && result.attempts < 3) return 'retry'; // 可重试且未达上限
+  return 'rollback-then-replan';              // 不可重试，先回退到检查点再重排
 }
+```
+**这段代码在做什么**
+- 成功分支也要判断，因为产出结构变了会让后续步骤的输入假设失效。
+- `attempts < 3` 是重试上限，达到上限后不再重试。
+- 最后一步失败时没有剩余步骤可重排，直接走 abort。
+- 不可重试的失败先回退到检查点，再从该点重排，避免丢弃已完成的工作。
+- 四个返回值是枚举语义的字符串，便于在上层用 switch 处理。
 
-func (p *Planner) addOp(op Op) {
-    p.buffer[op.ObjectID] = append(p.buffer[op.ObjectID], op) // 先缓存，不立即广播
-}
+运行结果（一个可重试的中间步骤失败）：`"retry"`。
 
-func (p *Planner) flush() []BatchTask {
-    var tasks []BatchTask
-    for id, ops := range p.buffer {
-        merged := mergeOps(ops)               // 同一对象的多次移动合并成一次
-        if merged.Version < lastAcked[id] {   // 版本回退检测，丢弃过期操作
-            continue
-        }
-        tasks = append(tasks, BatchTask{ID: id, Op: merged})
+**动手验证**
+
+```js
+// 依赖：无。运行环境：Node 20+，保存为 validate-replan.mjs 后执行 node validate-replan.mjs
+import assert from 'node:assert/strict';
+
+/** 极简依赖图，只保留判环能力，供验证阶段复用 */
+function detectCycles(steps, dependencies) {
+  const adj = new Map(steps.map((s) => [s.id, new Set()])); // 先铺满节点，避免脏边引用
+  for (const d of dependencies) adj.get(d.target).add(d.source);
+  const visited = new Set();
+  const stack = new Set();  // 当前递归路径上的节点
+  const cycles = [];
+  const dfs = (id, path) => {
+    visited.add(id); stack.add(id); path.push(id);
+    for (const next of adj.get(id) || []) {
+      if (!visited.has(next)) dfs(next, [...path]);        // 传副本，每条支路拿到独立路径
+      else if (stack.has(next)) cycles.push([...path.slice(path.indexOf(next)), next]); // 回边即环
     }
-    p.buffer = make(map[string][]Op)          // 清空缓冲，开始下一窗口
-    return tasks
+    stack.delete(id);                                      // 关键回溯：离开节点必须出栈
+  };
+  for (const id of adj.keys()) if (!visited.has(id)) dfs(id, []);
+  return cycles;
 }
-```
 
-- 合并的核心是 `mergeOps`：同一对象在 50ms 内从 (10,10) 移到 (15,15) 再移到 (20,20)，合并后只保留终点 (20,20)，中间态不发出去。
-- 版本回退检测放在规划器里，执行器拿到的任务已经是"可安全广播"的，不用再做冲突判断。
-- 50ms 窗口是可调参数：窗口越大合并率越高但延迟越差，需要按"用户可感知延迟"设定，通常 30-50ms 是可以接受的。
-- 执行器只需要按顺序把 BatchTask 推送到 WebSocket 广播通道，不需要理解合并逻辑。
+/** 依次跑三类检查，最后汇总，errors 非空即判定计划无效 */
+function validatePlan(plan) {
+  const errors = [];
+  const warnings = [];
+  const covered = new Set(plan.steps.flatMap((s) => s.achievesGoals || []));
+  const missing = plan.targetGoals.filter((g) => !covered.has(g)); // 集合求差得缺口
+  if (missing.length > 0) errors.push({ code: 'INCOMPLETE_GOAL', message: `目标未覆盖：${missing.join('、')}` });
 
-- **怎么度量收益**：用服务端日志统计每秒广播消息条数，改造前后对比。用客户端打点测量"操作到远端可见"的端到端延迟，确保 P50 不超过 100ms。用 Prometheus 的 `histogram` 指标记录每个窗口合并掉的操作数，衡量合并率。
+  const cycles = detectCycles(plan.steps, plan.dependencies);
+  if (cycles.length > 0) errors.push({ code: 'CIRCULAR_DEPENDENCY', message: `发现环：${cycles.map((c) => c.join('->')).join('；')}` });
 
-- **什么时候不该用**：如果白板同时在线人数不超过 2 人且图形对象少于 100 个，合并窗口引入的 50ms 延迟大于收益，直接逐条广播更实时。如果操作本身有严格顺序要求（例如文本输入的回退/重做链），合并会破坏顺序语义，需要换成 OT 或 CRDT 的完整实现，不能只靠简单合并。
+  const estimated = plan.steps.reduce((sum, s) => sum + s.estimatedTime, 0);
+  if (plan.timeLimit && estimated > plan.timeLimit) warnings.push({ code: 'TIME_CONSTRAINT_VIOLATION', message: `预计 ${estimated} 超过限制 ${plan.timeLimit}` });
 
-#### 场景 3：低端安卓手机的首屏加载
+  return { valid: errors.length === 0, errors, warnings }; // valid 是 errors 的纯函数
+}
 
-- **业务背景**：一个 H5 应用需要跑在 2GB 内存的低端安卓机上，首屏包含 15 个 JS 模块和 6 个 CSS 文件，全部加载需要 8 秒，期间白屏。用户跳出率很高，但团队不知道先优化哪一步。
-
-- **怎么用本页知识解决**：思路是用规划器在构建阶段分析模块依赖图，生成"首屏最小加载计划"，把首屏不需要的模块标记为延迟加载。执行器按照计划先加载关键模块，再在空闲时预加载其余模块。
-
-```javascript
-// 构建阶段的规划器：分析依赖，生成加载计划
-import { analyzeDeps } from './dep-analyzer.js';       // 用依赖分析工具解析模块图
-
-const entry = 'src/main.js';                            // 入口文件
-const depGraph = analyzeDeps(entry);                    // 生成完整的依赖图
-const criticalModules = findCriticalPath(depGraph, entry); // 找出首屏渲染必须经过的模块
+/** 判断是否需要重规划，返回处理策略 */
+function decideReplan(step, result, plan) {
+  if (result.success) return 'continue';                  // 演示版只处理失败分支
+  const isLast = step.id === plan.steps[plan.steps.length - 1].id;
+  if (isLast) return 'abort';                             // 最后一步失败且无剩余步骤可重排
+  if (result.retryable && result.attempts < 3) return 'retry'; // 可重试且未达上限
+  return 'rollback-then-replan';                          // 不可重试，先回退到检查点再重排
+}
 
 const plan = {
-  critical: criticalModules,                            // 首屏立即加载的模块列表
-  deferred: depGraph.allModules.filter(m => !criticalModules.includes(m)), // 延迟加载
+  targetGoals: ['完成同步'],
+  timeLimit: 8,
+  steps: [
+    { id: 's1', name: '拉取源数据', estimatedTime: 2, achievesGoals: [] },
+    { id: 's2', name: '清洗数据', estimatedTime: 3, achievesGoals: ['完成同步'] },
+    { id: 's3', name: '写入目标库', estimatedTime: 4, achievesGoals: [] },
+  ],
+  dependencies: [{ source: 's2', target: 's1' }, { source: 's3', target: 's2' }],
 };
-writeFileSync('./dist/load-plan.json', JSON.stringify(plan)); // 计划写入构建产物
+
+const ok = validatePlan(plan);
+assert.equal(ok.valid, true);                              // 无错误
+assert.equal(ok.warnings.length, 1);                       // 预计 9 超过限制 8，产生一条警告
+
+const missGoal = validatePlan({ ...plan, targetGoals: ['完成同步', '生成回执'] });
+assert.equal(missGoal.valid, false);
+assert.equal(missGoal.errors[0].code, 'INCOMPLETE_GOAL');  // 缺口被识别
+
+const cyclic = validatePlan({ ...plan, dependencies: [...plan.dependencies, { source: 's1', target: 's3' }] });
+assert.equal(cyclic.valid, false);
+assert.equal(cyclic.errors.some((e) => e.code === 'CIRCULAR_DEPENDENCY'), true);
+
+assert.equal(decideReplan(plan.steps[1], { success: false, retryable: true, attempts: 1 }, plan), 'retry');
+assert.equal(decideReplan(plan.steps[2], { success: false, retryable: true, attempts: 1 }, plan), 'abort');
+assert.equal(decideReplan(plan.steps[1], { success: false, retryable: false, attempts: 1 }, plan), 'rollback-then-replan');
+
+console.log('校验通过，警告数：', ok.warnings.length);
+console.log('全部断言通过');
 ```
 
-```javascript
-// 运行时的执行器：按计划加载
-const plan = await fetch('./load-plan.json').then(r => r.json()); // 读取加载计划
-await Promise.all(plan.critical.map(m => import(m)));  // 首屏关键模块全部并行加载
-onFirstPaint();                                        // 首屏渲染完成，用户可见
-
-// 空闲时段预加载其余模块，不阻塞首屏
-requestIdleCallback(() => {
-  for (const m of plan.deferred) {
-    import(m).catch(() => {});                         // 静默预加载，失败不阻塞
-  }
-});
+预期输出：
+```
+校验通过，警告数： 1
+全部断言通过
 ```
 
-- 规划器跑在构建阶段，不占用运行时性能：依赖分析和计划生成在打包时完成，手机上只执行计划。
-- `findCriticalPath` 是关键函数：从入口出发，标记渲染首屏必须经过的模块，其余都进 deferred。
-- 首屏关键模块用 `Promise.all` 并行加载，比逐个 `import` 的串行加载快。
-- 延迟加载放在 `requestIdleCallback` 里，只在主线程空闲时执行，不影响首屏响应。
+**常见坑**
 
-- **怎么度量收益**：用 Chrome DevTools 的 Performance 面板在 CPU 降速 6 倍（模拟低端机）下录制首屏时间，对比改造前后的 First Contentful Paint 和 Time to Interactive。用 `performance.mark` 在代码里埋点，记录 `onFirstPaint` 的触发时刻。用构建工具的分包报告（如 `webpack-bundle-analyzer`）查看 critical 和 deferred 的体积占比。
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 校验通过了但执行还是崩 | 只查了结构与引用，没有做可执行性模拟 | 增加一步沙盘推演，只跑前置条件检查不做真实调用 |
+| 一有错就中断校验 | 遇到第一个错误就 return | 改成累积 errors 数组，最后一次返回 |
+| 重规划把已完成的步骤也重排了 | 重规划入口没有带上已完成集合 | 重规划时传入检查点，只重排未完成的步骤 |
+| 重试把不可重试的失败也重试了 | 没有区分可重试与不可重试错误 | 在结果对象里加 retryable 字段，由调用方设置 |
+| 时间超限被当成硬错误 | 校验把警告也计入了 errors | 区分 errors 与 warnings，valid 只看 errors |
 
-- **什么时候不该用**：如果目标设备全是中高端机（内存 6GB 以上），首屏 8 秒的问题不在模块加载顺序，而在网络或渲染性能，规划加载计划解决不了这个问题。如果应用本身就是单页工具型应用，所有模块在首屏都会用到，拆分后用户一交互就要二次加载，体验反而更差。
+**用在哪里**
 
-### 行业先进实践
+- 后台管理的批量导入。业务背景：导入过程中某批写入失败，前面的批次已经落库。这一节的知识怎么用：每批完成写一个检查点，失败后带着检查点重排剩余批次。指标衡量收益：失败后需要重跑的批次数，以及重复写入导致的冲突条数。什么时候不该用：整批在一个数据库事务里、失败即全部回滚的场景。
+- 多步骤发布流程。业务背景：发布包含构建、灰度、全量、回滚四个步骤。这一节的知识怎么用：先用校验拦掉目标未覆盖的计划，灰度失败时按 decideReplan 决定重试还是回滚重排。指标衡量收益：一次发布的成功恢复比例与回滚耗时。什么时候不该用：单机脚本发布，没有中间状态需要保留。
+- 长周期数据回填任务。业务背景：回填三个月的历史数据，每天一批。这一节的知识怎么用：每天一批写一个检查点，中途失败只重排当天剩余的分片。指标衡量收益：回填的总天数与失败日的重跑分片数。什么时候不该用：回填数据量小、一次跑完在分钟级的场景。
 
-Lazy Loading 与 Route-based Code Splitting（出处：webpack 官方文档 Code Splitting 章节）
+**行业实践**
 
-webpack 文档明确建议按路由拆分代码，首屏只加载当前路由需要的模块，其他路由在导航时按需加载。这个做法的核心是"以后用到的代码以后加载"，与规划器"只执行当前需要执行的步骤"同构。你的项目可以在构建配置里按页面目录做 `splitChunks` 分组，再用手动 `import()` 触发按需加载。
+- 本站该页面的旧版内容中给出的四类校验（来源：本站该页面的旧版内容，以原文为准）：目标覆盖、依赖完整性、资源需求、时间约束，其中时间超限只记为警告。怎么借鉴到你的项目：把校验结果分成 errors 与 warnings 两个数组，让调用方决定 warnings 是否阻断。
+- 本站该页面的旧版内容中关于模拟执行的做法（来源：本站该页面的旧版内容，以原文为准）：逐步检查前置条件，被阻塞的步骤记录原因但继续模拟后续步骤。怎么借鉴到你的项目：模拟阶段只读不写，任何有副作用的调用都用桩替换。
+- LangGraph 官方文档关于持久化与恢复的章节。它讨论了保存执行状态并在中断后恢复的做法。怎么借鉴到你的项目：把检查点设计成可序列化的纯数据，与业务对象解耦，便于换存储介质。
 
-Sagas 的任务可恢复设计（出处：redux-saga 官方文档）
+**小结**
 
-redux-saga 的 saga 在任务中断后可以按步骤标记恢复执行，而不是从头开始。官方文档描述了 saga 是长期运行的事务性流程，具备可中断和可恢复特性。这个设计可以用来参考规划器任务的断点续跑：给每个子任务记录执行状态和中间产出，进程崩溃后从最后完成的状态继续，不重做已完成步骤。你的实现至少需要做子任务状态持久化。
+- 校验在交付执行器之前完成，一次返回全部问题比逐条报错省时间。
+- 重规划的粒度越小越省，能只重排剩余步骤就不要整体重来。
+- 检查点是重规划的前提，没有它就只能从头再来。
 
-Falcon 的 DAG 化部署（出处：Falcon 官方文档，Falcon 是一个公开的部署工具）
+## 应用地图
 
-Falcon 的部署流程用 DAG 描述依赖关系，每个节点是独立的部署步骤，节点之间用边表达执行顺序。官方文档列出了部署步骤可以并行或串行执行。这个做法与规划器的依赖图分析一致：先画清任务依赖，再决定并行度。你的项目可以把"生成计划"和"执行计划"拆成两个模块，计划生成时输出 DAG，执行时按 DAG 的拓扑顺序调度。
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 后台管理的批量导入 | 任务分解、依赖图、检查点重规划 | 规则分解加 SQL 批量写入 | 每批落一个检查点，失败只重跑剩余批次 |
+| CI 流水线的多阶段构建 | 层级分批、并行批次 | 构建工具自带的依赖图加调度器 | 同批并发数受机器核数与缓存配额限制 |
+| 数据仓库每日调度 | 拓扑排序、关键路径 | 调度平台加表级依赖声明 | 关键路径上的表不要随意加前置，会拉长窗口 |
+| 代码仓库批量重构 | 能力匹配、原子步骤粒度 | 搜索工具加改写工具的组合 | 改写前的文件清单要落盘，便于回滚 |
+| 客服工单自动分派 | ReAct 与规划-执行的选型打分 | 规则网关加模型兜底 | 打分低只是说明不需要规划，不代表可以省掉校验 |
+| 多步骤表单提交编排 | 依赖强度与 criticality | 事务加补偿动作 | required 边保证顺序，补偿动作对应回滚计划 |
+| 长周期数据回填 | 检查点、动态重规划 | 分片任务加断点续跑 | 检查点要写清分片边界，避免重复写入 |
+| 增量构建调度 | 优先级排序、阻塞因子 | 构建缓存加任务队列 | 优先级只在同批内生效，不能覆盖依赖约束 |
 
-### 从学到用：落地路线
+## 动手作业
 
-第 1 步：先在一个可以接受出错的内部工具上试点，把一个大任务拆成两个子任务并验证跑通。验收标准：一个新任务从规划到执行全程可追踪，失败时能定位到具体子任务。
+目标：写一个单文件规划器，输入一组步骤与依赖，输出一份通过校验的执行计划。
 
-第 2 步：在试点工具上加入度量，记录任务拆分前后的耗时和内存峰值。验收标准：至少有一个可复现的实验显示拆分后内存峰值下降，且总耗时没有超过原方案的 1.2 倍。
+步骤：
+1. 定义 `TaskStep`、`Dependency`、`ExecutionPlan` 三个结构，字段按第 3 节的最小集。
+2. 实现 `computeLevels`、`topologicalSort`、`identifyParallelBatches` 三个函数。
+3. 实现 `validatePlan`，检查目标覆盖与循环依赖两类问题。
+4. 实现 `priorityScore`，按第 6 节的权重表在批内排序。
+5. 为每个函数写至少两条断言，覆盖正常输入与非法输入各一。
 
-第 3 步：把验证过的拆分模式推广到用户可见的功能，先从读多写少的查询类任务开始。验收标准：线上功能保留旧路径，通过开关切换，连续 7 天新路径错误率不高于旧路径。
+验收标准：
+- 用四条步骤三条依赖的输入，输出批次数为 3，分批结果为 `[["s1"],["s2","s3"],["s4"]]`。
+- 把依赖改成含环的输入后，`validatePlan` 返回的 `valid` 为 `false`，且 `errors` 中含 `CIRCULAR_DEPENDENCY`。
+- 目标清单里加一个没有任何步骤覆盖的目标后，`errors` 中含 `INCOMPLETE_GOAL`。
+- 全部断言通过，脚本退出码为 0，控制台输出最后一行固定为 `全部断言通过`。
 
-第 4 步：建立回归防线，防止后续改动把任务拆分逻辑改坏。验收标准：每个拆分逻辑有单元测试覆盖，CI 中跑通全量测试才能合入主干。
+## 综合对比
 
-### 动手作业
+| 维度 | ReAct | Plan-and-Execute | 混合式 |
+| --- | --- | --- | --- |
+| 决策时机 | 每一步 | 规划阶段集中一次 | 先规划，偏差超阈值时回到规划 |
+| 决策次数与步数的关系 | 等于步数 | 恒为 1 次规划 | 介于两者之间，由重规划次数决定 |
+| 全局视角 | 无，按当前状态贪心 | 有，基于完整依赖图 | 有，但会被重规划刷新 |
+| 失败恢复方式 | 循环自然重试 | 需要显式的回滚与重排机制 | 局部重排，保留已完成部分 |
+| 中间产物形态 | 思考、动作、观察的记录串 | 带 id 与依赖的步骤表 | 步骤表加一份检查点 |
+| 调试难度来源 | 步数多、记录长 | 规划逻辑本身复杂 | 两套逻辑都要看 |
+| 选型打分 | 低于 0.3 | 高于 0.7 | 0.3 到 0.7 之间 |
+| 规划深度档位 | NONE | DEEP | LIGHT 或 MODERATE |
+| 适用任务特征 | 步骤少、探索性强、可逆 | 步骤多、依赖密、不可逆 | 目标会被中间结果改写 |
 
-**目标**：为一个 Node.js 脚本写一个简单的规划-执行器，把处理 100 个 URL 的抓取任务拆成可并发执行的子任务，并且失败子任务可以单独重试。
+权重与阈值的来源是本站该页面的旧版内容（以原文为准），属于经验值，落地前应先用真实任务样本回归。
 
-**步骤**：
+## 自测题
 
-1. 准备一个 `urls.txt` 文件，每行一个 URL，共 100 行。
-2. 写一个 `planner.js`，读取文件并把 URL 列表拆成 10 个包，每个包 10 个 URL，输出 JSON 格式的任务文件。
-3. 写一个 `executor.js`，读取任务文件，用 `Worker` 或 `Promise` 池并发执行抓取，并发上限为 3。
-4. 给每个子任务记录状态：`pending`、`running`、`done`、`failed`，状态写入一个 `status.json`。
-5. 抓取失败（例如超时或非 200 状态码）时把该子任务标记为 `failed`，但不影响其他子任务。
-6. 写一个 `retry.js`，读取 `status.json`，把所有 `failed` 的子任务重新入队执行。
-7. 最后输出一个汇总报告：成功数量、失败数量、重试后仍失败的数量。
+??? question "Plan-and-Execute 与 ReAct 最本质的差别是什么？"
+    - 差别在决策发生的时机，不在用了多少工具。
+    - ReAct 每一步都要重新推理一次，决策次数与执行步数线性相关。
+    - Plan-and-Execute 在规划阶段集中决策一次，执行阶段只做调度不做选择。
+    - 代价是多了一次规划调用，收益是拿到了全局视角。
+    - 全局视角让并行批次与依赖约束成为可计算的东西。
 
-**验收标准**：
+??? question "为什么计划要存成边列表，而不是只存一个步骤数组？"
+    - 数组下标只能表达一种固定顺序，表达不了并行。
+    - 边列表能表达"谁必须等谁"，也能表达"谁和谁无关"。
+    - 有了边才能做拓扑排序、判环、算关键路径。
+    - 边列表可以序列化，便于落盘与跨进程传递。
+    - 只用数组时，漏掉一条顺序约束不会被任何检查发现。
 
-1. 运行 `node planner.js` 后能生成合法的任务文件和初始状态文件。
-2. 运行 `node executor.js` 后，`status.json` 中每个子任务的状态都被更新为 `done` 或 `failed`。
-3. 故意让 20 个 URL 指向本地不存在的端口，执行后退出的失败数正好是 20。
-4. 运行 `node retry.js` 后，重试的失败子任务数量等于执行后标记为 `failed` 的数量。
-5. 全程并发数不超过 3，可以通过在执行器里打印当前运行中的任务数来验证。
+??? question "循环依赖检测为什么不能只用一个已访问集合？"
+    - 全局已访问集合区分不出"回边"与"走完的支路"。
+    - 回边指向的是当前递归路径上还没回溯的节点，这才构成环。
+    - 指向已完成节点的边只是正常的前向边，不是环。
+    - 所以需要额外维护一个当前路径集合，离开节点时把它删掉。
+    - 不做这个回溯，已完成的节点会被误判成环的端点。
 
+??? question "拓扑排序返回 null 和抛异常，哪种契约更好？"
+    - 两种都可以，关键是在同一个模块里保持统一。
+    - 本页旧版内容中，排序失败返回 null，分批失败抛异常，调用方要分场景处理。
+    - 返回 null 会迫使调用方在类型层面处理空值分支。
+    - 抛异常适合"调用方无法继续"的场合，比如分批时一轮都推不动。
+    - 混用会让调用方漏掉某个分支，最好统一后再写测试固定下来。
+
+??? question "preferred 边为什么要连进图，却不计入入度？"
+    - preferred 表示建议顺序，不是硬约束，不该阻塞执行。
+    - 计入入度会让拓扑排序把它当成必须等待的前置。
+    - 连进反向表后，分批逻辑仍然能看见它，从而尊重这个建议。
+    - 结果是同一张图在拓扑排序与分批两处得到不同强度的约束。
+    - 这个不对称要在文档里写明，否则调用方会误以为两者等价。
+
+??? question "优先级分数为什么必须设上下限？"
+    - 没有下限时，反复失败的步骤分数会一路降到接近 0。
+    - 降到接近 0 意味着它几乎永远不会被调度，形成饿死。
+    - 没有上限时，多个因子叠加可能让分数超过 1，失去可比性。
+    - 本页的规则里，重试下限是 0.1，截止加权的上限是 1.0。
+    - 这些阈值来自旧版内容的经验值，改动前要用真实数据回归。
+
+??? question "什么情况下必须触发重规划，而不是重试当前步骤？"
+    - 当前步骤成功但产出结构与预期不符时，后续步骤的输入假设已经不成立。
+    - 当前步骤失败且错误不可重试时，重试只会重复失败。
+    - 当前步骤失败且已达到重试次数上限时，继续重试没有意义。
+    - 这三种情况都要回到规划阶段，带上检查点只重排未完成部分。
+    - 最后一步失败时没有剩余步骤可重排，直接终止。
+
+??? question "计划校验为什么要把时间超限只记为警告？"
+    - 时间超限不改变计划的逻辑正确性，步骤与依赖依然成立。
+    - 人工调整参数或资源后，同一个计划仍可能按期完成。
+    - 把它当作硬错误会让计划被无谓地拒绝。
+    - 所以校验结果分成 errors 与 warnings，valid 只看 errors。
+    - 代价是调用方必须自己决定要不要处理 warnings，不能忽略这个字段。
+
+## 延伸阅读
+
+- LangChain 官方文档：Plan-and-Execute agents 章节
+- LangGraph 官方文档：规划-执行教程章节、持久化与恢复章节
+- Mermaid 官方文档：Flowchart 语法章节、Sequence Diagram 语法章节、State Diagram 语法章节
+- Node.js 官方文档：node:assert 章节
+- ReAct 论文原文（作者与编号需核对官方文档确认）
+- TypeScript 官方文档：Interface 章节、Discriminated Unions 章节

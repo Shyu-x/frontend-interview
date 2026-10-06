@@ -1,1464 +1,1308 @@
 ---
-title: RAG：原理与检索系统
-description: RAG 的核心原理与检索系统：向量检索、混合检索与重排序。
-tags:
-  - ai-agent
-  - rag
-date: 2026-05-17
+title: "RAG：原理与检索系统"
+description: "RAG 的核心原理与检索系统：向量检索、混合检索与重排序。"
 ---
 
 # RAG：原理与检索系统
 
-> 本文是「RAG」系列第 1 篇（共 4 篇）。下一篇：[RAG：知识库构建](rag-knowledge-base.md)
+!!! abstract "学完这一页你能"
 
-> 本文档全面解析 RAG（Retrieval Augmented Generation）的核心原理、系统架构、实践方法和前沿进展，适用于希望构建知识增强型 AI Agent 的开发者。
+- 说出 RAG 解决的 5 类模型失效，并为每类写出对应工程对策。
+- 画出离线索引与在线检索两条链路，指出各自的失败点。
+- 用 Node 20+ 写一个零依赖检索系统，跑通向量召回、BM25、RRF 融合与重排。
+- 判断一个需求该走 RAG、微调还是提示词工程，并写出判定依据。
 
-## 1. RAG 核心原理
-
-### 1.1 为什么需要 RAG
-
-大型语言模型（LLM）虽然具备强大的语言理解和生成能力，但存在以下固有局限：
-
-| 问题类型 | 具体表现 | RAG 解决方案 |
-|---------|---------|-------------|
-| **知识时效性** | 训练数据有截止日期，无法获取实时信息 | 实时检索最新文档 |
-| **知识边界** | 垂直领域知识不足或缺失 | 接入领域知识库 |
-| **幻觉问题** | 生成内容与事实不符 | 基于检索结果生成，减少虚构 |
-| **信息透明度** | 无法追溯答案来源 | 返回检索来源，增强可信度 |
-| **私有知识** | 企业内部数据无法用于训练 | 私有知识库检索 |
-
-**RAG 的核心价值**：在不修改模型权重的情况下，通过检索外部知识来增强模型的回答质量和准确性。
-
-### 1.2 RAG vs 微调（Fine-tuning）
-
-选择 RAG 还是微调是工程实践中的常见决策点：
+## 0. 知识地图
 
 ```mermaid
 flowchart TB
-    subgraph LLM["LLM 能力增强路径"]
-        direction LR
-        PE["Prompt Engineering<br/>成本最低 · 灵活性高 · 效果一般"] --> RAG["RAG<br/>成本适中 · 中等灵活性 · 效果好"] --> FT["Fine-tune<br/>成本最高 · 灵活性低 · 效果最好"]
-    end
-    classDef low-cost fill:#90EE90,color:#1d1d1f
-    classDef mid-cost fill:#FFD700,color:#1d1d1f
-    classDef high-cost fill:#FF6B6B,color:#1d1d1f
-    class PE low-cost
-    class RAG mid-cost
-    class FT high-cost
+    R0["RAG"] --> WHY["为什么需要 RAG"]
+    R0 --> CH["RAG 与微调的选择"]
+    R0 --> OFF["离线索引链路"]
+    R0 --> ON["在线检索链路"]
+    OFF --> CK["切分 Chunk"]
+    OFF --> EM["Embedding 编码"]
+    OFF --> DB["向量数据库写入"]
+    ON --> QP["查询处理"]
+    ON --> RC["召回"]
+    ON --> RK["重排序"]
+    ON --> SG["上下文组装与生成"]
+    RC --> VEC["向量检索"]
+    RC --> BM["BM25 关键词检索"]
+    VEC --> RRF["RRF 倒数排序融合"]
+    BM --> RRF
+    RRF --> RK
+    EM --> MD["Embedding 模型"]
+    DB --> IDX["ANN 索引结构"]
 ```
 
-#### 1.2.1 详细对比
+先读第 1、2 节，把"为什么做"和"该不该做"定下来。再读第 3 节，拿到两条链路的全局图。
 
-| 维度 | RAG | 微调 |
-|------|-----|------|
-| **数据需求** | 文档级数据，无需标注 | 需要高质量标注数据 |
-| **更新频率** | 高（实时更新知识库） | 低（需重新训练） |
-| **成本** | 索引 + 检索基础设施 | 训练算力 + 调参成本 |
-| **可解释性** | 高（可追溯文档来源） | 低（隐含在模型权重中） |
-| **幻觉抑制** | 强（基于检索内容生成） | 中等（依赖训练数据质量） |
-| **适用场景** | 知识问答、实时信息 | 风格迁移、任务特定优化 |
-| **延迟** | 增加检索延迟 | 无额外延迟 |
+第 4 到第 8 节是零件，可以按需跳读：做召回看第 5、7 节，做效果调优看第 6、7 节，做防幻觉看第 8 节。
 
-**决策建议**：
-- 需要频繁更新知识 → 选择 RAG
-- 需要特定输出风格 → 选择微调
-- 两者结合 → 最佳实践（先用 RAG 提供知识，再用微调优化响应）
+## 1. 为什么需要 RAG
 
-### 1.3 RAG 工作流程
+**先想一个问题**
+
+公司内部问答机器人被问"今年差旅报销上限是多少"。它答了一个 2019 年的数字。
+
+模型没有说谎，它只知道训练截止日期之前的事。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：RAG 让模型开卷答题，先查资料再落笔。
+    日常类比：律师上庭前翻案卷，结论来自案卷而不是记忆。
+    类比不成立的地方：律师会判断案卷的新旧真伪，检索器只按向量距离排序，案卷本身可能过期。
+
+!!! note "术语：RAG"
+    RAG（Retrieval Augmented Generation，检索增强生成）：先从外部知识库检索相关片段，再把片段拼进提示词交给大模型生成答案的整套流程。例子：用户问退款政策，系统先检索出《退款政策》第 2 节原文，再要求模型只依据该节作答。
+
+!!! note "术语：LLM"
+    LLM（Large Language Model，大语言模型）：在海量文本上训练、按已出现的词预测下一个词的神经网络。例子：输入一句问题，它逐个词吐出回答。
+
+**图解**
 
 ```mermaid
 flowchart TB
-    subgraph Online["在线检索阶段"]
-        direction LR
-        QI["Query Input<br/>用户输入"] --> QP["Query Process<br/>查询理解/意图识别"] --> RET["Retrieve<br/>向量相似度 Top-K"] --> RR["Rerank<br/>相关性重排过滤噪音"] --> SYN["Synth LLM<br/>生成最终回答"]
-        QI -.->|"用户输入自然语言"| QP
-        QP -.->|"生成检索向量"| RET
-        RET -.->|"初检结果"| RR
-        RR -.->|"精排结果"| SYN
-    end
-
-    subgraph Offline["索引构建阶段（离线）"]
-        direction LR
-        DS["Docs Source<br/>文档源"] --> EX["Extract Text<br/>文本提取"] --> CK["Chunk<br/>切分文本"] --> EM["Embed<br/>向量编码"] --> VS["Vector Store<br/>向量存储"]
-    end
+    P1["知识时效 训练有截止日期"] --> S["检索外部文档"]
+    P2["知识边界 垂直语料缺失"] --> S
+    P3["幻觉 生成与事实不符"] --> S
+    P4["来源不可追溯"] --> S
+    P5["私有数据不能进训练"] --> S
+    S --> O1["答案有依据"]
+    S --> O2["可标注来源"]
+    S --> O3["改库即可更新"]
 ```
 
-#### 1.3.1 各阶段详解
+1. 训练数据有截止日期，查不到新发生的事情，用检索补时效。
+2. 垂直领域语料不在训练集里，用领域知识库补边界。
+3. 模型会编造细节，用检索到的原文约束生成。
+4. 用户要看到出处，检索片段自带元数据可以一起返回。
+5. 企业私有数据不能拿去训练，放在自己的库里按需检索。
 
-**1. 查询处理（Query Processing）**
-```python
-class QueryProcessor:
-    """查询处理：理解用户意图，生成检索向量"""
-    
-    def __init__(self, embedding_model):
-        self.embedding_model = embedding_model
-        self.intent_classifier = load_intent_model()
-    
-    def process(self, query: str, conversation_history: list = None) -> dict:
-        """
-        处理查询输入
-        
-        Args:
-            query: 用户当前查询
-            conversation_history: 对话历史上下文
-        
-        Returns:
-            处理后的检索向量和元信息
-        """
-        # 1. 意图分类
-        intent = self.intent_classifier.predict(query)
-        
-        # 2. 查询扩展：融入对话历史
-        expanded_query = self._expand_query(query, conversation_history)
-        
-        # 3. 查询改写：处理模糊/口语化表达
-        rewritten_query = self._rewrite_query(expanded_query)
-        
-        # 4. 生成检索向量
-        embedding = self.embedding_model.encode(rewritten_query)
-        
-        return {
-            "original_query": query,
-            "expanded_query": expanded_query,
-            "rewritten_query": rewritten_query,
-            "embedding": embedding,
-            "intent": intent
-        }
-    
-    def _expand_query(self, query: str, history: list) -> str:
-        """基于对话历史扩展查询"""
-        if not history:
-            return query
-        
-        # 提取历史关键信息
-        context = " ".join([
-            f"用户说：{h['user']}，助手答：{h['assistant']}"
-            for h in history[-3:]
-        ])
-        
-        return f"上下文：{context}。当前问题：{query}"
-    
-    def _rewrite_query(self, query: str) -> str:
-        """查询改写：同义词替换、问题补全"""
-        # 简化的查询改写示例
-        rewrites = [
-            ("怎么做", "如何实现"),
-            ("啥是", "什么是"),
-            ("咋整", "怎么处理"),
-        ]
-        
-        result = query
-        for old, new in rewrites:
-            result = result.replace(old, new)
-        
-        return result
+**一步一步来**
+
+**第 1 步：把用户抱怨翻译成失效类型**
+
+这一步要做什么：抱怨都叫"答案不对"，但对策取决于它属于哪类失效。
+
+```js
+// 三类失效与对策的映射表
+function diagnose(issue) {
+  const table = {
+    stale: "知识过期：接入可随时更新的外部知识库",
+    domain: "领域缺失：接入垂直语料库",
+    citation: "来源缺失：返回检索片段的元数据",
+  };
+  // 未命中已知类型时给出兜底提示，避免静默返回错误建议
+  return table[issue] ?? "未知类型：先收集 10 条真实失败样例再判断";
+}
+
+console.log(diagnose("stale"));
 ```
 
-**2. 检索（Retrieval）**
-```python
-class RetrievalEngine:
-    """检索引擎：向量相似度搜索"""
+**这段代码在做什么**
 
-    # 第 1 段：初始化依赖与检索参数
-    # 这里采用"依赖注入"而非在内部 new 一个向量库：vector_store 由外部传入，
-    # 便于替换不同后端（FAISS/Chroma/pgvector）以及在测试中注入假实现。
-    # top_k 做成实例属性而非写死在 search 里，使同一引擎可按配置复用；
-    # 默认 10 是经验值，兼顾召回率与后续 LLM 的上下文预算。
-    def __init__(self, vector_store, top_k: int = 10):
-        self.vector_store = vector_store
-        self.top_k = top_k
+- 用一个对象字面量建立"失效类型 → 对策"映射。
+- `??` 是空值合并运算符，只在左侧为 `null` 或 `undefined` 时取右侧。
+- 返回自然语言对策，可以直接贴进需求文档。
+- 整个函数没有外部依赖，只有字符串处理。
+- `console.log` 用来观察单次调用结果。
 
-    # 第 2 段：对外检索入口——拿到原始命中再统一整形
-    # 关键数据流：查询向量 + 过滤条件 → 向量库返回 doc 对象列表 →
-    # 逐个映射成统一 dict（内容/元数据/距离/分数）返回给上层。
-    # filters 默认 None 而非 {}，避免可变默认参数的共享状态陷阱；
-    # 向量库一般把 None 视作"不过滤"，与"过滤条件为空"语义等价。
-    def search(self, embedding: np.ndarray, filters: dict = None) -> list[dict]:
-        """
-        执行向量检索
+**运行结果**
 
-        Args:
-            embedding: 查询向量
-            filters: 元数据过滤条件
+`知识过期：接入可随时更新的外部知识库`
 
-        Returns:
-            相关文档片段列表
-        """
-        # 把 top_k 与 filter 透传给底层库，由它决定用哪种索引做近邻搜索；
-        # 这里是唯一一次 I/O，复杂度取决于索引类型（HNSW/IVF 约 O(log n)，
-        # 暴力检索则是 O(n·d)，n 为库中文档数、d 为向量维度）。
-        results = self.vector_store.similarity_search(
-            embedding,
-            k=self.top_k,
-            filter=filters
-        )
+**动手验证**
 
-        # 第 3 段：结果标准化——屏蔽不同向量库的字段差异
-        # 上层只依赖这里定义的 dict 契约，换库时无需改调用方代码。
-        # 易错点：distance 越小越相近，而 score 是越大越相关，二者方向相反；
-        # 因此同时保留两者，排序/阈值判断时别用错字段。
-        return [
-            {
-                "content": doc.text,        # 正文片段，直接喂给下游 prompt
-                "metadata": doc.metadata,    # 来源、页码等，用于引用与去重
-                "distance": doc.distance,    # 原始距离，保持可追溯
-                "score": self._distance_to_score(doc.distance)  # 归一化相似度
-            }
-            for doc in results
-        ]
+下面把判定扩成一个带断言的完整脚本，直接 `node diagnose.mjs` 就能跑。
 
-    # 第 4 段：距离 → 相似度 的转换
-    # 仅对余弦距离成立：cos_distance ∈ [0, 2]，故 score ∈ [-1, 1]，
-    # 其中 1 表示完全同向、0 表示正交、负值表示方向相反。
-    # 边界条件：若向量已做过 L2 归一化，距离落在 [0, 2]，score 才稳定；
-    # 换成欧氏距离时此公式不适用，需另写 1/(1+d) 之类的映射。
-    def _distance_to_score(self, distance: float) -> float:
-        """将距离转换为相似度分数（0-1）"""
-        # 余弦距离转换为相似度
-        return 1 - distance
+```js
+// 依赖：Node 20+ 内置 node:assert，不需要 npm install
+import assert from "node:assert";
+
+const FAILURE_TO_FIX = {
+  stale: "检索外部知识库",
+  domain: "接入垂直语料库",
+  citation: "返回片段元数据",
+};
+
+function diagnose(issue) {
+  // 命中映射直接返回，未命中走兜底分支
+  return FAILURE_TO_FIX[issue] ?? "unknown";
+}
+
+assert.strictEqual(diagnose("stale"), "检索外部知识库");
+assert.strictEqual(diagnose("domain"), "接入垂直语料库");
+assert.strictEqual(diagnose("citation"), "返回片段元数据");
+assert.strictEqual(diagnose("other"), "unknown");
+console.log("4 条断言通过");
 ```
-**3. 重排序（Rerank）**
-```python
-# 第 1 段：类定义与模型加载方式（承载重排序所需的重型模型）
-class Reranker:
-    """检索结果重排序：提升相关性"""
 
-    # 交叉编码器（cross-encoder）与常见的双塔（bi-encoder）检索不同：它把 query 与 doc
-    # 拼在一起送进同一个 Transformer 做全交互注意力，因此精度高但无法预先建索引、
-    # 必须对每个候选逐一前向计算，延迟和成本远高于向量内积，所以只用于对少量召回结果精排。
-    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-12-v2"):
-        # 易错点：加载模型是重操作（数百 MB 权重 + 词表），此处放在构造函数里意味着
-        # 每次 Reranker(...) 都会重新加载；生产环境通常做成模块级单例或依赖注入复用。
-        self.model = load_cross_encoder(model_name)
+运行结果：
 
-    # 第 2 段：接口契约（用 docstring 固定输入输出语义，避免调用方误解返回结构）
-    def rerank(self, query: str, documents: list[str]) -> list[dict]:
-        """
-        使用交叉编码器重排序
-
-        Args:
-            query: 原始查询
-            documents: 检索到的文档列表
-
-        Returns:
-            重排序后的文档列表（含相关性分数）
-        """
-        # 第 3 段：构造成对样本并批量打分（数据流：documents -> pairs -> scores）
-        # 每个元素是 (query, doc) 元组，模型内部会自行拼接为 [CLS] query [SEP] doc [SEP]
-        # 并输出单个相关性 logit。predict 一次处理整批，避免逐条调用的 Python 层开销。
-        # 关键行注释：pairs 与 documents 按位置一一对应，scores[i] 就是 documents[i] 的分数。
-        pairs = [(query, doc) for doc in documents]
-        # 复杂度：时间 O(N) 次完整 Transformer 前向（N 为候选数），显存/内存峰值与 batch 大小成正比；
-        # 边界条件：documents 为空时 predict 传入空列表，需保证底层实现能返回空数组而非报错。
-        scores = self.model.predict(pairs)
-
-        # 第 4 段：按分数降序排列（对分数排序，但保留原始下标做回溯）
-        # np.argsort 默认升序返回的是「下标」而非分数，[::-1] 将其反转为降序。
-        # 之所以排下标而不是排 (score, doc) 元组，是因为后面还要用 idx 取回原始文本并暴露 original_index。
-        # 易错点：argsort 默认非稳定排序，分数完全相同的文档其相对顺序不保证稳定，
-        # 若业务依赖「同分时保持召回顺序」，应改用 kind="stable" 并额外反转比较键。
-        ranked_indices = np.argsort(scores)[::-1]
-
-        # 第 5 段：组装可序列化的返回结构（把 numpy 类型收敛成原生类型）
-        return [
-            {
-                "text": documents[idx],
-                # float(...) 是必要的类型转换：scores[idx] 是 numpy 标量，
-                # 直接返回会导致 json.dumps / 日志序列化失败。
-                "rerank_score": float(scores[idx]),
-                # 保留召回阶段的原始位置，方便与上游结果对齐、做 A/B 对比或调试排序变化。
-                "original_index": idx
-            }
-            for idx in ranked_indices
-        ]
 ```
-**4. 合成（Synthesis）**
-```python
-class RAGSynthesizer:
-    """RAG 合成器：结合检索内容生成回答"""
-
-    # 第 1 段：初始化与依赖注入
-    # 这里不做任何检索/生成动作，只保存协作者与配置，便于测试时注入 mock llm。
-    # max_context_tokens 是后续"上下文裁剪"的唯一预算来源，属于全局约束。
-    def __init__(self, llm, max_context_tokens: int = 4000):
-        self.llm = llm
-        self.max_context_tokens = max_context_tokens
-
-    # 第 2 段：对外主流程（模板方法式的三段式管线）
-    # 编排顺序固定为「选上下文 → 建提示词 → 调模型」，把易变逻辑下沉到私有方法，
-    # 使主流程保持稳定；conversation_history 默认 None 而不是 []，避免可变默认值共享。
-    def synthesize(
-        self,
-        query: str,
-        retrieved_docs: list[dict],
-        conversation_history: list = None
-    ) -> dict:
-        """
-        综合检索结果生成回答
-
-        Args:
-            query: 用户查询
-            retrieved_docs: 检索到的文档
-            conversation_history: 对话历史
-
-        Returns:
-            生成的回答和引用信息
-        """
-        # 1. 选择上下文窗口
-        # 先裁剪再拼提示词，是为了让 LLM 调用这条"贵路径"之前就完成预算控制。
-        context = self._select_context(query, retrieved_docs)
-
-        # 2. 构建提示词
-        prompt = self._build_prompt(query, context, conversation_history)
-
-        # 3. 生成回答
-        response = self.llm.generate(prompt)
-
-        # 返回值刻意带上 prompt_used：RAG 出问题时，最先要排查的就是喂给模型的原文。
-        # sources 由 context 反推而非直接透传 retrieved_docs，保证引用与真实入模内容一致。
-        return {
-            "answer": response.text,
-            "sources": self._extract_sources(context),
-            "prompt_used": prompt  # 可用于调试
-        }
-
-    # 第 3 段：上下文预算裁剪（token 上限内的贪心选择）
-    # 复杂度 O(n)，每个文档只估算一次 token；注意 query 参数在此实现中未参与打分，
-    # 说明这里假设 retrieved_docs 已由上游按相关性排序 —— 顺序即优先级。
-    def _select_context(self, query: str, docs: list[dict]) -> str:
-        """选择最相关的上下文（token 限制内）"""
-        context_parts = []
-        total_tokens = 0
-
-        for doc in docs:
-            doc_tokens = self._estimate_tokens(doc["content"])
-
-            # 易错点：这里是 break 而不是 continue。一旦某个文档放不下就整体停止，
-            # 后面的短文档即使装得下也会被丢弃；这样写换取了确定性，但会浪费预算。
-            if total_tokens + doc_tokens > self.max_context_tokens:
-                break
-
-            context_parts.append(doc["content"])
-            total_tokens += doc_tokens
-
-        # 用带分隔线的空行拼接，既给模型清晰的多文档边界，也方便下游按分隔符拆回来。
-        # 边界条件：docs 为空或全部超限时，返回空字符串，而非 None。
-        return "\n\n---\n\n".join(context_parts)
-
-    # 第 4 段：提示词构造（约束注入 + 多轮历史展开）
-    # 把"只依据参考资料、无信息要明说、要标注来源"写进 system 部分，
-    # 这是抑制幻觉的主要手段，属于提示词层面而非代码层面的防幻觉。
-    def _build_prompt(
-        self,
-        query: str,
-        context: str,
-        history: list = None
-    ) -> str:
-        """构建 RAG 提示词"""
-
-        # 模板里唯一的占位符是 {context}；其余花括号会与 str.format 冲突，故此处保持无花括号。
-        # 反过来说：如果以后要在模板里加大括号示例，必须先转义成 {{ }}，否则运行时 ValueError。
-        system_prompt = """你是一个知识助手，基于提供的参考资料回答用户问题。
-
-要求：
-1. 只使用参考资料中的信息回答，不要添加外部知识
-2. 如果参考资料中没有相关信息，明确指出这一点
-3. 回答时注明信息来源
-4. 保持回答简洁、有条理
-
-参考材料：
-{context}"""
-
-        user_message = f"问题：{query}"
-
-        # 有历史时把问题改写为"历史 + 当前问题"，让指代（如"它""上面那个"）可被消解；
-        # 注意只保留 user/assistant 两个键，历史过长会挤占上下文预算，此处未做截断。
-        if history:
-            history_text = "\n".join([
-                f"用户：{h['user']}\n助手：{h['assistant']}"
-                for h in history
-            ])
-            user_message = f"对话历史：\n{history_text}\n\n当前问题：{query}"
-
-        # 只在 system 部分做一次 format，user_message 保持原样拼接，
-        # 这样用户查询或历史里出现 { } 也不会触发格式化错误（同时避免了模板注入）。
-        return system_prompt.format(context=context) + "\n\n" + user_message
-
-    # 第 5 段：引用来源提取（当前为占位实现）
-    # 设计意图是从入模的 context 反查文档元数据；现在恒定返回空列表，
-    # 属于未完成逻辑：调用方拿到的 sources 永远为空，需按实际数据格式补齐解析。
-    def _extract_sources(self, context: str) -> list[dict]:
-        """从上下文中提取来源信息"""
-        # 从 metadata 中提取来源
-        sources = []
-        # 实现来源提取逻辑
-        return sources
-
-    # 第 6 段：token 估算（粗糙启发式）
-    # 用字符数乘以系数代替真实 tokenizer，零依赖、快，但只是上界估计：
-    # 对纯英文会高估（约 0.25 tokens/字符），混合文本误差更大；系数偏保守可避免超限。
-    def _estimate_tokens(self, text: str) -> int:
-        """估算 token 数量（简单估计：中文约 1.5 tokens/字）"""
-        # 边界条件：text 为空时返回 0；int() 向下取整，短文本可能被低估到 0。
-        return int(len(text) * 1.5)
+4 条断言通过
 ```
-## 2. 检索系统
 
-### 2.1 Embedding 模型
+**常见坑**
 
-Embedding 模型是将文本转换为向量的核心组件：
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 检索回来的片段答不上问题 | 问题属于知识库外的推理类任务 | 先确认库里确实有答案原文，再谈检索调优 |
+| 加了 RAG 后答案仍旧编造 | 提示词没写"只依据资料回答" | 把约束写进系统提示，并要求无信息时明说 |
+| 知识库更新了但答案没变 | 只改了源文档，没重跑索引链路 | 把索引重建做成可重复执行的任务 |
+
+**用在哪里**
+
+- 企业内部 Wiki 问答
+  - 业务背景：制度文档每季度更新，员工用自然语言提问。
+  - 怎么用：把这 5 类失效写进需求评审，先统计各占多少条。
+  - 指标：人工标注 100 条问题，统计答对比例与引用可点击比例。
+  - 不该用：问题需要跨文档做多步计算时，单轮检索答不好。
+- 电商客服退款政策问答
+  - 业务背景：政策按品类分版本，客服话术要能追溯到原文。
+  - 怎么用：用"来源缺失"这一条推动返回片段标题与生效日期。
+  - 指标：转人工率、引用被点击次数。
+  - 不该用：政策只有一句话且长期不变时，直接写进提示词更省事。
+
+**行业实践**
+
+- RRF 作为融合算法：Elasticsearch 官方文档的 Reciprocal rank fusion 章节、Azure AI Search 官方文档的 Hybrid search scoring 章节都实现了它。借鉴方式：先按文档给的默认参数跑通，再调权重，需核对官方文档确认默认值。
+- 上下文增强检索：Anthropic 工程博客的 Contextual Retrieval 文章提出在编码前给片段补一句上下文说明。借鉴方式：对切分后语义断裂的片段做一次补写，需核对官方文档确认成本结构。
+- 两阶段召回加精排：Pinecone 官方文档的 Reranking 章节、Cohere 官方文档的 Rerank 章节都把它作为标准配置。借鉴方式：召回阶段放宽候选条数，精排阶段再收敛，具体阈值需核对官方文档。
+
+**小结**
+
+- RAG 解决知识时效、边界、幻觉、来源、私有数据这 5 类问题。
+- 先判断失效类型，再选技术手段，顺序不能反。
+- 提示词里"只依据资料回答"是抑制幻觉的第一道约束。
+
+## 2. RAG 还是微调
+
+**先想一个问题**
+
+团队要把客服回复改成固定话术风格，同时政策文档每周更新。这是两件事，只选一个方案会顾此失彼。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：RAG 换的是模型看到什么，微调换的是模型怎么说话。
+    日常类比：RAG 给员工换一本最新的手册，微调把员工送去培训。
+    类比不成立的地方：培训会改掉员工已有的习惯，微调也可能让模型丢掉原有能力。
+
+!!! note "术语：微调"
+    微调（Fine-tuning）：用领域数据继续训练模型参数，让输出风格或任务表现向目标靠拢。例子：用 2000 条客服对话训练，让模型统一使用"已为您登记"这类话术。
+
+**图解**
 
 ```mermaid
 flowchart LR
-    subgraph Embedding["Embedding 模型"]
-        direction TB
-        Q[""什么是 JavaScript""] --> T["Tokenize<br/>分词"]
-        T --> E["Encode<br/>(Transformer)"]
-        E --> P["Project<br/>向量投影"]
-        P --> V["[0.23, -0.45, 0.89...]<br/>输出向量"]
-    end
-    O["输出维度：384 / 768 / 1024 / 1536 / 3072"]
+    A["提示词工程"] --> B["RAG"]
+    B --> C["微调"]
+    A --> A1["改的是输入"]
+    B --> B1["改的是知识来源"]
+    C --> C1["改的是模型参数"]
 ```
 
-#### 2.1.1 主流 Embedding 模型对比
+1. 提示词工程只改输入，上线成本最低，知识仍然来自模型参数。
+2. RAG 改知识来源，知识库变更后重新索引就生效。
+3. 微调改模型参数，风格与任务格式的稳定性来自训练。
+4. 三者可以叠加：先用 RAG 提供知识，再用微调固定风格。
 
-| 模型 | 维度 | 上下文 | 特点 | 适用场景 |
-|------|------|--------|------|----------|
-| **text-embedding-ada-002** | 1536 | 8192 | OpenAI 官方，稳定 | 通用场景 |
-| **text-embedding-3-small** | 256-3072 | 8192 | 轻量高性能 | 成本敏感 |
-| **text-embedding-3-large** | 256-3072 | 8192 | 高性能 | 精度优先 |
-| **BGE-large-zh** | 1024 | 512 | 中文优化 | 中文场景 |
-| **BAAI/bge-m3** | 1024 | 8192 | 多语言+稀疏 | 多语言场景 |
-| **E5-mistral-7b** | 1024 | 4096 | 高性能 | 精度优先 |
-| **GTE-large-zh** | 1024 | 512 | 阿里中文 | 中文场景 |
-| **NV-Embed-QA** | 4096 | 32K | 长上下文 | 长文档 |
+**一步一步来**
 
-#### 2.1.2 Embedding 实现
+**第 1 步：写一个路径判定函数**
 
-```python
-from sentence_transformers import SentenceTransformer
-import torch
+这一步要做什么：把业务事实翻译成技术路径，避免团队在方案上反复拉扯。
 
-class EmbeddingModel:
-    """Embedding 模型封装"""
-    
-    # 模型配置
-    MODEL_CONFIGS = {
-        "bge-large-zh": {
-            "path": "BAAI/bge-large-zh-v1.5",
-            "dimension": 1024,
-            "max_length": 512,
-            "normalize": True
-        },
-        "bge-m3": {
-            "path": "BAAI/bge-m3",
-            "dimension": 1024,
-            "max_length": 8192,
-            "normalize": True
-        },
-        "e5-base": {
-            "path": "intfloat/e5-base-v2",
-            "dimension": 768,
-            "max_length": 512,
-            "normalize": True
-        }
-    }
-    
-    def __init__(
-        self,
-        model_name: str = "bge-large-zh",
-        device: str = None,
-        batch_size: int = 32
-    ):
-        """
-        初始化 Embedding 模型
-        
-        Args:
-            model_name: 模型名称或本地路径
-            device: 运行设备（auto/cuda/cpu）
-            batch_size: 批处理大小
-        """
-        self.model_name = model_name
-        self.batch_size = batch_size
-        
-        # 自动设备选择
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = device
-        
-        # 加载模型
-        self.model = SentenceTransformer(
-            self.MODEL_CONFIGS.get(model_name, {}).get("path", model_name),
-            device=device
-        )
-        
-        # 模型配置
-        config = self.MODEL_CONFIGS.get(model_name, {})
-        self.dimension = config.get("dimension", self.model.get_sentence_embedding_dimension())
-        self.normalize = config.get("normalize", True)
-    
-    def encode(
-        self,
-        texts: str | list[str],
-        batch_size: int = None,
-        show_progress: bool = False
-    ) -> np.ndarray:
-        """
-        将文本编码为向量
-        
-        Args:
-            texts: 单个文本或文本列表
-            batch_size: 批大小（覆盖默认值）
-            show_progress: 是否显示进度
-        
-        Returns:
-            归一化的嵌入向量
-        """
-        if isinstance(texts, str):
-            texts = [texts]
-        
-        embeddings = self.model.encode(
-            texts,
-            batch_size=batch_size or self.batch_size,
-            show_progress_bar=show_progress,
-            normalize_embeddings=self.normalize,
-            convert_to_numpy=True
-        )
-        
-        return embeddings
-    
-    def encode_query(self, query: str) -> np.ndarray:
-        """
-        专门编码查询（某些模型需要特殊前缀）
-        
-        Args:
-            query: 查询文本
-        
-        Returns:
-            查询向量
-        """
-        # E5 系列模型需要 query 前缀
-        if "e5" in self.model_name.lower():
-            query = f"query: {query}"
-        
-        return self.encode(query)[0]
-    
-    def encode_corpus(
-        self,
-        corpus: list[str],
-        show_progress: bool = True
-    ) -> np.ndarray:
-        """
-        批量编码文档语料
-        
-        Args:
-            corpus: 文档列表
-            show_progress: 是否显示进度
-        
-        Returns:
-            文档向量矩阵
-        """
-        # E5 系列模型需要 passage 前缀
-        if "e5" in self.model_name.lower():
-            corpus = [f"passage: {doc}" for doc in corpus]
-        
-        return self.encode(corpus, show_progress=show_progress)
-    
-    def similarity(
-        self,
-        query_embedding: np.ndarray,
-        doc_embeddings: np.ndarray
-    ) -> np.ndarray:
-        """
-        计算查询与文档的相似度
-        
-        Args:
-            query_embedding: 查询向量 (d,)
-            doc_embeddings: 文档向量矩阵 (n, d)
-        
-        Returns:
-            相似度分数 (n,)
-        """
-        if self.normalize:
-            # 余弦相似度（已归一化，点积即相似度）
-            return np.dot(doc_embeddings, query_embedding)
-        else:
-            # 余弦相似度（未归一化）
-            from sklearn.metrics.pairwise import cosine_similarity
-            return cosine_similarity(
-                query_embedding.reshape(1, -1),
-                doc_embeddings
-            )[0]
+```js
+// 根据三个业务事实给出增强路径建议
+function pickPath(f) {
+  // 知识每周变，走 RAG，改库即可，不必重训
+  if (f.knowledgeChangesWeekly) return "RAG";
+  // 必须给出处，走 RAG，片段自带元数据
+  if (f.needCitation) return "RAG";
+  // 知识稳定但要固定话术，且有标注数据，走微调
+  if (f.needFixedTone && f.hasLabeledPairs) return "Fine-tuning";
+  // 以上都不满足时，先试提示词工程
+  return "Prompt Engineering";
+}
 ```
 
-### 2.2 向量数据库
+**这段代码在做什么**
 
-向量数据库是存储和检索高维向量的基础设施：
+- 入参是业务事实，不是技术指标。
+- 判断顺序体现优先级：更新频率高于可追溯性高于风格。
+- 微调分支要求同时满足"要固定风格"和"有标注数据"两个条件。
+- 都不满足时退回提示词工程，这是成本最低的起点。
+- 返回值是字符串，方便直接打印或写进文档。
+
+**运行结果**
+
+`pickPath({ knowledgeChangesWeekly: true })` → `"RAG"`
+
+**动手验证**
+
+```js
+// 依赖：Node 20+ 内置 node:assert
+import assert from "node:assert";
+
+// 每条规则是[条件函数, 结论]的二元组，顺序即优先级
+const RULES = [
+  [(f) => f.knowledgeChangesWeekly, "RAG"],
+  [(f) => f.needCitation, "RAG"],
+  [(f) => f.needFixedTone && f.hasLabeledPairs, "Fine-tuning"],
+];
+
+function pickPath(f) {
+  // find 返回第一条命中的规则，命中即取其结论
+  const hit = RULES.find(([cond]) => cond(f));
+  return hit ? hit[1] : "Prompt Engineering";
+}
+
+assert.strictEqual(pickPath({ knowledgeChangesWeekly: true }), "RAG");
+assert.strictEqual(pickPath({ needCitation: true }), "RAG");
+assert.strictEqual(pickPath({ needFixedTone: true, hasLabeledPairs: true }), "Fine-tuning");
+assert.strictEqual(pickPath({}), "Prompt Engineering");
+console.log("4 条断言通过");
+```
+
+运行结果：
+
+```
+4 条断言通过
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 微调后模型答不出新政策 | 知识进了参数，政策变了要重训 | 知识层交给 RAG，微调只负责风格 |
+| RAG 回答话术每次都不一样 | 风格约束不在提示词里 | 补上格式模板与示例 |
+| 两套都上了但效果没变 | 检索没命中，模型只能凭参数回答 | 先单测检索召回率，再谈微调 |
+
+**用在哪里**
+
+- 金融客服话术统一
+  - 业务背景：合规要求固定措辞，产品条款每季度更新。
+  - 怎么用：RAG 供条款原文，微调固定措辞模板。
+  - 指标：合规抽检通过率、条款引用准确率。
+  - 不该用：只有 1 个产品线且话术可枚举时，模板字符串就够。
+- 内部框架问答助手
+  - 业务背景：框架每周发版，文档和代码示例同步更新。
+  - 怎么用：走 RAG，指标看引用的文档版本是否为最新。
+  - 不该用：问题集中在 API 记忆类时，微调对格式的帮助更直接。
+
+**行业实践**
+
+- 组合用法：OpenAI 官方文档的 Fine-tuning 章节把"检索加微调"列为可选组合。借鉴方式：先上 RAG，把风格问题攒成清单，再决定是否微调，需核对官方文档确认支持的模型与数据格式。
+- 分段评估：LangSmith 官方文档的 Evaluation 章节提供检索与生成的分段评估。借鉴方式：把"检索命中"和"生成正确"拆成两个指标分别看，需核对官方文档确认指标口径。
+
+**小结**
+
+- RAG 管知识，微调管风格，提示词管格式。
+- 知识高频变化时优先 RAG，因为改库不用重训。
+- 组合方案的上线顺序是 RAG 在前、微调在后。
+
+## 3. 两阶段工作流：离线索引与在线检索
+
+**先想一个问题**
+
+你上传了 300 页产品手册，问"保修期多久"，系统返回了目录页。原因是文档按固定长度切块，检索命中了标题而不是正文。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：RAG 是两条流水线，离线把文档变成可检索的向量，在线把问题变成答案。
+    日常类比：图书馆先把书编目上架，读者来了才查目录取书。
+    类比不成立的地方：图书馆的目录由人编，向量索引由模型算，切分方式一变整个目录要重做。
+
+!!! note "术语：Chunk"
+    Chunk（切分块）：把长文档按规则切成的一段文本，是索引与检索的最小单位。例子：把 300 页手册按每段 500 字切开，每段附上页码与章节标题。
+
+**图解**
 
 ```mermaid
 flowchart TB
-    subgraph Databases["向量数据库生态"]
-        direction LR
-        P["Pinecone<br/>(云原生)"] & C["Chroma<br/>(轻量级)"] & F["FAISS<br/>(高效)"] & M["Milvus<br/>(大规模)"]
-        W["Weaviate<br/>(GraphQL)"] & Q["Qdrant<br/>(Rust)"] & PG["pgvector<br/>(PostgreSQL)"] & A["AstraDB<br/>(DataStax)"]
+    subgraph OFF["离线索引链路"]
+        D1["文档源"] --> D2["提取纯文本"]
+        D2 --> D3["切分为 Chunk"]
+        D3 --> D4["Embedding 编码"]
+        D4 --> D5["写入向量库 带元数据"]
     end
+    subgraph ON["在线检索链路"]
+        Q1["用户问题"] --> Q2["查询处理"]
+        Q2 --> Q3["召回 Top-K"]
+        Q3 --> Q4["重排序"]
+        Q4 --> Q5["组装上下文"]
+        Q5 --> Q6["生成答案与引用"]
+    end
+    D5 -.-> Q3
 ```
 
-#### 2.2.1 各向量数据库对比
+1. 离线链路只在文档变化时跑，产出向量库。
+2. 在线链路每次提问都跑，从向量库取片段。
+3. 两条链路通过向量库解耦，各自可以独立扩容。
+4. 离线链路的切分策略决定了在线链路能召回什么。
 
-| 数据库 | 类型 | 优势 | 劣势 | 适用规模 |
-|--------|------|------|------|----------|
-| **Pinecone** | 云服务 | 全托管、易用、免运维 | 付费、成本高 | 中大型项目 |
-| **Chroma** | 本地/云 | 轻量、API 简洁 | 功能有限 | 原型/小规模 |
-| **FAISS** | 本地库 | 高性能、GPU 加速 | 无分布式 | 中型项目 |
-| **Milvus** | 开源/云 | 功能全面、可扩展 | 运维复杂 | 大规模项目 |
-| **Qdrant** | 开源/云 | Rust 性能高、Filter 强 | 社区较小 | 中大型项目 |
-| **pgvector** | PostgreSQL 扩展 | 与现有 DB 集成 | 性能一般 | 已有 PG 环境 |
+**一步一步来**
 
-#### 2.2.2 Pinecone 实现
+**第 1 步：按窗口切分并保留重叠**
 
-```python
-import pinecone
-from pinecone import ServerlessSpec
+这一步要做什么：把长文档切成可独立检索的片段，同时避免句子被切断。
 
-# 第 1 段：定义封装类（对外暴露统一的向量库操作接口）
-# 用「组合」而非继承的方式包装 Pinecone 客户端：业务层只需依赖本类的方法，
-# 后续若要换成 Milvus/Qdrant，只替换本类实现即可，无需改动调用方。
-# 注意：索引句柄（pinecone.Index）是懒创建的，每次都按 index_name 重新取，
-# 这是为了兼容无状态/多进程场景，代价是多一次轻量查询。
-
-class PineconeVectorStore:
-    """Pinecone 向量数据库封装"""
-    
-    # 第 2 段：构造与全局初始化（绑定 API Key / 环境，并保存索引名）
-    # pinecone.init 是 SDK 的模块级全局配置，一旦调用就对后续所有操作生效；
-    # 因此同一进程内混用多个不同 api_key 的实例会互相覆盖，这是常见坑。
-    def __init__(
-        self,
-        api_key: str,
-        environment: str = "us-east-1",
-        index_name: str = "rag-index"
-    ):
-        """
-        初始化 Pinecone
-        
-        Args:
-            api_key: Pinecone API Key
-            environment: 环境区域
-            index_name: 索引名称
-        """
-        pinecone.init(api_key=api_key, environment=environment)
-        self.index_name = index_name
-    
-    # 第 3 段：创建索引（声明向量维度与距离度量）
-    # dimension 决定向量空间大小，必须与后续写入/查询向量严格一致，否则 upsert 会报维度不匹配；
-    # metric 影响 score 的语义："cosine" 越接近 1 越相似，"euclidean" 则越小越相似。
-    def create_index(
-        self,
-        dimension: int,
-        metric: str = "cosine",
-        spec: dict = None
-    ):
-        """
-        创建索引
-        
-        Args:
-            dimension: 向量维度
-            metric: 距离度量（cosine/euclidean/dotproduct）
-            spec: 索引规格配置
-        """
-        # 默认走 Serverless：按量付费、无需手动规划 Pod，适合中小规模 RAG；
-        # 若换成 pod 模式，需要自行传入额外容量参数。
-        if spec is None:
-            spec = ServerlessSpec(
-                cloud="aws",
-                region="us-east-1"
-            )
-        
-        # 幂等保护：create_index 对已存在的索引会抛异常，先 list 再创建可让该方法重复调用安全。
-        # 易错点：list_indexes() 返回的是索引名集合，名字写错会静默新建一个重复索引。
-        if self.index_name not in pinecone.list_indexes():
-            pinecone.create_index(
-                self.index_name,
-                dimension=dimension,
-                metric=metric,
-                spec=spec
-            )
-    
-    # 第 4 段：批量写入向量（upsert = 存在则更新，不存在则插入）
-    # 这里直接透传 vectors 而不做分批：单次请求体有大小/条数上限，
-    # 生产环境若一次塞入过多（如 >100 条或超大 metadata）容易被拒，需在调用侧切分。
-    # namespace 用于逻辑隔离（如按租户/知识库分片），同名 id 在不同 namespace 下互不冲突。
-    def upsert(self, vectors: list[dict], namespace: str = ""):
-        """
-        批量插入向量
-        
-        Args:
-            vectors: [{id, values, metadata}, ...]
-            namespace: 命名空间（用于数据隔离）
-        """
-        index = pinecone.Index(self.index_name)
-        index.upsert(vectors, namespace=namespace)
-    
-    # 第 5 段：向量相似度检索（ANN 近邻查询 + 元数据过滤）
-    # top_k 是「近似」结果数量而非全量排序，Pinecone 内部走 ANN 索引，召回率与延迟需权衡；
-    # include_metadata=True 才会把 metadata 一同带回，否则结果里只有 id 和 score。
-    def search(
-        self,
-        query_vector: list[float],
-        top_k: int = 10,
-        filter: dict = None,
-        namespace: str = ""
-    ) -> list[dict]:
-        """
-        向量相似度搜索
-        
-        Args:
-            query_vector: 查询向量
-            top_k: 返回数量
-            filter: 元数据过滤条件
-            namespace: 命名空间
-        
-        Returns:
-            检索结果
-        """
-        index = pinecone.Index(self.index_name)
-        
-        # filter 为 None 时交由 SDK 处理，等价于「不过滤」；
-        # filter 的字段必须是 metadata 中已存在的键，否则可能返回空结果。
-        results = index.query(
-            vector=query_vector,
-            top_k=top_k,
-            filter=filter,
-            namespace=namespace,
-            include_metadata=True
-        )
-        
-        # 统一输出结构：屏蔽 SDK 原始响应字段（如 values/namespace），只保留业务关心三项，
-        # 便于上层直接喂给 LLM 做 prompt 拼装。复杂度 O(top_k)。
-        return [
-            {
-                "id": match["id"],
-                "score": match["score"],
-                "metadata": match["metadata"]
-            }
-            for match in results["matches"]
-        ]
-    
-    # 第 6 段：按 id 删除向量（用于数据下架 / 重建前清理）
-    # 只删指定 id，不会动索引结构与其它 namespace；ids 为空列表时是空操作，不会清库。
-    def delete(self, ids: list[str], namespace: str = ""):
-        """删除向量"""
-        index = pinecone.Index(self.index_name)
-        index.delete(ids=ids, namespace=namespace)
-    
-    # 第 7 段：读取索引统计（用于监控健康度与容量）
-    # 返回包含各 namespace 的向量总数、维度等信息，常用来做「写入是否成功」的断言；
-    # 注意统计值存在秒级延迟，刚写完立即查询可能不反映最新数量。
-    def describe_index(self) -> dict:
-        """获取索引统计信息"""
-        index = pinecone.Index(self.index_name)
-        return index.describe_index_stats()
-```
-#### 2.2.3 Chroma 实现
-
-```python
-import chromadb
-from chromadb.config import Settings
-from typing import list
-
-# 第 1 段：依赖导入——锁定"客户端 + 配置 + 类型标注"三件套
-# why: PersistentClient 负责落盘、Settings 负责关掉匿名遥测（企业内网/离线环境必关，否则会向外部发请求）。
-# 易错点: typing 模块里并没有 list，正确写法是 from typing import List；
-#         一旦执行到这一行就会 ImportError，属于"抄示例时最容易踩的坑"。
-#         下方注解 list[str] 之所以看起来能用，是因为 Python 3.9+ 内置 list 已支持下标，与这行导入无关。
-
-class ChromaVectorStore:
-    """Chroma 向量数据库封装"""
-
-    # 第 2 段：角色定位——把 Chroma 的"客户端/集合"两级概念收敛成一个门面类
-    # why: 上层只需要一个对象，不关心 client 与 collection 的生命周期差异；
-    #      后续所有读写方法都转发到 self.collection，形成薄封装（thin wrapper），便于替换后端。
-    # 数据流: 调用方 -> ChromaVectorStore 方法 -> self.collection -> Chroma 客户端 -> 本地磁盘
-
-    def __init__(
-        self,
-        persist_directory: str = "./chroma_db",
-        collection_name: str = "documents"
-    ):
-        """
-        初始化 Chroma
-
-        Args:
-            persist_directory: 持久化目录
-            collection_name: 集合名称
-        """
-        # 第 3 段：建立持久化客户端——连接是复用的重资源，必须在构造期一次性建好
-        # why: PersistentClient 采用嵌入式模式，直接读写本地目录，无需单独起服务；
-        #      anonymized_telemetry=False 关闭匿名埋点，避免生产环境外联与隐私合规问题。
-        # 边界: 目录不存在时客户端会自动创建，路径权限不足才会在这里抛异常。
-        self.client = chromadb.PersistentClient(
-            path=persist_directory,
-            settings=Settings(anonymized_telemetry=False)
-        )
-        self.collection_name = collection_name
-        self.collection = self._get_or_create_collection()
-
-    # 第 4 段：集合获取——用 get_or_create 实现幂等初始化
-    # why: 同一进程重启、或多进程并发启动时，重复调用不应报错，因此不能只用 create_collection；
-    #      metadata 里的 "hnsw:space" 决定底层 HNSW 索引的度量方式，一旦集合已存在则此参数被忽略，
-    #      易错点: 想换距离度量必须删库重建，改代码参数对已有集合无效。
-    def _get_or_create_collection(self):
-        """获取或创建集合"""
-        return self.client.get_or_create_collection(
-            name=self.collection_name,
-            metadata={"hnsw:space": "cosine"}  # cosine 余弦距离
-        )
-
-    # 第 5 段：写入——批量新增（Upsert 语义之外的最纯粹插入路径）
-    # why: documents / ids / embeddings / metadatas 四个列表按下标一一对应，
-    #      长度不一致是最高频的运行时错误（Chroma 会直接拒绝整批写入，无部分成功）。
-    # 边界: embeddings 传 None 时，由 collection 绑定的 embedding function 自动向量化；
-    #       ids 必须全局唯一，重复 id 会覆盖或报错，取决于具体版本。
-    def add(
-        self,
-        documents: list[str],
-        ids: list[str],
-        embeddings: list[list[float]] = None,
-        metadatas: list[dict] = None
-    ):
-        """
-        添加文档
-
-        Args:
-            documents: 文档内容列表
-            ids: 文档 ID 列表
-            embeddings: 向量列表（可选，自动生成）
-            metadatas: 元数据列表
-        """
-        self.collection.add(
-            documents=documents,
-            ids=ids,
-            embeddings=embeddings,
-            metadatas=metadatas
-        )
-
-    # 第 6 段：检索——按向量近邻 + 结构化过滤的复合查询
-    # why: n_results 只限制返回条数，不保证距离阈值，所以"相关文档不足"时可能返回噪声；
-    #      where 作用于 metadata、where_document 作用于原文关键词，两者是"先过滤再近邻"还是
-    #      "先近邻再过滤"由 Chroma 内部策略决定，过滤条件过于苛刻时结果数可能少于 n_results。
-    # 复杂度: HNSW 近邻为近似检索，查询约 O(log N)，但过滤条件下的召回率会下降。
-    def query(
-        self,
-        query_embeddings: list[list[float]],
-        n_results: int = 10,
-        where: dict = None,
-        where_document: dict = None
-    ) -> dict:
-        """
-        查询相似文档
-
-        Args:
-            query_embeddings: 查询向量
-            n_results: 返回数量
-            where: 元数据过滤条件
-            where_document: 文档内容过滤
-
-        Returns:
-            查询结果
-        """
-        return self.collection.query(
-            query_embeddings=query_embeddings,
-            n_results=n_results,
-            where=where,
-            where_document=where_document
-        )
-
-    # 第 7 段：更新——按 id 局部覆盖，未传的字段保持原值
-    # why: 与 add 的区别在于"必须命中已存在的 id"，缺失 id 不会新建而会被忽略或报错；
-    #      注意只改 documents 而不同步 embeddings 时，向量仍指向旧内容，会造成检索语义漂移。
-    def update(
-        self,
-        ids: list[str],
-        documents: list[str] = None,
-        embeddings: list[list[float]] = None,
-        metadatas: list[dict] = None
-    ):
-        """更新文档"""
-        self.collection.update(
-            ids=ids,
-            documents=documents,
-            embeddings=embeddings,
-            metadatas=metadatas
-        )
-
-    # 第 8 段：删除——支持按 id 精确删与按 metadata 条件批量删
-    # 易错点: ids 与 where 都可为 None，若两者同时为 None，不同版本行为不一致
-    #         （可能清空整个集合，也可能直接报错），生产代码务必二选一显式传入。
-    def delete(self, ids: list[str] = None, where: dict = None):
-        """删除文档"""
-        self.collection.delete(ids=ids, where=where)
-
-    # 第 9 段：读取——按 id 或 metadata 取回原始记录（不含相似度计算）
-    # why: get 是"确定性取数"，与 query 的"近似检索"互补，常用于更新前回显或删除前校验；
-    #      返回结构同样按 id 分组，注意它不会返回 distance 字段。
-    def get(self, ids: list[str] = None, where: dict = None) -> dict:
-        """获取文档"""
-        return self.collection.get(ids=ids, where=where)
-```
-#### 2.2.4 FAISS 实现
-
-```python
-import faiss
-import numpy as np
-
-class FAISSVectorStore:
-    """FAISS 向量数据库封装"""
-    
-    def __init__(
-        self,
-        dimension: int,
-        index_type: str = "IVFFlat",
-        nlist: int = 100
-    ):
-        """
-        初始化 FAISS
-        
-        Args:
-            dimension: 向量维度
-            index_type: 索引类型
-                - "Flat": 精确检索（小规模）
-                - "IVFFlat": 倒排索引（中等规模）
-                - "HNSW": 图索引（高性能）
-                - "IVFPQ": 量化为索引（大规模）
-            nlist: IVF 聚类中心数
-        """
-        self.dimension = dimension
-        self.index_type = index_type
-        self.nlist = nlist
-        
-        # 存储原始向量和元数据
-        self.id_to_text = {}
-        self.id_to_metadata = {}
-        self.current_id = 0
-        
-        # 构建索引
-        self.index = self._build_index()
-    
-    def _build_index(self):
-        """构建索引"""
-        if self.index_type == "Flat":
-            # 精确检索（暴力搜索）
-            return faiss.IndexFlatIP(self.dimension)  # 内积（需要归一化向量）
-        
-        elif self.index_type == "IVFFlat":
-            # 倒排文件索引
-            quantizer = faiss.IndexFlatIP(self.dimension)
-            index = faiss.IndexIVFFlat(quantizer, self.dimension, self.nlist)
-            return index
-        
-        elif self.index_type == "HNSW":
-            # 分层可导航小世界图
-            index = faiss.IndexHNSWFlat(self.dimension, 32)  # 32 为 M 参数
-            return index
-        
-        elif self.index_type == "IVFPQ":
-            # 乘积量化
-            quantizer = faiss.IndexFlatIP(self.dimension)
-            m = 16  # 子向量数
-            nbits = 8  # 每子向量位数
-            index = faiss.IndexIVFPQ(quantizer, self.dimension, self.nlist, m, nbits)
-            return index
-        
-        else:
-            raise ValueError(f"Unsupported index type: {self.index_type}")
-    
-    def train(self, vectors: np.ndarray):
-        """训练索引（IVF/PQ 索引需要训练）"""
-        if not self.index.is_trained:
-            vectors = vectors.astype('float32')
-            self.index.train(vectors)
-    
-    def add(
-        self,
-        vectors: np.ndarray,
-        texts: list[str],
-        metadatas: list[dict] = None
-    ):
-        """
-        添加向量
-        
-        Args:
-            vectors: numpy 向量数组 (n, d)
-            texts: 文本列表
-            metadatas: 元数据列表
-        """
-        vectors = vectors.astype('float32')
-        
-        # 训练索引
-        if not self.index.is_trained:
-            self.train(vectors)
-        
-        # 添加到索引
-        self.index.add(vectors)
-        
-        # 存储元数据
-        for i, text in enumerate(texts):
-            doc_id = str(self.current_id)
-            self.id_to_text[doc_id] = text
-            self.id_to_metadata[doc_id] = metadatas[i] if metadatas else {}
-            self.current_id += 1
-    
-    def search(
-        self,
-        query_vector: np.ndarray,
-        k: int = 10
-    ) -> list[dict]:
-        """
-        搜索相似向量
-        
-        Args:
-            query_vector: 查询向量
-            k: 返回数量
-        
-        Returns:
-            搜索结果
-        """
-        query_vector = query_vector.astype('float32').reshape(1, -1)
-        
-        if self.index_type == "IVFFlat" and not self.index.is_trained:
-            self.index.nprobe = 10  # 搜索的聚类中心数
-        
-        distances, indices = self.index.search(query_vector, k)
-        
-        results = []
-        for dist, idx in zip(distances[0], indices[0]):
-            if idx >= 0:  # FAISS 返回 -1 表示无效
-                doc_id = str(idx)
-                results.append({
-                    "id": doc_id,
-                    "text": self.id_to_text.get(doc_id, ""),
-                    "metadata": self.id_to_metadata.get(doc_id, {}),
-                    "distance": float(dist),
-                    "score": float(1 / (1 + dist))  # 转换为相似度
-                })
-        
-        return results
-    
-    def save(self, path: str):
-        """保存索引到磁盘"""
-        faiss.write_index(self.index, path)
-        
-        # 保存元数据
-        import json
-        metadata = {
-            "id_to_text": self.id_to_text,
-            "id_to_metadata": self.id_to_metadata,
-            "current_id": self.current_id,
-            "dimension": self.dimension,
-            "index_type": self.index_type
-        }
-        with open(f"{path}.meta", "w", encoding="utf-8") as f:
-            json.dump(metadata, f, ensure_ascii=False)
-    
-    @classmethod
-    def load(cls, path: str) -> "FAISSVectorStore":
-        """从磁盘加载索引"""
-        index = faiss.read_index(path)
-        
-        # 加载元数据
-        import json
-        with open(f"{path}.meta", "r", encoding="utf-8") as f:
-            metadata = json.load(f)
-        
-        store = cls(
-            dimension=metadata["dimension"],
-            index_type=metadata["index_type"]
-        )
-        store.index = index
-        store.id_to_text = metadata["id_to_text"]
-        store.id_to_metadata = metadata["id_to_metadata"]
-        store.current_id = metadata["current_id"]
-        
-        return store
+```js
+// 固定窗口切分，相邻块保留 overlap 个字
+function chunk(text, size = 500, overlap = 50) {
+  // 参数校验放在最前面，避免步长非正导致死循环
+  if (overlap >= size) throw new Error("overlap 必须小于 size");
+  const out = [];
+  // step 是窗口每次前进的距离
+  const step = size - overlap;
+  for (let i = 0; i < text.length; i += step) {
+    // slice 超出长度时自动截断，最后一块可以短于 size
+    out.push({ text: text.slice(i, i + size), start: i });
+  }
+  return out;
+}
 ```
 
-### 2.3 混合检索
+**这段代码在做什么**
 
-混合检索结合多种检索方式以获得更好的效果：
+- `size` 是每块的目标字数，`overlap` 是相邻块的重叠字数。
+- `step` 等于 `size - overlap`，决定窗口滑动的步长。
+- 循环用 `i += step`，`i` 超过文本长度时结束。
+- 每块记录 `start` 偏移，方便回填页码与定位。
+- 重叠的作用是让跨块的句子至少完整出现在一块里。
+- 参数校验放最前面，把错误挡在循环之外。
 
-```mermaid
-flowchart TB
-    Q["Query"] --> SEM["Semantic Search<br/>(向量检索)"]
-    Q --> KWD["Keyword Search<br/>(BM25/TF-IDF)"]
-    Q --> FLT["Filter Conditions<br/>(元数据)"]
+**运行结果**
 
-    SEM --> RRF["Reciprocal Rank Fusion<br/>(RRF) 倒数排序融合"]
-    KWD --> RRF
-    FLT --> RRF
+`chunk("abcdefghij", 4, 1)` 返回 3 块，起始偏移分别是 0、3、6。
 
-    RRF --> MR["Merged Results"]
+**动手验证**
+
+```js
+// 依赖：Node 20+ 内置 node:assert
+import assert from "node:assert";
+
+function chunk(text, size = 500, overlap = 50) {
+  // 步长必须为正，否则 for 循环原地打转
+  if (overlap >= size) throw new Error("overlap 必须小于 size");
+  const out = [];
+  const step = size - overlap;
+  for (let i = 0; i < text.length; i += step) {
+    out.push({ text: text.slice(i, i + size), start: i });
+  }
+  return out;
+}
+
+const parts = chunk("abcdefghij", 4, 1);
+assert.strictEqual(parts.length, 3);
+assert.strictEqual(parts[0].text, "abcd");
+assert.strictEqual(parts[1].text, "defg");
+assert.strictEqual(parts[1].start, 3);
+console.log("4 条断言通过，共", parts.length, "块");
 ```
 
-#### 2.3.1 Reciprocal Rank Fusion (RRF)
+运行结果：
 
-```python
-import numpy as np
-from rank_bm25 import BM25Okapi
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-class HybridRetriever:
-    """混合检索器：结合语义检索和关键词检索"""
-    
-    def __init__(
-        self,
-        vector_store,
-        embedding_model,
-        k1: float = 1.2,  # BM25 参数
-        b: float = 0.75,  # BM25 长度归一化
-        rrf_k: int = 60   # RRF 参数
-    ):
-        """
-        初始化混合检索器
-        
-        Args:
-            vector_store: 向量数据库
-            embedding_model: Embedding 模型
-            k1, b: BM25 参数
-            rrf_k: RRF 融合参数
-        """
-        self.vector_store = vector_store
-        self.embedding_model = embedding_model
-        self.k1 = k1
-        self.b = b
-        self.rrf_k = rrf_k
-        
-        # BM25 组件
-        self.bm25: BM25Okapi = None
-        self.corpus_tokenized: list[list[str]] = None
-        self.corpus_texts: list[str] = None
-        self.corpus_ids: list[str] = None
-    
-    def index(self, documents: list[dict]):
-        """
-        索引文档
-        
-        Args:
-            documents: [{id, text, metadata}, ...]
-        """
-        # 1. 向量索引
-        texts = [doc["text"] for doc in documents]
-        embeddings = self.embedding_model.encode_corpus(texts)
-        
-        vectors = [
-            {"id": doc["id"], "values": emb.tolist(), "metadata": doc.get("metadata", {})}
-            for doc, emb in zip(documents, embeddings)
-        ]
-        self.vector_store.upsert(vectors)
-        
-        # 2. BM25 索引
-        self.corpus_ids = [doc["id"] for doc in documents]
-        self.corpus_texts = texts
-        self.corpus_tokenized = [self._tokenize(text) for text in texts]
-        self.bm25 = BM25Okapi(self.corpus_tokenized)
-    
-    def search(
-        self,
-        query: str,
-        top_k: int = 10,
-        filters: dict = None,
-        semantic_weight: float = 0.5,
-        keyword_weight: float = 0.5
-    ) -> list[dict]:
-        """
-        混合搜索
-        
-        Args:
-            query: 查询文本
-            top_k: 返回数量
-            filters: 元数据过滤
-            semantic_weight: 语义检索权重
-            keyword_weight: 关键词检索权重
-        
-        Returns:
-            融合后的结果
-        """
-        # 1. 语义检索
-        query_embedding = self.embedding_model.encode_query(query)
-        semantic_results = self.vector_store.search(
-            query_vector=query_embedding.tolist(),
-            top_k=top_k * 2,  # 多检索一些用于融合
-            filter=filters
-        )
-        
-        # 2. 关键词检索
-        keyword_results = self._bm25_search(query, top_k * 2)
-        
-        # 3. RRF 融合
-        fused_results = self._rrf_fusion(
-            semantic_results,
-            keyword_results,
-            top_k,
-            semantic_weight,
-            keyword_weight
-        )
-        
-        return fused_results
-    
-    def _bm25_search(self, query: str, top_k: int) -> list[dict]:
-        """BM25 关键词检索"""
-        if self.bm25 is None:
-            return []
-        
-        query_tokens = self._tokenize(query)
-        scores = self.bm25.get_scores(query_tokens)
-        
-        # 获取 Top-K
-        top_indices = np.argsort(scores)[::-1][:top_k]
-        
-        return [
-            {
-                "id": self.corpus_ids[idx],
-                "text": self.corpus_texts[idx],
-                "score": float(scores[idx])
-            }
-            for idx in top_indices if scores[idx] > 0
-        ]
-    
-    def _rrf_fusion(
-        self,
-        semantic_results: list[dict],
-        keyword_results: list[dict],
-        top_k: int,
-        semantic_weight: float,
-        keyword_weight: float
-    ) -> list[dict]:
-        """
-        倒数排序融合 (RRF)
-        
-        RRF 公式: RRF(d) = Σ 1/(k + rank(d))
-        
-        Args:
-            semantic_results: 语义检索结果
-            keyword_results: 关键词检索结果
-            top_k: 返回数量
-            semantic_weight: 语义权重
-            keyword_weight: 关键词权重
-        
-        Returns:
-            融合后的结果
-        """
-        # 构建排名字典
-        semantic_ranks = {
-            r["id"]: (i + 1) for i, r in enumerate(semantic_results)
-        }
-        keyword_ranks = {
-            r["id"]: (i + 1) for i, r in enumerate(keyword_results)
-        }
-        
-        # 获取所有文档 ID
-        all_ids = set(semantic_ranks.keys()) | set(keyword_ranks.keys())
-        
-        # 计算 RRF 分数
-        rrf_scores = {}
-        for doc_id in all_ids:
-            s_rank = semantic_ranks.get(doc_id, float('inf'))
-            k_rank = keyword_ranks.get(doc_id, float('inf'))
-            
-            s_rrf = semantic_weight / (self.rrf_k + s_rank) if s_rank != float('inf') else 0
-            k_rrf = keyword_weight / (self.rrf_k + k_rank) if k_rank != float('inf') else 0
-            
-            rrf_scores[doc_id] = s_rrf + k_rrf
-        
-        # 排序并返回结果
-        sorted_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
-        
-        # 构建结果（保留原始文本）
-        id_to_text = {}
-        for r in semantic_results:
-            id_to_text[r["id"]] = r.get("text", "")
-        for r in keyword_results:
-            if r["id"] not in id_to_text:
-                id_to_text[r["id"]] = r.get("text", "")
-        
-        return [
-            {
-                "id": doc_id,
-                "text": id_to_text.get(doc_id, ""),
-                "rrf_score": rrf_scores[doc_id],
-                "semantic_rank": semantic_ranks.get(doc_id),
-                "keyword_rank": keyword_ranks.get(doc_id)
-            }
-            for doc_id in sorted_ids[:top_k]
-        ]
-    
-    def _tokenize(self, text: str) -> list[str]:
-        """简单分词（中文按字符，英文按空格）"""
-        import re
-        # 简单处理：中文按字符，英文按空格和标点
-        tokens = re.findall(r'[一-鿿]|[a-zA-Z]+', text)
-        return tokens
+```
+4 条断言通过，共 3 块
 ```
 
-### 2.4 重排序
+**常见坑**
 
-重排序（Rerank）是在初检基础上进一步提升结果相关性的关键步骤：
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 每块都从半句话开始 | 按固定字数切，不看句子边界 | 先在句号与换行处切，再合并到目标字数 |
+| 检索总是命中目录页 | 标题短，和问题词面接近 | 切分时把章节标题拼到每个子块开头 |
+| 改了源文档但检索结果没变 | 只重跑了半条链路 | 把切分到写入做成一个幂等任务，重跑全量 |
+
+**用在哪里**
+
+- 产品说明书问答
+  - 业务背景：手册按章节组织，用户问的是具体参数。
+  - 怎么用：按章节切分，把章节标题写进每块开头。
+  - 指标：抽样 50 个问题，统计首条召回块是否含答案原句。
+  - 不该用：文档只有 2 页且结构清晰时，整篇塞进上下文即可。
+- 合同条款检索
+  - 业务背景：条款有编号，漏掉一条会有法律风险。
+  - 怎么用：切分时保留条款编号，重叠长度设为整条条款长度。
+  - 指标：条款编号命中率。
+  - 不该用：条款之间强耦合时，按整章切分再靠重排收敛。
+
+**行业实践**
+
+- 语义切分：LlamaIndex 官方文档的 Node Parser 章节提供按句子与语义边界的切分器。借鉴方式：先用固定窗口跑通，再针对"跨块断裂"的样例换语义切分，需核对官方文档确认可用切分器清单。
+- 上下文补写：Anthropic 工程博客的 Contextual Retrieval 文章提出在编码前给每块补一句它属于哪份文档哪一节。借鉴方式：对目录页与正文混杂的语料做一次补写。
+
+**小结**
+
+- 离线索引与在线检索通过向量库解耦。
+- 切分粒度决定召回上限，重叠是补断裂的手段。
+- 索引任务要做成可重复执行，否则更新会漏。
+
+## 4. Embedding 模型：把文本变成向量
+
+**先想一个问题**
+
+用户问"怎么退押金"，知识库里写的是"保证金退还流程"。字面没有一个词重合，纯关键词检索会漏掉这条。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：Embedding 把文本映射到高维空间，语义接近的文本距离近。
+    日常类比：把每句话在地图上标一个点，找答案就是找离你最近的点。
+    类比不成立的地方：地图是二维的，向量有几百到几千维，坐标轴没有可读含义。
+
+!!! note "术语：Embedding"
+    Embedding（嵌入向量）：由模型输出的定长浮点数组，用来表示一段文本的语义。例子：一句话被编码成长度 1024 的数组，两条数组的余弦相似度越高表示语义越接近。
+
+**图解**
 
 ```mermaid
 flowchart LR
-    Q["Query"] --> VDB["Vector DB<br/>(Top-100)"]
-    VDB --> RR["Reranker<br/>(Cross-Encoder)"]
-    RR --> TOP["Top K"]
-
-    S1["Stage 1: 高效但粗糙的向量检索"] --> S2["Stage 2: 精确但耗时的交叉编码器重排"]
+    T["文本 怎么退押金"] --> TK["分词 Tokenize"]
+    TK --> EN["编码 Encode"]
+    EN --> PR["投影 Project"]
+    PR --> V["向量 0.23 -0.45 0.89"]
+    V --> C["余弦相似度比较"]
 ```
 
-#### 2.4.1 Cross-Encoder 重排序实现
+1. 分词把文本切成模型词表里的 token 序列。
+2. 编码器把 token 序列变成上下文相关的表示。
+3. 投影层把表示压到固定维度，得到一条定长向量。
+4. 比较时对两条向量算余弦相似度，值越接近 1 表示方向越一致。
 
-```python
-from sentence_transformers import CrossEncoder
-import numpy as np
+常见模型的维度与上下文长度，来源为本站 RAG 旧版页面，以原文为准。
 
-# 第 1 段：模块依赖与类声明（引入交叉编码器与数值库）
-# CrossEncoder 会同时把 query 和 doc 拼成一条序列送进 Transformer，让两段文本
-# 在注意力层内部互相看见，因此精度远高于双塔向量点积，但代价是无法预计算文档向量，
-# 每次检索都必须在线跑一遍模型，属于典型的"用算力换准确率"。
-class Reranker:
-    """交叉编码器重排序"""
+| 模型 | 输出维度 | 最大上下文 |
+|---|---|---|
+| text-embedding-ada-002 | 1536 | 8192 |
+| text-embedding-3-small | 256 至 3072 | 8192 |
+| BGE-large-zh | 1024 | 512 |
+| BAAI/bge-m3 | 1024 | 8192 |
+| E5-mistral-7b | 1024 | 4096 |
+| GTE-large-zh | 1024 | 512 |
+| NV-Embed-QA | 4096 | 32K |
 
-    # 第 2 段：内置重排模型的别名表（把易记的短名映射为 HuggingFace 仓库名）
-    # 这里三个 ms-marco 别名都指向同一个权重，明显是历史遗留/占位写法：按别名取模型时
-    # 并不会因为选了 "ms-marco-large" 就真的加载到更大模型，教学时应留意这个坑。
-    # 用 dict + get(默认回退到原名) 的好处是既支持别名，也支持用户直接传本地路径。
-    # 常用重排模型
-    RERANK_MODELS = {
-        "ms-marco": "cross-encoder/ms-marco-MiniLM-L-12-v2",
-        "ms-marco-large": "cross-encoder/ms-marco-MiniLM-L-12-v2",
-        "ms-marco-deberta": "cross-encoder/ms-marco-MiniLM-L-12-v2",
-        "bge-reranker": "BAAI/bge-reranker-large",
-        "bge-reranker-base": "BAAI/bge-reranker-base"
+**一步一步来**
+
+**第 1 步：实现哈希向量与余弦相似度**
+
+这一步要做什么：不装模型也能验证检索链路，用哈希把字组合映射到固定维度。
+
+```js
+// 用相邻两字的组合做哈希，得到固定维度的向量
+function embed(text, dim = 64) {
+  const vec = new Array(dim).fill(0);
+  for (let i = 0; i < text.length - 1; i++) {
+    // 相邻两字组成一个 gram，覆盖中文短词的常见切法
+    const gram = text.slice(i, i + 2);
+    let h = 0;
+    // 多项式哈希，把 gram 映射到 0 到 dim-1 之间
+    for (const ch of gram) h = (h * 31 + ch.codePointAt(0)) % dim;
+    vec[h] += 1;
+  }
+  return vec;
+}
+
+// 余弦相似度：点积除以两条向量长度之积
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  // 分母为 0 时兜底为 1，避免零向量产生 NaN
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+```
+
+**这段代码在做什么**
+
+- `embed` 输出长度固定为 `dim` 的数组，非零位置由哈希决定。
+- 哈希用 31 进制累加再对 `dim` 取模，保证下标落在范围内。
+- 相同的字组合会落到同一维，累加后形成词频特征。
+- `cosine` 返回余弦相似度，取值在 -1 到 1 之间。
+- 分母用 `|| 1` 兜底，防止零向量导致除以 0。
+- 两个函数都是纯函数，可以直接写断言。
+
+**运行结果**
+
+`cosine(embed("怎么退押金"), embed("押金怎么退"))` 返回一个接近 1 的值，因为两次的字组合重合度高。
+
+**动手验证**
+
+```js
+// 依赖：Node 20+ 内置 node:assert
+import assert from "node:assert";
+
+function embed(text, dim = 64) {
+  const vec = new Array(dim).fill(0);
+  for (let i = 0; i < text.length - 1; i++) {
+    const gram = text.slice(i, i + 2);
+    let h = 0;
+    for (const ch of gram) h = (h * 31 + ch.codePointAt(0)) % dim;
+    vec[h] += 1;
+  }
+  return vec;
+}
+
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+
+const q1 = embed("怎么退押金");
+const q2 = embed("押金怎么退");
+const q3 = embed("发票怎么开");
+
+// 语序变化的两句，相似度应高于完全不相关的一句
+assert.ok(cosine(q1, q2) > cosine(q1, q3));
+// 同一条向量与自己的相似度恒为 1
+assert.strictEqual(Number(cosine(q1, q1).toFixed(6)), 1);
+console.log("2 条断言通过", cosine(q1, q2).toFixed(4), cosine(q1, q3).toFixed(4));
+```
+
+运行结果：打印两个相似度数值，第一个大于第二个，并输出"2 条断言通过"。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 中文短查询检索效果差 | 只按单字建特征，丢了词序信息 | 改用相邻两字或引入真实嵌入模型 |
+| 换模型后旧向量全失效 | 不同模型的向量空间不通用 | 换模型必须重建全量索引 |
+| 相似度出现 NaN | 某条文本的向量全为 0 | 在余弦函数里兜底，或跳过空文本 |
+| 长文档被截断 | 超过模型最大上下文长度 | 先切分再编码，单块长度低于上限 |
+
+**用在哪里**
+
+- 站内搜索的语义兜底
+  - 业务背景：用户用口语提问，商品标题是标准品名。
+  - 怎么用：向量检索兜住字面不重合的查询，关键词检索兜住型号词。
+  - 指标：首条命中率按查询类型分组统计。
+  - 不该用：查询几乎都是精确型号时，结构化字段匹配就够。
+- 相似工单聚合
+  - 业务背景：客服每天收到大量重复问题，需要归并。
+  - 怎么用：对工单标题编码后做近邻聚类。
+
+**行业实践**
+
+- 查询与文档加不同前缀：BAAI 官方文档的 bge 系列模型说明里提到，检索任务需要在查询侧加指令前缀。借鉴方式：查询与文档走两条编码函数，需核对官方文档确认前缀写法。
+- 归一化后再比：Sentence Transformers 官方文档的 Semantic Textual Similarity 章节把归一化加余弦作为默认组合。借鉴方式：编码时统一开启归一化，检索时用点积代替余弦，需核对官方文档确认参数名。
+
+**小结**
+
+- Embedding 把语义相近的文本放到相近的位置。
+- 同一索引里只能用一个模型，换模型就要重建。
+- 向量维度、最大上下文、是否需要前缀，是选型时先看的三项。
+
+## 5. 向量数据库与 ANN 索引
+
+**先想一个问题**
+
+知识库有 200 万条片段，每次提问都和全部片段算一遍相似度，单次响应超过 10 秒。需要近似最近邻索引。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：ANN 索引用一点召回率换取速度上的数量级提升。
+    日常类比：查字典不逐页翻，先按部首定位再到那一小段里找。
+    类比不成立的地方：字典定位一定准确，ANN 是近似的，可能漏掉真正最近的那一条。
+
+!!! note "术语：ANN"
+    ANN（Approximate Nearest Neighbor，近似最近邻）：用索引结构快速找出与查询向量接近的一批候选，不保证返回全局最近的那条。例子：在 200 万条向量里，ANN 返回 10 条候选，其中可能漏掉 1 条真实最近邻。
+
+**图解**
+
+```mermaid
+flowchart TB
+    Q["查询向量"] --> BR["选择索引类型"]
+    BR -->|"数据量小于 10 万"| F["Flat 暴力比对"]
+    BR -->|"中等规模"| IV["IVFFlat 倒排聚类"]
+    BR -->|"低延迟要求"| HN["HNSW 分层图"]
+    BR -->|"超大规模"| PQ["IVFPQ 乘积量化"]
+    F --> RC["返回 Top-K"]
+    IV --> RC
+    HN --> RC
+    PQ --> RC
+```
+
+1. Flat 与全部向量比对，结果精确，耗时随向量条数线性增长。
+2. IVFFlat 先把向量聚成若干簇，查询时只扫描其中几簇。
+3. HNSW 建多层图，从上层快速接近目标再逐层下降。
+4. IVFPQ 把向量切段量化，用更少字节表示每条向量。
+5. 四条路径都输出 Top-K 候选，交给后续重排。
+
+常见向量库的定位，来源为本站 RAG 旧版页面，以原文为准。
+
+| 数据库 | 类型 | 适用规模 |
+|---|---|---|
+| Pinecone | 云服务，全托管 | 中大型项目 |
+| Chroma | 本地或云，API 简洁 | 原型与小规模 |
+| FAISS | 本地库，支持 GPU | 中型项目 |
+| Milvus | 开源或云，可扩展 | 大规模项目 |
+| Qdrant | 开源或云，Rust 实现 | 中大型项目 |
+| pgvector | PostgreSQL 扩展 | 已有 PG 环境 |
+
+**一步一步来**
+
+**第 1 步：实现暴力检索加元数据过滤**
+
+这一步要做什么：先有一个正确但慢的实现，作为 ANN 的对照基线。
+
+```js
+// 在候选集里按余弦相似度打分并排序
+function searchAll(queryVec, docs, filter = null, topK = 3) {
+  const scored = [];
+  for (const doc of docs) {
+    // 元数据过滤先做，不满足条件的直接跳过，省下相似度计算
+    if (filter && Object.entries(filter).some(([k, v]) => doc.meta[k] !== v)) continue;
+    scored.push({ id: doc.id, text: doc.text, score: cosine(queryVec, doc.vec) });
+  }
+  // 分数从高到低排序，分数相同时按 id 字典序保证结果稳定
+  scored.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  return scored.slice(0, topK);
+}
+```
+
+**这段代码在做什么**
+
+- 遍历全部文档，时间复杂度是文档数乘以向量维度。
+- 过滤条件在相似度计算之前执行，减少无效计算。
+- `some` 只要有一个字段不匹配就返回 true，整条被跳过。
+- 排序用 `||` 兜底，分数相同时按 id 字典序，保证结果可复现。
+- `slice` 只保留前 `topK` 条，避免把全部结果返回给上层。
+
+**运行结果**
+
+返回 3 条按分数降序排列的候选，每条带 `id`、`text`、`score`。
+
+**动手验证**
+
+```js
+// 依赖：Node 20+ 内置 node:assert
+import assert from "node:assert";
+
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+
+const docs = [
+  { id: "a", text: "押金退还流程", vec: [1, 0, 0], meta: { lang: "zh" } },
+  { id: "b", text: "发票开具说明", vec: [0, 1, 0], meta: { lang: "zh" } },
+  { id: "c", text: "refund policy", vec: [1, 0, 0], meta: { lang: "en" } },
+];
+
+function searchAll(queryVec, list, filter = null, topK = 3) {
+  const scored = [];
+  for (const doc of list) {
+    if (filter && Object.entries(filter).some(([k, v]) => doc.meta[k] !== v)) continue;
+    scored.push({ id: doc.id, text: doc.text, score: cosine(queryVec, doc.vec) });
+  }
+  scored.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  return scored.slice(0, topK);
+}
+
+const hit = searchAll([1, 0, 0], docs, { lang: "zh" }, 2);
+// 过滤掉英文文档后只剩两条候选
+assert.strictEqual(hit.length, 2);
+assert.strictEqual(hit[0].id, "a");
+console.log("2 条断言通过，首条命中", hit[0].id);
+```
+
+运行结果：
+
+```
+2 条断言通过，首条命中 a
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 写入向量后查不到 | 查询向量与入库向量的维度或归一化方式不一致 | 写入与查询复用同一个编码函数 |
+| 过滤后结果少于预期 | 先近邻再过滤，被过滤掉太多 | 增大召回数量，或在索引侧支持过滤 |
+| 更新文档后旧内容还在 | 只插入新向量，没删旧记录 | 用文档 id 加块序号生成稳定 id，写入前先删同 id |
+| 索引重建后结果跳变 | 索引参数改了但没记录版本 | 把索引参数写进配置并与索引一起打版本号 |
+
+**用在哪里**
+
+- 电商商品搜索
+  - 业务背景：千万级商品，要在 100 毫秒内返回候选。
+  - 怎么用：HNSW 索引做 ANN 召回，类目与库存状态走元数据过滤。
+  - 指标：召回率与 P99 延迟一起看，只调其中一个都会失衡。
+  - 不该用：商品总量小于 1 万时，暴力检索的实现与运维成本更低。
+- 日志与工单检索
+  - 业务背景：已有 PostgreSQL，不想再引入独立向量服务。
+  - 怎么用：pgvector 扩展，把向量列和业务表放在同一个库做联表过滤。
+  - 指标：查询延迟、索引体积。
+  - 不该用：写入量达到每分钟数十万条时，PG 的写入压力会成为瓶颈。
+
+**行业实践**
+
+- 索引选型建议：FAISS 官方文档的 Guidelines 章节给出不同规模下的索引选择方向。借鉴方式：先按数据量选类型，再用自己的语料测召回率，需核对官方文档确认参数含义。
+- 量化压缩：FAISS 官方文档的 IndexIVFPQ 章节说明乘积量化如何用更少字节表示向量。借鉴方式：内存吃紧时先用量化压缩，再测召回率下降幅度，需核对官方文档确认压缩比与召回率的取舍。
+
+**小结**
+
+- ANN 用可接受的召回损失换数量级的速度提升。
+- 索引类型的选择依据是数据量、延迟要求和内存预算。
+- 元数据过滤和向量检索要在同一层完成，否则结果会被截断。
+
+## 6. 查询处理：从用户问题到检索输入
+
+**先想一个问题**
+
+多轮对话里用户说"那它的上限呢"。直接把这句话编码去检索，什么也搜不到。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：查询处理把口语化的当前问题改写成能对齐知识库表述的检索语句。
+    日常类比：把"那个啥咋弄"翻译成"如何办理挂失"再去查手册。
+    类比不成立的地方：翻译有标准答案，查询改写依赖模型判断，改错了整条链路都走偏。
+
+!!! note "术语：查询改写"
+    查询改写（Query Rewriting）：在编码之前对用户问题做补全、指代消解与同义词替换，让它更接近知识库的表述。例子：把"那它的上限呢"改写为"差旅报销的单次上限是多少"。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+    participant U as "用户"
+    participant C as "会话状态"
+    participant R as "改写器"
+    participant E as "编码器"
+    U->>C: "那它的上限呢"
+    C->>R: "最近 3 轮对话"
+    R->>R: "指代消解与补全"
+    R->>E: "差旅报销单次上限是多少"
+    E-->>U: "查询向量"
+```
+
+1. 用户输入一句依赖上文的问题。
+2. 会话状态取出最近若干轮对话作为上下文。
+3. 改写器把指代词替换成具体实体，补全省略的主语。
+4. 编码器只对改写后的句子编码，输出查询向量。
+
+**一步一步来**
+
+**第 1 步：拼接历史并做指代替换**
+
+这一步要做什么：让改写规则可测试，避免每次改代码都靠人工体验判断。
+
+```js
+// 用最近 n 轮对话补全当前问题里的指代词
+function rewriteQuery(query, history, n = 3) {
+  // 取最近 n 轮，历史为空时直接返回原问题
+  const recent = history.slice(-n);
+  if (recent.length === 0) return query;
+  // 把最后一轮记录的实体作为指代词的替换目标
+  const lastTopic = recent[recent.length - 1].topic;
+  // 只替换白名单里的 3 个指代词，控制改动范围
+  const fixed = query.replace(/它|这个|那个/g, lastTopic ?? "");
+  // 附带最近话题，帮助下游对齐表述
+  return `${fixed}（话题：${lastTopic ?? "无"}）`;
+}
+```
+
+**这段代码在做什么**
+
+- `slice(-n)` 取最近 n 轮，历史为空时直接返回原问题。
+- `lastTopic` 是上一轮识别出的实体名，来自会话状态。
+- 正则只匹配 3 个常见指代词，替换范围可控。
+- 拼接话题前缀是为了让编码器拿到完整的语义。
+- 函数是纯函数，相同输入得到相同输出，便于写断言。
+
+**运行结果**
+
+`rewriteQuery("那它的上限呢", [{ topic: "差旅报销" }])` 返回 `"那差旅报销的上限呢（话题：差旅报销）"`。
+
+**动手验证**
+
+```js
+// 依赖：Node 20+ 内置 node:assert
+import assert from "node:assert";
+
+function rewriteQuery(query, history, n = 3) {
+  const recent = history.slice(-n);
+  if (recent.length === 0) return query;
+  const lastTopic = recent[recent.length - 1].topic;
+  const fixed = query.replace(/它|这个|那个/g, lastTopic ?? "");
+  return `${fixed}（话题：${lastTopic ?? "无"}）`;
+}
+
+// 无历史时保持原样，避免凭空插入话题
+assert.strictEqual(rewriteQuery("押金怎么退", []), "押金怎么退");
+
+const out = rewriteQuery("那它的上限呢", [{ topic: "差旅报销" }]);
+assert.ok(out.includes("差旅报销"));
+assert.ok(!out.includes("它"));
+console.log("3 条断言通过", out);
+```
+
+运行结果：
+
+```
+3 条断言通过 那差旅报销的上限呢（话题：差旅报销）
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 多轮对话越聊越搜不到 | 只把当前问题送去编码 | 改写时拼接最近若干轮的话题 |
+| 改写后偏离原意 | 替换规则过于宽泛 | 只替换白名单里的指代词，改完做人工抽查 |
+| 同一问题两次检索结果不同 | 改写过程引入了随机性 | 改写阶段用确定性规则，或把采样温度设为 0 |
+| 历史太长挤占预算 | 把全部历史都拼进查询 | 只保留最近 n 轮，n 取 3 到 5 |
+
+**用在哪里**
+
+- 银行 App 智能客服
+  - 业务背景：用户习惯用"这个""那个"指代上一句提到的业务。
+  - 怎么用：检索前做指代消解，把业务名补进查询。
+  - 指标：多轮场景下的首条命中率，与单轮场景分开统计。
+  - 不该用：只支持单轮问答时，改写环节可以跳过。
+- 代码仓库问答
+  - 业务背景：用户问"这个函数在哪调用的"，指代上一次提到的函数名。
+  - 怎么用：从上一轮命中的文件与符号表里取出实体名做替换。
+  - 指标：引用文件的准确率。
+  - 不该用：符号名本身就是唯一关键词时，直接检索更稳。
+
+**行业实践**
+
+- 查询改写：LangChain 官方文档的 Query Transformation 章节列出多种改写策略。借鉴方式：从"拼接历史"这一种开始，用失败样例驱动增加策略，需核对官方文档确认各策略的输入输出约定。
+- 查询路由：Azure AI Search 官方文档的 Query 章节说明如何按查询类型选择检索模式。借鉴方式：把关键词型与语义型问题分流到不同检索通道，需核对官方文档确认路由的判定字段。
+
+**小结**
+
+- 查询处理的目标是让问题和知识库表述对齐。
+- 指代消解是长对话场景里收益最直接的一步。
+- 改写规则要能写成纯函数，否则无法做回归测试。
+
+## 7. 混合检索与重排序
+
+**先想一个问题**
+
+用户搜产品型号"XZ-2000A"。向量检索返回一堆同系列文档，就是没有这个型号的页面。型号这类字面精确的查询，关键词检索更合适。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：先宽召回，再精排序，向量管语义，BM25 管字面。
+    日常类比：招聘先用关键词筛简历，再由面试官逐份细看。
+    类比不成立的地方：面试官会读完整份简历，重排模型只看查询和单条片段。
+
+!!! note "术语：BM25"
+    BM25（Best Matching 25）：一种基于词频与逆文档频率的关键词打分函数，对词频做饱和处理并按文档长度归一化。例子：查询词在某文档出现 3 次，得分不会比出现 1 次高 3 倍，因为词频增长有上限。
+
+!!! note "术语：RRF"
+    RRF（Reciprocal Rank Fusion，倒数排序融合）：把多路检索结果按名次而不是分数融合的算法，每路的贡献是 1 除以 k 加名次，再跨路求和。例子：语义检索排第 1、关键词检索排第 5 的同一篇文档，两路得分相加后名次上升。
+
+!!! note "术语：交叉编码器"
+    交叉编码器（Cross-Encoder）：把查询和候选片段拼在一起送进同一个模型打分，精度高于分别编码再算相似度。例子：交叉编码器能判断"退押金"和"保证金退还流程"说的是同一件事。
+
+**图解**
+
+```mermaid
+flowchart LR
+    Q["用户查询"] --> V["向量检索"]
+    Q --> B["BM25 关键词检索"]
+    V --> R["RRF 倒数排序融合"]
+    B --> R
+    R --> RR["交叉编码器重排序"]
+    RR --> T["最终 Top-N"]
+```
+
+1. 查询同时送进向量检索与 BM25 两条通道。
+2. 两路各自返回按分数排序的候选列表。
+3. RRF 只使用名次做融合，绕开了两路分数不可比的问题。
+4. 融合后的候选交给交叉编码器逐条打分。
+5. 重排结果取前 N 条进入提示词。
+
+参数默认值来自本站 RAG 旧版页面，以原文为准：BM25 的 k1 为 1.2，b 为 0.75，RRF 的 k 为 60。
+
+**一步一步来**
+
+**第 1 步：实现 BM25 打分**
+
+这一步要做什么：给关键词通道一个可解释的打分函数，作为向量通道的补充。
+
+```js
+// 简化版 BM25：词频饱和、逆文档频率、长度归一化三部分
+function bm25(queryTokens, docs, k1 = 1.2, b = 0.75) {
+  const df = new Map();
+  // 先统计每个词出现在多少篇文档里，用于算逆文档频率
+  for (const d of docs) for (const t of new Set(d.tokens)) df.set(t, (df.get(t) ?? 0) + 1);
+  const avgLen = docs.reduce((s, d) => s + d.tokens.length, 0) / docs.length;
+  return docs.map((d) => {
+    let score = 0;
+    for (const t of queryTokens) {
+      const tf = d.tokens.filter((x) => x === t).length;
+      if (tf === 0) continue;
+      const idf = Math.log(1 + (docs.length - df.get(t) + 0.5) / (df.get(t) + 0.5));
+      // 词频饱和：tf 越大得分增长越慢；长度归一化惩罚长文档
+      score += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * d.tokens.length / avgLen));
     }
-
-    # 第 3 段：构造与模型加载（把配置解析和设备选择收敛到一处）
-    # 设备判定交给设备无关的探测逻辑，避免上层调用者关心 CUDA 是否存在；
-    # device=None 表示"自动选择"，显式传入字符串则完全尊重调用方意图（可能是有意跑 CPU 复现）。
-    def __init__(
-        self,
-        model_name: str = "ms-marco",
-        device: str = None
-    ):
-        """
-        初始化重排序模型
-
-        Args:
-            model_name: 模型名称或路径
-            device: 运行设备
-        """
-        # 别名优先，查不到就当作本地目录 / HuggingFace 全名直接使用，做到"别名与路径两用"
-        model_path = self.RERANK_MODELS.get(model_name, model_name)
-
-        # 第 4 段：设备探测（自动模式下的兜底）
-        # 注意 CrossEncoder._model_has_device() 并不是 sentence_transformers 的既有 API，
-        # 在真实环境里会抛 AttributeError；正确写法应是 torch.cuda.is_available()，
-        # 这里保留原样仅作教学演示，属于必须指出的易错点。
-        if device is None:
-            device = "cuda" if CrossEncoder._model_has_device() else "cpu"
-
-        # max_length=512 是硬截断上限：query+doc 拼接后超出部分会被静默丢弃，
-        # 长文档尾部信息将参与不到打分，检索长文本时要先切块或调大该值。
-        # 模型实例被复用（在 __init__ 里只建一次），后续 rerank 复用同一份权重，避免重复加载。
-        self.model = CrossEncoder(
-            model_path,
-            device=device,
-            max_length=512
-        )
-
-    # 第 5 段：核心重排接口（query + 候选文档 → 按相关性排序的 Top-K）
-    # 输入是原始字符串列表而非向量，说明本方法完全依赖模型在线推理；
-    # top_k 与 return_scores 都设了默认值，使"只要排名"和"要分数"两种调用方式统一入口。
-    def rerank(
-        self,
-        query: str,
-        documents: list[str],
-        top_k: int = 10,
-        return_scores: bool = True
-    ) -> list[dict]:
-        """
-        重排序检索结果
-
-        Args:
-            query: 查询文本
-            documents: 文档列表
-            top_k: 返回数量
-            return_scores: 是否返回分数
-
-        Returns:
-            重排序后的结果
-        """
-        # 第 6 段：构造查询-文档对
-        # 交叉编码器的输入单位是 (query, doc) 二元组，因此同一个 query 会被重复拼接 N 次，
-        # 这正是重排 O(N) 次前向计算、无法像向量检索那样 O(1) 查表的根本原因。
-        # 构建查询-文档对
-        pairs = [(query, doc) for doc in documents]
-
-        # 第 7 段：批量打分（一次前向覆盖全部候选，比逐个预测更省时间）
-        # predict 内部会自行分批、tokenize 并做 padding，返回的是与 pairs 等长的相关性分数数组。
-        # 若 documents 为空列表，这里会得到空数组，后续流程不会报错，只是结果为空 —— 属于隐性边界。
-        # 批量预测相关性分数
-        scores = self.model.predict(pairs)
-
-        # 第 8 段：统一分数容器类型（把 ndarray / 标量 归一成可索引的 Python 结构）
-        # 一维 ndarray 转 list 是为了后续能被 argsort 之外的原生索引安全访问；
-        # 之所以还要 `elif not isinstance(scores, list)`，是因为极少数模型/单条输入可能返回标量，
-        # 不包成单元素列表时后面的 scores[idx] 会直接 TypeError。
-        # 转换为列表（如果是单个结果）
-        if isinstance(scores, np.ndarray) and len(scores.shape) == 1:
-            scores = scores.tolist()
-        elif not isinstance(scores, list):
-            scores = [scores]
-
-        # 第 9 段：按分数降序排列
-        # argsort 默认升序，[::-1] 反转得到降序 —— 注意反转同时会翻转并列分数的相对次序，
-        # 且默认快排不是稳定排序，因此分数相同的文档其先后顺序不保证与输入一致；
-        # 对结果稳定性有要求时应改用 sorted(range(n), key=..., reverse=True) 之类的稳定方案。
-        # 按分数降序排列
-        ranked_indices = np.argsort(scores)[::-1]
-
-        # 第 10 段：组装返回结构（rank 由输出位置而非原始下标决定）
-        # rank 用 len(results)+1 计算，保证名次从 1 连续递增；
-        # idx 来自 numpy 整数，拿去索引 Python list 合法但得到的是原文档引用，不产生拷贝（省内存）。
-        # 切片 [:top_k] 在 top_k 大于文档总数时自动截短，无需额外判断。
-        results = []
-        for idx in ranked_indices[:top_k]:
-            result = {
-                "text": documents[idx],
-                "rank": len(results) + 1
-            }
-            if return_scores:
-                # 显式 float() 是为了把 numpy 浮点转成原生类型，避免下游 JSON 序列化失败
-                result["score"] = float(scores[idx])
-            results.append(result)
-
-        return results
-
-    # 第 11 段：便捷封装（面向"要并列数组"的调用方）
-    # 返回 (文档, 分数) 两个平行列表，便于直接喂给下游做加权融合或截断；
-    # top_k=len(documents) 表示全量重排，因此本方法依赖 rerank 默认 return_scores=True，
-    # 若哪天把该默认值改成 False，这里的 r["score"] 会立刻 KeyError —— 是隐式耦合点。
-    def rerank_with_scores(
-        self,
-        query: str,
-        documents: list[str]
-    ) -> tuple[list[str], list[float]]:
-        """
-        重排序，返回文档和分数
-
-        Returns:
-            (重排序后的文档列表, 对应分数列表)
-        """
-        results = self.rerank(query, documents, top_k=len(documents))
-        return [r["text"] for r in results], [r["score"] for r in results]
+    return { id: d.id, score };
+  });
+}
 ```
+
+**这段代码在做什么**
+
+- `df` 记录每个词的文档频率，`Set` 保证同一篇里只算一次。
+- `avgLen` 是全部文档的平均词数，用于长度归一化。
+- 逆文档频率取对数形式，越罕见的词权重越高。
+- 词频除以带 `k1` 的分母，实现饱和效果。
+- 分母里的 `b` 控制长度归一化的强度。
+- 返回每条文档的 id 与 BM25 分数，未命中的词不计入。
+
+**运行结果**
+
+含查询词的文档得分大于 0，其余文档得分为 0。
+
+**动手验证**
+
+```js
+// 依赖：Node 20+ 内置 node:assert
+import assert from "node:assert";
+
+function bm25(queryTokens, docs, k1 = 1.2, b = 0.75) {
+  const df = new Map();
+  for (const d of docs) for (const t of new Set(d.tokens)) df.set(t, (df.get(t) ?? 0) + 1);
+  const avgLen = docs.reduce((s, d) => s + d.tokens.length, 0) / docs.length;
+  return docs.map((d) => {
+    let score = 0;
+    for (const t of queryTokens) {
+      const tf = d.tokens.filter((x) => x === t).length;
+      if (tf === 0) continue;
+      const idf = Math.log(1 + (docs.length - df.get(t) + 0.5) / (df.get(t) + 0.5));
+      score += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * d.tokens.length / avgLen));
+    }
+    return { id: d.id, score };
+  });
+}
+
+const docs = [
+  { id: "a", tokens: ["xz", "2000a", "说明"] },
+  { id: "b", tokens: ["xz", "1000", "说明"] },
+];
+const scores = bm25(["2000a"], docs);
+const hit = scores.find((s) => s.id === "a");
+const miss = scores.find((s) => s.id === "b");
+assert.ok(hit.score > 0);
+assert.strictEqual(miss.score, 0);
+console.log("2 条断言通过，命中分数", hit.score.toFixed(4));
+```
+
+运行结果：
+
+```
+2 条断言通过，命中分数 输出一个大于 0 的值
+```
+
+**第 2 步：RRF 融合两路结果**
+
+这一步要做什么：把语义通道和关键词通道的名次合成一个顺序。
+
+```js
+// 按名次融合多路结果，k 越大名次差异被压得越平
+function rrf(lists, k = 60) {
+  const acc = new Map();
+  for (const list of lists) {
+    list.forEach((id, i) => {
+      // 名次从 1 开始，所以分母是 k 加 i 再加 1
+      acc.set(id, (acc.get(id) ?? 0) + 1 / (k + i + 1));
+    });
+  }
+  // 融合分数从高到低排序，只输出文档 id
+  return [...acc.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id);
+}
+```
+
+**这段代码在做什么**
+
+- 入参是若干条已排好序的 id 列表。
+- 每路按下标换算名次，名次从 1 开始。
+- 同一个 id 在多路出现时，贡献累加。
+- `k` 控制名次差异的衰减速度，k 越大前排优势越小。
+- 返回融合后的 id 序列，交给重排阶段。
+
+**运行结果**
+
+`rrf([["a", "b", "c"], ["c"]])` 返回 `["c", "a", "b"]`，因为 `c` 在两路都出现。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 融合后结果不如单路 | 两路分数直接相加，量纲不一致 | 改用 RRF 只用名次，或先做分数归一化 |
+| BM25 命中了无关长文档 | 长文档词频天然高 | 确认 b 为 0.75，长度归一化是否生效 |
+| 重排后延迟翻倍 | 送入交叉编码器的候选太多 | 把候选压到 50 条以内再精排 |
+| 型号类查询搜不到 | 向量模型把型号编码成了通用语义 | 给 BM25 通道更高权重，或对型号建独立字段索引 |
+
+**用在哪里**
+
+- 电商商品搜索
+  - 业务背景：用户既搜"适合跑步的鞋"也搜"XZ-2000A"。
+  - 怎么用：语义通道处理描述型查询，BM25 处理型号与品牌词。
+  - 指标：点击率与首条命中率按查询类型分开统计。
+  - 不该用：查询几乎都是型号时，直接做结构化字段匹配。
+- 法规条文检索
+  - 业务背景：条文编号与法律术语都需要精确匹配。
+  - 怎么用：BM25 保证条文号命中，向量通道补语义相近的表述。
+  - 指标：条文号命中率、人工抽检的相关性。
+  - 不该用：条文总量只有几百条时，全文扫描加简单排序就够。
+
+**行业实践**
+
+- RRF 融合：Elasticsearch 官方文档的 Reciprocal rank fusion 章节与 Azure AI Search 官方文档的 Hybrid search scoring 章节都提供 RRF。借鉴方式：先用 RRF 跑通两路融合，再评估是否改成加权，需核对官方文档确认默认 k 值。
+- 两阶段重排：Pinecone 官方文档的 Reranking 章节说明召回与精排的分工。借鉴方式：召回阶段放宽条数，精排阶段收敛，延迟预算按两段分别测，需核对官方文档确认候选上限建议。
+
+**小结**
+
+- 向量检索管语义，BM25 管字面，两者覆盖的查询类型不同。
+- RRF 用名次融合，绕开了两路分数不可比的问题。
+- 交叉编码器精度高但要逐条前向，只适合小候选集。
+
+## 8. 上下文组装与答案合成
+
+**先想一个问题**
+
+召回 50 条片段，全部塞进提示词会超出模型的上下文长度。要按预算裁剪，还要保留最相关的部分。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：把召回片段当成预算有限的背包，按相关性择优装入。
+    日常类比：行李箱空间固定，先放最重要的东西。
+    类比不成立的地方：行李可以挤压，token 不能，超出一个就整段被拒。
+
+!!! note "术语：上下文窗口"
+    上下文窗口（Context Window）：模型单次调用能接受的最大 token 数量，输入与输出共用这个额度。例子：窗口为 8192 token 时，提示词加回答的总长度不能超过 8192。
+
+**图解**
+
+```mermaid
+flowchart TB
+    A["重排后的候选"] --> B["按 token 预算裁剪"]
+    B --> C["拼接上下文片段"]
+    C --> D["填入提示词模板"]
+    D --> E["调用模型生成"]
+    E --> F["返回答案与引用列表"]
+```
+
+1. 重排后的候选按分数从高到低排列。
+2. 裁剪环节按 token 预算依次装入，装不下就停止。
+3. 用分隔符拼接片段，保留片段边界。
+4. 把上下文填入系统提示的占位符。
+5. 生成后从入模的上下文反推引用，保证引用与实际内容一致。
+
+**一步一步来**
+
+**第 1 步：按 token 预算裁剪并拼接**
+
+这一步要做什么：在调用模型之前把上下文长度控制在预算内。
+
+```js
+// 按估算 token 数贪心装入，超出预算即停止
+function selectContext(docs, maxTokens = 4000) {
+  const parts = [];
+  let used = 0;
+  for (const doc of docs) {
+    // 中文按每个字 1.5 token 估算，来源：本站 RAG 旧版页面，以原文为准
+    const cost = Math.floor(doc.text.length * 1.5);
+    // 装不下就整体停止，保证同样输入得到同样结果
+    if (used + cost > maxTokens) break;
+    parts.push(doc.text);
+    used += cost;
+  }
+  // 用空行拼接，给模型清晰的片段边界
+  return { context: parts.join("\n\n"), used };
+}
+```
+
+**这段代码在做什么**
+
+- 按传入顺序遍历，顺序即优先级，由上游重排决定。
+- token 用字数乘 1.5 估算，只是上界的近似值。
+- 超预算时用 `break` 而不是跳过，结果可复现。
+- 用空行拼接片段，边界清晰，便于模型区分来源。
+- 返回拼接结果与已用预算，便于打点监控。
+
+**运行结果**
+
+装入若干条短片段后，返回上下文文本与已用 token 数。
+
+**动手验证**
+
+```js
+// 依赖：Node 20+ 内置 node:assert
+import assert from "node:assert";
+
+function selectContext(docs, maxTokens = 4000) {
+  const parts = [];
+  let used = 0;
+  for (const doc of docs) {
+    const cost = Math.floor(doc.text.length * 1.5);
+    if (used + cost > maxTokens) break;
+    parts.push(doc.text);
+    used += cost;
+  }
+  return { context: parts.join("\n\n"), used };
+}
+
+const docs = [
+  { id: "a", text: "押金在提交申请后 7 个工作日退回。" },
+  { id: "b", text: "发票可在订单详情页申请。" },
+  { id: "c", text: "本段很长".repeat(2000) },
+];
+
+const { context, used } = selectContext(docs, 100);
+// 第三条超预算被丢弃，上下文里不应出现它的内容
+assert.ok(!context.includes("本段很长"));
+assert.ok(used <= 100);
+assert.ok(context.includes("押金"));
+console.log("3 条断言通过，已用约", used, "token");
+```
+
+运行结果：
+
+```
+3 条断言通过，已用约 输出一个不超过 100 的数 token
+```
+
+**第 2 步：组装提示词**
+
+这一步要做什么：把上下文和防幻觉约束拼成一次调用的完整输入。
+
+```js
+// 把上下文填入模板，并把只依据资料回答写进系统提示
+function buildPrompt(query, context) {
+  // 用数组加 join 拼接，避免字符串模板的转义问题
+  const system = [
+    "你是一个知识助手，只能依据下面的参考资料回答。",
+    "参考资料没有相关信息时，明确说没有查到，不要补充外部知识。",
+    "参考资料：",
+    context,
+  ].join("\n");
+  // 用户问题单独拼接，不参与模板替换
+  return `${system}\n\n问题：${query}`;
+}
+```
+
+**这段代码在做什么**
+
+- 用数组加 `join` 拼模板，避开字符串模板的转义问题。
+- 前两行是防幻觉约束，必须随每次调用下发。
+- 上下文与系统提示放在同一条消息里，模型能直接对应。
+- 用户问题单独拼接，用户输入里的符号不会被当作模板。
+- 函数无副作用，可以直接写断言。
+
+**运行结果**
+
+输出一段包含约束、上下文与问题的完整提示词。
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+|---|---|---|
+| 模型回答了资料里没有的内容 | 约束没写进系统提示，或写法太软 | 明确写"资料没有时回答没有查到" |
+| 引用列表与答案对不上 | 引用取自召回列表而不是入模上下文 | 从入模的上下文反推引用 |
+| 请求报上下文超长 | token 估算偏低，输出也占额度 | 预算里预留输出额度，估算系数取上界 |
+| 同样输入两次答案不同 | 生成阶段有随机性 | 需要稳定输出时把采样温度设为 0，需核对官方文档确认参数名 |
+
+**用在哪里**
+
+- 保险条款问答
+  - 业务背景：答案出错会有合规风险，必须给出条款出处。
+  - 怎么用：上下文里保留条款编号，引用从入模文本反推。
+  - 指标：引用可点击率、答案与原文一致的人工抽检通过率。
+  - 不该用：任务是"帮我总结这份保单"时，整篇文档作为输入更合适。
+- 运维知识库助手
+  - 业务背景：故障处理步骤有严格顺序，缺步会引发二次故障。
+  - 怎么用：裁剪时按步骤块整体装入，不允许切断步骤。
+  - 指标：步骤完整率的抽检结果。
+  - 不该用：步骤之间有条件分支时，先做流程判断再检索。
+
+**行业实践**
+
+- 引用与溯源：Azure AI Search 官方文档的 Retrieval 章节说明如何返回片段来源信息。借鉴方式：把来源信息与片段一起入库，生成后回填引用，需核对官方文档确认字段格式。
+- token 精确计数：OpenAI 官方文档的 Tokenizer 章节提供计数工具。借鉴方式：用真实分词器替换字数估算，把预算误差压下来，需核对官方文档确认工具用法与适用模型。
+
+**小结**
+
+- 上下文预算是常量，裁剪策略决定哪些片段能进模型。
+- 防幻觉约束写在系统提示里，随每次调用下发。
+- 引用必须从入模的上下文反推，才能和答案对得上。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
+| 企业 Wiki 问答 | 第 1 节失效判定、第 3 节切分 | 向量库加大模型生成 | 制度文档版本多，元数据要带生效日期 |
+| 电商商品搜索 | 第 5 节 ANN 索引、第 7 节混合检索 | HNSW 索引加 BM25 加 RRF | 型号与品牌词必须走字面匹配通道 |
+| 多轮客服机器人 | 第 6 节查询改写 | 会话状态加指代消解规则 | 改写要有回归测试集，否则改动无法验证 |
+| 法规条文检索 | 第 7 节重排序 | BM25 加交叉编码器 | 条文号必须精确命中，不能被语义通道覆盖 |
+| 内部代码助手 | 第 4 节 Embedding、第 3 节切分 | 代码专用嵌入模型加符号元数据 | 按函数切而不是按字数切 |
+| 保险条款问答 | 第 8 节上下文组装 | 预算裁剪加引用回填 | 引用必须能点回原文，否则合规不认 |
+| 工单相似度聚合 | 第 5 节向量库 | pgvector 复用现有 PG | 过滤条件走 SQL 更直接，别塞进向量查询 |
+| 差旅政策多轮问答 | 第 2 节路径选择、第 6 节改写 | RAG 加提示词模板 | 政策每季度更新时不要走微调路线 |
+
+## 动手作业
+
+**目标**
+
+搭一个 50 条语料的本地检索系统，跑通"切分、编码、两路召回、RRF 融合、重排、提示词组装"6 个环节，全程不依赖第三方库。
+
+**步骤**
+
+1. 准备 50 条中文短文本，每条包含 `id`、`text`、`meta` 三个字段，`meta` 至少有 `lang` 与 `version`。
+2. 用第 3 节的 `chunk` 把每条文本切成不超过 120 字的片段，片段 id 用"原文 id 加偏移"拼接。
+3. 用第 4 节的 `embed` 与 `cosine` 给每个片段和查询编码。
+4. 用第 5 节的 `searchAll` 做向量召回，取前 10 条。
+5. 用第 7 节的 `bm25` 做关键词召回，取前 10 条。
+6. 用第 7 节的 `rrf` 融合两路结果，取出前 5 条。
+7. 用第 8 节的 `selectContext` 和 `buildPrompt` 生成最终提示词，打印出来。
+
+**验收标准**
+
+- 全部代码放在一个 `.mjs` 文件里，`node 文件名.mjs` 能直接运行，无第三方依赖。
+- 脚本里至少有 10 条 `node:assert` 断言，覆盖 6 个环节各至少 1 条。
+- 断言里必须包含一条"融合结果里同时出现过两路命中的片段排在最前"的检查。
+- 打印出的提示词里必须同时出现"只能依据"这句约束和至少 1 条片段原文。
+- 把某条语料的 `meta.version` 改成新值后重跑，向量召回里该条的 `version` 字段应同步变化。
+
+## 综合对比
+
+| 维度 | 提示词工程 | RAG | 微调 | 长上下文直塞 |
+|---|---|---|---|---|
+| 改动位置 | 输入文本 | 外部知识库 | 模型参数 | 输入文本 |
+| 知识更新方式 | 手动改提示词 | 重建索引 | 重新训练 | 手动改输入 |
+| 是否需要标注数据 | 不需要 | 不需要 | 需要成对样本 | 不需要 |
+| 单次请求额外延迟 | 无 | 增加检索与重排 | 无 | 随输入长度上升 |
+| 答案可追溯性 | 无 | 片段元数据可追溯 | 参数内不可追溯 | 取决于输入是否带来源 |
+| 上下文长度约束 | 受窗口限制 | 只送 Top-N 片段 | 受窗口限制 | 全部内容都要塞进窗口 |
+| 知识规模上限 | 受窗口限制 | 受索引与存储限制 | 受训练数据限制 | 受窗口限制 |
+| 适合的任务 | 格式与语气控制 | 知识问答、条款检索 | 风格统一、任务格式固化 | 单篇长文档总结 |
 
 ## 深入阅读与参考
 
@@ -1489,233 +1333,67 @@ class Reranker:
 | [DeepLearning.AI 短课程](https://www.deeplearning.ai/short-courses/) | 短小视频课，快速建立检索到生成的直觉 | 选 Agent 或 RAG 一门，边看边改 notebook 参数，观察检索结果变化 |
 | [Retrieval-Augmented Generation（Prompt Guide 中文）](https://www.promptingguide.ai/zh/research/rag) | 中文入门指南，快速厘清朴素与高级 RAG 的区别 | 通读后写一句话区分 Naive 与 Advanced RAG，再判断自己方案属哪类 |
 
-## 应用与行业实践
-
-### 应用场景地图
-
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-| --- | --- | --- | --- |
-| 客服工单的中文短句查历史记录 | 分块、混合检索、重排 | BM25 与向量双路召回，交叉编码器重排 | 工单口语词多，需同义词与型号词典 |
-| 百页合同的条款级问答 | 按结构分块、元数据过滤 | 条款号切块，块带合同 ID 与字符偏移 | 条款互相引用，命中后要回溯父条款 |
-| 设备维修手册的图文混排检索 | 多模态向量、分块 | 图注文字单独成块，图与文共用文档 ID | 表格与图纸要单独抽取，别当正文切 |
-| 多语言商品标题的跨语种召回 | 向量化、相似度度量 | 多语向量模型加余弦距离 | 距离阈值要按语言分别标定 |
-| 会议转写记录按时间点回看 | 时间窗分块、元数据过滤 | 块带起止时间与说话人，命中后合并 | 说话人切换处易切断话题，需重叠 |
-| 代码仓库里相似函数查找 | 结构分块、元数据过滤 | 按函数切块，加符号名过滤 | 标识符大小写与下划线要保持原样 |
-| 内部 Wiki 的按权限检索 | 元数据过滤、召回评测 | 向量索引加权限标签预过滤 | 先过滤还是后过滤要用压测决定 |
-| 论坛长贴里的关键句定位 | 重排、上下文拼装 | 召回 Top-50 后重排取 3 段 | 长贴噪音多，必须返回段落偏移 |
-
-### 三个场景拆解
-
-#### 场景 1：客服工单的中文短句查历史记录
-
-**业务背景**
-
-客服坐席要在通话中翻历史工单，输入是口语短句，知识库是规范写法的产品手册。
-
-规模用 SQL 统计：`SELECT count(*) FROM tickets` 得到工单行数，手册条目数从文档表统计。
-
-**怎么用本页知识解决**
-
-思路：词法召回抓型号与报错码，向量召回抓同义说法，两路融合后交给重排。
-
-```python
-import re
-def tokenize(text):                        # 中文按字、英文数字按词切，型号不被拆散
-    return re.findall(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]", text)
-def bm25(q, doc, avg_len, k1=1.2, b=0.75):  # 词频饱和加长度归一化，IDF 用检索库的
-    score, dl = 0.0, len(doc)
-    for t in q:
-        f = doc.count(t)
-        score += f * (k1 + 1) / (f + k1 * (1 - b + b * dl / avg_len))
-    return score
-def hybrid_rank(query, docs, top_k=50):    # 输出候选 id，生成交给下一层
-    q = tokenize(query)
-    avg = sum(len(tokenize(d["text"])) for d in docs) / len(docs)
-    lex = [bm25(q, tokenize(d["text"]), avg) for d in docs]
-    qv = embed(query)                      # embed 由你选用的向量模型提供
-    vec = [sum(a * b for a, b in zip(qv, d["vec"])) for d in docs]  # 向量已归一化，点积即余弦
-    norm = lambda xs: [(x - min(xs)) / (max(xs) - min(xs) + 1e-9) for x in xs]
-    fused = [0.5 * a + 0.5 * b for a, b in zip(norm(lex), norm(vec))]  # 等权融合
-    order = sorted(range(len(docs)), key=lambda i: -fused[i])          # 按融合分降序
-    return [docs[i]["id"] for i in order[:top_k]]
-```
-
-- `tokenize` 把中文单字与英文数字分开切，保证 `A1200` 这类型号不被拆散。
-- `bm25` 只算词频饱和度与长度归一化，IDF 交给检索库；自写版本用于离线对照。
-- 两路分数量纲不同，先各自 min-max 归一化再相加，否则向量分会压住词法分。
-- `top_k=50` 是候选数，不是最终结果数；重排只吃这 50 条，耗时可控。
-- 0.5 与 0.5 是起点权重，用评测集的 Recall@10 决定是否调整。
-
-**怎么度量收益**
-
-候选阶段看 Recall@50，最终结果看 nDCG@10，链路看检索 p95 延迟。
-
-做法：抽 N 条历史问题（N 取 200 起）人工标注正确工单，用 `pytrec_eval` 算指标。
-
-线上延迟用 Locust 或 wrk 压出 p95，再用 Prometheus 直方图持续记录。
-
-**什么时候不该用**
-
-- 查询条件是订单号、手机号这类等值匹配：直接走数据库索引，不要过向量召回。
-- 知识条目总量小到能整篇塞进上下文：省掉检索层，少一个出错环节。
-
-#### 场景 2：百页合同的条款级问答
-
-**业务背景**
-
-法务要从合同里定位责任条款、付款节点与违约金额，逐份人工翻页核对耗时。
-
-量级测量：PDF 转文本后数条款标号出现次数，再乘以合同份数。
-
-**怎么用本页知识解决**
-
-思路：按条款号切块，块里带合同 ID、条款号与字符偏移，命中后回溯整条条款。
-
-```python
-import re
-CLAUSE = re.compile(r"第[一二三四五六七八九十百零\d]+条")   # 条款号是天然切分锚点
-def split_contract(text, contract_id, max_len=500):
-    marks = [(m.start(), m.group()) for m in CLAUSE.finditer(text)]
-    chunks = []
-    for i, (pos, no) in enumerate(marks):
-        end = marks[i + 1][0] if i + 1 < len(marks) else len(text)
-        body = text[pos:end].strip()
-        for j in range(0, len(body), max_len):        # 超长条款再切，避免向量被稀释
-            chunks.append({
-                "id": f"{contract_id}-{no}-{j // max_len}",
-                "text": body[j:j + max_len],
-                "meta": {"contract_id": contract_id, "clause_no": no, "offset": pos + j},
-            })
-    return chunks
-```
-
-- 正则按条款号锚点切，条款正文成块，条款号进元数据供过滤。
-- 超长条款按 `max_len` 再切，块内留 `offset`，回答时能指出原文位置。
-- 子块命中后回溯父条款全文，避免漏掉同一句里的例外条件。
-- 检索时用 `contract_id` 预过滤，只搜目标合同，候选空间按份数缩小。
-- 命中块相似度低于阈值时不生成答案，直接提示未找到。
-
-**怎么度量收益**
-
-出处准确率：人工看返回的条款号与偏移是否落在标注区间内。
-
-召回看 Recall@10 与 MRR；生成看 `ragas` 的 faithfulness 与 context_recall，判断引用能否支撑答案。
-
-**什么时候不该用**
-
-- 要跨合同做金额汇总或排序：先抽成结构化字段落库，再用 SQL 聚合。
-- 条款之间有强引用链（附件、补充协议）：需按引用图取全文，单条召回会漏。
-
-#### 场景 3：会议转写记录按时间点回看
-
-**业务背景**
-
-会后要回答“当时谁说的、在第几分钟”，逐条听录音核对耗时。
-
-量级测量：转写字数除以音频分钟数得到语速，据此估算块数量。
-
-**怎么用本页知识解决**
-
-思路：按时间窗切块，块带起止时间与说话人；命中后合并相邻块，返回播放位置。
-
-```python
-def window_chunks(segments, window=3, overlap=1):   # segments 含 start/end/text/speaker
-    chunks, step = [], window - overlap             # 错位滑窗，话题跨段时不被切断
-    for i in range(0, len(segments), step):
-        part = segments[i:i + window]
-        if not part:
-            break
-        chunks.append({
-            "text": "".join(s["text"] for s in part),
-            "meta": {"start": part[0]["start"],
-                     "end": part[-1]["end"],
-                     "speakers": sorted({s["speaker"] for s in part})},
-        })
-    return chunks
-```
-
-- 转写结果按句或按说话人分段，每段自带起止时间与说话人。
-- `window=3` 表示每块含 3 段，`overlap=1` 让跨块话题有重叠。
-- 块文本拼接后送向量化，元数据保留时间区间与说话人集合。
-- 命中块索引相邻时合并成一段，再交给生成，避免同一话题被切两次。
-- 合并会拉长上下文，块数与 token 预算之间要定一个上限。
-
-**怎么度量收益**
-
-区间命中率：把返回的起止时间与人工标注区间算 IoU，看是否落在同一话题。
-
-链路延迟：记录从提问到首条结果返回的 p95。
-
-**什么时候不该用**
-
-- 需要逐字引用或定稿纪要：回到原始转写与音频逐句校对。
-- 实时会议中边开边检索：转写分段未定稿，块边界会反复变化。
-
-### 行业先进实践
-
-**倒数排名融合（出处：Elasticsearch 官方文档）**
-
-把词法召回与向量召回的名次按 1/(k+rank) 相加，两路分数不可比的问题就绕开了。
-
-k 的取值照官方文档填；你的项目先做等权融合，再看评测集名次变化决定是否加权重。
-
-**召回加重排的两阶段检索（出处：sentence-transformers 官方文档）**
-
-第一阶段用双塔向量召回 Top-k 候选，第二阶段用交叉编码器对候选逐条打分重排。
-
-交叉编码器把问题与文档拼在一起编码，判断准于双塔，代价是只能跑小候选集。
-
-借鉴方式：候选条数按压测的 p95 延迟定。
-
-**分层图近似最近邻索引（出处：hnswlib 开源项目）**
-
-查询时从上层粗定位到下层细找，用 ef 参数控制搜索宽度。
-
-借鉴方式：先用默认参数建索引，再固定召回集，只改 ef，画出延迟与召回的对照表。
-
-**向量检索中的元数据预过滤（出处：Qdrant 官方文档）**
-
-在搜索过程中按 payload 条件过滤，避免先取全量候选再筛掉大部分。
-
-借鉴方式：把合同 ID、时间范围、权限标签写进 payload，压测过滤选择性与延迟的关系。
-
-**检索与生成的分项评测（出处：RAGAS 开源项目）**
-
-提供 faithfulness、context_precision、context_recall 三个指标，检查答案是否被检索内容支持。
-
-借鉴方式：把评测跑进 CI，指标跌破基线版本时阻断合并。
-
-### 从学到用：落地路线
-
-第 1 步 试点：选一个查询频次高、答案可判定的单一场景，先只做召回不做生成。验收：标注集不少于 200 条，基线 Recall@10 有确定数值。
-
-第 2 步 验证：固定分块、向量模型与索引参数，每次只改一项，记录指标变化。验收：同一配置重跑两次，指标完全一致。
-
-第 3 步 推广：把切块、索引、评测脚本封装成模板，新场景只填数据与标注。验收：接入新场景的改动集中在一个配置文件里。
-
-第 4 步 防回退：评测进 CI，索引带版本号，指标跌破基线就阻断合并。验收：回滚流程演练过一次，能回到上一个索引版本。
-
-### 动手作业
-
-**目标**
-
-用公开中文文档搭一个可评测的检索服务，能给出 Recall@10 与 MRR 两个数。
-
-**步骤**
-
-1. 选一份公开中文文档，比如某个开源项目的使用手册，转成纯文本。
-2. 写 200 条问题，标注每条对应的正确段落，存成 JSONL。
-3. 按 300 字切块，保留字符偏移，块 ID 用文档名加序号。
-4. 实现词法召回输出 Top-50；再实现向量召回，向量先归一化。
-5. 用倒数排名融合把两路合成 Top-10，记录融合前后的名次变化。
-6. 写评测脚本算 Recall@10 与 MRR，结果写进 CSV。
-7. 把块长从 300 改成 500 重跑，对照两次的指标与块数量。
-
-**验收标准**
-
-1. 一条命令跑完评测，输出 Recall@10、MRR、块数量三个数。
-2. 同一配置连跑两次，两个指标完全相同。
-3. 每条结果能打印块 ID 与字符偏移，可回原文核对。
-4. 两种块长的实验记录都在 CSV 里，含参数值与指标值。
-5. 融合结果的 Recall@10 不低于词法召回单独的成绩；若低于，能指出原因。
-
+## 自测题
+
+??? question "RAG 和微调分别改的是什么？"
+    - RAG 改的是模型能看到的上下文，知识放在外部库里检索。
+    - 微调改的是模型参数，用来固定输出风格或任务格式。
+    - 知识高频变化时优先 RAG，因为改库不需要重新训练。
+    - 两者组合时，先上 RAG 保证知识正确，再考虑微调固定风格。
+
+??? question "离线索引链路和在线检索链路各自包含哪些步骤？"
+    - 离线链路：文档源、提取纯文本、切分为片段、编码、写入向量库。
+    - 在线链路：用户问题、查询处理、召回、重排序、组装上下文、生成答案。
+    - 两条链路通过向量库解耦，各自可以独立扩容和重跑。
+    - 离线链路的切分粒度决定了在线链路能召回什么内容。
+
+??? question "为什么切分时要保留重叠？重叠太大会有什么问题？"
+    - 重叠让跨越边界的句子至少完整出现在一个片段里。
+    - 重叠为零时，位于边界处的关键词可能两边都不完整。
+    - 重叠过大时片段数量成比例增长，索引体积与检索耗时一起上升。
+    - 常见做法是重叠长度取片段长度的百分之十到百分之二十。
+
+??? question "余弦相似度和点积在什么条件下结果一致？"
+    - 两条向量都做过 L2 归一化时，点积等于余弦相似度。
+    - 未归一化时点积会受向量长度影响，长向量得分偏高。
+    - 因此入库与查询两侧必须使用同一套归一化设置。
+    - 换模型或改归一化开关后，必须重建全量索引。
+
+??? question "RRF 为什么不直接相加两路的分数？"
+    - 向量相似度与 BM25 分数的取值范围和量纲不同。
+    - 直接相加会让取值大的那一路主导最终排序。
+    - RRF 只用名次，名次是同一量纲，跨路可比。
+    - 公式里的 k 用来压平前排优势，k 越大名次差异影响越小。
+
+??? question "ANN 索引相比暴力检索，代价是什么？"
+    - 代价是召回率，可能漏掉真实的最近邻。
+    - IVFFlat 只扫部分簇，簇边界附近的向量可能被漏掉。
+    - IVFPQ 用更少字节表达向量，精度损失随压缩比上升。
+    - 数据量小的时候，暴力检索的召回率是百分之百，实现也更简单。
+
+??? question "上下文裁剪时为什么用 break 而不是 continue？"
+    - 用 break 时结果只取决于传入顺序，同样输入得到同样输出。
+    - 用 continue 会把后面的短片段补进来，结果依赖片段长度分布。
+    - 可复现的裁剪结果更容易定位问题，也便于做回归测试。
+    - 代价是可能浪费剩余预算，需要在上游把候选按相关性排好。
+
+??? question "引用列表为什么要从入模的上下文反推，而不是直接透传召回结果？"
+    - 裁剪环节会丢掉装不下的片段，透传会和实际入模内容不一致。
+    - 答案只可能来自入模文本，引用也应当只标注这些文本。
+    - 不一致时会出现在答案里引用了一条模型根本没看到的片段。
+    - 实现上可以在拼接时记录片段 id，生成后按 id 回填标题与链接。
+
+## 延伸阅读
+
+- OpenAI 官方文档：Embeddings 指南章节、Token 计数与 Tokenizer 章节、Fine-tuning 章节。
+- Pinecone 官方文档：Reranking 章节、Hybrid Search 章节、Indexes 章节。
+- Elasticsearch 官方文档：Reciprocal rank fusion 章节、Vector search 章节。
+- Azure AI Search 官方文档：Hybrid search scoring 章节、Query 章节、Retrieval 章节。
+- LangChain 官方文档：Retrievers 章节、Query Transformation 章节。
+- LlamaIndex 官方文档：Node Parser 章节、Retriever 章节。
+- Chroma 官方文档：Collections 章节、Querying 章节。
+- FAISS 官方文档：Guidelines 章节、IndexIVFPQ 章节。
+- Sentence Transformers 官方文档：Semantic Textual Similarity 章节。
+- 论文：Robertson 与 Zaragoza 的 The Probabilistic Relevance Framework: BM25 and Beyond。
+- 论文：Cormack、Clarke 与 Buettcher 的 Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods。
+- Anthropic 工程博客：Contextual Retrieval 文章。

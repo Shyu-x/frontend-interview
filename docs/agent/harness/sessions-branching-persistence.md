@@ -11,6 +11,10 @@ description: "JSONL 树结构、分支与回放"
     - 讲清 `/tree`、`/fork`、`/clone` 三个动作分别写哪个文件，各举一个使用场景。
     - 写出一个 SessionStore 类，支持 append、branchTo、activeBranch、fork、compact、load 与崩溃截断恢复。
 
+!!! tip "生产实现怎么存？"
+    本页讲的是机制。真实的编码 agent 把会话和记忆存在哪里（例如 Codex 以 JSONL rollout 为事实来源，再用多个 SQLite 数据库做镜像与索引），
+    见 [会话与记忆存储全景](../storage/session-storage-overview.md) 与 [Codex 的存储设计](../storage/codex-storage-deep-dive.md)。
+
 ## 0. 知识地图
 
 ```mermaid

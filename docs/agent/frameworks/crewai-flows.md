@@ -1,331 +1,310 @@
 ---
-title: CrewAI Flows 编排
-description: 介绍 CrewAI Flows 的高级编排功能，涵盖从基础装饰器到复杂状态管理和错误恢复策略。
-tags:
-  - ai-agent
-  - langchain
-date: 2026-05-17
+title: "CrewAI Flows 编排"
+description: "介绍 CrewAI Flows 的高级编排功能，涵盖从基础装饰器到复杂状态管理和错误恢复策略。"
 ---
 
 # CrewAI Flows 编排
 
-本文档介绍 CrewAI Flows 的高级编排功能，涵盖从基础装饰器到复杂状态管理和错误恢复策略的全部核心概念。
+!!! abstract "学完这一页你能"
 
-## 1. CrewAI Flow 概述
+- 说清 Flow 与 Crew 的分工，并画出两者之间数据流动的方向。
+- 用 `@flow`、`@start`、`@router` 写出顺序、并行、条件三条执行链路。
+- 用 TypedDict 或 Pydantic 模型管理跨步骤状态，并把状态落盘后重新载入。
+- 给一条 Flow 加上重试、熔断、超时与降级，并说清每种策略的触发条件。
 
-CrewAI Flows 是 CrewAI 框架中用于构建**有向无环工作流**（DAG）的模块。它允许开发者以声明式方式编排多个 Agent、任务和工具的执行顺序，支持顺序执行、并行执行以及条件分支逻辑。
+## 0. 知识地图
 
-Flows 的核心设计目标：
-
-- **可组合性**：将复杂任务拆分为可复用的步骤
-- **可观测性**：内置状态跟踪和执行日志
-- **灵活性**：支持自定义 Python 逻辑、循环和条件判断
-- **可靠性**：内置错误处理和恢复机制
-
-Flows 适用于构建自动化流水线、多阶段数据处理管道、以及需要人机协作的复杂任务链。
-
-## 2. 使用 @flow 装饰器定义 Flow
-
-`@flow` 装饰器是 CrewAI Flows 的入口点。任何继承自 `CrewFlow` 基类并使用该装饰器标记的方法都成为一个可执行的 Flow。
-
-### 2.1 基础用法
-
-```python
-from crewai.flow.flow import Flow, flow, start
-from crewai import Agent, Task, Crew
-
-@flow
-def my_first_flow():
-    # Flow 的逻辑写在这里
-    pass
+```mermaid
+flowchart TD
+  A["诉求：多步骤任务要按顺序跑，中断后要能接着跑"] --> B["Flow 编排层"]
+  B --> C["定义节点：flow start router listen"]
+  C --> D["执行形态：顺序 并行 条件 循环"]
+  D --> E["跨步骤数据：state"]
+  E --> F["外部世界：API 数据库 文件 自定义工具"]
+  E --> G["出错之后：重试 熔断 超时 降级"]
+  G --> E
+  F --> E
+  E --> H["产物：CrewOutput 或合并后的状态快照"]
+  B --> I["Crew 执行层：Agent 是谁来做，Task 是做什么"]
+  I --> H
 ```
 
-### 2.2 带状态初始化的 Flow
+建议这样读：先读第 1 节，把"编排层"和"执行层"的分工分开。再读第 2 节，用最小 Flow 跑通一次。之后按第 3 节改执行形态，按第 5 节加状态，最后按第 6 节加恢复策略。
 
-```python
-from crewai.flow.flow import Flow, flow, start
-from crewai.flow.utils import Output
+## 1. Flow 是什么：编排层与执行层分开
 
-@flow
-def research_flow():
-    # 定义初始状态
-    state = {"topic": "AI Agents", "findings": [], "summary": ""}
-    
-    # 执行业务逻辑
-    state["findings"] = search_and_collect(state["topic"])
-    state["summary"] = synthesize(state["findings"])
-    
-    return state
+**先想一个问题**
+
+你要做一条内容生产线：先查资料，再写稿，最后过一遍合规检查。用三个函数加 if 串起来也能跑，可中间某步失败时，你说不出哪一步的产出已经落库。
+
+Flow 就是给这种多步骤任务加一层"记录每一步"的骨架。
+
+!!! note "术语：Flow"
+    Flow 是 CrewAI 中描述"步骤之间怎么连"的编排单元。它负责顺序、分支、状态和重试，不负责某个步骤内部由哪个模型完成。例子：节点 A 跑完才能跑 B，这个先后关系写在 Flow 里。
+
+!!! note "术语：DAG"
+    DAG 是有向无环图的英文缩写（Directed Acyclic Graph，有向无环图）。有向指边只朝一个方向走，无环指不能绕回自己。例子：A 完成后才轮到 B，B 不能反过来触发 A。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：Flow 是一条带状态记录的传送带，每个节点是一段代码，谁先谁后由装饰器声明。
+    日常类比：像快递分拣线，包裹（state）在带上走，每个工位（节点）只做一件事，做完盖一个章。
+    类比不成立的地方：分拣线的工位顺序由机器焊死，而 Flow 的分支由运行期的返回值决定，同一份代码两次运行可能走不同支路。
+
+**图解**
+
+```mermaid
+flowchart LR
+  U["用户输入 topic"] --> F["Flow 编排层"]
+  F --> N1["节点一：建 Agent 与 Task"]
+  N1 --> N2["节点二：Crew.kickoff"]
+  N2 --> C["Crew 执行层"]
+  C --> A1["Agent：谁来做"]
+  C --> A2["Task：做什么"]
+  A1 --> R["CrewOutput"]
+  A2 --> R
+  R --> S["写回 state 并返回"]
 ```
 
-### 2.3 Crew 集成的 Flow
+1. 用户输入先从编排层进入，编排层不调用任何模型。
+2. 节点一负责构造 Agent 与 Task，这一步只是声明"计划"。
+3. 节点二调用 `kickoff()`，控制权交给执行层。
+4. 执行层里 Agent 决定"谁来做"，Task 决定"做什么"，两者组装成一次执行。
+5. 执行层产出一个 `CrewOutput` 结构化对象。
+6. 编排层把这个产物写回状态，再决定是否继续下一个节点。
+
+**一步一步来**
+
+第 1 步：先只写执行层，确认装配顺序。
 
 ```python
+# 依赖：pip install crewai
 from crewai import Agent, Task, Crew
 
-@flow
+researcher = Agent(                                # Agent 是"谁来做"
+    role="Research Analyst",
+    goal="Gather comprehensive information",
+    backstory="Expert at gathering and analyzing information.",
+    verbose=True,                                  # 打印推理过程，排障用
+)
+writer = Agent(
+    role="Content Writer",
+    goal="Write engaging content",
+    backstory="Skilled writer with expertise in creating compelling narratives.",
+    verbose=True,
+)
+research_task = Task(                              # Task 是"做什么"
+    description="Research the topic: AI Agents",
+    agent=researcher,                              # 每个 Task 必须绑定一个 Agent
+    expected_output="Comprehensive research notes",
+)
+write_task = Task(
+    description="Write an article based on research",
+    agent=writer,
+    expected_output="A well-structured article",
+)
+crew = Crew(                                       # 装配阶段，不产生模型调用
+    agents=[researcher, writer],
+    tasks=[research_task, write_task],             # 列表顺序即执行顺序
+    verbose=True,
+)
+```
+
+**这段代码在做什么**
+
+- 先建 Agent 再建 Task，因为每个 Task 的 `agent` 字段要指向一个已存在的 Agent。
+- `Crew(...)` 只是描述执行计划，构造本身很快，不代表任务已经开始跑。
+- `tasks` 列表的顺序就是顺序执行的顺序，框架默认不会替你重排依赖。
+- 若某个 Task 绑定的 Agent 不在 `agents` 列表里，要等运行时才报错。
+- `verbose=True` 在教学和排障时有用，生产环境会放大日志量。
+
+运行结果：这一段不触发模型调用，终端没有输出。
+
+第 2 步：把上面这段装进一条 Flow，让它成为流程的一步。
+
+```python
+from crewai.flow.flow import Flow, flow, start  # noqa: F401  Flow 与 start 供扩展时使用
+from crewai import Agent, Task, Crew
+
+@flow                                            # 把普通函数注册成一条流程
 def content_creation_flow(topic: str):
-    # 创建 Agent
-    researcher = Agent(
-        role="Research Analyst",
-        goal="Gather comprehensive information",
-        backstory="Expert at gathering and analyzing information.",
-        verbose=True
-    )
-    
-    writer = Agent(
-        role="Content Writer",
-        goal="Write engaging content",
-        backstory="Skilled writer with expertise in creating compelling narratives.",
-        verbose=True
-    )
-    
-    # 创建 Task
-    research_task = Task(
-        description=f"Research the topic: {topic}",
-        agent=researcher,
-        expected_output="Comprehensive research notes"
-    )
-    
-    write_task = Task(
-        description="Write an article based on research",
-        agent=writer,
-        expected_output="A well-structured article"
-    )
-    
-    # 创建 Crew 并执行
-    crew = Crew(
-        agents=[researcher, writer],
-        tasks=[research_task, write_task],
-        verbose=True
-    )
-    
-    result = crew.kickoff()
-    return {"article": result}
+    researcher = Agent(role="Research Analyst", goal="Gather information",
+                       backstory="Expert at gathering and analyzing information.")
+    writer = Agent(role="Content Writer", goal="Write engaging content",
+                   backstory="Skilled writer with expertise in creating compelling narratives.")
+    research_task = Task(description=f"Research the topic: {topic}",
+                         agent=researcher, expected_output="Comprehensive research notes")
+    write_task = Task(description="Write an article based on research",
+                      agent=writer, expected_output="A well-structured article")
+    crew = Crew(agents=[researcher, writer], tasks=[research_task, write_task])
+    return {"article": crew.kickoff()}                # 把结果包成流程产物
 ```
 
-## 3. 顺序执行、并行执行与条件执行
+**这段代码在做什么**
 
-### 3.1 顺序执行（Sequential）
+- `@flow` 把函数体声明成流程的主分支，函数返回值就是这次流程运行的产物。
+- 本例没有分支、没有循环、没有跨步骤共享状态，所以用无参函数加一个入参就够。
+- `kickoff()` 是同步阻塞调用，默认按 `tasks` 列表顺序串行推进。
+- 任何模型或工具的异常都会向上冒泡，中断整条流程。
+- 需要重试或兜底时，要在这一层外面包策略，而不是改 Crew 内部。
 
-顺序执行是最基本的编排模式，任务按定义顺序依次执行，每个任务在前一个任务完成后才开始。
+运行结果：`{"article": "...文章正文..."}`，其中正文由模型生成。
 
-```python
-# 第 1 段：导入依赖——分清“流程层”和“团队层”两套 API
-# Flow/flow/start 属于流程层：负责把多个步骤串成有状态、可比分支的编排单元；
-# Agent/Task/Crew 属于团队层：Agent 是“谁来做”，Task 是“做什么”，Crew 是把两者组装起来的执行容器。
-# 关键数据流：Agent 实例 → Task 实例（绑定 Agent）→ Crew → kickoff() 的返回值。
-# 易错点：这里的 start 在本片段中没有被使用，说明该教学片段只保留了“顺序执行”这一条主线；
-# 真实项目里带分支/循环的流程，入口通常由被 @start 标注的方法（或 @router 分支）承担。
-from crewai.flow.flow import Flow, flow, start
-from crewai import Agent, Task, Crew
+需核对官方文档：函数式 `@flow` 装饰器在你安装的 crewai 版本中是否可用，以及它与类式 `Flow` 加 `@start` 的入口差异。
 
-# 第 2 段：把普通函数注册成一条可被框架驱动的流程入口
-# @flow 把函数的函数体声明为流程的“主分支”，返回值即这次流程运行的产物；
-# 之所以能这样写，是因为本例没有分支、没有循环、没有需要跨步骤共享的状态，
-# 用一个无参函数就足以表达“一条直线跑到底”的流水线。
-# 易错点：@flow 修饰的是“流程定义”而不是普通工具函数，不要把它与业务函数混用；
-# 一旦后续需要外部输入或状态读写，就该改用带 state 的 Flow 子类，而不是在这里加参数。
-@flow
-def sequential_pipeline_flow():
-    # 第 3 段：先建 Agent，再依赖 Agent 建 Task，顺序不可颠倒
-    # create_agents()/create_tasks() 是外部封装（本片段省略了实现），这种拆分让“角色定义”与“任务定义”解耦，
-    # 便于单独测试角色提示词，也方便复用同一批 Agent 跑不同任务集。
-    # 关键数据流：agents 列表被作为参数交给 create_tasks，因为每个 Task 必须绑定一个 Agent 来决定“谁来干”；
-    # 若先建 tasks 再造 agents，就只能事后回填 Task.agent，破坏依赖方向且容易漏绑。
-    agents = create_agents()
-    tasks = create_tasks(agents)
-    
-    # 第 4 段：声明式装配 Crew——构造阶段不产生任何 LLM 调用
-    # 这段代码只是“描述”执行计划：把 Agent 池和 Task 序列交给 Crew，真正的开销全部推迟到 kickoff() 时发生，
-    # 所以 Crew(...) 构造本身很快，不能把它当作“已经开始跑了”。
-    # agents 与 tasks 传入的是同一批对象的引用（不是深拷贝），构造后再改动 agent 的属性会连带影响已装配的 crew。
-    crew = Crew(
-        agents=agents,
-        tasks=tasks,  # tasks 列表顺序即执行顺序；Crew 默认不会替你做拓扑排序，依赖要靠 Task.context 显式表达
-        verbose=True  # 打印每个 Agent 的推理与工具调用过程：教学/排障用，生产环境会明显增加日志噪声与开销
-    )
-    
-    # 第 5 段：启动执行并把结果交给上层流程
-    # kickoff() 是同步阻塞调用，默认按 tasks 列表顺序串行推进，复杂度约等于 Σ(每个 Task 触发的 LLM 调用次数 × 单次调用成本)，
-    # 而 Task 的“重试 + 工具调用轮次”通常才是真正的耗时来源，Agent 数量只是放大系数。
-    # 边界与易错点：返回值是 CrewOutput（结构化结果对象），此处直接作为流程函数的输出，框架会把它当作该 flow 的产物；
-    # 任何 LLM/工具异常都会向上冒泡并中断整条流程，需要重试或兜底时应在这一层外面包一层策略，而不是在 Crew 里硬改。
-    # 另外，若某个 Task 绑定的 Agent 不在 agents 列表中，会在运行时才报错——这是装配阶段最容易漏的检查。
-    return crew.kickoff()
-```
-```python
-# 显式顺序执行示例
-@flow
-def explicit_sequential_flow(data: str):
-    result1 = step_one(data)      # 第一步
-    result2 = step_two(result1)   # 第二步，等待第一步完成
-    result3 = step_three(result2) # 第三步，等待第二步完成
-    return result3
-```
+**动手验证**
 
-### 3.2 并行执行（Parallel）
-
-并行执行允许多个任务同时进行，显著提升执行效率。CrewAI 通过 Crew 的 `process` 参数控制并行策略。
+下面这个脚本用标准库复刻"编排层持有状态、执行层产出结果"的分工，不需要 API Key。
 
 ```python
-from crewai import Crew
+# 依赖：Python 3.10+，只用标准库
+# 对照关系：run_pipeline 对应 @flow 函数，STEPS 对应 Crew 的 tasks 列表
 
-@flow
-def parallel_research_flow(topics: list[str]):
-    agents = []
-    tasks = []
-    
-    for topic in topics:
-        agent = Agent(
-            role=f"Researcher for {topic}",
-            goal=f"Research {topic}",
-            backstory=f"Expert researcher specializing in {topic}."
-        )
-        
-        task = Task(
-            description=f"Research and summarize: {topic}",
-            agent=agent,
-            expected_output="A detailed summary with key points"
-        )
-        
-        agents.append(agent)
-        tasks.append(task)
-    
-    # 顺序模式
-    crew_sequential = Crew(
-        agents=agents,
-        tasks=tasks,
-        process=Process.sequential
-    )
-    
-    # 并行模式（所有任务同时开始）
-    crew_parallel = Crew(
-        agents=agents,
-        tasks=tasks,
-        process=Process.hierarchical  # 也可使用并行执行
-    )
-    
-    return crew_parallel.kickoff()
-```
+STEPS = ["research", "write", "compliance"]          # 顺序即执行顺序
 
-### 3.3 使用 `or` 运算符并行执行多个 Flow
-
-```python
-from crewai.flow.flow import Flow, flow
-from crewai.flow.logger import FlowLogger
-import asyncio
-
-# 第 1 段：导入依赖（编排框架 + 日志 + 异步运行时）
-# Flow/flow 提供"把普通函数声明成流程"的能力，FlowLogger 用于流程级日志追踪，
-# asyncio 是并行协程调度的底座——三者缺一，后面要么没有流程语义，要么无法并发。
-# 注意：Flow 此处虽未直接使用，通常是作为类型标注/继承基类的保留导入，勿删。
-
-# 第 2 段：用 @flow 声明一个"并行编排"流程入口
-# @flow 会把被装饰函数注册成一个可被框架调度/观测的 Flow，而不是普通函数；
-# 因此这里的返回值语义是"流程要执行的内容"，而非最终业务数据。
-@flow
-def parallel_flows():
-    # 使用 asyncio.gather 并行执行多个 Flow
-
-    # 第 3 段：定义内部协程，并用 gather 并发拉起多个子流程
-    # 为什么要包一层 async def：gather 必须运行在事件循环里，外层同步的 parallel_flows
-    # 只负责"声明"，真正 await 的动作交给返回的这个协程，避免在定义阶段就阻塞。
-    # 关键点 return_exceptions=True：任一子流程抛错时不会被立即中断，
-    # 而是把异常对象当作结果塞回 results 列表——保证三个分支的成败都能被聚合观察，
-    # 由调用方按位置判断第 i 项是结果还是 Exception（易错点：不做判断直接取值会踩异常）。
-    # 并发收益：总耗时约为 max(flow_a, flow_b, flow_c)，而非三者之和。
-    async def run_parallel():
-        results = await asyncio.gather(
-            flow_a(),
-            flow_b(),
-            flow_c(),
-            return_exceptions=True
-        )
-        return results
-
-    # 第 4 段：返回协程对象交由外层事件循环驱动
-    # 注意此处没有 await，返回的是"待执行的协程"，调用方需 await 或
-    # asyncio.run(...) 才会真正触发 run_parallel；直接取返回值不会产生任何执行。
-    return run_parallel()
-```
-### 3.4 条件执行（Conditional）
-
-条件执行允许根据中间结果动态决定下一步执行路径。
-
-```python
-from crewai.flow.flow import Flow, flow, start
-from crewai.flow.utils import Condition
-
-@flow
-def conditional_analysis_flow(data: dict):
-    state = {"data": data, "analysis_type": None, "results": {}}
-    
-    # 第一步：初步分析
-    state["initial_result"] = perform_initial_analysis(state["data"])
-    
-    # 条件判断
-    if state["initial_result"]["confidence"] > 0.8:
-        state["analysis_type"] = "deep"
-        state["results"] = perform_deep_analysis(state["data"])
-    elif state["initial_result"]["confidence"] > 0.5:
-        state["analysis_type"] = "standard"
-        state["results"] = perform_standard_analysis(state["data"])
-    else:
-        state["analysis_type"] = "manual_review"
-        state["results"] = flag_for_manual_review(state["data"])
-    
-    # 根据分析类型选择后续步骤
-    if state["analysis_type"] == "deep":
-        state["final_report"] = generate_detailed_report(state["results"])
-    else:
-        state["final_report"] = generate_summary_report(state["results"])
-    
+def run_pipeline(topic: str) -> dict:
+    state = {"topic": topic, "trace": [], "article": None}
+    for name in STEPS:                               # 模拟顺序执行
+        state["trace"].append(name)                  # 每步都落一条痕迹
+        if name == "write":
+            state["article"] = f"article about {topic}"
     return state
+
+result = run_pipeline("AI Agents")
+assert result["trace"] == ["research", "write", "compliance"]   # 顺序被固定
+assert result["article"] == "article about AI Agents"
+assert "topic" in result                                # 输入被保留在状态里
+print(result)
+print("OK")
 ```
 
-### 3.5 使用 Route 装饰器实现条件路由
+预期输出：
+
+```
+{'topic': 'AI Agents', 'trace': ['research', 'write', 'compliance'], 'article': 'article about AI Agents'}
+OK
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 构造 Crew 后以为任务已开始 | `Crew(...)` 只是装配，开销推迟到 `kickoff()` | 在日志里打印 `kickoff` 前后的时间戳 |
+| 任务顺序和预期不一致 | 依赖只写了列表顺序，没写 `Task.context` | 把上游 Task 放进下游的 `context` |
+| 运行时才报 Agent 未找到 | Task 绑定的 Agent 没进 `agents` 列表 | 装配后加一次断言校验绑定关系 |
+| 返回值直接当字典用报错 | `kickoff()` 返回的是 `CrewOutput` 而非 dict | 先取字段再包成 dict 返回 |
+
+**用在哪里**
+
+- 内容生产流水线。业务背景是市场团队每天要产出若干篇选题稿。知识用法是把"查资料、写初稿、合规检查"拆成三个节点，用 state 记录每步产物。收益指标是单篇稿件的返工轮次与人工审阅耗时。什么时候不该用：稿件只有一段 200 字的短文案，加编排层只会增加阅读代码的成本。
+- 后台管理的批量导入。业务背景是运营把 CSV 一次性导入商品库。知识用法是同一条 Flow 处理单条记录，外层用循环驱动多条。收益指标是导入失败条数与重试成功率。什么时候不该用：导入只有一次性几十行数据，直接写脚本更快。
+- 多阶段数据处理管道。业务背景是把原始日志清洗、聚合、生成日报。知识用法是每阶段一个节点，节点产物写入 state 便于回溯。收益指标是从"发现问题"到"定位到哪一阶段"的排查时长。什么时候不该用：每一步互相独立且无共享状态，直接并行跑函数即可。
+
+**行业实践**
+
+- CrewAI 官方文档的 Flows 章节把节点声明为事件驱动的 `@start`、`@listen`、`@router`，并支持在节点间传递结构化状态。借鉴方式：先按官方文档写类式 Flow，把每个业务步骤落成一个方法名，代码可读性来自方法名而不是注释。
+- Prefect 官方文档的 Flows 章节把"运行状态"和"重试"作为框架的一等公民，流程运行有独立的状态记录。借鉴方式：在你的持久化结构里固定写出 `created_at` 与 `updated_at`，让外部系统能识别一次运行。
+- Pydantic 官方文档在模型章节说明可变默认值要用工厂函数而不是字面量。借鉴方式：状态模型里的列表字段一律写 `default_factory=list`。
+
+怎么借鉴到你的项目：先照着官方文档的类式写法搭骨架，把持久化字段和状态模型定下来，再往里填业务逻辑。
+
+**小结**
+
+- Flow 管步骤之间的连接，Crew 管单个步骤内部怎么执行。
+- Agent 回答"谁来做"，Task 回答"做什么"，Crew 把两者装配起来。
+- 装配和运行是两件事，`Crew(...)` 不触发模型调用，`kickoff()` 才触发。
+
+## 2. 用 @flow 与 @start 定义一条 Flow
+
+**先想一个问题**
+
+同一条合规检查流程，既要在接口请求里跑一次，也要在定时任务里跑一次。你不想写两遍节点顺序，更不想在业务函数里塞调用关系。
+
+装饰器就是解决这件事的：顺序写在标记里，不写在函数体里。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：装饰器是贴在方法上的标签，框架扫描标签拼出执行顺序。
+    日常类比：像会议室的座签，谁坐主位（入口）、谁坐次位（依赖上游）由座签决定，不由进门先后决定。
+    类比不成立的地方：座签是静态的，而 `@router` 返回的标签在运行期才确定，同一次会议可能换座位。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant D as 定义阶段
+  participant R as 注册表
+  participant E as 执行引擎
+  D->>R: 扫描 start 与 router 标记
+  R->>R: 按声明的上游拼出执行顺序
+  E->>R: 读取入口节点
+  E->>E: 运行入口并写入 state
+  E->>R: 取下一个依赖已满足的节点
+  E->>E: 运行节点并把返回值当分支标签
+```
+
+1. 定义阶段只做一件事：把带标记的方法登记进注册表。
+2. 注册表根据每个方法声明的上游，拼出一张执行顺序图。
+3. 执行引擎从入口节点开始，入口没有任何上游依赖。
+4. 入口运行结束后把结果写进 `self.state`。
+5. 引擎取出下一个依赖已满足的节点。
+6. 如果该节点是路由器，它的返回值会决定激活哪条下游分支。
+
+**一步一步来**
+
+第 1 步：写一个只有一个入口节点的类式 Flow。
 
 ```python
-# 第 1 段：导入依赖与定义"路由标签"枚举（这一段建立流程可用的分支标识）
-# 说明：@router 装饰器通过"上游节点返回的标签"与"下游节点声明的 route_options"做等值匹配，
-# 因此标签必须是稳定、可比较的值；用 Enum 而非裸字符串可避免拼写错误导致的静默丢分支。
-# 易错点：本段只导入了 Flow/flow/router/Route，但后面用了 @start，实际运行时需要额外
-# 从 crewai.flow.flow 导入 start（或使用该库提供的等效入口），否则会在类定义阶段报 NameError。
-from crewai.flow.flow import Flow, flow, router, Route
+from crewai.flow.flow import Flow, flow, start
+
+@flow                                            # 类式写法同样用 @flow 标记
+class GreetingFlow(Flow):
+    @start()                                     # 入口节点：没有上游依赖
+    def build_topic(self):
+        self.state["topic"] = "AI Agents"        # 写入共享状态
+        return self.state["topic"]               # 返回值是该节点的输出
+
+flow_instance = GreetingFlow()
+flow_instance.kickoff()                          # 需要核对官方文档：类式 Flow 的启动方法名
+print(flow_instance.state)
+```
+
+**这段代码在做什么**
+
+- `@start()` 声明这是入口，执行顺序由装饰器决定，不由代码书写位置决定。
+- `self.state` 是整条流程唯一的跨节点数据通道。
+- 节点没有 `return` 时，隐式返回 `None`，此时下游不能靠返回值取数据，只能读 state。
+- 状态必须落进 `self.state`，放在局部变量里的值出不了这个节点。
+- 类式写法便于把每个节点拆成单独的方法，便于按方法名阅读。
+
+运行结果：`{'topic': 'AI Agents'}`。
+
+需核对官方文档：`Flow` 子类的启动方法名与 `@start` 的具体导入路径，不同版本可能不同。
+
+第 2 步：加一个路由器节点，把连续的数值分成互斥分支。
+
+```python
 from enum import Enum
+from crewai.flow.flow import Flow, flow, router, Route
 
 class RouteOptions(Enum):
-    # 枚举值（右侧字符串）是真正参与匹配和持久化的内容；成员名只是代码里的可读别名。
-    HIGH_PRIORITY = "high_priority"
+    HIGH_PRIORITY = "high_priority"              # 右侧字符串才是真正参与匹配的值
     STANDARD = "standard"
     LOW_PRIORITY = "low_priority"
     ESCALATE = "escalate"
 
-# 第 2 段：定义 Flow 主体与唯一入口节点（这一段负责"读文档 → 分类 → 写入共享状态"）
-# @flow 会把普通类改造成可编排的 Flow：自动收集 @start/@router/@listen 标记的方法并生成执行图。
-# @start() 声明流程起点，它没有任何上游依赖，所以整个流程从这里被触发。
 @flow
 class DocumentProcessingFlow(Flow):
     @start()
     def classify_document(self):
-        # 关键数据流：self.state 是整条流程唯一的跨节点数据总线，
-        # 分类结果必须以 state 形式落地，下游 router 才能读到，不能只靠局部变量传递。
-        # 注意：classify 是未定义的外部占位函数，教学示例需自行实现或注入。
-        # 本节点没有 return，即隐式返回 None —— 这是刻意的：它不通过返回值向后传递，
-        # 而是由下游 @router(classify_document) 显式声明"我在这个节点之后运行"。
-        self.state["classification"] = classify(self.state["document"])
+        self.state["priority"] = classify(self.state["document"])
 
-    # 第 3 段：优先级路由器（这一段把连续的 priority 数值离散成 4 个互斥的 RouteOptions 标签）
-    # @router(上游节点) 表示本节点在上游完成后执行，并且返回的标签将决定走哪条分支。
-    # 关键意图：把"业务判断"和"具体处理逻辑"解耦，新增档位时只改这里，不动下游处理器。
-    # 易错点：必须从高到低用 elif 判断，且阈值为 >=9 / >=5 / >=2 / <2，
-    # 区间是左闭右开的分段（9-∞、5-8、2-4、<2）；顺序颠倒或写成 > 会漏掉边界值。
-    @router(classify_document)
+    @router(classify_document)                   # 声明上游是 classify_document
     def route_based_on_priority(self):
-        priority = self.state["classification"]["priority"]
-        
-        if priority >= 9:
+        priority = self.state["priority"]
+        if priority >= 9:                        # 资料给的档位是 9 / 5 / 2 / 其余（来源：本站该页面的旧版内容，以原文为准）
             return RouteOptions.HIGH_PRIORITY
         elif priority >= 5:
             return RouteOptions.STANDARD
@@ -333,319 +312,584 @@ class DocumentProcessingFlow(Flow):
             return RouteOptions.LOW_PRIORITY
         else:
             return RouteOptions.ESCALATE
-    
-    # 第 4 段：四条互斥分支处理器（这一段按标签各自执行对应策略，并回写处理结果）
-    # 四个节点都挂在同一个上游 route_based_on_priority 上，靠 route_options 做白名单过滤：
-    # 只有"上游返回值 ∈ route_options"的那个节点会被激活，其余三个被跳过。
-    # 由于上游每次只返回一个枚举值，实际是四选一的分支，而不是四路并行。
-    # 复杂度：每个分支内部都是一次 O(1)（或由 process_* 自身决定）的委托调用，流程开销在调度层。
-    @router(route_based_on_priority, route_options=[RouteOptions.HIGH_PRIORITY])
-    def process_high_priority(self):
-        # process_expedited / process_standard / process_batch 均为外部占位函数，需自行实现。
-        # 返回值同时承担两个职责：写入 state 供后续节点使用，并作为该节点的输出参与流程记录。
-        self.state["processed"] = process_expedited(self.state["document"])
-        return self.state["processed"]
-    
-    @router(route_based_on_priority, route_options=[RouteOptions.STANDARD])
-    def process_standard(self):
-        self.state["processed"] = process_standard(self.state["document"])
-        return self.state["processed"]
-    
-    @router(route_based_on_priority, route_options=[RouteOptions.LOW_PRIORITY])
-    def process_low_priority(self):
-        self.state["processed"] = process_batch(self.state["document"])
-        return self.state["processed"]
-    
-    # 边界条件：priority < 2（含非法/缺失值落入 else）时才走到这里。
-    # 该分支不产生 processed，而是打上 escalated 标记并触发人工介入，属于"逃逸路径"，
-    # 因此返回整个 state（便于人工看到分类上下文），而不是单一处理结果。
-    @router(route_based_on_priority, route_options=[RouteOptions.ESCALATE])
-    def escalate(self):
-        self.state["escalated"] = True
-        notify_human(self.state["document"])
-        return self.state
 ```
-### 3.6 条件循环执行
+
+**这段代码在做什么**
+
+- `@router(上游)` 表示这个节点在上游跑完后执行，返回值决定走哪条支路。
+- 把优先级数值离散成四个互斥标签，新增档位时只改这一处。
+- `elif` 必须从高到低写，否则边界值 9 会先命中 `>= 5`，落进错误的档位。
+- 用 Enum 而不是裸字符串，可以避免拼写错误导致分支静默失效。
+- 下游分支节点用 `route_options=[RouteOptions.HIGH_PRIORITY]` 做白名单过滤。
+
+运行结果：`route_based_on_priority` 返回一个枚举成员，下游只有匹配的那个分支被激活。
+
+`classify` 是外部占位函数，教学示例需要自行实现或注入。
+
+**动手验证**
+
+下面的脚本用标准库复刻"注册表 + 分支标签"的机制，不依赖 crewai。
 
 ```python
+# 依赖：Python 3.10+，只用标准库
+from enum import Enum
+
+class Route(Enum):
+    HIGH = "high"
+    STANDARD = "standard"
+    ESCALATE = "escalate"
+
+class MiniFlow:
+    def __init__(self):
+        self.state = {}
+        self.trace = []
+
+    def classify(self, document):
+        self.state["document"] = document
+        self.state["priority"] = document["priority"]     # 写进状态，供路由器读取
+        self.trace.append("classify")
+
+    def route(self):
+        priority = self.state["priority"]
+        self.trace.append("route")
+        if priority >= 9:
+            return Route.HIGH
+        if priority >= 5:
+            return Route.STANDARD
+        return Route.ESCALATE
+
+    def run(self, document):
+        self.classify(document)                # 入口固定先跑
+        label = self.route()                   # 再跑路由器
+        self.state["branch"] = label.value
+        return self.state
+
+f = MiniFlow()
+assert f.run({"priority": 9})["branch"] == "high"          # 边界值走高档
+assert MiniFlow().run({"priority": 5})["branch"] == "standard"
+assert MiniFlow().run({"priority": 1})["branch"] == "escalate"
+assert MiniFlow().run({"priority": 4})["branch"] == "escalate"
+print(MiniFlow().run({"priority": 5}))
+print("OK")
+```
+
+预期输出：
+
+```
+{'document': {'priority': 5}, 'priority': 5, 'branch': 'standard'}
+OK
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 类定义阶段报 NameError | `@start` 少写导入 | 从流程模块把 `start`、`router` 一起导入 |
+| 分支永远不触发 | 路由器返回值与 `route_options` 类型不一致 | 两边统一用同一个 Enum 成员 |
+| 边界值落错档 | `elif` 顺序颠倒或写成 `>` | 从高到低写，边界用 `>=` |
+| 下游读不到上游数据 | 上游把结果放在局部变量 | 上游必须写进 `self.state` |
+
+**用在哪里**
+
+- 客服工单自动分派。业务背景是工单按紧急度进入不同处理队列。知识用法是路由器把紧急度数值映射成队列标签，四个分支各自处理。收益指标是分派错误率与首次响应时长。什么时候不该用：只有"高"和"低"两档且规则半年不变，直接写 if 更好读。
+- 内容风控分级。业务背景是模型给出的风险分需要落到不同审核策略。知识用法是把阈值集中在路由器一处，审计时只读这一处。收益指标是策略变更的回归测试用例数量。什么时候不该用：阈值需要业务方在后台实时改，硬编码的阈值不合适。
+- 文档入库前的分类。业务背景是合同、发票、简历走不同解析器。知识用法是用路由器选择解析分支，各分支独立演进。收益指标是新增文档类型的开发耗时。什么时候不该用：分类结果还需要人工二次确认，分支不该自动往下跑。
+
+**行业实践**
+
+- CrewAI 官方文档 Flows 章节给出 `@router` 返回标签、下游用 `route_options` 白名单接收的写法。借鉴方式：所有分支标签集中定义成 Enum，禁止在节点里写字面量字符串。
+- Python 官方文档 `enum` 模块章节说明枚举成员是单例，比较安全。借鉴方式：分支判断统一用 `is` 或 `==` 比较枚举成员，不要比较 `.value`。
+- 需核对官方文档：`route_options` 参数在当前 crewai 版本中的确切名称与取值类型。
+
+怎么借鉴到你的项目：先把分支标签列出来，写成一个 Enum 文件，再让路由器和分支节点都引用它。
+
+**小结**
+
+- `@start` 标记入口，`@router` 标记分叉点，上游关系写在装饰器参数里。
+- 路由器只做判断，不写业务处理，业务处理留给各自的分支节点。
+- 所有跨节点数据必须落进 `self.state`。
+
+## 3. 顺序、并行与条件执行
+
+**先想一个问题**
+
+同一条研究流程要覆盖三个话题，逐个跑要等三倍时间。你想让三个话题同时开始，但最后汇总时不能丢掉失败分支的错误信息。
+
+这就是执行形态的问题：谁等谁、谁和谁同时跑、哪条路被选中。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：顺序是接力跑，并行是发令枪，条件是岔路口。
+    日常类比：接力跑必须等上一棒交棒；发令枪一响各跑各的；岔路口只走其中一条。
+    类比不成立的地方：接力跑的交棒点是固定的，而 Flow 的顺序由 `tasks` 列表或上游声明决定，改动一处就会改变全局顺序。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["上游产物"] --> B["顺序：逐个等待前一个完成"]
+  A --> C["并行：gather 同时拉起多个分支"]
+  A --> D["条件：按返回值选一条路"]
+  D --> E["router 返回标签"]
+  E --> F["匹配 route_options 的分支被激活"]
+  C --> G["结果列表，失败项以异常对象形式保留"]
+  B --> H["单一返回值，继续往下传"]
+```
+
+1. 顺序执行从上游产物出发，每一步都要等前一步完成。
+2. 并行执行在同一时刻拉起多个分支，总耗时取决于最慢的那个分支。
+3. 条件执行先算出标签，再决定激活哪个分支。
+4. 被选中的分支之外，其他分支节点被跳过，不会执行。
+5. 并行结果以列表形式返回，其中失败项是异常对象而不是结果值。
+6. 顺序执行只产出一个返回值，直接作为下一步输入。
+
+**一步一步来**
+
+第 1 步：写显式顺序执行。
+
+```python
+from crewai.flow.flow import flow
+
+@flow
+def explicit_sequential_flow(data: str):
+    result1 = step_one(data)          # 第一步
+    result2 = step_two(result1)       # 第二步，等第一步完成
+    result3 = step_three(result2)     # 第三步，等第二步完成
+    return result3
+
+def step_one(data):
+    return data.upper()               # 占位实现，便于本地验证
+```
+
+**这段代码在做什么**
+
+- 顺序执行靠 Python 的函数调用链表达，前一个返回值直接作为后一个入参。
+- 每一步都是阻塞的，整条链的耗时是三步之和。
+- 中间某一步抛错，后面两步不会执行。
+- 这种写法没有共享状态，适合纯函数式的数据处理。
+
+运行结果：`explicit_sequential_flow("abc")` 返回 `"ABC"`。
+
+第 2 步：写并行执行。
+
+```python
+import asyncio
+from crewai.flow.flow import flow
+
+@flow
+def parallel_flows():
+    async def run_parallel():
+        results = await asyncio.gather(
+            flow_a(),                 # 三个分支同时被拉起
+            flow_b(),
+            flow_c(),
+            return_exceptions=True,   # 任一分支抛错也把异常当结果返回
+        )
+        return results
+
+    return run_parallel()             # 返回协程，交给事件循环驱动
+```
+
+**这段代码在做什么**
+
+- 包一层 `async def` 是因为 `gather` 必须运行在事件循环里。
+- 外层函数没有 `await`，返回的是待执行的协程对象，直接取返回值不会触发任何执行。
+- `return_exceptions=True` 让单个分支失败时其他分支继续跑完。
+- 结果列表按传入顺序排列，第 i 项可能是结果，也可能是异常对象。
+- 总耗时由最慢的分支决定，而不是各分支耗时相加。
+
+运行结果：`['结果 A', '结果 B', 异常对象]` 形式的三元素列表。
+
+`flow_a`、`flow_b`、`flow_c` 是占位函数，需要由你提供实现。
+
+第 3 步：写带循环的条件执行。
+
+```python
+from crewai.flow.flow import flow
+
 @flow
 def iterative_refinement_flow(initial_content: str, max_iterations: int = 3):
-    self.state = {
+    state = {
         "content": initial_content,
         "iterations": 0,
         "quality_score": 0.0,
-        "feedback_history": []
+        "feedback_history": [],
     }
-    
-    while self.state["iterations"] < max_iterations:
-        if self.state["quality_score"] >= 0.9:
-            break  # 质量达标，提前退出
-        
-        # 改进内容
-        improved = improve_content(self.state["content"])
-        
-        # 评估质量
-        self.state["quality_score"] = evaluate_quality(improved)
-        self.state["feedback_history"].append(self.state["quality_score"])
-        
-        # 更新内容
-        self.state["content"] = improved
-        self.state["iterations"] += 1
-    
-    return self.state
+    while state["iterations"] < max_iterations:
+        if state["quality_score"] >= 0.9:            # 阈值 0.9，上限 3 次，来源：本站该页面的旧版内容，以原文为准
+            break                                    # 质量达标，提前退出
+        improved = improve_content(state["content"])
+        state["quality_score"] = evaluate_quality(improved)
+        state["feedback_history"].append(state["quality_score"])
+        state["content"] = improved
+        state["iterations"] += 1
+    return state
 ```
+
+**这段代码在做什么**
+
+- `while` 循环的终止条件有两个：次数上限和质量阈值，先命中哪个就退出。
+- 计数字段必须显式自增，否则循环不会结束。
+- 每次迭代都往 `feedback_history` 追加分数，事后能看出质量是否在收敛。
+- 循环体里先改进再评分，所以退出时的 `content` 是最后一次改进后的版本。
+- 循环内部若调用模型，失败会直接抛出，需要外层包错误处理。
+
+运行结果：`{'content': ..., 'iterations': 2, 'quality_score': 0.93, 'feedback_history': [0.61, 0.93]}`，具体数值取决于实现。
+
+**动手验证**
+
+下面的脚本验证并行的并发效果与失败隔离，使用标准库，结果可复现。
+
+```python
+# 依赖：Python 3.10+，只用标准库
+import asyncio
+
+peak = 0                       # 记录同时在跑的分支数
+running = 0
+
+async def branch(name, fail=False):
+    global peak, running
+    running += 1
+    peak = max(peak, running)  # 并发峰值
+    await asyncio.sleep(0.05)  # 模拟等待外部服务
+    running -= 1
+    if fail:
+        raise ValueError(f"{name} failed")
+    return f"{name} ok"
+
+async def main():
+    results = await asyncio.gather(
+        branch("a"), branch("b", fail=True), branch("c"),
+        return_exceptions=True,
+    )
+    return results
+
+results = asyncio.run(main())
+assert peak == 3                                     # 三个分支确实同时跑
+assert results[0] == "a ok"                          # 成功项是结果
+assert isinstance(results[1], ValueError)            # 失败项是异常对象
+assert str(results[1]) == "b failed"
+assert results[2] == "c ok"                          # 一个失败不影响其他分支
+assert running == 0                                  # 计数被正确归还
+print(results)
+print("OK")
+```
+
+预期输出：
+
+```
+['a ok', ValueError('b failed'), 'c ok']
+OK
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 并行分支返回协程对象 | 忘记 `await` 或没有事件循环驱动 | 用 `asyncio.run` 包裹外层调用 |
+| 一个分支失败导致全部结果丢失 | 没开 `return_exceptions` | 打开该参数，再逐项判断类型 |
+| 循环不结束 | 计数字段没自增或阈值永远达不到 | 显式自增并加硬上限 |
+| 并行结果顺序错乱 | 依赖结果列表的下标契约 | 给每个分支带上业务标识再汇总 |
+
+**用在哪里**
+
+- 电商商品详情页的多路取数。业务背景是一次请求要取价格、库存、评价三份数据。知识用法是用 `gather` 并发取数，任一失败时用兜底值补齐。收益指标是首屏接口的 P95 延迟与降级率。什么时候不该用：三份数据里有强依赖，价格要等库存算完才能定，此时顺序执行不可避免。
+- 后台管理的数据核对任务。业务背景是每晚核对多个供应商的对账文件。知识用法是每个供应商一个并行分支，失败隔离后单独重跑。收益指标是核对任务的整体时长与失败重跑次数。什么时候不该用：供应商之间有共享的写入资源，并发会互相覆盖。
+- 稿件质量迭代。业务背景是初稿质量不达标时需要多轮打磨。知识用法是 `while` 循环加质量阈值与次数上限。收益指标是达标稿件的占比与平均迭代轮次。什么时候不该用：每轮打分不收敛，循环只会烧钱，此时应改为人工介入。
+
+**行业实践**
+
+- CrewAI 官方文档的 Process 章节区分顺序与分层两种编排策略，顺序按任务列表推进，分层由一个管理角色分派。借鉴方式：先用顺序跑通，确认收益后再换分层，不要一开始就上分层。
+- Python 官方文档 `asyncio` 任务与协程章节说明 `gather` 的 `return_exceptions` 参数会改变聚合语义。借鉴方式：在代码里对每个结果显式做类型判断，不要假设它们都是正常值。
+- 需核对官方文档：`Process.hierarchical` 是否被文档描述为并行执行，本页资料里的注释把它当作并行使用，需以官方说明为准。
+
+怎么借鉴到你的项目：给每个并行分支补一个业务标识字段，汇总时按标识对齐，避免依赖列表下标。
+
+**小结**
+
+- 顺序靠调用链，并行靠 `gather`，条件靠 `@router` 返回的标签。
+- 并行的总耗时由最慢分支决定，失败隔离依赖 `return_exceptions`。
+- 循环一定要同时有阈值退出和次数上限两个出口。
 
 ## 4. 自定义逻辑与代码集成
 
-### 4.1 集成外部 API
+**先想一个问题**
+
+你的 Flow 需要调一次内部风控接口，再查一次数据库，最后写一份报告。这三件事都不是模型调用，但都在流程中间。
+
+编排层必须能容纳普通代码，否则流程只能停在模型这一步。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：Flow 节点里可以放任何 Python 代码，只要把结果写进 state。
+    日常类比：像插座，模型、HTTP 客户端、数据库连接都能插上去，插座的形状由 state 决定。
+    类比不成立的地方：插座不会记录你插过什么，而 Flow 的每个节点都要把产物落到 state，否则下游读不到。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["Flow 节点"] --> B["HTTP 接口调用"]
+  A --> C["数据库读写"]
+  A --> D["本地文件读写"]
+  A --> E["自定义工具 BaseTool"]
+  B --> F["结果写回 state"]
+  C --> F
+  D --> F
+  E --> F
+  F --> G["下游节点读取同一份 state"]
+```
+
+1. 一个节点同时可以调用接口、数据库、文件和自定义工具。
+2. 接口调用要显式处理状态码，非 2xx 时把错误写进 state，不要让它裸奔。
+3. 数据库操作要用 `try/finally` 保证连接关闭。
+4. 文件处理要区分"传入的是文件"与"传入的是目录"两种情况。
+5. 所有结果统一写回 state，下游节点只认 state，不认局部变量。
+6. 自定义工具的 `name` 与 `description` 决定模型何时选用它。
+
+**一步一步来**
+
+第 1 步：在节点里调用外部接口并把错误收敛进状态。
 
 ```python
 import requests
-from crewai.flow.flow import Flow, flow
+from crewai.flow.flow import flow
 
 @flow
 def api_integration_flow(query: str):
     state = {"query": query, "api_results": None, "processed": None}
-    
-    # 调用外部 API
     response = requests.post(
         "https://api.example.com/analyze",
         json={"query": query},
         headers={"Authorization": "Bearer YOUR_API_KEY"},
-        timeout=30
+        timeout=30,                                   # 超时 30 秒，来源：本站该页面的旧版内容，以原文为准
     )
-    
-    if response.status_code == 200:
+    if response.status_code == 200:                   # 只有 2xx 才当成功处理
         state["api_results"] = response.json()
     else:
         state["api_results"] = {"error": f"API error: {response.status_code}"}
-    
-    # 处理 API 结果
     state["processed"] = transform_results(state["api_results"])
-    
     return state
 ```
 
-### 4.2 集成数据库操作
+**这段代码在做什么**
+
+- `timeout=30` 是必要的：没有超时的请求会把流程永久挂住。
+- 非 200 时写入结构化错误对象，下游可以统一判断 `"error" in ...`。
+- 密钥写在代码里只是示例，真实项目要从环境变量读取。
+- 错误分支同样会流入 `transform_results`，所以该函数必须能处理错误对象。
+- 返回值是整个 state，保证流程任何位置中断都能看到上下文。
+
+运行结果：成功时 `state["api_results"]` 是接口返回的字典，失败时是含 `error` 键的字典。
+
+第 2 步：用 `BaseTool` 写一个可被模型选用的校验工具。
 
 ```python
-import psycopg2
-from crewai.flow.flow import Flow, flow
+from crewai.tools import BaseTool
 
-@flow
-def database_workflow_flow(user_id: int):
-    state = {"user_id": user_id, "user_data": None, "report": None}
-    
-    # 连接数据库
-    conn = psycopg2.connect(
-        host="localhost",
-        database="mydb",
-        user="admin",
-        password="password"
-    )
-    
-    try:
-        with conn.cursor() as cursor:
-            # 查询用户数据
-            cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-            state["user_data"] = cursor.fetchone()
-            
-            # 执行更新操作
-            cursor.execute(
-                "UPDATE users SET last_accessed = NOW() WHERE id = %s",
-                (user_id,)
-            )
-            conn.commit()
-    finally:
-        conn.close()
-    
-    state["report"] = generate_user_report(state["user_data"])
-    return state
+class DataValidationTool(BaseTool):
+    name: str = "data_validation"                     # 模型靠这个名字判断何时选用
+    description: str = "Validates input data against defined rules"
+
+    def _run(self, data: dict, rules: dict) -> dict:
+        errors = []
+        for field, rule in rules.items():
+            if field not in data:                     # 先判缺失，再判类型
+                if rule.get("required", False):
+                    errors.append(f"Missing required field: {field}")
+            elif rule.get("type"):
+                expected = rule["type"]
+                if not isinstance(data[field], expected):
+                    errors.append(
+                        f"Invalid type for {field}: "
+                        f"expected {expected.__name__}, got {type(data[field]).__name__}"
+                    )
+        return {"valid": len(errors) == 0, "errors": errors}
 ```
 
-### 4.3 集成文件处理
+**这段代码在做什么**
+
+- 子类只需要实现 `_run`，参数绑定和错误包装由框架在 `run()` 里完成。
+- 先判断字段是否存在，再判断类型，否则对不存在的键取值会直接抛 `KeyError`。
+- 校验结果累积成列表返回，一次给出全部问题，避免多轮往返。
+- 返回值固定为 `valid` 与 `errors` 两个键，方便序列化和上层判断。
+- 要在节点里调用 `validator.run(...)` 而不是直接调 `_run`，前者才会走框架的保护逻辑。
+
+运行结果：`{"valid": False, "errors": ["Missing required field: email"]}`。
+
+`isinstance` 遵循继承链，`bool` 是 `int` 的子类，所以 `age=True` 会被判为合法整数。业务上要拒绝布尔值就得额外排除 `bool`。
+
+第 3 步：把文件与目录两种情况都覆盖到。
 
 ```python
 import json
 from pathlib import Path
-from crewai.flow.flow import Flow, flow
+from crewai.flow.flow import flow
 
 @flow
 def file_processing_flow(input_file: str):
     state = {"input_file": input_file, "results": []}
-    
     input_path = Path(input_file)
-    
-    if input_path.is_file():
-        # 处理单个文件
+    if input_path.is_file():                          # 情况一：单个文件
         state["results"] = process_file(input_path)
-    elif input_path.is_dir():
-        # 处理目录中的所有文件
+    elif input_path.is_dir():                         # 情况二：目录
         for file_path in input_path.glob("*.json"):
-            result = process_file(file_path)
-            state["results"].append(result)
-    
-    # 保存结果
+            state["results"].append(process_file(file_path))
     output_file = input_path.parent / f"{input_path.stem}_processed.json"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(state["results"], f, ensure_ascii=False, indent=2)
-    
     return state
 ```
 
-### 4.4 自定义工具函数
+**这段代码在做什么**
+
+- 用 `Path` 而不是字符串拼接，跨平台路径分隔符的问题交给标准库处理。
+- 单文件场景与目录场景分开处理，两种返回值形状统一为列表。
+- `ensure_ascii=False` 保证中文不被转义成 `\uXXXX`。
+- 输出文件落在输入路径的同级目录，文件名加 `_processed` 后缀，避免覆盖原始文件。
+- 目录场景下 `glob` 只匹配 JSON，其他格式会被静默跳过。
+
+运行结果：同级目录下生成 `xxx_processed.json`，内容为处理结果列表。
+
+**动手验证**
+
+下面的脚本把"接口错误收敛 + 批量校验 + 落盘"合成一条可跑通的流程，只用标准库。
 
 ```python
-# 第 1 段：依赖导入（引入工具基类与流程装饰器）
-# BaseTool 是 CrewAI 提供的"可被 Agent 调用"的工具抽象，子类只需实现 _run，
-# 参数校验、错误包装、调用日志都由框架在 run() 里完成，因此业务方不该绕过它。
-from crewai.tools import BaseTool
-# flow 是把普通函数标记为流程入口的装饰器；它并不等于 Flow 子类那套
-# @start/@listen 事件驱动 API，两者别混用（Flow 被导入但此处未用到）。
-from crewai.flow.flow import Flow, flow
+# 依赖：Python 3.10+，只用标准库
+import json
+import tempfile
+from pathlib import Path
 
-# 第 2 段：校验工具的类声明与元信息
-# name/description 不是给人看的装饰：LLM 正是依据它们决定"何时选用这个工具"，
-# 措辞含糊会直接拉低 Agent 的选工具准确率，所以必须与 _run 的真实行为严格一致。
-class DataValidationTool(BaseTool):
-    name: str = "data_validation"
-    description: str = "Validates input data against defined rules"
-    
-    # 第 3 段：校验主逻辑——逐字段比对规则，累积全部错误而非遇到首个错误就中断
-    # 用列表累积而不是抛异常：批量表单场景下一次性返回所有问题，调用方可一轮改完，
-    # 避免"改一个、报一个"的多轮往返，也让输出天然可 JSON 序列化。
-    def _run(self, data: dict, rules: dict) -> dict:
-        errors = []
-        
-        # 第 4 段：遍历规则，先处理"字段是否存在"这一层
-        # 顺序是关键：必须先判缺失再判类型，否则对不存在的 key 取 data[field] 会直接
-        # KeyError 把流程打断。required 缺省 False，意味着"缺失但非必需"时静默跳过，
-        # 这正是"可选字段"语义的落地方式。
-        for field, rule in rules.items():
-            if field not in data:
-                if rule.get("required", False):
-                    errors.append(f"Missing required field: {field}")
-            # 第 5 段：字段存在时做类型校验
-            # 用 rule.get("type") 作真值判断，等于说没配 type 的规则整段跳过——校验是
-            # "按需生效"的，这也让同一套 rules 能混合必填检查和类型检查。
-            # 易错点：isinstance 遵循继承链，issubclass(bool, int) 为真，于是 age=True
-            # 会被判为合法 int；业务上要拒绝布尔就得额外排除 bool。
-            elif rule.get("type"):
-                expected_type = rule["type"]
-                if not isinstance(data[field], expected_type):
-                    # 报错串同时给出期望类型名与实际类型名，便于调用方或 LLM
-                    # 直接定位并自行修复，无需再去翻代码猜参数格式。
-                    errors.append(
-                        f"Invalid type for {field}: "
-                        f"expected {expected_type.__name__}, "
-                        f"got {type(data[field]).__name__}"
-                    )
-        
-        # 第 6 段：汇总并返回结果
-        # 固定返回 {valid, errors} 两个键，把"是否通过"和"为何没通过"合成一个可序列化
-        # 对象，作为工具输出回传给 Agent。复杂度 O(F)，F 为规则条数，与 data 的字段
-        # 总量无关——未被规则覆盖的字段一律不检查。
-        return {"valid": len(errors) == 0, "errors": errors}
+def fake_api(query: str) -> dict:                     # 模拟接口，可切换成功与失败
+    if query == "boom":
+        return {"error": "API error: 503"}            # 收敛成结构化错误
+    return {"query": query, "hits": [1, 2, 3]}
 
-# 第 7 段：流程入口（被 @flow 装饰的函数即编排起点）
-# @flow 把普通函数接入 CrewAI 流程运行时；入参 data 是外部原始输入，函数内不直接
-# 改动它，而是把各阶段快照放进 state，保证原始数据始终可追溯、可回放。
-@flow
-def validated_processing_flow(data: dict):
-    # 第 8 段：初始化流程状态
-    # 用三个槽位分别记录数据在"原始 / 已校验 / 已处理"阶段的形态，出问题时一眼能看出
-    # 是哪一步把数据改坏的；validated_data 初值为 None，兼作"尚未通过校验"的哨兵。
-    state = {"original_data": data, "validated_data": None, "processed": None}
-    
-    # 第 9 段：实例化校验工具并执行校验
-    # 调用的是 BaseTool.run 而非 _run：run 才是框架暴露的公开入口，负责参数绑定、
-    # 结果封装与异常兜底，直接调 _run 会绕开这些保护。
-    # 规则字典在此硬编码，真实项目通常外置为配置或由上游传入，以便按业务切换。
-    validator = DataValidationTool()
-    validation_result = validator.run(
-        data=data,
-        rules={
-            "name": {"required": True, "type": str},
-            "age": {"required": True, "type": int},
-            "email": {"required": True, "type": str}
-        }
+def validate(data: dict, rules: dict) -> dict:
+    errors = []
+    for field, rule in rules.items():
+        if field not in data:
+            if rule.get("required", False):
+                errors.append(f"Missing required field: {field}")
+        elif rule.get("type") and not isinstance(data[field], rule["type"]):
+            errors.append(f"Invalid type for {field}")
+    return {"valid": len(errors) == 0, "errors": errors}
+
+def run(query: str) -> dict:
+    state = {"query": query, "api": None, "validation": None, "saved": None}
+    state["api"] = fake_api(query)                    # 节点一：取数
+    state["validation"] = validate(                  # 节点二：校验
+        {"query": query} if "error" not in state["api"] else {},
+        {"query": {"required": True, "type": str}},
     )
-    
-    # 第 10 段：校验失败分支——提前返回，阻断后续处理
-    # 遵循 fail-fast：不合规数据绝不流入 process_validated_data，防止脏数据落库；
-    # errors 写进 state 供调用方读取明细。
-    # 边界条件：本分支的返回结构比成功分支多一个 "errors" 键，两条出口的 shape 不一致，
-    # 调用方必须按 valid 与否分别取值，否则会踩 KeyError。
-    if not validation_result["valid"]:
-        state["errors"] = validation_result["errors"]
+    if not state["validation"]["valid"]:              # 校验失败不落盘，直接返回
         return state
-    
-    # 第 11 段：校验通过分支——回填状态并触发处理
-    # 先写 validated_data 再调用处理函数，这样即便处理阶段抛异常，state 里也留有
-    # "该数据已通过校验"的证据，便于断点重试。
-    # 注意：process_validated_data 在本文件中并未定义，运行时需由外部注入或同模块提供，
-    # 否则此处会抛 NameError——这是这段代码作为示例留白的最大坑。
-    state["validated_data"] = data
-    state["processed"] = process_validated_data(data)
-    
+    with tempfile.TemporaryDirectory() as d:          # 节点三：落盘
+        p = Path(d) / "out.json"
+        p.write_text(json.dumps(state["api"], ensure_ascii=False), encoding="utf-8")
+        state["saved"] = json.loads(p.read_text(encoding="utf-8"))
     return state
-```
-### 4.5 LLM 工具集成
 
-```python
-from crewai import LLM
+ok = run("flow")
+assert ok["api"]["hits"] == [1, 2, 3]
+assert ok["validation"] == {"valid": True, "errors": []}
+assert ok["saved"]["query"] == "flow"                 # 落盘内容与内存一致
 
-@flow
-def llm_augmented_flow(user_query: str):
-    state = {"query": user_query, "context": None, "response": None}
-    
-    # 使用 LLM 增强上下文理解
-    llm = LLM(model="gpt-4o")
-    
-    # 生成搜索关键词
-    context_prompt = f"""
-    Analyze the following user query and extract key concepts for research:
-    Query: {user_query}
-    
-    Extract:
-    1. Main topic
-    2. Related concepts
-    3. Potential search terms
-    """
-    
-    llm_response = llm.call(context_prompt)
-    state["context"] = parse_llm_response(llm_response)
-    
-    # 基于 LLM 上下文进行进一步处理
-    state["response"] = generate_response(state["context"])
-    
-    return state
+bad = run("boom")
+assert "error" in bad["api"]
+assert bad["validation"]["valid"] is False            # 接口失败被校验拦下
+assert bad["saved"] is None                           # 脏数据不落盘
+print(ok["validation"], bad["validation"])
+print("OK")
 ```
+
+预期输出：
+
+```
+{'valid': True, 'errors': []} {'valid': False, 'errors': ['Missing required field: query']}
+OK
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 请求把流程挂死 | 没设置超时 | 显式传 `timeout` 参数 |
+| 数据库连接泄漏 | 缺少 `finally` 关闭 | 用 `with` 或 `try/finally` 包裹 |
+| 中文写入文件变成转义序列 | 默认 `ensure_ascii=True` | 传 `ensure_ascii=False` 并指定编码 |
+| 模型不选用自定义工具 | `description` 与 `_run` 行为不一致 | 让描述只写工具真实能做的一件事 |
+
+**用在哪里**
+
+- 电商下单前的风控校验。业务背景是下单要过一次风控接口和一次本地黑名单。知识用法是风控节点把接口结果与本地结果合并写进 state。收益指标是被拦截订单的误杀率与接口超时率。什么时候不该用：风控接口必须在 50 毫秒内返回，此时同步编排不适合，应改为异步事件流。
+- 后台管理的批量数据导入。业务背景是运营上传 Excel 后要逐行校验并写库。知识用法是用校验工具累积全部错误，一次性回给运营修改。收益指标是运营的修改轮次（从多轮降到一轮）。什么时候不该用：单次导入只有几行，直接抛第一个错误更快定位。
+- 报表生成流水线。业务背景是每晚从多个数据源取数后生成日报文件。知识用法是每个数据源一个节点，最后统一落盘。收益指标是报表生成失败率与重跑耗时。什么时候不该用：数据源之间需要事务一致性，文件落盘无法回滚。
+
+**行业实践**
+
+- CrewAI 官方文档 Tools 章节说明 `BaseTool` 的 `name` 与 `description` 会被模型用来挑选工具。借鉴方式：给每个工具写一句只描述一个动作的描述，删除"以及"这类连接词。
+- `requests` 官方文档的快速上手章节示例里推荐给请求加超时。借鉴方式：把所有外部调用统一封装到一个带超时的客户端里，禁止在节点里裸写请求。
+- Python 官方文档 `pathlib` 章节推荐用 `Path` 处理路径。借鉴方式：项目里禁止用字符串拼接路径，统一走 `Path`。
+
+怎么借鉴到你的项目：先写一个网络与文件访问的统一封装，再让 Flow 节点只调用这个封装。
+
+**小结**
+
+- Flow 节点里可以放任意 Python 代码，判断标准是产物能不能落进 state。
+- 所有外部调用都要有超时、错误收敛和资源释放三件事。
+- 自定义工具的 `description` 就是模型的选择依据，必须与实际行为一致。
 
 ## 5. Flow 状态管理
 
-### 5.1 状态类定义
+**先想一个问题**
+
+流程跑到第三步时进程被重启，你不知道第一步的产出还在不在，也不知道上次跑到哪一步。重跑一次意味着重复付费。
+
+状态管理就是回答"数据放在哪、以什么形状放、怎么存下来"。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：state 是流程的共享台账，每个节点读它、改它、再交给下一个节点。
+    日常类比：像医院的病历本，病人（数据）走到哪个科室，哪个科室就往上面写一段。
+    类比不成立的地方：病历本不会因为一次误写而让后续判断全部错位，而 state 的键名写错会让下游直接取不到值。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING
+  PENDING --> IN_PROGRESS
+  IN_PROGRESS --> COMPLETED
+  IN_PROGRESS --> FAILED
+  FAILED --> IN_PROGRESS
+  COMPLETED --> [*]
+```
+
+1. 流程启动时状态是 `PENDING`，表示尚未开始处理。
+2. 进入处理节点后状态推进到 `IN_PROGRESS`。
+3. 处理成功时状态变为 `COMPLETED`，这是终态之一。
+4. 处理失败时状态变为 `FAILED`，错误信息要一并写入状态。
+5. `FAILED` 可以回到 `IN_PROGRESS`，这就是重试的入口。
+6. 只有终态才允许被外部系统当作"这次运行结束"。
+
+**一步一步来**
+
+第 1 步：用 TypedDict 与 Enum 把状态契约写下来。
 
 ```python
-# 第 1 段：导入依赖（搭好 Flow 框架、类型系统与枚举工具的入口）
-# CrewAI 的 Flow 负责"节点编排 + 状态携带"，TypedDict 提供静态结构校验，Enum 保证状态取值收敛。
-# 注意：这里只导入了 Flow 和 flow，下面用到的 @start 并未导入——真实运行前需补 `from crewai.flow.flow import start`，否则会在装饰阶段抛 NameError。
-from crewai.flow.flow import Flow, flow
-from typing import TypedDict
 from enum import Enum
+from typing import TypedDict
 
-# 第 2 段：处理状态枚举（把"字符串魔法值"升级为受约束的有限状态机）
-# 继承 str 是为了让枚举值能直接被 JSON 序列化 / 与数据库字符串字段比较，无需额外转换。
-# 枚举成员是单例，比较用 `is` 或 `==` 都安全；但拼接字符串时拿到的是成员而非值，需显式 .value。
-class ProcessingStatus(str, Enum):
+class ProcessingStatus(str, Enum):        # 继承 str 便于直接序列化
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
 
-# 第 3 段：文档状态契约（定义整条流程共享的 state 形状）
-# total=False 表示所有键都可选：流程刚启动时 state 是空字典，节点只能"逐步填充"，不能假设字段已存在。
-# 边界条件：TypedDict 只在静态检查期生效，运行时不会做类型校验，误写键名或类型错误不会被自动拦截。
 class DocumentState(TypedDict, total=False):
     document_id: str
     content: str
@@ -654,857 +898,486 @@ class DocumentState(TypedDict, total=False):
     results: list[dict]
     error: str | None
 
-# 第 4 段：声明 Flow 并接入初始化节点（流程入口，负责建立状态基线）
-# @flow 把普通类转换成 CrewAI 可调度的流程对象；Flow[DocumentState] 让成员方法内的 self.state 获得类型提示。
-# @start() 标记该方法为流程的起始节点，执行顺序由装饰器决定而非代码书写顺序，因此初始化必须写在最前面。
-@flow
-class DocumentStateFlow(Flow[DocumentState]):
-    @start()
-    def initialize(self):
-        # 显式写入三个字段，避免后续节点读到不存在的键而触发 KeyError；这是"先建契约、再填数据"的防御式写法。
-        self.state["status"] = ProcessingStatus.PENDING  # 起始态统一为 PENDING，后续节点按需推进到 IN_PROGRESS/COMPLETED/FAILED
-        self.state["results"] = []  # 用可变列表做累加容器；注意不要用可变对象做默认参数，这里每次调用都新建实例
-        self.state["error"] = None  # 用 None 而非空字符串，便于用 `is None` 区分"未出错"和"出错但信息为空"
-```
-### 5.2 状态初始化与更新
-
-```python
-@flow
-def state_management_flow(initial_data: dict):
-    # 方式一：直接赋值
-    state = {
-        "data": initial_data,
-        "step": 1,
-        "history": []
+def init_state(document_id: str) -> DocumentState:
+    return {
+        "document_id": document_id,
+        "status": ProcessingStatus.PENDING,   # 起始态固定为 PENDING
+        "results": [],                        # 每次调用新建列表，不复用
+        "error": None,                        # 用 None 区分"未出错"与"信息为空"
     }
-    
-    # 第一步
-    result1 = step_one(state["data"])
-    state["step_result_1"] = result1
-    state["history"].append({"step": 1, "result": result1})
-    
-    # 第二步
-    result2 = step_two(result1)
-    state["step_result_2"] = result2
-    state["history"].append({"step": 2, "result": result2})
-    
-    # 最终结果
-    state["final"] = combine_results(result1, result2)
-    
-    return state
 ```
 
-### 5.3 持久化状态
+**这段代码在做什么**
 
-```python
-import json
-from pathlib import Path
-from datetime import datetime
+- `total=False` 表示所有键可选，流程刚启动时不必把全部字段填满。
+- 继承 `str` 让枚举值能直接参与 JSON 序列化和字符串比较。
+- `results` 用列表做累加容器，每次初始化都新建实例，避免跨运行污染。
+- `error` 用 `None` 而不是空字符串，便于用 `is None` 判断。
+- TypedDict 只在静态检查时生效，运行期不会拦截类型错误。
 
-# 第 1 段：依赖导入与外部符号约定（本文件的可移植性边界）
-# json 负责状态序列化，Path 提供跨平台的路径对象，datetime 生成可读、可排序的 ISO 时间戳。
-# 注意：Flow、start、perform_work 在本文件中未定义也未导入，属于运行时注入或同包内其他模块提供的符号；
-# 教学演示时需补上 `from crewai.flow.flow import Flow, start` 之类的导入，否则会 NameError。
+运行结果：`{'document_id': 'd1', 'status': 'pending', 'results': [], 'error': None}`，状态以字符串形式打印。
 
-class PersistentStateFlow(Flow):
-    # 第 2 段：构造与状态载入（决定"首次运行"与"恢复运行"两条分支）
-    # 状态文件路径写死在当前工作目录，意味着进程的 CWD 就是状态的"身份标识"：
-    # 换个目录启动同一个流程会读到一份全新的空状态，这是隐式耦合，生产环境应改成可注入路径。
-    def __init__(self):
-        super().__init__()
-        self.state_file = Path("flow_state.json")
-        self._load_state()
-    
-    # 第 3 段：_load_state —— 用"文件是否存在"区分冷启动与热恢复
-    # 已存在则整体替换 self.state，而不是做 key 级合并：旧文件里缺失的字段不会自动补默认值，
-    # 因此后续代码必须用 .get() 之类的容错读取，不能假设某个键一定存在。
-    # 冷启动只写入 created_at 而不落盘——真正持久化要等到第一次 _save_state 调用。
-    def _load_state(self):
-        if self.state_file.exists():
-            with open(self.state_file, "r") as f:
-                self.state = json.load(f)
-        else:
-            self.state = {"created_at": datetime.now().isoformat()}
-    
-    # 第 4 段：_save_state —— 每次落盘前刷新时间戳的统一出口
-    # 把 updated_at 的写入收敛在这一个方法里，保证任何调用点都自动获得最新时间，避免调用方漏写。
-    # 易错点有三：default=str 是兜底，遇到 datetime/自定义对象会退化成字符串而非报错，
-    # 反序列化时拿到的是 str 而不是原类型；indent=2 便于人读但增大体积；
-    # 这里是"就地覆盖写"，没有写临时文件 + rename 的原子性，进程在写一半时崩溃会留下损坏的 JSON。
-    def _save_state(self):
-        self.state["updated_at"] = datetime.now().isoformat()
-        with open(self.state_file, "w") as f:
-            json.dump(self.state, f, indent=2, default=str)
-    
-    # 第 5 段：process 主流程（@start 标记入口）——"改状态 → 落盘 → 干活 → 再落盘"的检查点模式
-    # 分两次落盘是刻意的：第一次记录"已进入该步骤"，第二次记录"结果已产出"。
-    # 若 perform_work 中途崩溃，重启后仍能从文件里看到 step=1，从而判断任务曾被中断（即最小可用的断点恢复）。
-    # 边界条件：state.get("data") 在冷启动时为 None，perform_work 必须能处理这种输入；
-    # 另外本方法没有 try/except，异常会直接向上抛出，此时 updated_at 保留的是上一次成功保存的时间。
-    @start()
-    def process(self):
-        self.state["step"] = 1
-        self._save_state()
-        
-        self.state["result"] = perform_work(self.state.get("data"))
-        self._save_state()
-        
-        return self.state
-```
-### 5.4 状态合并策略
-
-```python
-# 第 1 段：任务入口与输入契约（@flow 包装的并行结果汇总单元）
-# @flow 让本函数成为可被编排、重试、观测的独立任务节点，因此函数体必须"纯"：只依赖入参、只产出返回值。
-# parallel_results 是各并行分支的局部结果列表；调用方只保证它是 list，**不保证每个 dict 内部字段齐全**，
-# 这一点决定了第 3 段必须全部使用 .get(...) 而不是下标取值。
-@flow
-def merging_state_flow(parallel_results: list[dict]):
-    # 合并多个并行执行的结果
-    # 第 2 段：预置累加器骨架（先定形状，再填内容）
-    # 先把"最终结果的完整形状"一次性写死（空列表 + 零值指标），这样即使 parallel_results 为空，
-    # 也能返回结构一致的 merged，下游不必写 None / 缺键判断（这一步是幂等合并的前提）。
-    # 易错点：必须用全新字面量而非类属性或共享引用，否则多次调用会交叉污染。
-    merged = {
-        "total_items": 0,
-        "all_items": [],
-        "aggregated_metrics": {
-            # count 只是占位，最终会被第 4 段用 total_items 覆盖；sum 则一直保留原始累加和。
-            "count": 0,
-            "sum": 0,
-            # avg 预置 0 是为了空输入时不出现缺键，但它在语义上代表"未定义"，见第 4 段边界说明。
-            "avg": 0
-        }
-    }
-
-    # 第 3 段：单次遍历的顺序归并（时间 O(n)，额外空间 O(所有 items 元素数)）
-    # 一个循环同时推进三个累加量，避免多次遍历；每处都用 .get(key, 默认值)，
-    # 使"分支跳过/失败导致字段缺失"等价于"该分支贡献 0 或空集合"，从而不抛 KeyError。
-    # 易错点：extend 是浅扩展，items 里的元素仍是原对象的引用，后续改动双方可见；
-    # 且 all_items 的顺序 = 并行结果被收集的顺序，不保证稳定，依赖序的下游需自行排序。
-    for result in parallel_results:
-        merged["total_items"] += result.get("count", 0)  # 行尾：count 缺失按 0 计
-        merged["all_items"].extend(result.get("items", []))  # 行尾：items 缺失按空列表计
-        merged["aggregated_metrics"]["sum"] += result.get("total", 0)  # 行尾：total 缺失按 0 计
-
-    # 第 4 段：派生指标收口（唯一的分支点，也是 avg 的唯一定义处）
-    # count 与 total_items 对齐，语义统一为"条目数"；再用守卫条件做除法，
-    # 避免空输入触发 ZeroDivisionError。
-    # 边界/易错点：total_items 为 0 时 avg 保持占位值 0，含义是"未定义"而非"平均值为 0"；
-    # 另外 sum 来自各分支的 total，count 来自各分支的 count，若同一分支这两者口径不一致，
-    # 算出的 avg 是混合口径的近似值——需在数据源头保证 count 与 total 同量纲。
-    merged["aggregated_metrics"]["count"] = merged["total_items"]
-    if merged["aggregated_metrics"]["count"] > 0:
-        merged["aggregated_metrics"]["avg"] = (
-            merged["aggregated_metrics"]["sum"] / 
-            merged["aggregated_metrics"]["count"]
-        )
-
-    # 第 5 段：返回合并快照
-    # 返回的是本地新建的容器，与 parallel_results 只共享 items 中的元素引用，不共享容器本身；
-    # 调用方对 merged 的增删改不会回写任何分支结果。
-    return merged
-```
-### 5.5 类型安全的状态管理
+第 2 步：用 Pydantic 模型做类型校验的状态。
 
 ```python
 from pydantic import BaseModel, Field
-from crewai.flow.flow import Flow, flow
 
-# 第 1 段：定义状态模型——把整个流程的“共享内存”声明成一个强类型对象
-# 为什么这么做：CrewAI 的 Flow 在步骤之间传递数据时，需要一个显式的状态载体；
-# 用 Pydantic 模型声明状态，等于给流程加了一份可校验、可序列化、可调试的数据契约。
-# 易错点：可变默认值（list/dict）必须用 default_factory，若写成 `= []` 会被 Pydantic
-# 在类定义阶段拒绝或造成所有实例共享同一对象；`Field` 就是为此引入的。
 class AnalysisState(BaseModel):
-    input_data: str                                    # 唯一必填字段：外部传入的原始数据，作为流程的起点
-    processed_data: str = ""                           # 清洗/转换后的中间态，默认空串便于“未处理”可判定
-    analysis_results: list[str] = Field(default_factory=list)   # 每次分析产出的多条结论，工厂函数保证实例间互不共享
-    final_report: str = ""                             # 面向最终用户的成品文本，仅在末段被写入
-    metadata: dict = Field(default_factory=dict)       # 预留的开放扩展位：耗时、模型名、trace_id 等都不必改模型
-    iteration_count: int = 0                           # 执行计数：用于重试上限、幂等性判断或循环终止条件
+    input_data: str                                              # 唯一必填字段
+    processed_data: str = ""                                     # 默认空串，便于判断"未处理"
+    analysis_results: list[str] = Field(default_factory=list)    # 可变默认值必须用工厂
+    final_report: str = ""
+    metadata: dict = Field(default_factory=dict)                 # 开放扩展位
+    iteration_count: int = 0                                     # 重试上限与幂等判断用
 
-# 第 2 段：用 @flow 把普通函数升级为可编排的 Flow
-# 关键点：装饰器会把函数体包装进一个动态生成的 Flow 子类，函数本身变成其中
-# 的一个步骤；返回类型标注 AnalysisState 让框架能推断出状态模型（类型即配置）。
-# 注意 `Flow` 是导入的基类，此处未直接使用，属于为扩展自定义 Flow 类预留的入口。
-@flow
-def typed_state_flow(data: str) -> AnalysisState:
-    # 第 3 段：初始化状态——构造唯一的状态实例
-    # 数据流：外部入参 data -> state.input_data，此后所有步骤都只读写 state，不再碰裸参数，
-    # 这样流程无论被谁调用、在哪一步中断，状态都是自洽可恢复的。
-    state = AnalysisState(input_data=data)
-    
-    # Pydantic 会自动验证类型
-    # 第 4 段：数据转换与计数——把原始输入变成可分析的形态
-    # 赋值时 Pydantic 会做类型校验/强制转换，若 transform_data 返回非字符串会立刻在此抛错，
-    # 相当于把“脏数据”挡在入口，而不是等到生成报告时才失败（fail-fast）。
-    # 复杂度取决于 transform_data 的实现，此处仅是一次 O(1) 赋值 + 自增。
-    state.processed_data = transform_data(state.input_data)
-    state.iteration_count += 1                         # 计数放在转换之后：只有真正跑过一遍才计入，便于统计有效执行次数
-    
-    # 第 5 段：核心计算——分析并生成报告（流水线顺序依赖）
-    # 这两步是串行强依赖：analyze 只读 processed_data，generate_report 只读 analysis_results；
-    # 这种“窄接口”让每一步都能被单独替换或单测，而不必构造整个上游状态。
-    # 边界条件：若 analysis_results 为空列表，generate_report 应自行处理空输入，而不是靠调用方兜底。
-    state.analysis_results = analyze(state.processed_data)
-    state.final_report = generate_report(state.analysis_results)
-    
-    # 第 6 段：收尾——序列化后返回
-    # 为什么用 model_dump()：Flow 的输出需要跨进程/跨序列化边界（日志、API、持久化），
-    # 返回纯 dict（含 list/dict 等原生类型）比返回模型实例更通用。
-    # 易错点：函数签名标注的是 AnalysisState，实际返回的是 dict——注解表达“逻辑上的状态类型”，
-    # 而非运行时类型；若下游按模型属性访问会失败，需要 AnalysisState(**result) 重建。
-    return state.model_dump()
+state = AnalysisState(input_data="raw text")
+state.processed_data = transform_data(state.input_data)          # 赋值时触发类型校验
+state.iteration_count += 1
+result = state.model_dump()                                      # 转成原生类型再跨边界传递
 ```
-## 6. 错误处理与恢复
 
-### 6.1 基础错误处理
+**这段代码在做什么**
+
+- 用模型声明状态，等于给流程加一份可校验、可序列化的数据契约。
+- 可变默认值必须用 `default_factory`，写成 `= []` 会让所有实例共享同一个列表。
+- 赋值时 Pydantic 会做类型校验，脏数据在入口就被挡住。
+- `model_dump()` 把模型转成字典，便于写日志、过接口或落盘。
+- 函数标注的类型是模型，实际返回的可能是字典，下游按属性访问会失败。
+
+运行结果：`{'input_data': 'raw text', 'processed_data': 'RAW TEXT', 'analysis_results': [], 'final_report': '', 'metadata': {}, 'iteration_count': 1}`。
+
+第 3 步：把状态落盘，支持中断后续跑。
 
 ```python
-# 第 1 段：装饰器与函数签名（把普通函数注册为可编排的流程单元）
-# @flow（通常来自 Prefect 等编排框架）会把这层函数包装成一个可被调度、观测状态的 Flow，
-# 从而自动获得运行记录、日志与重试能力；去掉装饰器函数仍可运行，但会退化成普通函数。
-@flow
-def error_handling_flow(data: str):
-    # 第 2 段：状态容器初始化（把输入、结果、错误、重试次数收拢进一个字典）
-    # 用单个 dict 承载整个流程状态，而非多个局部变量：返回值只暴露 state 一个对象，
-    # 调用方无需关心内部变量个数；retry_count 先占位 0，为后续失败重试逻辑预留字段。
-    state = {"data": data, "result": None, "error": None, "retry_count": 0}
-    
-    # 第 3 段：受保护的核心调用（执行可能抛异常的外部/不可信操作）
-    # 只把 risky_operation 这一句放进 try，刻意收窄保护范围：若把返回值的后续处理也塞进来，
-    # 处理阶段的异常会被误判成"操作本身"的异常，掩盖真实错误来源，调试时极难定位。
-    try:
-        state["result"] = risky_operation(data)
-    # 第 4 段：按类型分层捕获异常（从具体到宽泛，顺序不可颠倒）
-    # except 自上而下匹配，而 Exception 是绝大多数异常的基类；一旦把它排在前面，
-    # 后面的 ValueError / ConnectionError 分支将永远不可达——Python 不报错，只会静默吞掉，属高危易错点。
-    # 各分支只写 state["error"] 而不 re-raise，使成功与失败都能走统一出口，返回结构一致的 state 供上层判断。
-    except ValueError as e:
-        state["error"] = f"Validation error: {str(e)}"
-    except ConnectionError as e:
-        state["error"] = f"Connection failed: {str(e)}"
-    except Exception as e:
-        state["error"] = f"Unexpected error: {str(e)}"
-    
-    # 第 5 段：统一返回（成功与失败共用同一出口）
-    # 成功时 error 为 None，失败时 result 为 None，二者互为镜像，便于调用方用同一套逻辑判定。
-    # 边界条件：SystemExit、KeyboardInterrupt 等 BaseException 子类不会被 Exception 捕获，函数会直接中断，
-    # 这是有意设计——避免吞掉用户主动终止的信号。时间复杂度 O(1)（不含 risky_operation 自身开销）。
-    return state
+import json
+from datetime import datetime
+from pathlib import Path
+
+class PersistentStateFlow:
+    def __init__(self, state_file: str = "flow_state.json"):
+        self.state_file = Path(state_file)           # 路径可注入，不写死
+        self._load_state()
+
+    def _load_state(self):
+        if self.state_file.exists():                 # 存在即恢复
+            self.state = json.loads(self.state_file.read_text(encoding="utf-8"))
+        else:                                        # 不存在即冷启动
+            self.state = {"created_at": datetime.now().isoformat()}
+
+    def _save_state(self):
+        self.state["updated_at"] = datetime.now().isoformat()
+        self.state_file.write_text(
+            json.dumps(self.state, indent=2, default=str), encoding="utf-8"
+        )
+
+    def process(self):
+        self.state["step"] = 1
+        self._save_state()                           # 先记录"已进入该步骤"
+        self.state["result"] = perform_work(self.state.get("data"))
+        self._save_state()                           # 再记录"结果已产出"
+        return self.state
 ```
-### 6.2 重试机制
+
+**这段代码在做什么**
+
+- 冲突点在于两次落盘：进入步骤记一次，产出结果记一次，崩溃后能看出中断位置。
+- `_save_state` 统一刷新 `updated_at`，调用方不会漏写时间。
+- `default=str` 是兜底，遇到日期对象会退化成字符串，反序列化时拿回的是字符串。
+- 这里是原地覆盖写，没有"写临时文件再改名"的原子性，写到一半崩溃会留下损坏的 JSON。
+- `perform_work` 是外部占位函数，需要由你提供实现。
+
+运行结果：生成 `flow_state.json`，内容含 `created_at`、`step`、`result`、`updated_at` 四个键。
+
+**动手验证**
+
+下面的脚本验证状态合并策略与落盘恢复，只用标准库。
+
+```python
+# 依赖：Python 3.10+，只用标准库
+import json
+import tempfile
+from pathlib import Path
+
+def merge(parallel_results: list) -> dict:
+    merged = {                                        # 先定形状，再填内容
+        "total_items": 0,
+        "all_items": [],
+        "aggregated_metrics": {"count": 0, "sum": 0, "avg": 0},
+    }
+    for r in parallel_results:                        # 单次遍历，O(n)
+        merged["total_items"] += r.get("count", 0)    # 缺字段按 0 计
+        merged["all_items"].extend(r.get("items", []))
+        merged["aggregated_metrics"]["sum"] += r.get("total", 0)
+    merged["aggregated_metrics"]["count"] = merged["total_items"]
+    if merged["aggregated_metrics"]["count"] > 0:     # 守卫条件，避免除零
+        merged["aggregated_metrics"]["avg"] = (
+            merged["aggregated_metrics"]["sum"] / merged["aggregated_metrics"]["count"]
+        )
+    return merged
+
+m = merge([{"count": 2, "items": [1, 2], "total": 10}, {"count": 2, "total": 20}])
+assert m["total_items"] == 4
+assert m["all_items"] == [1, 2]                       # 第二项没带 items，按空列表计
+assert m["aggregated_metrics"]["avg"] == 7.5
+assert merge([])["aggregated_metrics"]["avg"] == 0    # 空输入不抛异常
+
+with tempfile.TemporaryDirectory() as d:              # 落盘再读回
+    p = Path(d) / "flow_state.json"
+    p.write_text(json.dumps({"step": 1, "result": m}, ensure_ascii=False), encoding="utf-8")
+    loaded = json.loads(p.read_text(encoding="utf-8"))
+assert loaded["result"]["all_items"] == [1, 2]        # 往返后内容一致
+print(m["aggregated_metrics"], loaded["step"])
+print("OK")
+```
+
+预期输出：
+
+```
+{'count': 4, 'sum': 30, 'avg': 7.5} 1
+OK
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 多次运行之间数据互相污染 | 可变默认值写成 `= []` | 改用 `default_factory` 或每次新建 |
+| 崩溃后 JSON 无法解析 | 覆盖写没有原子性 | 先写临时文件，再改名替换 |
+| 恢复后某字段不存在报 KeyError | 旧文件缺少新字段 | 读取统一用 `.get()` 并补默认值 |
+| 平均值口径混乱 | count 与 total 来自不同分支口径 | 在数据源头保证两个量同量纲 |
+
+**用在哪里**
+
+- 长视频转码流水线。业务背景是一次转码要几分钟，进程可能被重启。知识用法是把每个阶段写进状态文件，重启后从最后一个成功阶段继续。收益指标是重启后的重复计算量。什么时候不该用：转码总时长只有几秒，落盘带来的 IO 开销占比过高。
+- 后台管理的数据同步任务。业务背景是每天从上游系统拉取变更数据。知识用法是用 `updated_at` 与 `step` 记录进度，支持断点续传。收益指标是同步任务的平均重跑时间。什么时候不该用：上游提供了游标接口，直接存游标比存整份状态更省事。
+- 多源结果汇总报表。业务背景是多个数据源并行取数后要合并平均值、总量等指标。知识用法是用单次遍历的归并函数，缺字段按零处理。收益指标是报表口径不一致导致的返工次数。什么时候不该用：各源指标口径本来就不同，强行求平均只会产出误导数字。
+
+**行业实践**
+
+- Pydantic 官方文档的模型章节说明可变默认值要用工厂函数，否则实例间共享。借鉴方式：状态模型里所有列表与字典字段都写 `default_factory`。
+- Prefect 官方文档的状态与结果持久化章节把运行状态独立存储，支持失败后重跑。借鉴方式：把 `created_at`、`updated_at`、`step` 三个字段作为持久化的最小集合。
+- 需核对官方文档：CrewAI 是否提供官方持久化装饰器及其名称，本页资料只给出手写 JSON 落盘的示例。
+
+怎么借鉴到你的项目：先定义状态模型，再定义落盘函数，最后才写业务节点，顺序不能倒。
+
+**小结**
+
+- 状态契约先定形状再填内容，能避免下游到处写防御性判断。
+- 可变默认值一律用工厂函数，否则不同运行会共享同一个容器。
+- 持久化要记录"进入步骤"和"产出结果"两个时间点，才能判断中断位置。
+
+## 6. 错误处理与恢复
+
+**先想一个问题**
+
+风控接口在高峰期连续返回 503，你的 Flow 每来一个请求就打一次，下游服务被拖垮。与此同时，另一条流程因为一次网络抖动直接失败，其实重试一次就能成功。
+
+这两种故障需要不同的策略：一个要快速失败，一个要重试。
+
+**心智模型**
+
+!!! tip "心智模型"
+    一句话模型：重试治抖动，熔断治雪崩，超时治挂死，降级保可用。
+    日常类比：像家里的空气开关，短路时跳闸（熔断），排除故障后手动复位（半开探测），而不是每次都硬顶着烧。
+    类比不成立的地方：空气开关跳闸后需要人手动合闸，而熔断器的半开探测是自动的，冷却时间一到自己就会放一次探测流量。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["调用外部依赖"] --> B["是否已熔断"]
+  B -->|"是且冷却未到"| C["快速失败，走兜底"]
+  B -->|"是且冷却已到"| D["半开：放一次探测"]
+  B -->|"否"| E["正常调用"]
+  E --> F["成功：失败计数清零"]
+  E --> G["失败：计数加一"]
+  G --> H["计数达到阈值"]
+  H --> I["进入熔断状态"]
+  D --> F
+  D --> G
+  C --> J["返回降级结果"]
+```
+
+1. 每次调用先判断熔断器是否处于打开状态。
+2. 打开且冷却未到时直接走兜底，不再触碰下游。
+3. 打开且冷却已到时切换到半开状态，只放一次探测请求。
+4. 未熔断时正常调用下游。
+5. 调用成功就把失败计数清零，回到关闭状态。
+6. 调用失败就累加计数，达到阈值时进入熔断状态。
+
+**一步一步来**
+
+第 1 步：分层捕获异常，给外部调用套上重试。
 
 ```python
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from crewai.flow.flow import Flow, flow
+import requests
 
 @retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type(ConnectionError)
+    stop=stop_after_attempt(3),                                        # 最多 3 次，来源：本站该页面的旧版内容，以原文为准
+    wait=wait_exponential(multiplier=1, min=2, max=10),                # 退避 2 到 10 秒，来源同上
+    retry=retry_if_exception_type(ConnectionError),                    # 只对连接错误重试
 )
 def unreliable_api_call(data: dict):
-    # 可能失败的 API 调用
-    response = requests.post(
-        "https://api.example.com/unstable-endpoint",
-        json=data,
-        timeout=30
-    )
-    response.raise_for_status()
+    response = requests.post("https://api.example.com/unstable-endpoint",
+                             json=data, timeout=30)
+    response.raise_for_status()                                        # 4xx 与 5xx 转成异常
     return response.json()
 
-@flow
 def resilient_flow(data: dict):
-    state = {"data": data, "result": None, "attempts": 0}
-    
+    state = {"data": data, "result": None, "attempts": 0, "error": None}
     try:
         state["result"] = unreliable_api_call(data)
     except Exception as e:
-        state["error"] = str(e)
-        # 降级处理
-        state["result"] = fallback_processing(data)
-    
+        state["error"] = str(e)                                        # 记录后不抛出
+        state["result"] = fallback_processing(data)                    # 降级处理
     return state
 ```
 
-### 6.3 断路器模式
+**这段代码在做什么**
+
+- `stop_after_attempt(3)` 限制总尝试次数，避免无限重试烧配额。
+- `wait_exponential` 让重试间隔逐渐拉长，给下游恢复时间。
+- `retry_if_exception_type(ConnectionError)` 把重试限制在连接类错误，校验错误不重试。
+- 只把可能失败的那一行放进 `try`，缩小保护范围，异常来源更容易定位。
+- 捕获后写入 state 而不是向上抛，保证返回值结构一致。
+
+运行结果：接口恢复时返回 `{"result": {...接口数据...}}`，接口持续失败时返回 `{"result": 兜底数据, "error": "..."}`。
+
+`fallback_processing` 是外部占位函数，需要由你提供实现。
+
+第 2 步：写一个熔断器，并给流程加超时保护。
 
 ```python
-# 第 1 段：依赖与状态机枚举（熔断器的三态定义）
-# 熔断器本质是一个有限状态机：CLOSED →（连续失败达阈值）→ OPEN →（超时冷却）→ HALF_OPEN →（探测成功）→ CLOSED，
-# 或从 HALF_OPEN（探测失败）→ OPEN。先把状态枚举固定下来，后续所有判断都只依赖这三个值，避免用字符串裸奔导致拼写错误。
 import time
 from enum import Enum
 
 class CircuitState(str, Enum):
-    # 同时继承 str，使枚举值在 JSON 序列化/日志打印/== 字符串比较时都能直接使用（教学站点常忽略这点）
-    CLOSED = "closed"      # 正常状态
-    OPEN = "open"          # 熔断状态
-    HALF_OPEN = "half_open"  # 半开状态
+    CLOSED = "closed"          # 正常状态
+    OPEN = "open"              # 熔断状态
+    HALF_OPEN = "half_open"    # 半开探测状态
 
-# 第 2 段：熔断器构造与阈值配置（把"策略参数"与"运行时状态"分开）
-# failure_threshold 是进入 OPEN 的失败次数阈值，timeout 是 OPEN 的冷却秒数；
-# 二者是业务策略，来自构造参数以便不同依赖配置不同策略（例如读服务宽、写服务严）。
-# 易错点：last_failure_time 初值设为 None 而不是 0，因为 time.time() 很大，用 0 会让"未失败过"也判定为已超时。
 class CircuitBreaker:
     def __init__(self, failure_threshold: int = 5, timeout: int = 60):
         self.failure_threshold = failure_threshold
         self.timeout = timeout
-        self.failure_count = 0            # 连续失败计数，成功后必须清零，否则是"累计失败"而非"连续失败"
-        self.last_failure_time = None     # 记录最近一次失败的墙钟时间，用于判断冷却是否结束
+        self.failure_count = 0
+        self.last_failure_time = None                  # None 而不是 0，避免误判为已超时
         self.state = CircuitState.CLOSED
 
-    # 第 3 段：调用入口 call（先做准入判断，再代理执行）
-    # 数据流：调用方传入 func/参数 → 熔断器决定"直接拒绝"还是"放行执行" → 成功/失败回调更新状态 → 结果或异常向上抛。
-    # 设计意图：熔断判断必须是同步、O(1) 的，绝不能自身产生阻塞或远程调用，否则熔断器会变成新的故障点。
     def call(self, func, *args, **kwargs):
         if self.state == CircuitState.OPEN:
-            # 只有 OPEN 状态且冷却时间已过，才降级为 HALF_OPEN 放行一次探测；否则快速失败（fail-fast），
-            # 避免故障依赖被持续打爆，也给下游留出恢复时间。
             if time.time() - self.last_failure_time > self.timeout:
-                self.state = CircuitState.HALF_OPEN
+                self.state = CircuitState.HALF_OPEN     # 冷却结束，放一次探测
             else:
                 raise CircuitBreakerOpenError("Circuit breaker is open")
-
-        # 注意：这里同时覆盖 CLOSED 与 HALF_OPEN 两条路径——HALF_OPEN 恰好只允许这一路探测流量通过。
         try:
             result = func(*args, **kwargs)
             self._on_success()
             return result
-        except Exception as e:
-            # 捕获宽泛的 Exception 是刻意的：任何异常都应计入失败并触发熔断，而不是只挑特定的网络异常。
-            # 关键顺序：先更新状态再 raise，保证调用方看到的异常不会被熔断逻辑吞掉。
-            self._on_failure()
+        except Exception:
+            self._on_failure()                          # 先更新状态再抛出
             raise
 
-    # 第 4 段：成功回调——把状态机"归零复位"
-    # 一个成功信号即可认定依赖已恢复，因此同时清空失败计数并回到 CLOSED；
-    # 若只改状态不清计数，下一次单次失败就可能立刻重新熔断，导致抖动。
     def _on_success(self):
-        self.failure_count = 0
+        self.failure_count = 0                          # 同时清计数，避免抖动
         self.state = CircuitState.CLOSED
 
-    # 第 5 段：失败回调——累计失败并在达阈值时跳闸
-    # 复杂度 O(1)。边界条件：在 HALF_OPEN 下探测失败时，failure_count 本已 >= threshold，
-    # 自增后仍满足条件，于是状态重新落回 OPEN，last_failure_time 也被刷新，冷却期从头开始计时。
     def _on_failure(self):
         self.failure_count += 1
         self.last_failure_time = time.time()
-        
         if self.failure_count >= self.failure_threshold:
             self.state = CircuitState.OPEN
-
-# 第 6 段：业务编排流（把熔断器包进一条可观测的流水线）
-# 前置依赖：@flow、fragile_api_call、fallback_response、CircuitBreakerOpenError 需由外部框架/模块提供，
-# 本段示例未定义它们——这是最容易踩的坑，直接运行会报 NameError，不代表结构有误。
-# 数据流：data 原样保存在 state 里传递，执行结果写回 state["result"]，同时用 state["circuit_state"]
-# 记录本次走的是成功、降级还是异常分支，方便上层做监控与重试决策。
-@flow
-def circuit_breaker_flow(data: dict):
-    # 每次调用都新建 breaker，因此熔断窗口是"每请求独立"的；生产环境应把 breaker 提为模块级/单例，
-    # 否则失败计数无法跨请求累计，熔断功能形同虚设。
-    breaker = CircuitBreaker(failure_threshold=3, timeout=30)
-    state = {"data": data, "result": None, "circuit_state": None}
-    
-    # 异常处理顺序是刻意设计的：CircuitBreakerOpenError 分支必须在 Exception 之前，
-    # 否则"熔断打开"会被通用分支吞掉，降级逻辑永远不会执行。
-    try:
-        state["result"] = breaker.call(fragile_api_call, data)
-        state["circuit_state"] = "success"
-    except CircuitBreakerOpenError:
-        # 快速失败路径：不重试、不再触碰下游，直接返回兜底数据，保证响应延迟可控。
-        state["result"] = fallback_response()
-        state["circuit_state"] = "fallback_used"
-    except Exception as e:
-        # 真实调用失败（如超时、5xx）：此时 breaker 内部已计入失败，这里只负责记录并继续向上交付状态。
-        state["circuit_state"] = "error"
-        state["error"] = str(e)
-    
-    return state
 ```
-### 6.4 超时处理
+
+**这段代码在做什么**
+
+- 阈值 5 次、冷却 60 秒是构造参数，不同依赖可以配不同策略（来源：本站该页面的旧版内容，以原文为准）。
+- 失败计数统计的是"连续失败"，成功后必须清零，否则退化成累计失败。
+- `last_failure_time` 初值为 `None`，用 0 会让"没失败过"也被判为冷却已过。
+- 熔断判断本身是同步的 O(1) 操作，不能自己产生远程调用。
+- 在 `except` 里先调用 `_on_failure` 再 `raise`，保证调用方看到的异常不被吞掉。
+
+运行结果：连续 5 次失败后，第 6 次调用直接抛 `CircuitBreakerOpenError`，60 秒后放一次探测。
+
+`CircuitBreakerOpenError` 需要你自己定义，它是 `Exception` 的子类。
+
+第 3 步：用信号给整个流程加超时。
 
 ```python
-# 第 1 段：导入依赖（含一个隐藏的致命前提）
-# signal 是 Unix 信号机制入口：SIGALRM + alarm() 只能在「主线程」注册与触发，
-# 因此下面整套超时方案在子线程、Windows 或非主解释器里会失效甚至直接报错。
-# wraps 用来把被装饰函数的元信息（__name__/__doc__ 等）复制到 wrapper，避免调试与框架反射时“身份丢失”。
-# flow 是 CrewAI 的流程装饰器，把普通函数注册成可编排的 flow；Flow 是类式写法基类，本片段未直接使用。
 import signal
 from functools import wraps
-from crewai.flow.flow import Flow, flow
 
-
-# 第 2 段：自定义超时异常与信号处理函数
-# 不复用内建 TimeoutError 而是单独定义，是为了把“信号触发的超时”与内建/第三方同名异常区分开，
-# 便于上层精确捕获，避免误吞其它模块抛出的 TimeoutError。
-# timeout_handler 必须签名 (signum, frame)：signum 是触发的信号号，frame 是中断处的栈帧，这里都用不到。
 class TimeoutError(Exception):
     pass
 
-
 def timeout_handler(signum, frame):
-    # 关键机制：信号处理器会在“当前执行点”直接抛异常，从而打断正在运行的业务代码（栈展开到最近的 try）。
-    # 注意：只能打断纯 Python 字节码；若函数正阻塞在 C 层调用（某些 IO/锁），异常要等其返回后才生效。
-    raise TimeoutError("Operation timed out")
+    raise TimeoutError("Operation timed out")     # 在当前执行点直接抛异常
 
-
-# 第 3 段：with_timeout —— 参数化的超时装饰器工厂
-# 采用「工厂套装饰器」两层结构：外层接收 seconds 配置，内层返回可复用的 decorator，
-# 这样才能写成 @with_timeout(30)（先调用工厂拿到 decorator），而不是把它当成单层装饰器使用。
 def with_timeout(seconds: int):
     def decorator(func):
-        @wraps(func)
+        @wraps(func)                              # 保留原函数名与文档
         def wrapper(*args, **kwargs):
-            # 每次调用都重新注册：handler 是进程级全局状态，可能被其它代码覆盖，重设最稳妥。
             signal.signal(signal.SIGALRM, timeout_handler)
-            # 设定 seconds 秒后向本进程投递一次 SIGALRM；粒度是整数秒，且 alarm 不叠加只覆盖。
-            signal.alarm(seconds)
+            signal.alarm(seconds)                 # 整数秒粒度，重复设置会覆盖
             try:
-                result = func(*args, **kwargs)
+                return func(*args, **kwargs)
             finally:
-                # 易错点核心：无论正常返回还是抛异常都要取消定时器（alarm(0)），
-                # 否则函数提前结束后残留的定时器会在“完全无关”的后续代码里炸出 TimeoutError。
-                signal.alarm(0)
-            return result
+                signal.alarm(0)                   # 必须取消，否则会在无关代码处炸出异常
         return wrapper
     return decorator
-
-
-# 第 4 段：入口流程函数与状态容器
-# @flow 让 CrewAI 识别该函数为流程节点，可直接被编排/调用。
-# 用普通 dict 承载 state，是“显式状态机”写法：调用方拿到的永远是同一结构，含结果、超时标记与错误信息。
-@flow
-def timeout_protected_flow(data: dict, timeout_seconds: int = 30):
-    state = {"data": data, "result": None, "timed_out": False}
-    
-    # 第 5 段：把待执行的重活包进超时装饰器
-    # 这里刻意用「内层闭包 + 捕获 data」来绑定本次调用的数据：装饰器本身不认识业务参数，
-    # 于是超时能力与业务逻辑解耦，long_running_process 无需关心超时。
-    @with_timeout(timeout_seconds)
-    def timed_operation():
-        return long_running_process(data)
-    
-    # 第 6 段：分级异常处理与降级
-    # except 顺序不能颠倒：自定义 TimeoutError 继承自 Exception，
-    # 若先写 except Exception 会把超时也吞掉，导致 timed_out 永远为 False。
-    try:
-        state["result"] = timed_operation()
-    except TimeoutError:
-        # 超时不是“失败”，而是可预期分支：置位标记并退化为部分结果，保证流程仍能继续往下走。
-        state["timed_out"] = True
-        state["result"] = partial_results(data)
-    except Exception as e:
-        # 其它异常统一收敛成字符串塞进 state，避免异常穿出破坏 flow 编排，同时保留可诊断信息。
-        state["error"] = str(e)
-    
-    # 无论走哪个分支都返回；state 结构恒定，调用方靠 timed_out/error 判断实际结局。
-    return state
-```
-### 6.5 优雅降级
-
-```python
-@flow
-def graceful_degradation_flow(data: dict):
-    state = {"data": data, "execution_path": [], "result": None}
-    
-    # 主路径：完整处理
-    try:
-        state["execution_path"].append("primary")
-        state["result"] = primary_processing_pipeline(data)
-    except PrimaryProcessingError:
-        # 降级路径 1：简化处理
-        try:
-            state["execution_path"].append("degraded_level_1")
-            state["result"] = simplified_processing(data)
-        except SimplifiedProcessingError:
-            # 降级路径 2：最小化处理
-            try:
-                state["execution_path"].append("degraded_level_2")
-                state["result"] = minimal_processing(data)
-            except Exception as e:
-                # 最终降级：返回原始数据
-                state["execution_path"].append("fallback")
-                state["result"] = {"data": data, "warning": "Processed with fallback"}
-    
-    return state
 ```
 
-### 6.6 补偿事务
+**这段代码在做什么**
+
+- 自定义 `TimeoutError` 而不是复用内建同名异常，便于上层精确捕获。
+- 信号处理器会在当前执行点抛异常，打断正在运行的业务代码。
+- 只能打断纯 Python 字节码，函数若阻塞在 C 层调用，异常要等它返回才生效。
+- `finally` 里取消定时器是关键，否则残留定时器会在后续无关代码里触发。
+- `signal.alarm` 只在主线程有效，且粒度是整数秒。
+
+运行结果：函数在 30 秒内返回时正常取值，超过 30 秒时抛出 `TimeoutError`。
+
+Python 官方文档 `signal` 模块章节说明 `SIGALRM` 由主线程处理，子线程或 Windows 上这套方案不适用。
+
+**动手验证**
+
+下面的脚本用可注入的时钟验证熔断器状态转换，不需要真实网络。
 
 ```python
-@flow
-def compensating_transaction_flow(operations: list[dict]):
-    state = {
-        "operations": operations,
-        "completed": [],
-        "rolled_back": [],
-        "final_state": None
-    }
-    
-    executed_actions = []
-    
-    try:
-        for op in operations:
-            # 执行操作
-            result = execute_operation(op)
-            executed_actions.append({"operation": op, "result": result})
-            state["completed"].append(op["id"])
-        
-        state["final_state"] = "success"
-    
-    except Exception as e:
-        state["error"] = str(e)
-        state["final_state"] = "rolled_back"
-        
-        # 逆序执行补偿操作
-        for action in reversed(executed_actions):
-            try:
-                compensate(action)
-                state["rolled_back"].append(action["operation"]["id"])
-            except CompensationError:
-                # 记录无法补偿的操作，需要人工介入
-                state["failed_compensation"] = action["operation"]["id"]
-    
-    return state
-```
+# 依赖：Python 3.10+，只用标准库
+class BreakerOpen(Exception):
+    pass
 
-### 6.7 完整错误恢复示例
+class Breaker:
+    def __init__(self, threshold=3, cooldown=60):     # 阈值 3、冷却 60 秒便于演示
+        self.threshold, self.cooldown = threshold, cooldown
+        self.fail = 0
+        self.opened_at = None
+        self.state = "closed"
 
-```python
-from dataclasses import dataclass, field
-from typing import Optional
-from crewai.flow.flow import Flow, flow
-
-# 第 1 段：引入依赖，搭建"状态容器 + 流程编排"所需的三块基石
-# - dataclass/field 用来声明一个可变、可聚合的状态对象，让恢复逻辑在一个地方读写；
-# - Optional 用于表达 checkpoint/error "可能为空"的语义，配合后续 None 判断实现断点续跑；
-# - Flow/flow 是 CrewAI 的流程装饰器入口，@flow 会把普通函数注册成可被框架调度/持久化的 flow。
-# 易错点：Flow 与 flow 在此处被导入但未直接使用，是预留的框架 API，删除反而可能影响扩展。
-
-# 第 2 段：定义恢复状态（RecoveryState），所有跨步骤的"记忆"都集中在这里
-# 为什么这样写：把 data/checkpoint/error/尝试次数等散落状态收进一个 dataclass，
-# 恢复处理器只需操作一个对象，天然支持序列化持久化，重启后可原样回填继续跑。
-# 关键数据流：data 是贯穿全流程的载荷；checkpoint 记录"当前/最近失败的步骤名"；
-# checkpoints_completed 是已完成步骤的有序日志，用于断点续跑时跳过。
-@dataclass
-class RecoveryState:
-    data: dict
-    checkpoint: Optional[str] = None
-    error: Optional[str] = None
-    recovery_attempts: int = 0
-    max_recovery_attempts: int = 3
-    # 用 field(default_factory=list) 而非 `= []`：避免可变默认参数被所有实例共享的经典陷阱，
-    # 保证每个 RecoveryState 实例都拿到独立列表，否则 checkpoint 记录会相互污染。
-    checkpoints_completed: list[str] = field(default_factory=list)
-
-# 第 3 段：流程入口与状态初始化
-# @flow 让该函数成为框架可识别、可（在部分后端下）编排的 flow，是断点续跑能力的挂载点。
-# 入参 initial_data 是不可变意图的输入，立刻封装进 RecoveryState，后续所有变更都走 state，避免副作用散逸。
-@flow
-def recoverable_flow(initial_data: dict):
-    state = RecoveryState(data=initial_data)
-    
-    # 第 4 段：把执行管线声明为"有序的 (步骤名, 处理函数) 列表"
-    # 为什么这样写：用数据描述流程顺序，而不是写死一长串顺序调用，
-    # 这样"步骤名"既能当 checkpoints_completed 的标识，又能在恢复时定位断点；
-    # 新增/调序步骤只需改这张表，主循环无需变动。
-    checkpoints = [
-        ("validate", validate_data),
-        ("transform", transform_data),
-        ("analyze", analyze_data),
-        ("report", generate_report)
-    ]
-    
-    # 第 5 段：逐步骤执行 + 失败恢复的主循环
-    # 数据流：state.data 如同"传送带"，依次流经各 checkpoint_func，被前一步的输出覆盖；
-    # 复杂度：对 N 个步骤线性 O(N)，每步最多重试 max_recovery_attempts 次，最坏 O(N * A)。
-    for checkpoint_name, checkpoint_func in checkpoints:
-        try:
-            if state.checkpoint and state.checkpoint != checkpoint_name:
-                # 从断点恢复：checkpoint 非空说明是续跑场景而非全新执行
-                # 从断点恢复，跳过已完成的步骤
-                # 依据 checkpoints_completed 判断该步是否已成功，已成功则 continue，
-                # 从而避免重复执行产生副作用或重复计费；边界条件：checkpoint 为 None（首次运行）时整体跳过此分支。
-                if checkpoint_name in state.checkpoints_completed:
-                    continue
-            
-            # 关键行：把本步处理结果回写 state.data，形成"上一步输出=下一步输入"的链式数据流
-            state.data = checkpoint_func(state.data)
-            # 执行成功即登记完成日志，并推进 checkpoint 指针，为下次恢复提供锚点
-            state.checkpoints_completed.append(checkpoint_name)
-            state.checkpoint = checkpoint_name
-            
-        except CheckpointError as e:
-            # 只捕获 CheckpointError（可预期的业务级失败），其余异常向上抛出，
-            # 防止把真正的程序 bug 误当成"可恢复故障"而掩盖问题。
-            state.error = str(e)
-            
-            if state.recovery_attempts < state.max_recovery_attempts:
-                # 尚未耗尽重试额度：自增计数并交由 recovery_handler 修复/降级数据，
-                # 注意循环不会在此重试同一步，而是继续走后续步骤（依赖修复后的 state.data）。
-                state.recovery_attempts += 1
-                state.data = recovery_handler(checkpoint_name, state.data)
+    def call(self, func, now):
+        if self.state == "open":
+            if now - self.opened_at > self.cooldown:
+                self.state = "half_open"              # 冷却结束，放探测
             else:
-                # 恢复额度耗尽：把失败步骤记为 checkpoint 并 break，
-                # 使流程携带错误信息提前退出，同时保留断点供外部重启后续跑。
-                state.checkpoint = checkpoint_name
-                break
-    
-    # 第 6 段：组装对外返回结果
-    # 除最终数据外，一并暴露 checkpoints（进度审计）、error（失败原因）与
-    # recovered（是否发生过恢复，等价于 attempts>0），让调用方可据此决定重试或告警。
-    return {
-        "result": state.data,
-        "checkpoints": state.checkpoints_completed,
-        "error": state.error,
-        "recovered": state.recovery_attempts > 0
-    }
-```
-## 7. 完整代码示例
+                raise BreakerOpen("circuit open")     # 快速失败
+        try:
+            result = func()
+        except Exception:
+            self._fail(now)
+            raise
+        self.fail = 0                                 # 成功清零
+        self.state = "closed"
+        return result
 
-以下是一个综合性的 Flow 示例，整合了顺序执行、并行处理、条件分支和错误恢复：
+    def _fail(self, now):
+        self.fail += 1
+        self.opened_at = now
+        if self.fail >= self.threshold:
+            self.state = "open"
 
-```python
-"""
-综合示例：多阶段数据分析流水线
-包含：顺序执行、并行处理、条件路由、状态管理、错误恢复
-"""
+def boom():
+    raise ValueError("down")
 
-from crewai import Agent, Task, Crew
-from crewai.flow.flow import Flow, flow, router, Route, start
-from crewai.flow.state import State
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import TypedDict
-import logging
-from tenacity import retry, stop_after_attempt, wait_exponential
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-class ProcessingLevel(str, Enum):
-    QUICK = "quick"
-    STANDARD = "standard"
-    COMPREHENSIVE = "comprehensive"
-
-
-class PipelineState(TypedDict):
-    raw_data: dict
-    validated_data: dict | None
-    quick_results: list | None
-    comprehensive_results: dict | None
-    final_report: str | None
-    processing_level: ProcessingLevel | None
-    errors: list[str]
-    checkpoints: list[str]
-
-
-@flow
-class DataPipelineFlow(Flow[PipelineState]):
-    
-    @start()
-    def load_data(self, raw_data: dict):
-        """步骤 1：加载并验证输入数据"""
-        self.state["raw_data"] = raw_data
-        self.state["errors"] = []
-        self.state["checkpoints"] = ["load_data"]
-        
-        if not raw_data or not isinstance(raw_data, dict):
-            raise ValueError("Invalid input data format")
-        
-        logger.info("Data loaded successfully")
-    
-    @router(load_data)
-    def determine_processing_level(self) -> Route:
-        """根据数据规模决定处理级别"""
-        data_size = len(self.state["raw_data"].get("items", []))
-        
-        if data_size < 100:
-            self.state["processing_level"] = ProcessingLevel.QUICK
-            return Route.QUICK
-        elif data_size < 1000:
-            self.state["processing_level"] = ProcessingLevel.STANDARD
-            return Route.STANDARD
-        else:
-            self.state["processing_level"] = ProcessingLevel.COMPREHENSIVE
-            return Route.COMPREHENSIVE
-    
-    @router(determine_processing_level, route_options=[Route.QUICK])
-    def quick_processing(self):
-        """快速处理路径"""
-        self.state["checkpoints"].append("quick_processing")
-        
-        items = self.state["raw_data"]["items"]
-        self.state["quick_results"] = [
-            simple_analysis(item) for item in items
-        ]
-        
-        self.state["final_report"] = self._generate_summary_report()
-        return self.state
-    
-    @router(determine_processing_level, route_options=[Route.STANDARD])
-    def standard_processing(self):
-        """标准处理路径"""
-        self.state["checkpoints"].append("standard_processing")
-        
-        items = self.state["raw_data"]["items"]
-        
-        # 并行处理各个维度
-        results = parallel_analytics(items)
-        self.state["quick_results"] = results["basic"]
-        self.state["comprehensive_results"] = results["detailed"]
-        
-        self.state["final_report"] = self._generate_standard_report()
-        return self.state
-    
-    @router(determine_processing_level, route_options=[Route.COMPREHENSIVE])
-    def comprehensive_processing(self):
-        """全面处理路径（带 Crew 协作）"""
-        self.state["checkpoints"].append("comprehensive_processing")
-        
-        # 定义多个专业 Agent
-        data_agent = Agent(
-            role="Data Analyst",
-            goal="Extract and prepare data for analysis",
-            backstory="Expert in data preprocessing and feature engineering"
-        )
-        
-        insight_agent = Agent(
-            role="Insight Generator",
-            goal="Generate actionable insights from data",
-            backstory="Expert in statistical analysis and pattern recognition"
-        )
-        
-        # 创建分析任务
-        tasks = [
-            Task(
-                description="Clean and prepare the dataset",
-                agent=data_agent,
-                expected_output="Cleaned dataset ready for analysis"
-            ),
-            Task(
-                description="Perform comprehensive statistical analysis",
-                agent=insight_agent,
-                expected_output="Detailed insights and recommendations"
-            )
-        ]
-        
-        crew = Crew(
-            agents=[data_agent, insight_agent],
-            tasks=tasks,
-            process="sequential"
-        )
-        
-        crew_result = crew.kickoff()
-        self.state["comprehensive_results"] = {
-            "crew_output": crew_result,
-            "additional_metrics": calculate_metrics(self.state["raw_data"])
-        }
-        
-        self.state["final_report"] = self._generate_comprehensive_report()
-        return self.state
-    
-    def _generate_summary_report(self) -> str:
-        return f"""
-        Quick Analysis Report
-        =====================
-        Items Analyzed: {len(self.state.get('quick_results', []))}
-        Processing Level: {self.state['processing_level']}
-        Status: Complete
-        """
-    
-    def _generate_standard_report(self) -> str:
-        return f"""
-        Standard Analysis Report
-        ========================
-        Basic Results: {len(self.state.get('quick_results', []))}
-        Detailed Results: {len(self.state.get('comprehensive_results', {}))}
-        Processing Level: {self.state['processing_level']}
-        Status: Complete
-        """
-    
-    def _generate_comprehensive_report(self) -> str:
-        return f"""
-        Comprehensive Analysis Report
-        =============================
-        Processing Level: {self.state['processing_level']}
-        Crew Results: Available
-        Metrics: {len(self.state.get('comprehensive_results', {}).get('additional_metrics', []))}
-        Status: Complete
-        """
-
-
-# 辅助函数
-def simple_analysis(item: dict) -> dict:
-    """简单分析单个项目"""
-    return {"id": item.get("id"), "score": item.get("value", 0) * 0.8}
-
-
-def parallel_analytics(items: list) -> dict:
-    """并行执行多种分析"""
-    import concurrent.futures
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        basic_future = executor.submit(analyze_basic, items)
-        detailed_future = executor.submit(analyze_detailed, items)
-        pattern_future = executor.submit(find_patterns, items)
-        trend_future = executor.submit(analyze_trends, items)
-        
-        return {
-            "basic": basic_future.result(),
-            "detailed": detailed_future.result(),
-            "patterns": pattern_future.result(),
-            "trends": trend_future.result()
-        }
-
-
-def analyze_basic(items: list) -> list:
-    return [simple_analysis(item) for item in items]
-
-
-def analyze_detailed(items: list) -> dict:
-    return {"total": len(items), "avg_value": sum(i.get("value", 0) for i in items) / len(items) if items else 0}
-
-
-def find_patterns(items: list) -> list:
-    return [{"pattern": i % 3, "count": i} for i in range(min(5, len(items)))]
-
-
-def analyze_trends(items: list) -> dict:
-    return {"trend": "increasing" if len(items) > 5 else "stable"}
-
-
-def calculate_metrics(data: dict) -> list:
-    return ["metric_1", "metric_2", "metric_3"]
-
-
-# 使用示例
-if __name__ == "__main__":
-    # 创建示例数据
-    sample_data = {
-        "items": [
-            {"id": i, "value": i * 10, "category": f"cat_{i % 3}"}
-            for i in range(50)
-        ]
-    }
-    
-    # 执行流水线
-    pipeline = DataPipelineFlow()
-    result = pipeline.test(sample_data)
-    
-    print(f"Processing Level: {result['processing_level']}")
-    print(f"Checkpoints: {result['checkpoints']}")
-    print(f"Final Report:\n{result['final_report']}")
+b = Breaker()
+for t in range(3):                                    # 连续 3 次失败
+    try:
+        b.call(boom, now=t)
+    except ValueError:
+        pass
+assert b.state == "open"                              # 达到阈值即熔断
+try:
+    b.call(boom, now=10)
+    raise AssertionError("should not reach")
+except BreakerOpen:
+    pass                                              # 冷却期内快速失败
+assert b.call(lambda: "ok", now=100) == "ok"          # 冷却结束后探测成功
+assert b.state == "closed" and b.fail == 0            # 状态与计数一起复位
+print(b.state, b.fail)
+print("OK")
 ```
 
-## 8. 相关资源
+预期输出：
 
-- [CrewAI 官方文档](https://docs.crewai.com/)
-- [CrewAI Flows 指南](https://docs.crewai.com/concepts/flows)
+```
+closed 0
+OK
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 熔断功能形同虚设 | 每次调用新建一个熔断器，计数无法累计 | 把熔断器提为模块级或单例 |
+| 超时异常在无关代码处抛出 | 没在 `finally` 里取消定时器 | 调用 `signal.alarm(0)` |
+| 降级分支永远不执行 | 宽泛的 `except Exception` 写在前面 | 把具体异常分支写在前面 |
+| 重试把校验错误也重试了 | 重试条件没限定异常类型 | 用 `retry_if_exception_type` 限定 |
+
+**用在哪里**
+
+- 支付网关调用。业务背景是第三方支付接口偶发抖动。知识用法是连接错误重试三次并指数退避，连续失败则熔断走降级。收益指标是支付成功率与故障期间的下游请求量。什么时候不该用：支付是幂等敏感操作，重试必须配合幂等键，否则会重复扣款。
+- 后台报表定时任务。业务背景是每晚生成报表，单次运行可能超过预期时长。知识用法是给整个流程加超时，超时后落一份部分结果。收益指标是任务卡死次数。什么时候不该用：报表本身就允许跑两小时，硬超时只会中断正常任务。
+- 模型调用网关。业务背景是模型服务在高峰期返回 429。知识用法是重试加退避，超过阈值后切换到较小的备用模型。收益指标是请求失败率与平均响应时长。什么时候不该用：备用模型输出质量不达标时，降级结果会误导用户，此时宁可报错。
+
+**行业实践**
+
+- tenacity 官方文档提供 `stop_after_attempt` 与 `wait_exponential` 两个组件，可组合成"限次 + 退避"策略。借鉴方式：把重试参数集中到一个装饰器工厂里，禁止在每个函数上各写一套。
+- Microsoft Azure Architecture Center 的 Circuit Breaker Pattern 一文描述了关闭、打开、半开三种状态与冷却探测机制。借鉴方式：把熔断器提为进程级单例，并在日志里记录状态变更事件。
+- Python 官方文档 `signal` 模块章节说明 `SIGALRM` 的适用限制。借鉴方式：跨平台项目改用线程池加 `concurrent.futures` 的超时参数，不要依赖信号。
+
+怎么借鉴到你的项目：先给所有外部依赖列一张表，标出"可重试""必须熔断""必须有超时"，再逐项落地。
+
+**小结**
+
+- 重试、熔断、超时、降级各自解决一类故障，不要用一种策略覆盖全部。
+- 熔断器必须是长生命周期对象，否则计数无法跨请求累计。
+- 降级路径要在异常分支顺序上排在宽泛捕获之前。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 内容生产流水线 | Flow 与 Crew 的两层分工 | crewai 的 Agent、Task、Crew 加 `@flow` | 稿件较短时不要引入编排层 |
+| 客服工单分派 | `@router` 与 `route_options` 分支 | 枚举标签加分支节点 | 阈值集中在一处，便于审计 |
+| 商品详情页多路取数 | 并行执行与失败隔离 | `asyncio.gather` 加兜底值 | 结果按业务标识对齐，不依赖下标 |
+| 夜间数据核对任务 | 循环执行与状态持久化 | 状态文件加步数字段 | 落盘要有原子性，避免半截 JSON |
+| 合同文档解析入库 | 类式 Flow 与状态契约 | TypedDict 或 Pydantic 模型 | 可变默认值用工厂函数 |
+| 支付网关调用 | 重试、熔断、降级 | tenacity 加熔断器单例 | 重试必须配合幂等键 |
+| 长视频转码 | 断点恢复 | 阶段状态落盘 | 任务太短时落盘开销占比过高 |
+| 模型调用网关 | 退避重试与备用模型 | 限次重试加超时 | 降级结果质量不达标时宁可报错 |
+
+## 动手作业
+
+目标：写一条"三源取数后汇总"的 Flow，包含并行、状态持久化、重试与熔断。
+
+步骤：
+
+1. 定义状态契约，至少包含 `run_id`、`sources`、`merged`、`updated_at` 四个字段。
+2. 写三个取数函数，其中一个按配置会抛 `ConnectionError`，另一个会抛 `ValueError`。
+3. 用 `asyncio.gather` 并发执行三个取数，打开 `return_exceptions`。
+4. 对 `ConnectionError` 加限次重试，对连续失败加熔断器，对 `ValueError` 直接进错误列表。
+5. 用单次遍历归并成功结果，算出条目数与平均值，除零时平均值保持 0。
+6. 每次归并后把状态写进 JSON 文件，进程重启时能从文件恢复 `run_id` 与 `merged`。
+
+验收标准：
+
+- 三个取数函数在同一时刻被拉起，并发峰值等于 3，可用计数器断言。
+- 抛 `ValueError` 的分支不重试，`ConnectionError` 分支最多尝试 3 次。
+- 连续失败达到阈值后，后续调用在冷却期内直接抛熔断异常。
+- 空输入时归并结果的平均值为 0，且不抛 `ZeroDivisionError`。
+- 删除状态文件后重跑，脚本能冷启动；保留状态文件重跑，能读到上一次的 `run_id`。
+- 脚本以 `assert` 覆盖以上五条，全部通过后打印 `OK`。
+
+## 综合对比
+
+| 对比对象 | 中断后能否续跑 | 跨步骤数据放哪 | 单点失败的影响面 | 代码量的主要来源 | 适用场景 |
+| --- | --- | --- | --- | --- | --- |
+| 纯函数串行 | 不能，只能整条重跑 | 函数参数与返回值 | 后续全部中断 | 函数之间的调用链 | 三步以内的数据处理 |
+| Flow 顺序执行 | 配合落盘可以 | `self.state` 或返回值 | 后续节点中断 | 节点定义与状态契约 | 有明确先后依赖的流水线 |
+| Flow 并行执行 | 配合落盘可以 | 结果列表加 state | 只影响失败分支 | 并发控制与结果对齐 | 多数据源独立取数 |
+| Flow 条件执行 | 配合落盘可以 | 路由器标签加 state | 只影响被选中的分支 | 分支标签与阈值定义 | 分级处理与策略分派 |
+| Flow 加持久化 | 可以从上次步骤继续 | 落盘文件加 state | 影响当前步骤 | 序列化与原子写 | 长耗时任务与定时任务 |
 
 ## 深入阅读与参考
 
@@ -1537,175 +1410,65 @@ if __name__ == "__main__":
 | [Control flow and error handling](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Control_flow_and_error_handling) | MDN 控制流与错误处理，异常捕获思路可直接迁移。 | 读 try/catch/finally 与抛出错误两节，带着 Flow 失败恢复问题做笔记并试写。 |
 | [Atlassian Git 教程](https://www.atlassian.com/git/tutorials) | Git 工作流对比教程，帮助理解分支与主干并行模式。 | 读工作流对比部分，比较其分支并行与本页 Flow 顺序并行的差异。 |
 
-## 应用与行业实践
+## 自测题
 
-### 应用场景地图
+??? question "Flow 和 Crew 各自负责什么？"
+    Flow 是编排层，负责节点之间的先后、分支、状态与重试。
+    Crew 是执行层，负责把 Agent 与 Task 装配成一次具体执行。
+    Agent 回答"谁来做"，Task 回答"做什么"，两者都由 Crew 组装。
+    装配阶段不产生模型调用，只有 `kickoff()` 才真正触发执行。
 
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-| --- | --- | --- | --- |
-| 后台管理的万行表格批量导出与字段补全 | 条件执行 + 并行执行 + 状态管理 | CrewAI Flow、分页任务队列、对象存储 | 设定单批行数上限，别把整表塞进 state |
-| 低端安卓机型的首屏文案与降级素材生成 | 条件执行 + 状态管理 | CrewAI Flow、CDN、静态缓存 | Flow 只产出素材，首屏渲染不等待 Flow |
-| 多人协作白板的会议纪要与待办抽取 | 并行执行 + 状态管理 + 人工审核 | CrewAI Flow、白板开放 API | 写回卡片要带幂等键，避免重复建卡 |
-| 客服工单的意图分类与升级 | @flow 装饰器 + 错误处理与恢复 | CrewAI Flow、工单系统 Webhook | 分类失败的工单必须落人工队列 |
-| 电商价格的每日巡检与改价建议 | 顺序执行 + 条件执行 | CrewAI Flow、cron 定时任务 | 只出建议，写价操作留在审批之后 |
-| 代码仓库的 Issue 自动分诊 | 自定义逻辑与代码集成 + 状态管理 | CrewAI Flow、代码托管平台 API | 评论带幂等标记，重跑不重复评论 |
-| 多语言文档的术语一致性检查 | 并行执行 + 状态合并 | CrewAI Flow、术语库文件 | 合并结果保留来源段落编号 |
-| 合同条款的风险标注与复核 | @router 条件执行 + 人工审核 | CrewAI Flow、文档解析服务 | 每条标注可回溯到原文位置 |
+??? question "为什么 @router 的返回值要用 Enum 而不是裸字符串？"
+    裸字符串写错时分支会静默失效，流程跑完却没有结果，问题很难定位。
+    Enum 成员是单例，拼写错误会在导入或引用阶段就暴露。
+    继承 `str` 的枚举可以直接参与 JSON 序列化与数据库比较。
+    上游返回值与下游 `route_options` 必须使用同一个枚举，不能一边用成员一边用 `.value`。
 
-### 三个场景拆解
+??? question "顺序执行的耗时和并行执行有什么差别？"
+    顺序执行的总耗时是各步骤耗时之和，前一步不返回后一步不开始。
+    并行的总耗时由最慢的那个分支决定，其余分支的耗时可被覆盖。
+    并行的前提是分支之间没有共享的写入资源，否则并发会互相覆盖。
+    并发分支失败时，用 `return_exceptions=True` 保留异常对象，逐项判断类型。
 
-#### 场景 1：后台管理的万行表格批量导出
+??? question "为什么 TypedDict 拦不住运行期的类型错误？"
+    TypedDict 只在静态类型检查阶段生效，运行期它就是一个普通字典。
+    写错键名或值类型不会被自动拦截，只有在取值时报 KeyError 或下游计算报错。
+    需要运行期校验时改用 Pydantic 模型，赋值时就会触发校验。
+    无论用哪种，可变默认值都要用工厂函数，避免实例之间共享同一个容器。
 
-- **业务背景**：运营在后台导出订单表，行数从几百涨到上万，同步导出会把请求拖到超时。痛点是超时后不知道哪些行已经处理完，只能整表重跑。
-- **怎么用本页知识解决**：先用 `@router` 按总行数分流，小表走同步分支，大表走分批分支；分批分支内部逐批处理，失败批次写入状态后继续下一批。
-- 用 `@start` 读取总行数并写入 state，后续节点都能读到同一份数据。
-- 用 `@router` 以行数为判断依据，把两条路径分开，避免同步路径被大表拖垮。
-- 用 `@listen` 串联分批与执行两步，单批失败只记录批次编号，不中断整个 Flow。
-- 重跑时先读 state 里的 `failed_batches`，只补失败批次。
+??? question "持久化状态时为什么要写两次盘？"
+    第一次落盘记录"已进入该步骤"，第二次记录"结果已产出"。
+    进程在两步之间崩溃时，从文件里能看出任务是被中断的，而不是从未开始。
+    两次落盘也是断点恢复的判断依据，可以决定重跑还是沿用已有结果。
+    覆盖写没有原子性时，写到一半崩溃会留下损坏的 JSON，需要临时文件加改名的方式。
 
-```python
-from crewai.flow.flow import Flow, listen, start, router
-from pydantic import BaseModel
+??? question "重试和熔断分别解决什么问题？"
+    重试解决偶发抖动，假设下一次调用有可能成功。
+    熔断解决持续故障，假设短时间内调用不会恢复，继续打只会加重下游负担。
+    重试要限定异常类型与总次数，否则会把配额烧光。
+    熔断器必须是长生命周期对象，否则失败计数无法跨请求累计。
 
-class ExportState(BaseModel):
-    total_rows: int = 0              # 表格总行数
-    batches: int = 0                 # 分批数量
-    failed_batches: list[int] = []   # 失败批次编号
+??? question "signal.alarm 加超时有什么限制？"
+    只能在主线程注册与触发，子线程里会直接报错。
+    粒度是整数秒，且重复设置会覆盖上一次的定时器。
+    只能打断纯 Python 字节码，阻塞在 C 层调用时异常要等返回才生效。
+    无论正常返回还是抛异常，都要在 `finally` 里调用 `signal.alarm(0)` 取消定时器。
 
-class ExportFlow(Flow[ExportState]):
-    @start()
-    def count(self):
-        self.state.total_rows = count_rows()      # 读表统计行数并写入状态
+??? question "并行结果归并时最容易出什么口径问题？"
+    各分支的条目数与总量可能来自不同统计口径，算出的平均值会失真。
+    分支失败或被跳过时字段缺失，直接下标取值会抛 KeyError。
+    缺字段按零处理能避免报错，但零值参与平均会拉低结果，需要提前约定。
+    除零要有守卫条件，空输入时平均值保持未定义值，并在返回结构里说清它的含义。
 
-    @router(count)
-    def choose(self):
-        return "batch" if self.state.total_rows > 5000 else "inline"  # 大表走分批
+## 延伸阅读
 
-    @listen("batch")
-    def split(self):
-        self.state.batches = self.state.total_rows // 1000 + 1        # 每批约千行
-
-    @listen(split)
-    def run_batches(self):
-        for i in range(self.state.batches):
-            try:
-                export_batch(i, size=1000)        # 处理第 i 批
-            except Exception:
-                self.state.failed_batches.append(i)   # 记录失败批次，继续下一批
-```
-
-- **怎么度量收益**：用 Prometheus Histogram 记录每批耗时，看 p50 与 p95；用 `failed_batches` 长度除以 `batches` 得到批次失败率。测量方法：导出同一份表格各跑一次 inline 分支与 batch 分支，记录总耗时与超时次数。成本指标在 LLM 调用处埋点，统计 token 数。
-- **什么时候不该用**：表格只有几百行且数据库支持流式游标时，直接同步导出，引入 Flow 只增加排查成本。导出结果要求强一致快照时，分批读取跨越多个时间点，会读到不一致的数据。
-
-#### 场景 2：低端安卓机型首屏文案与降级素材生成
-
-- **业务背景**：首屏文案与图片要按机型档位出不同版本，低端机只能接受纯文本降级稿。痛点是素材生成流程串行跑，档位多的版本要排队等。
-- **怎么用本页知识解决**：把档位作为分支标签，用 `@router` 分流，用 `or_` 把多个档位的结果汇到同一个缓存节点，客户端只读缓存。
-- 用 state 存档位，分支逻辑只读状态，不在节点里重复判断。
-- 用 `or_` 合并分支，低端与中端共享同一套缓存写入逻辑。
-- 低端分支先产出纯文本降级稿，保证素材可用性优先。
-- 缓存键包含档位与文案版本，避免旧素材被新版本覆盖。
-
-```python
-from crewai.flow.flow import Flow, listen, start, router, or_
-from pydantic import BaseModel
-
-class VariantState(BaseModel):
-    tier: str = "low"          # 设备档位：low / mid / high
-    text: str = ""             # 生成的文案
-    fallback_ready: bool = False   # 降级稿是否就绪
-
-class FirstScreenFlow(Flow[VariantState]):
-    @start()
-    def detect(self):
-        self.state.tier = read_device_tier()      # 读取客户端上报的机型档位
-
-    @router(detect)
-    def branch(self):
-        return self.state.tier                    # 档位直接作为分支标签
-
-    @listen("low")
-    def gen_low(self):
-        self.state.fallback_ready = True          # 低端档位先出纯文本降级稿
-
-    @listen(or_("low", "mid", "high"))            # 三个档位汇到同一节点
-    def write_cache(self):
-        put_cache(self.state.tier, self.state.text)   # 按档位写缓存供客户端读取
-```
-
-- **怎么度量收益**：前端侧用 Lighthouse CI 在节流配置下测 LCP，线上用 Android Vitals 看 p75 LCP 与 INP。生成侧看缓存命中率与降级稿覆盖率，命中率用 CDN 访问日志统计。测量方法：固定同一批机型配置，对比接入前后各跑三次的 p75 数值。
-- **什么时候不该用**：首屏文案不随档位变化时，分支只增加维护面，直接用同一份素材。素材生成耗时远超首屏预算、客户端又不能异步替换时，应把生成放到离线任务，而不是挂在请求链路上。
-
-#### 场景 3：多人协作白板的会议纪要与待办抽取
-
-- **业务背景**：白板会议转写文本按发言人分段，每段要抽待办并写回卡片，一次会议可能几十段。痛点是重复写回会产生重复卡片，人工确认前的中间结果也会被推送。
-- **怎么用本页知识解决**：用 `@listen` 串起拉取、抽取、确认三步；抽取阶段按段落循环，写回时用幂等键去重；确认阶段通过后才推送通知。
-- 转写文本一次写入 state，后续节点不再重复拉取接口。
-- 每段独立抽取，单段失败不影响其他段落。
-- 写回卡片用 `action_id` 作为幂等键，重跑只更新不新建。
-- 人工确认作为独立节点，未确认时保持 `approved=False`，不触发通知。
-
-```python
-from crewai.flow.flow import Flow, listen, start
-from pydantic import BaseModel
-
-class BoardState(BaseModel):
-    transcript: str = ""            # 转写文本
-    actions: list[dict] = []        # 抽取出的待办
-    approved: bool = False          # 人工是否确认
-
-class MinutesFlow(Flow[BoardState]):
-    @start()
-    def load(self):
-        self.state.transcript = fetch_transcript()    # 拉取白板转写文本
-
-    @listen(load)
-    def extract(self):
-        for seg in split_by_speaker(self.state.transcript):   # 按发言人切段
-            self.state.actions += extract_action(seg)         # 逐段抽取待办
-        upsert_cards(self.state.actions, key="action_id")     # 幂等写回卡片
-
-    @listen(extract)
-    def confirm(self):
-        if self.state.approved:
-            notify_owners(self.state.actions)   # 仅在确认后推送负责人
-```
-
-- **怎么度量收益**：看卡片重复率，用白板审计日志按 `action_id` 统计重复创建条数。看人工确认耗时，用 Flow 状态里记录的两个时间戳相减。看抽取段落失败率，用失败段数除以总段数。
-- **什么时候不该用**：会议只有两三个人、待办当场口头分配时，抽取流程带来的确认开销高于收益。白板接口不支持幂等键、又不允许去重查询时，重跑会污染协作空间，应先改接口。
-
-### 行业先进实践
-
-- 检查点与断点续跑（出处：LangGraph 官方文档）：LangGraph 用 checkpointer 保存图状态，配合 thread_id 从上次中断处恢复。这么做的价值是长流程重跑不必从头执行。借鉴方式：把 Flow 状态在每个节点结束后落盘，重跑时先读状态再决定起点。CrewAI Flows 侧的持久化接口需核对官方文档：核对装饰器名称、序列化字段范围与恢复方式。
-- 重试策略与幂等 Activity（出处：Temporal 官方文档）：Temporal 允许为活动配置重试策略，并要求副作用操作可重复执行而不产生重复结果。有效原因是失败是常态，重试必须安全。借鉴方式：给 Flow 里每个外部写操作定义幂等键，重试前先查一次目标系统。
-- 状态机式 Retry 与 Catch（出处：AWS Step Functions 官方文档）：Step Functions 用 Retry 与 Catch 字段声明错误处理，失败可跳到兜底状态而非中断整个流程。有效原因是错误分支被显式建模，排查路径清晰。借鉴方式：把失败分支写成 `@router` 的一个返回值，而不是只在节点里写 try/except。
-- 期望状态与幂等 reconcile（出处：Kubernetes 官方文档）：控制器反复比对期望状态与实际状态，差值驱动下一步动作。有效原因是重复执行同一轮调谐不会改变结果。借鉴方式：Flow 重跑时先读外部系统当前状态，再决定写不写。
-- 人工审核节点（出处：需核对官方文档：核对 CrewAI Flows 是否提供人工反馈装饰器、其名称与支持的版本区间）：核对清楚后再决定用内置能力还是自建审批表。自建方案把审批结果写进 state，用 `@router` 按确认结果分流。
-
-### 从学到用：落地路线
-
-1. 先在一个只读场景试点：选一个不写外部系统、失败也不影响业务的流程，把它改成 Flow。验收标准：能在本地一次跑通，并打印每个节点前后的 state 快照。
-2. 用可复现实验验证：准备同一份输入，分别跑原流程和新 Flow 各三次，记录耗时、失败次数、外部调用次数。验收标准：三组数字落在同一份记录表里，且能指出差异来源。
-3. 推广到写操作场景：给每个写操作补幂等键，把失败分支写成 router 返回值。验收标准：同一任务连续重跑两次，目标系统里的记录条数不增加。
-4. 防止回退：把状态字段、幂等键、失败分支写成评审清单，改动 Flow 结构时逐条勾选。验收标准：清单进入合并请求模板，缺项时评审不予通过。
-
-### 动手作业
-
-**目标**：做一个"会议转写文本转待办卡片"的小 Flow，包含条件分支、失败记录与人工确认三步。
-
-**步骤**：
-1. 准备一份十段以上的转写文本，每段带发言人标记，存成本地文件。
-2. 定义 state，包含转写文本、待办列表、失败段编号、是否确认四个字段。
-3. 写 `@start` 节点读取文件并写入 state。
-4. 写 `@router` 节点，按段落数量分流：少于五段同步处理，多于五段分批处理。
-5. 写抽取节点，逐段生成待办，失败的段落编号写入失败列表。
-6. 写确认节点，只在确认字段为真时输出待办清单。
-7. 把待办写成本地 JSON 文件，用待办编号作为去重键。
-
-**验收标准**：
-- 同一份输入连续跑两次，输出 JSON 里的待办条数相同。
-- 人为让一段抽取失败，运行结束后失败列表里能看到该段编号，其余段落正常输出。
-- 确认字段为假时，不产生任何输出文件。
-- 打印每个节点前后的 state，能看出字段在哪一步被写入。
-- 输入换成二十段文本时，走分批分支，日志里能看到分批次数。
-
+- CrewAI 官方文档：Flows 章节，`@start`、`@listen`、`@router` 的事件驱动写法。
+- CrewAI 官方文档：Process 章节，顺序与分层两种编排策略。
+- CrewAI 官方文档：Tools 章节，`BaseTool` 的 `name` 与 `description` 约定。
+- Python 官方文档：`asyncio` 任务与协程章节，`gather` 与 `return_exceptions`。
+- Python 官方文档：`enum` 模块章节，枚举成员的比较语义。
+- Python 官方文档：`signal` 模块章节，`SIGALRM` 的线程与平台限制。
+- Python 官方文档：`pathlib` 章节，路径对象的推荐用法。
+- Pydantic 官方文档：模型章节，字段默认值与可变默认值的处理。
+- tenacity 官方文档：`stop_after_attempt` 与 `wait_exponential` 的组合用法。
+- Microsoft Azure Architecture Center：Circuit Breaker Pattern 一文。

@@ -1,140 +1,409 @@
 ---
-title: MCP 协议集成
-description: 介绍 MCP 协议的概念、实现以及与 AI Agent 的集成方式。
-tags:
-  - ai-agent
-  - mcp
-date: 2026-05-17
+title: "MCP 协议集成"
+description: "介绍 MCP 协议的概念、实现以及与 AI Agent 的集成方式。"
 ---
 
 # MCP 协议集成
 
-> 本文档介绍 MCP 协议的概念、实现以及与 AI Agent 的集成方式。
+!!! abstract "学完这一页你能"
 
-## 1. MCP 概述
+    - 说出 MCP 中 Host、Client、Server 三者的职责边界，并解释厂商私有工具调用在换宿主时为什么要重写代码。
+    - 手写 JSON-RPC 的请求、响应、通知三种消息，并断言通知因为缺少 id 因而不等待回复。
+    - 用装饰器或显式注册表，让一个进程对外暴露工具、资源、提示模板三类能力，并让客户端完成发现与调用。
+    - 给工具调用加上输入校验、路径白名单、滑动窗口限速与审计记录，并说出每道闸拦住的失败类型。
 
-### 1.1 什么是 MCP
+## 0. 知识地图
 
-MCP (Model Context Protocol) 是一个开放协议，用于标准化 AI 模型与外部工具、数据源之间的通信。它提供：
-
-- **统一接口**：不同厂商的工具使用相同协议
-- **可扩展性**：轻松添加新的工具和数据源
-- **类型安全**：强类型的工具定义和结果返回
-
-### 1.2 MCP vs 传统工具调用
-
-| 特性 | 传统工具调用 | MCP |
-|------|-------------|-----|
-| 协议 | 厂商私有 | 开放标准 |
-| 发现机制 | 静态定义 | 动态发现 |
-| 类型安全 | JSON Schema | JSON-RPC + Schema |
-| 状态管理 | 应用自行处理 | 内置会话状态 |
-| 传输层 | HTTP/自定义 | stdio / HTTP |
-
-## 2. 协议架构
-
-### 2.1 核心组件
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Host (Claude Code)                    │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │                   MCP Client                             │ │
-│  │  - 管理服务器连接                                        │ │
-│  │  - 路由请求/响应                                         │ │
-│  │  - 处理工具调用                                          │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────┬───────────────────────────────────┘
-                          │ stdio / HTTP
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    MCP Server                               │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │  - 工具定义与执行                                        │ │
-│  │  - 资源管理                                             │ │
-│  │  - 提示模板                                             │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+  A["MCP 是什么"] --> B["协议架构与消息格式"]
+  B --> C["服务器实现"]
+  B --> D["客户端实现"]
+  C --> E["工具定义与注册"]
+  C --> F["资源管理与提示模板"]
+  D --> E
+  E --> G["安全考虑"]
+  F --> G
+  G --> H["集成示例与工程落地"]
 ```
 
-### 2.2 JSON-RPC 消息格式
+建议按图中箭头顺序读。先读第 1 节弄明白 MCP 替代掉的是哪一段胶水代码，再读第 2 节掌握三种消息形状，然后分头读服务端与客户端两节。工具与资源两节是日常写代码打交道最多的地方；安全一节放到最后读，因为你需要先有一条能跑通的调用链，才看得懂每道闸拦下的是什么。
 
-```typescript
-// 请求格式
-interface MCPRequest {
-  jsonrpc: '2.0';
-  id: string | number;
-  method: string;
-  params?: {
-    name: string;
-    arguments?: Record<string, unknown>;
-  };
-}
+## 1. 从私有工具调用到 MCP
 
-// 响应格式
-interface MCPResponse {
-  jsonrpc: '2.0';
-  id: string | number;
-  result?: {
-    contents: Array<{
-      type: 'text' | 'image' | 'resource';
-      mimeType?: string;
-      text?: string;
-      data?: string;
-      uri?: string;
-    }>;
-  };
-  error?: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
-}
+**先想一个问题**
 
-// 通知格式（无响应）
-interface MCPNotification {
-  jsonrpc: '2.0';
-  method: string;
-  params?: {
-    event: 'notifications/message';
-    level: 'info' | 'warning' | 'error';
-    data: string;
-  };
-}
+你在编辑器插件里写好了「读取项目文件」函数，交给自研助手用。三个月后产品要求同时支持外部助手，你发现这套代码要重写一遍。
+
+问题不在函数本身，而在函数外那层描述：参数怎么声明、结果怎么返回、宿主怎么找到它。
+
+!!! note "术语：MCP"
+
+    MCP（Model Context Protocol，模型上下文协议）是一套开放协议，用统一的消息格式描述模型与外部工具、数据源之间的通信。例子：同一个读取文件的工具，用 MCP 描述一次，客户端 A 与客户端 B 都能按相同的字段名调用它。
+
+**心智模型**
+
+!!! tip "心智模型"
+
+    - 一句话模型：MCP 把工具能力从应用进程里搬出来，做成一台按固定字段对话的外部服务。
+    - 日常类比：把工具想成墙上统一规格的插座，谁家的电器都能插上去取电。
+    - 类比不成立的地方：插座不挑电器也不记账，MCP 服务端要按自己的权限表决定放不放行，还要留下调用记录。
+
+**图解**
+
+```mermaid
+flowchart LR
+  A1["应用 A"] --> T1["为 A 写的工具代码"]
+  A2["应用 B"] --> T2["为 B 重写的工具代码"]
+  B1["应用 A"] --> S["一台 MCP Server"]
+  B2["应用 B"] --> S
 ```
 
-### 2.3 核心方法
+1. 上半部分画出私有方式：应用 A 与应用 B 各带一份工具代码，函数签名与返回结构由各厂商自行规定。
+2. 应用 B 接入时，你要把参数声明、结果包装、错误码全部改写成 B 的格式。
+3. 下半部分画出 MCP 方式：工具代码只写一份，放进 MCP Server 进程。
+4. 应用 A 与应用 B 各自带一个 MCP Client，用协议字段与服务端对话。
+5. 新增宿主时，改的是宿主侧的配置声明，不是工具实现。
 
-| 方法 | 方向 | 说明 |
-|------|------|------|
-| `initialize` | Client → Server | 建立连接，交换能力 |
-| `tools/list` | Client → Server | 列出可用工具 |
-| `tools/call` | Client → Server | 调用工具 |
-| `resources/list` | Client → Server | 列出可用资源 |
-| `resources/read` | Client → Server | 读取资源 |
-| `prompts/list` | Client → Server | 列出提示模板 |
-| `prompts/get` | Client → Server | 获取提示 |
-| `sampling/createMessage` | Server → Client | 请求采样 |
+**一步一步来**
+
+**第 1 步：看清私有定义的耦合点在哪**
+
+先看一份典型的厂商私有工具定义，注意字段名由厂商规定。
+
+```js
+// 某厂商私有的工具描述：字段名 parameters 由该厂商规定
+const vendorTool = {
+  name: "read_file",
+  parameters: { path: "string" }, // 自定义结构，换一家厂商要改字段名与嵌套层级
+  run: async (args) => readFile(args.path), // 执行体与描述写在一起
+};
+```
+
+**这段代码在做什么**
+
+- `name` 与 `parameters` 这对字段名是厂商私有的，协议层不认识它们。
+- 描述与执行体写在同一个对象里，工具实现与宿主运行环境强绑定。
+- 换宿主时，`parameters` 要改成新宿主的字段名，`run` 要改成新宿主的调用约定。
+- 客户端无法在不读文档的前提下推断这份定义，只能靠人工适配。
+
+**第 2 步：把同一份能力改写成协议字段**
+
+MCP 把「描述」和「执行」拆开：描述走 `tools/list`，执行走 `tools/call`。
+
+```js
+// MCP 的 tools/list 响应形状：协议字段固定，客户端按字段名读取
+const mcpTool = {
+  name: "read_file",
+  description: "读取 UTF-8 文本文件", // 给模型看的语义说明，写得具体模型才选得准
+  inputSchema: {                      // JSON Schema 描述入参
+    type: "object",
+    properties: { path: { type: "string", description: "文件路径" } },
+    required: ["path"],               // 必填项由协议字段声明，客户端可提前校验
+  },
+};
+```
+
+**这段代码在做什么**
+
+- `name` 是工具的唯一标识，客户端按它查找与调用。
+- `description` 会进入模型上下文，模型据此判断这个工具能不能解决当前任务。
+- `inputSchema` 用 JSON Schema 描述入参类型、必填项与默认值。
+- 执行体不出现在列表里，它由服务端在收到 `tools/call` 时调用。
+- 任何按协议字段实现的客户端都能读懂这份定义，不需要读厂商文档。
+
+!!! note "术语：JSON Schema"
+
+    JSON Schema 是一套用 JSON 描述 JSON 结构的规范。例子：`{ "type": "object", "required": ["path"] }` 表示传入值必须是对象，且必须带 path 字段。
+
+**动手验证**
+
+```js
+// 依赖：无，仅用 Node 20+ 内置模块
+// 运行：node --input-type=module verify.mjs
+import assert from "node:assert/strict";
+
+// 私有定义：结构与含义由厂商规定
+const vendorTool = { name: "read_file", parameters: { path: "string" } };
+
+// 协议定义：字段名由协议规定，客户端不需要读厂商文档
+const mcpTool = {
+  name: "read_file",
+  description: "读取 UTF-8 文本文件",
+  inputSchema: {
+    type: "object",
+    properties: { path: { type: "string" } },
+    required: ["path"],
+  },
+};
+
+assert.ok(vendorTool.parameters, "私有定义使用 parameters 字段");
+assert.equal("inputSchema" in vendorTool, false, "私有定义没有协议字段");
+
+// 通用客户端只依赖协议字段，因此可以直接消费 mcpTool
+const readFirstRequired = (t) =>
+  t.inputSchema.properties[t.inputSchema.required[0]].type;
+
+assert.equal(readFirstRequired(mcpTool), "string");
+assert.throws(() => readFirstRequired(vendorTool), "私有定义会让通用客户端抛错");
+
+console.log("ok: 协议定义可被不认识的客户端读取");
+```
+
+**运行结果**
+
+```text
+ok: 协议定义可被不认识的客户端读取
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 换宿主后模型选错工具 | `description` 只写了工具名，没写用途边界 | 在描述里写清输入是什么、输出是什么、什么时候不该用 |
+| 客户端拿不到必填信息 | 只写了 `properties`，漏写 `required` | 把必填字段名填进 `required` 数组，并在 handler 里再兜底一次 |
+| 同一工具在两台服务端行为不同 | 工具名重复且描述不一致 | 给工具名加业务前缀，并让两台服务端共用同一份定义文件 |
+
+**用在哪里**
+
+- 场景一：多宿主 IDE 插件
+    - 业务背景：编辑器插件要同时接自研助手与外部助手，两边工具接口字段不同。
+    - 这一节的知识怎么用：把文件读取、符号查找写成一台 MCP Server，插件侧只做配置声明。
+    - 用什么指标衡量收益：新增一个宿主时需要改动的文件数，以及工具从开发完成到在宿主可用的日历天数。
+    - 什么时候不该用：插件只服务单一宿主，且该宿主的私有接口已经稳定运行，改动成本高于收益。
+- 场景二：客服后台的订单查询能力
+    - 业务背景：订单查询工具要同时暴露给自研 Agent 与第三方工单系统的助手。
+    - 这一节的知识怎么用：把订单查询封装成 `order_query` 工具，`inputSchema` 里用 `enum` 约束查询维度。
+    - 用什么指标衡量收益：接入第二套宿主时的接口适配代码行数，以及因参数格式错误导致的失败调用占比。
+    - 什么时候不该用：查询逻辑只在一个内网系统内使用，且不允许任何跨进程通信。
+
+**行业实践**
+
+- MCP 官方文档的介绍章节把 MCP 定义为开放协议，用于标准化模型与外部工具、数据源之间的通信。怎么借鉴到你的项目：先按协议字段整理现有工具清单，再动手写适配层。
+- `modelcontextprotocol/servers` 仓库维护一组参考服务器实现，覆盖文件系统、代码托管、搜索等能力。怎么借鉴到你的项目：找与自己业务形态接近的那一个，比对它的工具描述写法与资源划分方式。
+- Claude Code 文档中的 MCP 配置章节用 `mcpServers` 字段声明启动命令、参数与环境变量。怎么借鉴到你的项目：把密钥放进 `env` 字段并引用环境变量，不要把密钥写进仓库。
+
+**小结**
+
+- MCP 解决的是描述层的重复劳动，不是执行层的算法问题。
+- 描述（`tools/list`）与执行（`tools/call`）拆开，是协议能跨宿主复用的前提。
+- 工具描述是给模型读的文档，写清楚它的收益直接体现在模型选对工具的比例上。
+
+## 2. 协议架构与消息格式
+
+**先想一个问题**
+
+客户端第一次连上服务端，怎么知道对方支不支持资源读取？不能靠猜，也不能靠试错发请求。
+
+握手阶段双方各报一次能力清单，后续只调用对方声明过的能力。
+
+**心智模型**
+
+!!! tip "心智模型"
+
+    - 一句话模型：一次调用由「消息信封 + 能力协商 + 方法名」三段组成。
+    - 日常类比：像寄挂号信，信封上写明寄件编号，对方回信时必须抄上同一个编号。
+    - 类比不成立的地方：挂号信没有「不用回信」的类别，而 MCP 的通知类消息就是故意不回。
+
+!!! note "术语：JSON-RPC 2.0"
+
+    JSON-RPC 2.0 是一种用 JSON 承载远程调用的消息规范。例子：`{ "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {} }` 就是一条请求。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant C as "Client"
+  participant S as "Server"
+  C->>S: "1 initialize 带协议版本与客户端能力"
+  S-->>C: "2 返回 capabilities 与 serverInfo"
+  C->>S: "3 notifications initialized 无 id"
+  C->>S: "4 tools list"
+  S-->>C: "5 返回工具定义数组"
+  C->>S: "6 tools call 带 name 与 arguments"
+  S-->>C: "7 返回 contents 数组或 error"
+```
+
+1. 第 1 步客户端发 `initialize`，带上自己支持的协议版本与能力清单。
+2. 第 2 步服务端返回 `capabilities`，客户端据此知道后面能调用哪些方法组。
+3. 第 3 步客户端发 `notifications/initialized`，这是通知，不带 id，服务端不回复。
+4. 第 4 步客户端请求 `tools/list`，拿到工具定义数组。
+5. 第 5 步服务端返回工具名、描述、`inputSchema`，执行体不出现在返回里。
+6. 第 6 步客户端发 `tools/call`，带工具名与参数对象。
+7. 第 7 步服务端返回 `contents` 数组，或者返回带错误码的 `error` 对象。
+
+**一步一步来**
+
+**第 1 步：构造请求消息**
+
+请求三要素是 `id`、`method`、`params`，`id` 用来把响应配回请求。
+
+```js
+// 一次工具调用的请求：id 由客户端生成，服务端原样抄回
+const request = {
+  jsonrpc: "2.0",                                  // 协议版本标记，固定字符串
+  id: 7,                                           // 请求编号，数字或字符串都可以
+  method: "tools/call",                            // 方法名，斜杠分隔的两级命名
+  params: {                                        // 方法参数，字段名由方法决定
+    name: "read_file",
+    arguments: { path: "/tmp/a.txt" },             // 注意字段名是 arguments 不是 args
+  },
+};
+```
+
+**这段代码在做什么**
+
+- `jsonrpc` 固定为字符串 `"2.0"`，服务端据此拒绝其它版本的报文。
+- `id` 是关联键，服务端的响应必须带同一个值。
+- `method` 决定走哪条处理分支，写错会收到方法不存在错误。
+- `params` 是方法级参数，`tools/call` 要求里面必须有 `name` 与 `arguments`。
+- 客户端可以并发发送多个请求，靠 `id` 区分各自的响应。
+
+**第 2 步：区分响应、错误与通知**
+
+三类消息的差别只在字段有无，用 `id` 的有无区分是否要等回复。
+
+```js
+// 成功响应：必须带请求里的同一个 id
+const ok = { jsonrpc: "2.0", id: 7, result: { contents: [{ type: "text", text: "hello" }] } };
+
+// 失败响应：带 error 而不是 result，两者不能同时出现
+const bad = { jsonrpc: "2.0", id: 7, error: { code: -32602, message: "Invalid params" } };
+
+// 通知：没有 id，服务端不回复，收发双方都不能等它
+const note = { jsonrpc: "2.0", method: "notifications/initialized", params: {} };
+```
+
+**这段代码在做什么**
+
+- 成功响应把数据放进 `result`，`contents` 数组里每项带 `type` 字段。
+- 失败响应把信息放进 `error`，`code` 是数字错误码，`message` 是给人读的字符串。
+- 通知没有 `id`，因此接收方不需要也无法返回结果。
+- `notifications/initialized` 是协议规定的通知，握手后必须补发。
+- 把通知当请求去等回复，会让客户端卡在超时上。
+
+**动手验证**
+
+```js
+// 依赖：无，仅用 Node 20+ 内置模块
+// 运行：node --input-type=module verify.mjs
+import assert from "node:assert/strict";
+
+// 编码：把对象变成一行，换行符是 stdio 传输的消息边界
+const encode = (msg) => JSON.stringify(msg) + "\n";
+const decode = (line) => JSON.parse(line);
+
+const req = { jsonrpc: "2.0", id: 7, method: "tools/list", params: {} };
+const line = encode(req);
+
+assert.equal(line.endsWith("\n"), true, "每条消息以换行结尾");
+assert.deepEqual(decode(line), req, "编解码可往返");
+
+// 响应必须复用请求的 id，否则客户端无法配对
+const res = { jsonrpc: "2.0", id: req.id, result: { tools: [] } };
+assert.equal(res.id, req.id);
+
+// 通知没有 id，因此不会被任何请求等待
+const note = { jsonrpc: "2.0", method: "notifications/initialized", params: {} };
+assert.equal("id" in note, false);
+assert.equal("result" in note || "error" in note, false);
+
+console.log("ok: 请求 响应 通知 三种消息形状可区分");
+```
+
+**运行结果**
+
+```text
+ok: 请求 响应 通知 三种消息形状可区分
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 客户端一直等到超时 | 把通知当成请求发出去后又等响应 | 通知走不等待的发送路径，不发 `id` |
+| 响应串台，结果对不上调用 | 并发请求复用了同一个 `id` | 用自增计数器或随机数生成 `id`，保证在途唯一 |
+| 解析报 JSON 语法错误 | 服务端日志混进了标准输出 | 日志一律写标准错误，标准输出只放协议报文 |
+
+**用在哪里**
+
+- 场景一：本地开发工具与编辑器的通信
+    - 业务背景：编辑器需要调用本机的代码格式化、依赖检查能力。
+    - 这一节的知识怎么用：用 stdio 传输承载 JSON-RPC，报文以换行分帧。
+    - 用什么指标衡量收益：解析失败的调用次数占总调用次数的比例。
+    - 什么时候不该用：调用方与服务端在同一进程内，函数调用比序列化更直接。
+- 场景二：跨机房的内部工具网关
+    - 业务背景：多个团队的服务要把内部查询能力暴露给统一 Agent 平台。
+    - 这一节的知识怎么用：用 HTTP 承载同一套消息格式，`id` 生成改为带实例前缀避免跨实例冲突。
+    - 用什么指标衡量收益：错误码分布，尤其是参数错误与方法不存在的占比。
+    - 什么时候不该用：目标能力已经有一份成熟的内部 RPC 契约，重写协议层的收益低于维护两套的开销。
+
+**行业实践**
+
+- MCP 官方文档的架构与传输章节区分了 stdio 与 HTTP 两类传输，并说明消息格式在两类传输上一致。怎么借鉴到你的项目：把传输层封装成一个只负责收发字符串的函数，业务代码不感知传输方式。
+- MCP TypeScript SDK 仓库的 README 给出了客户端与服务端的最小示例，展示了先握手再调用方法的顺序。怎么借鉴到你的项目：把「握手必须最先执行」写进连接封装的构造函数，让业务代码拿不到未握手的连接。
+- MCP Python SDK 仓库的 README 展示了用装饰器注册能力的用法。怎么借鉴到你的项目：把注册动作集中在服务启动阶段，避免运行中动态注册导致能力清单前后不一致。
+
+**小结**
+
+- 消息只有三种形状，靠 `id` 和 `result`、`error` 字段区分。
+- 握手是顺序约束，不是可选步骤。
+- 通知不等待回复，凡是把它当请求用的实现都会卡住。
 
 ## 3. MCP 服务器实现
 
-### 3.1 Python FastMCP 实现
+**先想一个问题**
+
+如果每加一个工具都要手写一遍 JSON Schema，改参数名时容易漏改描述。有没有把函数直接变成工具的办法？
+
+装饰器方案让函数签名与类型注解自动生成入参描述，你只管写函数体。
+
+**心智模型**
+
+!!! tip "心智模型"
+
+    - 一句话模型：服务端就是「一张能力注册表 + 一条消息分发通道」。
+    - 日常类比：像公司前台登记访客，进门先登记能力和权限，之后按登记表放行。
+    - 类比不成立的地方：前台按人放行，服务端按方法名放行，同一个人换个方法名结果就不同。
+
+!!! note "术语：FastMCP"
+
+    FastMCP 是 MCP Python SDK 中的高层封装，用装饰器把普通函数登记为协议能力。例子：给函数加上 `@mcp.tool()` 后，函数参数名与类型注解会被用来生成该工具的入参描述。
+
+**图解**
+
+```mermaid
+stateDiagram-v2
+  state "未启动" as S1
+  state "已注册能力" as S2
+  state "运行中" as S3
+  state "已关闭" as S4
+  [*] --> S1
+  S1 --> S2
+  S2 --> S3
+  S3 --> S3
+  S3 --> S4
+  S4 --> [*]
+```
+
+1. `未启动` 是进程刚起来的阶段，此时还没有任何能力可用。
+2. 进入 `已注册能力`：装饰器或显式注册语句把工具、资源、提示写进注册表。
+3. 进入 `运行中`：调用启动方法后开始监听传输通道。
+4. `运行中` 的自环表示反复处理请求，每次请求触发一次查表与执行。
+5. 进入 `已关闭`：传输关闭，进程退出；注册表随进程一起消失。
+
+**一步一步来**
+
+**第 1 步：用装饰器注册三类能力**
+
+一个函数加上装饰器就进了注册表，函数签名被用来推导入参描述。
 
 ```python
-# server/fastmcp_server.py
-# 第 1 段：导入依赖并创建 MCP 服务实例（服务端的“总开关”）
-# FastMCP 是高层封装：一个 Python 函数只要挂上 @mcp.tool/@mcp.resource/@mcp.prompt 装饰器，
-# 就会被自动登记进协议能力表，并由函数签名 + 类型注解自动生成 JSON Schema。
-# 易错点：server 名 "Demo Server" 会出现在握手信息里，客户端可据此区分多台服务。
+# 依赖：fastmcp（Python 包，安装命令需核对官方文档）
 from fastmcp import FastMCP
 
-mcp = FastMCP("Demo Server")
+mcp = FastMCP("Demo Server")  # 服务名会出现在握手信息里
 
-
-# 第 2 段：注册“读取文件”工具（有副作用的 I/O 能力，按需调用）
-# 工具是模型可主动调用的函数：参数名、类型、默认值、以及 docstring 都会进入工具的
-# inputSchema/description 供 LLM 参考，所以 docstring 必须写清楚语义而非敷衍。
-# 数据流：path + limit → 打开文件 → 读入 → 原样返回字符串给客户端。
 @mcp.tool()
 def read_file(path: str, limit: int = 1000) -> str:
     """读取文件内容
@@ -143,1116 +412,1019 @@ def read_file(path: str, limit: int = 1000) -> str:
         path: 文件路径
         limit: 最大读取字符数
     """
-    # f.read(limit) 在文本模式下按“字符”截断（非字节），UTF-8 多字节字符不会被劈开成乱码；
-    # 若文件短于 limit，则原样读完全部内容，不会补白也不会报错。
-    # 边界：文件不存在/无权限时会抛异常，FastMCP 会把它转成协议层的错误响应返回客户端。
-    with open(path, 'r', encoding='utf-8') as f:
-        content = f.read(limit)
-    return content  # 上下文管理器确保句柄及时释放，返回值即工具的最终输出
+    # read(limit) 在文本模式下按字符截断，UTF-8 多字节字符不会被劈开
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read(limit)  # 上下文管理器保证句柄及时释放
 
-
-# 第 3 段：注册“网络搜索”工具（此处用假数据演示返回结构）
-# 返回值注解 list[dict] 会被用于推导 outputSchema，让客户端/模型知道结果形状。
-# 注意这是教学桩代码：并未真正联网，仅按 limit 数量生成占位结果。
-@mcp.tool()
-def search_web(query: str, limit: int = 5) -> list[dict]:
-    """搜索网络
-
-    Args:
-        query: 搜索关键词
-        limit: 结果数量
-    """
-    # 列表推导按 range(limit) 生成结果：复杂度 O(limit)，limit=0 时返回空列表（合法但无内容）。
-    # 真实实现里应在此处发起 HTTP 请求，并对 query 做转义与超时控制，避免注入与挂死。
-    results = [
-        {"title": f"Result {i}", "url": f"https://example.com/{i}"}
-        for i in range(limit)
-    ]
-    return results
-
-
-# 第 4 段：注册静态资源（由客户端主动读取的“数据端点”，模型不能随意改参数）
-# resource 与 tool 的区别：资源是只读的 URI 寻址数据，适合暴露配置、日志、schema 等上下文。
 @mcp.resource("file://config")
 def get_config() -> str:
     """返回配置文件内容"""
-    # URI 中无占位符，因此这是固定资源；若写成 "file://{path}" 则会变成带参数的模板资源。
-    # 返回类型应保持简单可序列化（str/bytes），否则序列化阶段可能失败。
-    return '{"setting": "value"}'
+    return '{"setting": "value"}'  # 返回值保持简单可序列化
 
-
-# 第 5 段：注册提示词模板（把常用指令封装成可复用、可带参数的 prompt）
-# prompt 函数不执行实际工作，只负责“渲染文本”供用户/客户端插入对话；函数参数即模板变量。
 @mcp.prompt()
 def code_review(file_path: str) -> str:
     """生成代码审查提示"""
-    # f-string 直接拼出多行 Markdown 提示；file_path 由调用方传入后再交由模型展开阅读。
-    # 易错点：函数返回的文本被视为模板内容，不要把真正的审查逻辑塞进来（那应由 tool 承担）。
-    return f"""请审查以下文件：
-{file_path}
+    return f"请审查以下文件：{file_path}"
 
-考虑：
-1. 代码质量和风格
-2. 潜在的 bug
-3. 安全问题
-4. 性能优化建议
-"""
-
-
-# 第 6 段：作为脚本直接启动时进入事件循环，开始对外提供 MCP 服务
-# __name__ 守卫保证被 import（如测试或作为库引用）时不会意外启动服务。
-# mcp.run() 默认使用 stdio 传输：通过标准输入/输出与宿主进程通信，适合本地编辑器/Agent 集成；
-# 若要暴露为网络服务需显式指定 SSE/HTTP 等 transport。
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run()  # 默认 stdio 传输
 ```
-### 3.2 TypeScript MCP SDK 实现
 
-```typescript
-// server/mcp-server.ts
-import { MCPServer, Tool, Resource, Prompt } from '@modelcontextprotocol/sdk';
+**这段代码在做什么**
 
-// 第 1 段：创建 MCP 服务实例
-// name/version 会随 initialize 握手返回给客户端，是服务端身份标识，客户端据此做版本协商与展示。
-const server = new MCPServer({
-  name: 'demo-server',
-  version: '1.0.0',
-});
+- `FastMCP("Demo Server")` 创建服务实例，名字进入握手返回的 `serverInfo`。
+- `@mcp.tool()` 把 `read_file` 登记为工具，参数名与类型注解生成入参描述。
+- 函数的 docstring 会进入工具的 `description`，不写会让模型难以判断用途。
+- `@mcp.resource` 登记只读数据端点，`file://config` 是这个资源的唯一标识。
+- `@mcp.prompt()` 登记的只负责渲染文本，不做实际业务处理。
+- `mcp.run()` 启动后进程阻塞在传输循环上，标准输入输出承载协议报文。
 
-// 第 2 段：定义 read_file 工具（把本地文件暴露给模型）
-// Tool 是"声明 + 执行"的合体：inputSchema 用 JSON Schema 描述入参，模型据此生成合法参数；
-// handler 才真正执行副作用。两者必须一一对应，否则模型可能传错类型导致运行时崩溃。
-// 易错点：path 未做路径越权校验，生产环境应限制在工作目录内，防止任意文件读取。
-const readFileTool: Tool = {
-  name: 'read_file',
-  description: '读取文件内容', // 描述会被注入模型上下文，写得越清楚模型选对工具的概率越高
-  inputSchema: {
-    type: 'object',
-    properties: {
-      path: { type: 'string', description: '文件路径' },
-      limit: { type: 'number', description: '最大字符数', default: 1000 }, // default 是给客户端的提示，非强制，handler 仍需兜底
-    },
-    required: ['path'], // 只有 path 必填，limit 缺省时走下面的 || 1000 兜底
+**第 2 步：用 TypeScript SDK 显式声明工具**
+
+显式声明把「描述」和「执行」分成两个字段，便于按环境过滤工具。
+
+```ts
+// 依赖：@modelcontextprotocol/sdk（具体导入路径需核对官方文档）
+const readFileTool = {
+  name: "read_file",
+  description: "读取 UTF-8 文本文件", // 会进入模型上下文
+  inputSchema: {                      // 模型据此生成合法参数
+    type: "object",
+    properties: { path: { type: "string" } },
+    required: ["path"],
   },
   handler: async (params) => {
-    // 动态 import：延迟加载 fs/promises，避免模块顶层引入 I/O 依赖，也便于测试时打桩
-    const fs = await import('fs/promises');
-    const content = await fs.readFile(params.path, 'utf-8'); // 一次性全量读取，大文件会占用内存
-    // 返回 MCP 约定的 contents 数组；slice 截断控制 token 消耗，但按字符切可能截断多字节字符
-    return {
-      contents: [{
-        type: 'text',
-        text: content.slice(0, params.limit || 1000),
-      }],
-    };
+    const fs = await import("node:fs/promises"); // 延迟加载，启动时不引入文件系统依赖
+    const text = await fs.readFile(params.path, "utf-8");
+    // MCP 只承载文本与二进制块，结构化数据要自己序列化
+    return { contents: [{ type: "text", text }] };
   },
 };
-
-// 第 3 段：定义 search_web 工具（对接外部搜索）
-// 与上一个工具结构完全一致，体现了 MCP 工具的可扩展模式：新增能力=新增一个声明对象。
-// performSearch 未在本文件定义，应来自外部导入；若缺失会在调用时才抛错，属于延迟失败。
-const searchWebTool: Tool = {
-  name: 'search_web',
-  description: '搜索网络获取信息',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string' },
-      limit: { type: 'number', default: 5 },
-    },
-    required: ['query'],
-  },
-  handler: async (params) => {
-    const results = await performSearch(params.query, params.limit);
-    // JSON 字符串化后以 text 回传：MCP 只认文本/资源等类型，结构化数据需自行序列化
-    // 缩进 2 空格是为了让模型（和调试者）更易读，代价是 token 略增
-    return {
-      contents: [{
-        type: 'text',
-        text: JSON.stringify(results, null, 2),
-      }],
-    };
-  },
-};
-
-// 第 4 段：注册工具列表处理器
-// tools/list 是客户端发现能力的入口，返回的数组即是"模型可见的工具清单"。
-// 把定义与注册分离，便于后续按权限/环境动态过滤可用工具。
-server.setRequestHandler('tools/list', async () => ({
-  tools: [readFileTool, searchWebTool],
-}));
-
-// 第 5 段：注册工具调用处理器（MCP 的核心分发逻辑）
-// 客户端按 name + arguments 发起 tools/call，这里做「查表 → 校验 → 执行」三步。
-server.setRequestHandler('tools/call', async (request) => {
-  // 注意：arguments 是保留字，用别名 args 解构；若客户端漏传则为 undefined
-  const { name, arguments: args } = request.params;
-
-  // 线性查找：工具少时够用，复杂度 O(n)；工具规模大时应换成 Map 索引降到 O(1)
-  const tool = [readFileTool, searchWebTool].find(t => t.name === name);
-  if (!tool) {
-    // 未知工具必须显式报错：静默返回会让模型无法理解失败原因、无法自我纠正
-    throw new Error(`Unknown tool: ${name}`);
-  }
-
-  // 直接透传原始入参给 handler；生产环境建议先按 inputSchema 做校验与默认值填充
-  return await tool.handler(args);
-});
-
-// 第 6 段：定义资源（只读、可寻址的数据，与"动作型"工具互补）
-// uri 是资源的唯一标识，客户端通过 resources/read 按 uri 拉取；mimeType 决定客户端如何渲染。
-const configResource: Resource = {
-  uri: 'config://app',
-  name: 'Application Config',
-  mimeType: 'application/json',
-  async load() {
-    // 这里返回写死的示例配置；真实场景通常从环境变量或配置文件读取，并注意脱敏
-    return {
-      contents: [{
-        type: 'resource',
-        mimeType: 'application/json',
-        text: JSON.stringify({ setting: 'value' }),
-      }],
-    };
-  },
-};
-
-// 资源列表处理器：与 tools/list 对称，供客户端枚举可读资源
-server.setRequestHandler('resources/list', async () => ({
-  resources: [configResource],
-}));
-
-// 第 7 段：启动服务器
-// 到此才开始监听/建立传输通道（具体取决于 SDK 与传输方式，如 stdio 或 HTTP）。
-// 启动前的所有 setRequestHandler 都必须在此时完成注册，否则首次请求会因无处理器而失败。
-server.start();
 ```
-### 3.3 NestJS MCP 集成
 
-```typescript
-// mcp.controller.ts
+**这段代码在做什么**
 
-// 第 1 段：控制器声明与依赖注入（把 HTTP 请求转成对 MCPService 的调用）
-// 控制器只负责"协议适配"：解析路由/参数、把结果交给 Nest 序列化为 JSON，
-// 真正的工具注册与执行逻辑全部下沉到 MCPService，保证可测试性与单一职责。
-@Controller('mcp')
-export class MCPToolsController {
-  // 通过构造函数注入单例 Service：Nest 容器保证同一进程内共享同一份工具注册表，
-  // 因此工具状态（如后续的动态注册）在所有请求间是可见的。
-  constructor(private readonly mcpService: MCPService) {}
+- `inputSchema` 与 `handler` 必须一一对应，少写一边模型就会传错类型。
+- `await import` 把模块加载推迟到首次调用，缩短服务启动时间。
+- `handler` 返回 `contents` 数组，每项声明 `type` 表示内容形态。
+- 执行体里的路径参数未做越权校验，生产环境要收敛到允许目录内。
+- 这份定义对象可以直接放进 `tools/list` 的返回数组。
 
-  // 第 2 段：GET /mcp/tools —— 列出可用工具（MCP 协议的 "tools/list"）
-  // 返回 { tools: Tool[] } 而非裸数组，是为了贴合 MCP JSON-RPC 的响应包封格式，
-  // 便于客户端直接透传；async 返回 Promise 时 Nest 会自动 await 并序列化。
-  @Get('tools')
-  async listTools(): Promise<{ tools: Tool[] }> {
-    return this.mcpService.listTools();
-  }
+**第 3 步：用注册表做常数级查找**
 
-  // 第 3 段：POST /mcp/tools/call —— 调用指定工具（MCP 的 "tools/call"）
-  // 用 POST 而非 GET：body 里既有 name 又有 arguments，参数可能很大且含敏感信息，
-  // 不应放进 URL（会进访问日志/浏览器历史）；arguments 用 Record<string, unknown>
-  // 而非 any，保留类型检查的同时允许任意 JSON 结构，实际校验交给工具自己的 inputSchema。
-  @Post('tools/call')
-  async callTool(
-    @Body() body: { name: string; arguments: Record<string, unknown> }
-  ): Promise<{ contents: Content[] }> {
-    return this.mcpService.callTool(body.name, body.arguments);
-  }
+工具数量增长后线性扫描会变慢，用 Map 按名字查找。
 
-  // 第 4 段：GET /mcp/resources —— 列出可读资源清单（MCP 的 "resources/list"）
-  // 与 listTools 对称，资源是"可寻址的数据"（文件、网页、数据库行），
-  // 工具是"可执行的动作"，协议上刻意拆成两组端点。
-  @Get('resources')
-  async listResources(): Promise<{ resources: Resource[] }> {
-    return this.mcpService.listResources();
-  }
-
-  // 第 5 段：GET /mcp/resources/:uri —— 按 URI 读取单个资源（MCP 的 "resources/read"）
-  // 注意：URI 常含 "/" 等字符，路径参数在真实部署中通常需要 encodeURIComponent
-  // 或改为通配路由，否则路由匹配会截断；此处直接透传，具体解析由 Service 负责。
-  @Get('resources/:uri')
-  async readResource(@Param('uri') uri: string): Promise<{ contents: Content[] }> {
-    return this.mcpService.readResource(uri);
-  }
-}
-
-// mcp.service.ts
-
-// 第 6 段：服务类声明与内部状态（注册表的持有者）
-// 用 Map 而不是数组：callTool/readResource 都需要按 name/uri 做 O(1) 查找，
-// 数组会是 O(n) 线性扫描；这里牺牲一点内存换取调用路径上的常数级查找，
-// 同时也天然保证键的唯一性（同名注册会覆盖旧值）。
+```ts
+// 依赖：NestJS（具体装饰器导入路径需核对官方文档）
 @Injectable()
 export class MCPService {
-  private tools: Map<string, Tool> = new Map();
-  private resources: Map<string, Resource> = new Map();
+  private tools = new Map<string, Tool>(); // Map 保证按名查找是常数级
 
-  // 第 7 段：构造函数 —— 启动时完成内置工具注册
-  // 注册是同步且极廉价的（仅往 Map 塞对象，handler 是惰性闭包，
-  // 真正 import('fs/promises') 发生在调用瞬间），所以可以安全地放在构造函数里；
-  // 若注册需要 IO（如读盘/远程发现），则应改成 OnModuleInit 的 async 生命周期钩子。
-  constructor() {
-    this.registerBuiltInTools();
-  }
-
-  // 第 8 段：内置工具注册（read_file）
-  // 每个工具是一份"自描述契约"：name/description/inputSchema 供模型理解与生成参数，
-  // handler 才是真正执行体。inputSchema 用 JSON Schema 描述入参，
-  // required: ['path'] 是给 LLM 的强约束，但运行时仍需自行防御非法输入。
-  private registerBuiltInTools() {
-    this.tools.set('read_file', {
-      name: 'read_file',
-      description: '读取文件内容',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-        },
-        required: ['path'],
-      },
-      // handler 内的动态 import 让 Node 的模块缓存只在首次调用时加载 fs/promises，
-      // 避免服务启动即引入文件系统依赖；args 建议先用 schema 校验，
-      // 此处直接透传意味着越权路径（如 ../../etc/passwd）需要在外层做白名单收敛。
-      handler: async (args) => {
-        const fs = await import('fs/promises');
-        const content = await fs.readFile(args.path, 'utf-8');
-        return { contents: [{ type: 'text', text: content }] };
-      },
-    });
-
-    // 第 9 段：内置工具注册（web_search）
-    // 与 read_file 的关键差异：limit 带 default: 5，默认值应由调用方/schema 层补全，
-    // 这里直接依赖运行时的 search 实现处理 undefined；
-    // 返回值用 JSON.stringify 包成 text —— MCP 的 contents 只承载文本/二进制块，
-    // 结构化结果必须以序列化字符串形式传递，客户端再自行反序列化。
-    this.tools.set('web_search', {
-      name: 'web_search',
-      description: '搜索网络',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' },
-          limit: { type: 'number', default: 5 },
-        },
-        required: ['query'],
-      },
-      handler: async (args) => {
-        const results = await search(args.query, args.limit);
-        return { contents: [{ type: 'text', text: JSON.stringify(results) }] };
-      },
-    });
-  }
-
-  // 第 10 段：列出全部工具
-  // Array.from 把 Map.values() 的迭代器摊平成数组（Map 本身不可直接 JSON 序列化，
-  // 序列化会得到空对象 {}，这是极常见的踩坑点）；返回前做浅拷贝语义，
-  // 调用方增删数组不会影响内部注册表，但 Tool 对象本身仍是引用。
-  async listTools(): Promise<{ tools: Tool[] }> {
+  async listTools() {
+    // Map 不能直接序列化，会变成空对象，必须先摊平成数组
     return { tools: Array.from(this.tools.values()) };
   }
 
-  // 第 11 段：按名执行工具（查找 → 校验存在性 → 委托 handler）
-  // 这里用 NotFoundException（HTTP 404）表达"工具不存在"，让控制器层无需 try/catch，
-  // 异常由 Nest 的异常过滤器统一转成标准错误响应；
-  // 注意返回的是 tool.handler(args) 的 Promise（未 await），由调用方链式等待，
-  // handler 抛出的错误会原样向上冒泡，不会在此被吞掉。
   async callTool(name: string, args: Record<string, unknown>) {
     const tool = this.tools.get(name);
-    if (!tool) {
-      throw new NotFoundException(`Tool ${name} not found`);
-    }
-    return tool.handler(args);
-  }
-
-  // 第 12 段：列出全部资源
-  // 与 listTools 同构；在真实实现里这里常需要过滤（如隐藏内部资源），
-  // 因此不宜把 Map 直接暴露给外部，保持"每次构造新数组"的习惯便于后续加权限裁剪。
-  async listResources(): Promise<{ resources: Resource[] }> {
-    return { resources: Array.from(this.resources.values()) };
-  }
-
-  // 第 13 段：按 URI 读取资源
-  // 与 callTool 的区别在于资源是惰性加载的：真正内容藏在 resource.load() 里，
-  // 列表阶段只返回元数据，避免一次性把所有资源（大文件）读进内存；
-  // 同样以 404 表达未注册的 URI，load() 内部的 IO 错误则按 500 语义冒泡。
-  async readResource(uri: string) {
-    const resource = this.resources.get(uri);
-    if (!resource) {
-      throw new NotFoundException(`Resource ${uri} not found`);
-    }
-    return resource.load();
+    if (!tool) throw new NotFoundException(`未知工具 ${name}`); // 未知工具要显式报错
+    return tool.handler(args); // 返回 Promise，由调用方等待
   }
 }
 ```
-## 4. MCP 客户端实现
 
-### 4.1 TypeScript 客户端
+**这段代码在做什么**
 
-```typescript
-// client/mcp-client.ts
-// 第 1 段：依赖导入与模块定位
-// 这是一个 MCP（Model Context Protocol）客户端最小实现：上层用 JSON-RPC 语义调用，
-// 下层把请求通过子进程的 stdio 转发给 MCP 服务器，从而把"协议编解码"和"传输方式"解耦。
-import { JSONRPCClient } from '@modelcontextprotocol/sdk';
+- 用 Map 而不是数组，把查找复杂度从线性降到与工具数量无关。
+- `Array.from(this.tools.values())` 把迭代器摊平成数组，这是能正确序列化的前提。
+- 找不到工具时抛异常而不是返回空对象，模型能据此理解失败原因。
+- 未知方法用 404 语义表达，交由统一异常过滤器转换成错误响应。
+- `handler` 的 Promise 不在此处等待，异常沿调用链向上冒泡。
 
-// 第 2 段：客户端类与状态字段
-// 用类封装连接生命周期与协议状态。capabilities 保存服务端在握手时声明的能力集，
-// 它是后续决定"能不能调用 tools/resources/prompts"的权威依据，因此先给空对象占位。
-class MCPClient {
-  private client: JSONRPCClient; // SDK 提供的 JSON-RPC 通道，负责 id 匹配、请求/通知区分
-  private capabilities: ServerCapabilities = {}; // 服务端能力快照，握手后才被填充
+**动手验证**
 
-  // 第 3 段：构造函数——搭建"传输适配器"
-  // JSONRPCClient 需要一个函数来真正把请求发出去。这里用闭包捕获 serverPath，
-  // 使 SDK 只关心 JSON-RPC 消息本身，而具体走 stdio 还是 HTTP 由 sendRequest 决定。
-  constructor(serverPath: string) {
-    this.client = new JSONRPCClient(async (request) => {
-      // 发送到服务器（stdio 或 HTTP）
-      // 易错点：必须 return 响应，返回值会被 SDK 当作本次请求的 JSON-RPC result 回填给调用方。
-      const response = await this.sendRequest(serverPath, request);
-      return response;
-    });
+```js
+// 依赖：无，仅用 Node 20+ 内置模块
+// 运行：node --input-type=module verify.mjs
+import assert from "node:assert/strict";
+
+const registry = new Map();
+const registerTool = (tool) => registry.set(tool.name, tool);
+
+function handle(method, params) {
+  if (method === "tools/list") {
+    // 列表只暴露描述字段，handler 留在服务端
+    return { tools: Array.from(registry.values(), ({ handler, ...meta }) => meta) };
   }
-
-  // 第 4 段：初始化握手（协议协商）
-  // MCP 要求先 initialize 再发 initialized 通知：前者协商版本与双方能力，
-  // 后者告诉服务端"我准备好了"，服务端收到后才会开始正常处理业务请求。
-  async initialize(): Promise<void> {
-    const response = await this.client.request('initialize', {
-      protocolVersion: '2024-11-05', // 版本不匹配时服务端可拒绝，属于协议级兼容边界
-      capabilities: {
-        // 客户端声明自己支持的能力：roots 变化通知 + 采样（sampling）
-        roots: { listChanged: true }, // listChanged 表示文件根目录变更时会主动通知服务端
-        sampling: {}, // 空对象即可，表示"支持该能力"而非参数配置
-      },
-      clientInfo: {
-        name: 'example-client',
-        version: '1.0.0',
-      },
-    });
-
-    // 关键数据流：服务端返回的 capabilities 决定本客户端后续可用的功能面
-    this.capabilities = response.capabilities;
-
-    // 发送初始化完成通知
-    // 用 notify 而非 request：通知无 id、不需要也不应该有响应，避免死等。
-    await this.client.notify('notifications/initialized', {});
+  if (method === "tools/call") {
+    const tool = registry.get(params.name);
+    if (!tool) throw new Error(`未知工具 ${params.name}`);
+    return tool.handler(params.arguments);
   }
-
-  // 第 5 段：Tools 相关方法（工具发现与调用）
-  // 拆成 listTools / callTool 两个独立请求，是因为 MCP 把"元数据枚举"和"实际执行"分离：
-  // 前者可缓存用于提示模型，后者才产生副作用。
-  async listTools(): Promise<Tool[]> {
-    const response = await this.client.request('tools/list', {});
-    return response.tools; // 只透出数组，隐藏 JSON-RPC 信封细节
-  }
-
-  async callTool(name: string, args: Record<string, unknown>) {
-    // 注意参数名是 arguments 而非 args，字段名错了服务端会校验失败；此处直接返回原始 result
-    return this.client.request('tools/call', {
-      name,
-      arguments: args,
-    });
-  }
-
-  // 第 6 段：Resources 相关方法（可读取的外部上下文）
-  // Resource 用 URI 标识（如 file://、db://），列表只给描述和 uri，真正的字节由 read 拉取。
-  async listResources(): Promise<Resource[]> {
-    const response = await this.client.request('resources/list', {});
-    return response.resources;
-  }
-
-  async readResource(uri: string) {
-    // 只传 uri：读取范围完全由 uri 决定，客户端无权携带其它定位参数
-    return this.client.request('resources/read', { uri });
-  }
-
-  // 第 7 段：Prompts 相关方法（服务端预置的提示模板）
-  // Prompts 与 Tools 的区别：前者返回给用户/宿主填充对话内容，通常不产生远程副作用。
-  async listPrompts(): Promise<Prompt[]> {
-    const response = await this.client.request('prompts/list', {});
-    return response.prompts;
-  }
-
-  async getPrompt(name: string, args?: Record<string, unknown>) {
-    // args 允许缺省（模板可能无参数），此时序列化为 arguments: undefined，服务端应容忍缺省
-    return this.client.request('prompts/get', { name, arguments: args });
-  }
-
-  // 第 8 段：底层 stdio 传输实现
-  // 每次请求都临时 spawn 一个服务器进程：实现最简单，但代价是"一请求一进程"，
-  // 无连接复用、无并发保护，真实场景应改为长驻进程 + 请求队列 + 帧边界解析。
-  private async sendRequest(
-    serverPath: string,
-    request: any
-  ): Promise<any> {
-    // stdio 通信实现
-    // 动态 import 让 child_process 只在真正需要传输时才被加载（便于在非 Node 环境替换实现）
-    const { spawn } = await import('child_process');
-    const child = spawn(serverPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-    return new Promise((resolve, reject) => {
-      // 累积缓冲区：TCP/管道是字节流，JSON 可能被拆成多个 data 事件到达
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-        try {
-          // 易错点：这里假设一次只处理一个完整 JSON 消息。若多帧粘包，JSON.parse 会失败，
-          // 且已 resolve 的 Promise 不会被后续数据影响，导致后续响应被静默丢弃。
-          const response = JSON.parse(stdout);
-          resolve(response);
-        } catch {
-          // 等待更多数据
-          // 解析失败通常只是"消息还没收全"，靠下一次 data 事件继续拼接即可
-        }
-      });
-
-      child.stderr.on('data', (data) => {
-        // 只收集不解析：stderr 是服务器日志，不属于协议消息，不能混入 stdout 的 JSON 流
-        stderr += data.toString();
-      });
-
-      child.on('error', reject); // 进程启动失败（路径不存在/无执行权限）在此冒泡
-
-      // 发送请求
-      // 末尾补 '\n' 作为消息定界符，是 stdio 传输层的约定，服务端按行切分读取
-      child.stdin.write(JSON.stringify(request) + '\n');
-    });
-  }
+  throw new Error(`未知方法 ${method}`);
 }
 
-// 第 9 段：使用示例
-// 演示典型生命周期：构造 → initialize（必须最先）→ 列工具 → 调用工具。
-// 复杂度上均为一次网络/进程往返，真正的成本在于每次 spawn 的进程启动开销。
-// 使用
-async function main() {
-  const client = new MCPClient('./mcp-server');
-  await client.initialize(); // 缺少这一步，后续所有 request 都会被服务端拒绝或行为未定义
-
-  const tools = await client.listTools();
-  console.log('Available tools:', tools);
-
-  const result = await client.callTool('read_file', { path: '/etc/hosts' });
-  console.log('File content:', result);
-}
-```
-### 4.2 Python 客户端
-
-```python
-# client/mcp_client.py
-# 第 1 段：模块导入与用途说明（把 MCP 客户端所需的依赖集中引入）
-# 该文件实现一个「走 stdio 传输」的 MCP（Model Context Protocol）客户端：
-# 它把每个 JSON-RPC 请求序列化成一行文本喂给服务端进程，再从 stdout 读回应答。
-# 只依赖标准库，避免引入网络/框架耦合，方便教学时把注意力放在协议本身。
-import json
-import subprocess
-from typing import Any
-
-
-# 第 2 段：客户端类与构造（保存服务端可执行路径，并预留能力集字段）
-# capabilities 初始为空字典，因为真实的能力清单要等 initialize 握手后由服务端返回；
-# 提前初始化可以让后续代码无需判空即可安全读取。
-class MCPClient:
-    def __init__(self, server_path: str):
-        self.server_path = server_path
-        self.capabilities = {}
-
-
-    # 第 3 段：核心请求发送（一次调用 = 启动一个服务端进程，一问一答）
-    # 关键设计：这里采用「每次请求都新起进程」的一次性模式，而不是长连接，
-    # 因此没有会话状态跨请求保留，实现简单但开销较大（进程创建 + 冷启动）。
-    # 数据流：request dict -> json 字符串 + 换行 -> 子进程 stdin -> stdout 文本 -> dict。
-    # 易错点：MCP 的 stdio 传输以「行」为消息边界，所以结尾必须补 '\n'，
-    # 否则服务端会一直等待消息终止符而阻塞；另外 json.loads(stdout) 假设
-    # stdout 恰好是一整条 JSON，若服务端输出多行/空行会直接抛异常，这是简化实现的边界。
-    def send_request(self, request: dict) -> dict:
-        """通过 stdio 发送请求"""
-        proc = subprocess.Popen(
-            [self.server_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,  # text=True 让管道以字符串而非 bytes 收发，省去手动 decode
-        )
-
-        # communicate 会一次性写入输入并等待进程结束，同时读走全部 stdout/stderr，
-        # 避免管道缓冲区写满导致的死锁；返回后子进程已退出，无需再显式 kill。
-        stdout, stderr = proc.communicate(input=json.dumps(request) + '\n')
-
-        # stderr 属于诊断信息，不属于协议内容，因此只打印不参与解析；
-        # 保留它便于排查服务端崩溃或启动失败的原因。
-        if stderr:
-            print(f"Server stderr: {stderr}")
-
-        # 把服务端应答反序列化为 dict 交给上层；注意此处未做结果校验与错误码处理。
-        return json.loads(stdout)
-
-
-    # 第 4 段：初始化握手（先声明协议版本与自身能力，再收取服务端能力）
-    # JSON-RPC 要求请求带唯一 id 以匹配响应，这里用固定字面量 1/2/3/4 区分调用；
-    # 生产中若并发复用连接需改用自增或随机 id，否则响应无法正确关联。
-    # protocolVersion 是协商基准，版本不匹配时服务端可能拒绝或降级，属于必须显式声明的字段。
-    async def initialize(self) -> None:
-        response = self.send_request({
-            'jsonrpc': '2.0',
-            'id': 1,
-            'method': 'initialize',
-            'params': {
-                'protocolVersion': '2024-11-05',
-                'capabilities': {},
-                'clientInfo': {
-                    'name': 'example-client',
-                    'version': '1.0.0',
-                },
-            },
-        })
-
-        # 服务端在 result.capabilities 里声明它支持哪些特性（tools/resources 等），
-        # 用 get 兜底避免字段缺失时抛 KeyError。
-        self.capabilities = response.get('capabilities', {})
-
-        # 发送初始化完成
-        # 这条是「通知」（notification）：没有 id，服务端不回应答，
-        # 但协议规定必须补发，服务端才会正式进入可服务状态。
-        self.send_request({
-            'jsonrpc': '2.0',
-            'method': 'notifications/initialized',
-            'params': {},
-        })
-
-
-    # 第 5 段：列出可用工具（从嵌套响应中逐层取字段）
-    # 响应结构为 result.tools，链式 get 使得任何一层缺失都退化为空列表，
-    # 从而把「服务端不支持 tools」和「返回空数组」统一处理为「没有工具」。
-    async def list_tools(self) -> list[dict]:
-        response = self.send_request({
-            'jsonrpc': '2.0',
-            'id': 2,
-            'method': 'tools/list',
-            'params': {},
-        })
-        return response.get('result', {}).get('tools', [])
-
-
-    # 第 6 段：调用指定工具（把工具名与参数透传给服务端）
-    # tools/call 是整个客户端最核心的动作：name 必须是 list_tools 返回过的名字，
-    # arguments 需符合该工具声明的输入 schema，否则由服务端返回错误。
-    # 这里只取 result，直接丢弃可能的 error 字段，属于教学版简化。
-    async def call_tool(self, name: str, arguments: dict) -> dict:
-        response = self.send_request({
-            'jsonrpc': '2.0',
-            'id': 3,
-            'method': 'tools/call',
-            'params': {
-                'name': name,
-                'arguments': arguments,
-            },
-        })
-        return response.get('result', {})
-
-
-    # 第 7 段：列出可用资源（与工具并列的另一类能力）
-    # resources 代表可读取的数据源（文件、数据库条目等），与 tools 的执行语义不同；
-    # 同样用链式 get 兜底，保证数据结构异常时返回空列表而非中断调用方。
-    async def list_resources(self) -> list[dict]:
-        response = self.send_request({
-            'jsonrpc': '2.0',
-            'id': 4,
-            'method': 'resources/list',
-            'params': {},
-        })
-        return response.get('result', {}).get('resources', [])
-```
-## 5. 工具定义与注册
-
-### 5.1 工具定义 Schema
-
-```typescript
-// 工具定义完整示例
-interface ToolDefinition {
-  name: string;           // 工具唯一标识
-  description: string;    // 描述（用于 LLM 理解）
-  inputSchema: {          // JSON Schema 定义
-    type: 'object';
-    properties: {
-      [key: string]: {
-        type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-        description?: string;
-        default?: any;
-        enum?: any[];
-        minimum?: number;
-        maximum?: number;
-        minLength?: number;
-        maxLength?: number;
-        pattern?: string;
-        items?: any;
-      };
-    };
-    required?: string[];
-  };
-  annotations?: {          // 可选元数据
-    title?: string;
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-  };
-}
-
-// 示例：复杂参数工具
-const executeSQLTool: ToolDefinition = {
-  name: 'execute_sql',
-  description: '执行 SQL 查询（只读查询）',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: {
-        type: 'string',
-        description: 'SQL 查询语句',
-        minLength: 1,
-        maxLength: 5000,
-      },
-      database: {
-        type: 'string',
-        description: '目标数据库名称',
-        enum: ['users', 'orders', 'analytics'],
-      },
-      limit: {
-        type: 'number',
-        description: '最大返回行数',
-        default: 100,
-        minimum: 1,
-        maximum: 1000,
-      },
-    },
-    required: ['query', 'database'],
-  },
-  annotations: {
-    title: 'Execute SQL Query',
-    readOnlyHint: true,  // 提示 LLM 这是只读操作
-  },
-};
-```
-
-### 5.2 工具注册流程
-
-```typescript
-// 工具注册时序图
-/*
-Server                              Client
-  │                                    │
-  │◀────── initialize ────────────────│  1. 客户端初始化请求
-  │─────── capabilities ──────────────▶│  2. 服务端返回能力
-  │                                    │
-  │◀────── notifications/initialized ─│  3. 客户端发送初始化完成
-  │                                    │
-  │◀──────── tools/list ──────────────│  4. 客户端请求工具列表
-  │───────── tools[] ──────────────────▶│  5. 服务端返回工具定义
-  │                                    │
-  │◀──────── tools/call ──────────────│  6. 客户端调用工具
-  │───────── result ──────────────────▶│  7. 服务端返回结果
-*/
-
-// 服务端注册
-server.setRequestHandler('tools/list', async () => {
-  return {
-    tools: [
-      {
-        name: 'read_file',
-        description: '读取文件内容',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            path: { type: 'string' },
-          },
-          required: ['path'],
-        },
-      },
-      // ... 更多工具
-    ],
-  };
+registerTool({
+  name: "read_file",
+  description: "读取 UTF-8 文本文件",
+  inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+  handler: async ({ path }) => ({ contents: [{ type: "text", text: `read ${path}` }] }),
 });
 
-// 客户端发现并缓存
-class ToolRegistry {
-  private tools: Map<string, ToolDefinition> = new Map();
+const listed = handle("tools/list", {});
+assert.equal(listed.tools.length, 1, "注册表里有一个工具");
+assert.equal("handler" in listed.tools[0], false, "列表不暴露执行体");
 
-  async discover(server: MCPClient) {
-    const tools = await server.listTools();
-    for (const tool of tools) {
-      this.tools.set(tool.name, tool);
-    }
-  }
+const called = await handle("tools/call", { name: "read_file", arguments: { path: "a.txt" } });
+assert.equal(called.contents[0].text, "read a.txt");
 
-  getTool(name: string): ToolDefinition | undefined {
-    return this.tools.get(name);
-  }
+assert.throws(() => handle("tools/call", { name: "no_such", arguments: {} }), /未知工具/);
 
-  getAllTools(): ToolDefinition[] {
-    return Array.from(this.tools.values());
-  }
-}
+console.log("ok: 注册表可列举 可调用 可拒绝未知工具");
 ```
 
-## 6. 资源管理
+**运行结果**
 
-### 6.1 资源定义
-
-```typescript
-// 资源定义
-interface Resource {
-  uri: string;           // 资源 URI（scheme://path）
-  name: string;          // 显示名称
-  description?: string; // 描述
-  mimeType?: string;    // MIME 类型
-}
-
-// 示例资源
-const resources: Resource[] = [
-  {
-    uri: 'file://config/app.json',
-    name: 'Application Config',
-    description: '当前应用配置文件',
-    mimeType: 'application/json',
-  },
-  {
-    uri: 'database://users/recent',
-    name: 'Recent Users',
-    description: '最近活跃用户列表',
-    mimeType: 'application/json',
-  },
-  {
-    uri: 'web://api/status',
-    name: 'API Status',
-    description: '外部 API 健康状态',
-    mimeType: 'application/json',
-  },
-];
+```text
+ok: 注册表可列举 可调用 可拒绝未知工具
 ```
 
-### 6.2 资源模板
+**常见坑**
 
-```typescript
-// 带参数的资源模板
-interface ResourceTemplate {
-  uriTemplate: string;   // URI 模板（如 file://logs/{date}）
-  name: string;
-  description?: string;
-  mimeType?: string;
-}
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| `tools/list` 返回空对象 | 直接把 Map 序列化成 JSON | 先 `Array.from` 摊平成数组再放进返回体 |
+| 模型调用时参数类型错误 | `inputSchema` 与 `handler` 的字段名不一致 | 让两者共用同一份字段常量，改一处即改全局 |
+| 服务启动即报模块找不到 | 顶层 import 了只有运行时才需要的模块 | 在 `handler` 内部用动态 `import` 延迟加载 |
 
-// 示例
-const logTemplate: ResourceTemplate = {
-  uriTemplate: 'file://logs/{date}',
-  name: 'Daily Logs',
-  description: '指定日期的应用日志',
-  mimeType: 'text/plain',
+**用在哪里**
+
+- 场景一：后台管理的批量导入校验服务
+    - 业务背景：运营要上传表格，Agent 需要在校验失败时解释每一行的原因。
+    - 这一节的知识怎么用：把列名校验、类型校验分别登记为工具，`inputSchema` 用 `enum` 约束表格类型。
+    - 用什么指标衡量收益：导入失败后运营需要人工排查的行数占比。
+    - 什么时候不该用：导入流程已经固化在后台表单里，模型没有介入的入口。
+- 场景二：电商商品列表的数据准备服务
+    - 业务背景：Agent 要在回答商品问题时读取库存与价格字段。
+    - 这一节的知识怎么用：把库存查询登记为工具，把商品字段表登记为资源，前者执行后者只读。
+    - 用什么指标衡量收益：模型回答商品问题时的字段引用错误次数。
+    - 什么时候不该用：数据需要在浏览器端就地渲染，跨进程取数会拖慢首屏。
+
+**行业实践**
+
+- MCP Python SDK 仓库的 README 用装饰器示例展示工具、资源、提示的注册方式。怎么借鉴到你的项目：把注册集中在启动文件里，让能力清单一眼可见。
+- MCP TypeScript SDK 仓库的 README 展示了 `setRequestHandler` 按方法名绑定处理函数。怎么借鉴到你的项目：把方法名写成常量，避免拼写错误导致首次请求就失败。
+- `modelcontextprotocol/servers` 仓库中文件系统相关参考服务器把可访问目录限制在启动参数指定的范围内。怎么借鉴到你的项目：把允许目录作为启动参数，不要写死在代码里。
+
+**小结**
+
+- 服务端等于注册表加分发通道，注册在启动阶段完成。
+- 描述字段与执行体必须成对维护，改一边就要改另一边。
+- 工具数量增长后，注册表的数据结构决定查找开销。
+
+## 4. MCP 客户端实现
+
+**先想一个问题**
+
+客户端调一次工具，要经过哪几个动作？连接、握手、发现、调用，缺一步都会失败。
+
+连接方式不止一种，客户端要把协议编解码与传输方式分开写。
+
+**心智模型**
+
+!!! tip "心智模型"
+
+    - 一句话模型：客户端是「协议编解码层」加一个可替换的「传输适配器」。
+    - 日常类比：像快递柜，柜子只负责按编号存取，包裹怎么送来的与它无关。
+    - 类比不成立的地方：快递柜不关心包裹顺序，协议要求握手必须排在所有业务请求之前。
+
+!!! note "术语：stdio 传输"
+
+    stdio 传输指客户端与服务端通过标准输入输出流交换报文。例子：客户端把一行 JSON 写进子进程的标准输入，从子进程的标准输出按行读出响应。
+
+**图解**
+
+```mermaid
+sequenceDiagram
+  participant H as "Host 宿主"
+  participant C as "MCP Client"
+  participant S as "MCP Server"
+  H->>C: "连接并握手"
+  C->>S: "initialize"
+  S-->>C: "capabilities"
+  C->>S: "notifications initialized"
+  H->>C: "请求可用工具"
+  C->>S: "tools list"
+  S-->>C: "tools 数组"
+  H->>C: "要求执行某个工具"
+  C->>S: "tools call"
+  S-->>C: "contents"
+  C-->>H: "文本结果"
+```
+
+1. 宿主发起连接，客户端负责建通道。
+2. 客户端发 `initialize`，服务端返回 `capabilities`。
+3. 客户端补发 `notifications/initialized`，握手结束。
+4. 宿主问有哪些工具，客户端转发 `tools/list`。
+5. 服务端返回工具数组，客户端缓存这份清单。
+6. 宿主选中某个工具，客户端发 `tools/call` 并透传参数。
+7. 服务端返回 `contents`，客户端把它交回宿主。
+
+**一步一步来**
+
+**第 1 步：完成握手并保存能力快照**
+
+握手结果决定后面哪些方法组能用，因此要存下来。
+
+```js
+// 握手请求：声明协议版本、自身能力、身份信息
+const initRequest = {
+  jsonrpc: "2.0",
+  id: 1,
+  method: "initialize",
+  params: {
+    protocolVersion: "2024-11-05", // 旧页示例值，最新版本号需核对官方文档
+    capabilities: {
+      roots: { listChanged: true }, // 声明自己会在根目录变更时发通知
+      sampling: {},                 // 空对象表示支持该能力
+    },
+    clientInfo: { name: "example-client", version: "1.0.0" },
+  },
 };
 
-// 客户端使用
-const resources = await client.listResources();
-// 如果有模板，可以展开
-const todayLogs = await client.readResource('file://logs/2024-01-15');
+// 服务端的 capabilities 决定后续可用的方法组
+const serverCapabilities = { tools: {}, resources: {} };
+if (!("tools" in serverCapabilities)) {
+  throw new Error("服务端未声明 tools 能力，不应调用 tools/list");
+}
 ```
 
-## 7. 提示模板
+**这段代码在做什么**
 
-### 7.1 提示定义
+- `protocolVersion` 是协商基准，值不匹配时服务端可能拒绝或降级。
+- `capabilities` 里放客户端支持的能力，服务端据此决定要不要主动发通知。
+- `clientInfo` 用于服务端日志与问题定位。
+- 握手返回的 `capabilities` 是权威依据，判断能否调用某方法组要先查它。
+- 跳过握手直接发业务请求，服务端行为未定义。
 
-```typescript
-// 提示模板定义
-interface Prompt {
-  name: string;           // 模板名称
-  description?: string;  // 描述
-  arguments?: Array<{    // 参数定义
-    name: string;
-    description?: string;
-    required?: boolean;
-  }>;
+**第 2 步：按行分帧读取标准输出**
+
+字节流会被拆成多段到达，需要自己按换行符切分并处理粘包。
+
+```js
+import { spawn } from "node:child_process";
+
+// 传输适配器：发一行，收多行
+const child = spawn(process.execPath, ["--input-type=module", "-e", "process.stdin.pipe(process.stdout)"], {
+  stdio: ["pipe", "pipe", "inherit"],
+});
+
+child.stdin.write(JSON.stringify(request) + "\n"); // 换行符是消息边界
+child.stdin.end(); // 关闭写入端，避免示例进程挂起
+
+let buffer = "";
+child.stdout.on("data", async (chunk) => {
+  buffer += chunk.toString(); // 先累积，再切分
+  let index;
+  while ((index = buffer.indexOf("\n")) !== -1) {
+    const line = buffer.slice(0, index); // 取出一条完整消息
+    buffer = buffer.slice(index + 1);    // 剩余部分留到下一轮
+    if (line.trim()) {
+      const message = JSON.parse(line);
+      await handle(message.method, message.params);
+    }
+  }
+});
+```
+**这段代码在做什么**
+
+- 写入时补 `"\n"`，这是 stdio 传输约定的消息终止符。
+- `buffer` 累积未处理完的字节，因为一次 `data` 事件可能只到半条消息。
+- `while` 循环处理一次到达多条消息的情况，避免后续响应被丢弃。
+- `line.trim()` 过滤空行，防止 `JSON.parse` 抛异常。
+- 标准错误流只收集不解析，它承载的是服务端日志。
+
+**动手验证**
+
+```js
+// 依赖：无，仅用 Node 20+ 内置模块
+// 运行：node --input-type=module verify.mjs
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+
+// 子进程脚本：读一行 JSON，回一行 JSON，然后退出
+const childCode = [
+  "let buf = '';",
+  "process.stdin.on('data', (d) => {",
+  "  buf += d;",
+  "  const i = buf.indexOf('\\n');",
+  "  if (i === -1) return;",
+  "  const req = JSON.parse(buf.slice(0, i));",
+  "  const res = { jsonrpc: '2.0', id: req.id, result: { tools: [{ name: 'read_file' }] } };",
+  "  process.stdout.write(JSON.stringify(res) + '\\n');",
+  "  process.exit(0);",
+  "});",
+].join("\n");
+
+// 用参数数组传代码，避免 shell 转义问题
+const out = spawnSync(process.execPath, ["-e", childCode], {
+  input: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }) + "\n",
+  encoding: "utf8",
+});
+
+assert.equal(out.status, 0, "子进程正常退出");
+const res = JSON.parse(out.stdout.trim());
+assert.equal(res.id, 1, "响应复用请求 id");
+assert.equal(res.result.tools[0].name, "read_file");
+assert.equal(out.stderr, "", "标准错误不承载协议报文");
+
+console.log("ok: stdio 一问一答完成，响应按 id 配对");
+```
+
+**运行结果**
+
+```text
+ok: stdio 一问一答完成，响应按 id 配对
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 第二条响应被丢掉 | 一次数据事件里有多条消息，只解析了第一条 | 用循环按换行符切分，处理完缓冲区里所有完整行 |
+| 后续请求全部失败 | 漏发 `notifications/initialized` | 握手后立即补发这条通知 |
+| 进程句柄泄漏 | 每次请求都新建子进程却没有回收 | 改用长驻进程加请求队列，并监听退出事件做重连 |
+
+**用在哪里**
+
+- 场景一：桌面客户端的本地能力接入
+    - 业务背景：桌面应用要接本机命令行工具，用户安装后即可使用。
+    - 这一节的知识怎么用：用 stdio 传输启动子进程，握手后缓存工具清单，卸载时关闭子进程。
+    - 用什么指标衡量收益：应用启动到工具可用的耗时，以及子进程残留数量。
+    - 什么时候不该用：能力已经作为库直接链接进应用，再加一层进程通信是多余开销。
+- 场景二：多租户 SaaS 的工具网关
+    - 业务背景：一个平台要为不同租户连接各自的内部数据服务。
+    - 这一节的知识怎么用：每个租户一个客户端实例，能力快照随实例保存，避免跨租户串用。
+    - 用什么指标衡量收益：跨租户越权调用的拦截次数，以及连接建立失败的占比。
+    - 什么时候不该用：租户之间共享同一套数据服务且权限由服务端统一判定，多实例管理成本高于收益。
+
+**行业实践**
+
+- MCP TypeScript SDK 仓库的客户端示例展示了构造、握手、列工具、调用工具的完整顺序。怎么借鉴到你的项目：把这段顺序封装成一个连接对象，让业务代码拿不到未握手的连接。
+- MCP 官方文档的传输章节说明 stdio 与 HTTP 两类传输共用同一套消息格式。怎么借鉴到你的项目：把传输实现抽成一个只暴露「发一行、收一行」的函数，替换传输不影响业务代码。
+- Claude Code 文档的 MCP 配置章节把每个服务端的启动命令与参数写在配置文件里。怎么借鉴到你的项目：让客户端从配置读取服务端路径，不要硬编码在代码中。
+
+**小结**
+
+- 客户端的两半是协议编解码与传输适配，两者可以分别替换。
+- 握手必须先于所有业务请求，能力快照要保存下来。
+- 按行分帧要处理半条消息与多条消息两种情况。
+
+## 5. 工具定义与注册
+
+**先想一个问题**
+
+同一个工具，模型有时传对参数有时传错。问题常常不在模型，而在描述写得含糊。
+
+`inputSchema` 是给模型的合同，字段名、类型、取值范围写清楚，传错的比例会下降。
+
+**心智模型**
+
+!!! tip "心智模型"
+
+    - 一句话模型：一份工具定义由「给模型看的描述」与「给运行时看的执行体」两半组成。
+    - 日常类比：像点餐单，菜单上写清楚配料与份量，后厨按单子做菜。
+    - 类比不成立的地方：菜单不会拒绝客人，工具定义要在运行时再校验一次参数，因为模型可能不按描述传值。
+
+!!! note "术语：annotations"
+
+    工具定义里的可选元数据字段，用来提示这个工具会不会改动数据。例子：`readOnlyHint` 表示该工具只读取数据，不产生副作用。
+
+**图解**
+
+```mermaid
+flowchart LR
+  A["服务端注册表"] --> B["tools list 只返回描述字段"]
+  B --> C["客户端缓存工具清单"]
+  C --> D["模型选工具并生成参数"]
+  D --> E["tools call 带 name 与 arguments"]
+  E --> F["服务端查表并执行 handler"]
+  F --> G["返回 contents 数组"]
+```
+
+1. 服务端把工具定义放进注册表，执行体留在服务端。
+2. `tools/list` 只返回描述字段，客户端拿到不含执行体的清单。
+3. 客户端把清单缓存起来，每次对话开始时注入模型上下文。
+4. 模型判断当前任务适合哪个工具，按 `inputSchema` 生成参数。
+5. 客户端发 `tools/call`，带上工具名与参数对象。
+6. 服务端按名字查表，执行对应的 `handler`。
+7. 执行结果包装成 `contents` 数组返回。
+
+**一步一步来**
+
+**第 1 步：写一份带约束的工具定义**
+
+约束写得越具体，模型生成非法参数的机会越少。
+
+```js
+// 完整工具定义：约束写在 properties 里，必填写在 required 里
+const executeSqlTool = {
+  name: "execute_sql",
+  description: "对指定数据库执行只读 SQL 查询", // 说明用途与边界
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: { type: "string", minLength: 1, maxLength: 5000 },
+      database: { type: "string", enum: ["users", "orders", "analytics"] }, // 限定取值范围
+      limit: { type: "number", default: 100, minimum: 1, maximum: 1000 },
+    },
+    required: ["query", "database"],
+  },
+  annotations: {
+    readOnlyHint: true, // 提示模型这是只读操作，不修改数据
+  },
+};
+```
+
+**这段代码在做什么**
+
+- `description` 写清了数据库范围与只读性质，模型据此排除写操作意图。
+- `enum` 把 `database` 限定在三个值内，越界值在协议层就被挡住。
+- `default` 是给客户端的提示，运行时仍需在 handler 里兜底。
+- `minLength`、`maximum` 这类数值约束让校验规则可被客户端提前读取。
+- `annotations.readOnlyHint` 是元数据，是否采纳由客户端决定。
+
+**第 2 步：服务端分发与客户端缓存**
+
+服务端按名字查表，客户端把清单缓存下来供多次对话复用。
+
+```js
+// 服务端：查表 校验 执行 三步
+function dispatch(method, params, registry) {
+  if (method === "tools/call") {
+    const tool = registry.get(params.name);
+    if (!tool) throw new Error(`未知工具 ${params.name}`); // 未知工具必须显式报错
+    const errors = validate(tool.inputSchema, params.arguments || {}); // 运行时再校验一次
+    if (errors.length) throw new Error(errors.join("; "));
+    return tool.handler(params.arguments);
+  }
+  throw new Error(`未知方法 ${method}`);
 }
 
-// 示例
-const prompts: Prompt[] = [
-  {
-    name: 'code_review',
-    description: '生成代码审查任务',
-    arguments: [
-      { name: 'file_path', description: '要审查的文件路径', required: true },
-      { name: 'language', description: '编程语言' },
-    ],
-  },
-  {
-    name: 'explain_error',
-    description: '解释错误并提供修复建议',
-    arguments: [
-      { name: 'error_message', description: '错误信息', required: true },
-      { name: 'stack_trace', description: '堆栈跟踪' },
-    ],
-  },
-];
+// 客户端：把清单装进 Map，按名字取用
+class ToolRegistry {
+  #tools = new Map();
+  async discover(client) {
+    for (const tool of await client.listTools()) this.#tools.set(tool.name, tool);
+  }
+  getTool(name) { return this.#tools.get(name); }
+  getAllTools() { return Array.from(this.#tools.values()); }
+}
 ```
 
-### 7.2 提示渲染
+**这段代码在做什么**
 
-```typescript
-// 服务端渲染提示
-// 第 1 段：注册 MCP 的 prompts/get 处理器（服务端对外暴露"取提示词"能力）
-// setRequestHandler 把「方法名 → 异步处理函数」绑定到 server 上；每个请求独立执行，
-// 因此这里的 async 函数必须自行完成 IO 并 return 符合协议结构的结果（不能只 side-effect）。
-server.setRequestHandler('prompts/get', async (request) => {
-  // 第 2 段：解构请求参数（name 决定走哪条提示词分支，args 是调用方传来的填充变量）
-  // 易错点：协议字段就叫 arguments，而它是 JS 函数内部的保留标识符，
-  // 这里用 `arguments: args` 重命名，避免遮蔽函数自带的 arguments 对象。
-  const { name, arguments: args } = request.params;
+- 服务端按名字查表，查不到就抛错，避免静默返回让人误判成功。
+- 运行时再校验一次参数，因为客户端的校验可以被绕过。
+- 执行体只在服务端出现，客户端拿到的定义里没有它。
+- 客户端用 Map 缓存清单，重复对话不需要重复请求 `tools/list`。
+- `#tools` 是私有字段，外部只能通过方法读取，避免注册表被就地改写。
 
-  // 第 3 段：命中 code_review 模板，按参数读取目标文件
-  // 数据流：file_path 来自客户端 → readFile 落盘读取 → content 作为待审查源码。
-  // readFile 是异步 IO，用 await 让事件循环去处理其他请求，避免阻塞。
-  if (name === 'code_review') {
+**动手验证**
+
+```js
+// 依赖：无，仅用 Node 20+ 内置模块
+// 运行：node --input-type=module verify.mjs
+import assert from "node:assert/strict";
+
+// 最小校验器：只查必填与类型，够验证拦截效果
+function validate(schema, args) {
+  const errors = [];
+  for (const key of schema.required ?? []) {
+    if (args[key] === undefined) errors.push(`缺少必填参数 ${key}`);
+  }
+  for (const [key, rule] of Object.entries(schema.properties)) {
+    if (args[key] === undefined) continue;
+    if (typeof args[key] !== rule.type) errors.push(`${key} 类型应为 ${rule.type}`);
+  }
+  return errors;
+}
+
+const schema = {
+  type: "object",
+  properties: { query: { type: "string" }, limit: { type: "number" } },
+  required: ["query"],
+};
+
+assert.deepEqual(validate(schema, { query: "mcp" }), [], "合法参数通过");
+assert.deepEqual(validate(schema, { query: "mcp", limit: "5" }), ["limit 类型应为 number"]);
+assert.deepEqual(validate(schema, {}), ["缺少必填参数 query"]);
+assert.equal(validate(schema, { query: "mcp" }).length, 0);
+
+console.log("ok: 校验器拦住了缺参与类型错误");
+```
+
+**运行结果**
+
+```text
+ok: 校验器拦住了缺参与类型错误
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 模型传入不存在的枚举值 | 描述里没写取值范围 | 在 `properties` 里加 `enum`，并在 handler 里再判断一次 |
+| 同名工具互相覆盖 | 注册表用普通对象且没检查重复 | 注册时先判断名字是否存在，重复则报错退出 |
+| 客户端缓存与线上不一致 | 服务端更新了工具但客户端不刷新 | 服务端支持能力变更通知，客户端收到后清空缓存重新发现 |
+
+**用在哪里**
+
+- 场景一：数据分析平台的查询入口
+    - 业务背景：业务人员用自然语言问指标，Agent 需要把问题转成只读 SQL。
+    - 这一节的知识怎么用：`database` 用 `enum` 限定库范围，`limit` 用 `maximum` 限制返回行数。
+    - 用什么指标衡量收益：生成的 SQL 被数据库拒绝的比例。
+    - 什么时候不该用：查询需要写操作或长事务，只读约束无法表达业务语义。
+- 场景二：代码审查机器人
+    - 业务背景：机器人要读取改动文件、查历史提交、给出行级评论。
+    - 这一节的知识怎么用：把读取文件、查询提交历史拆成两个工具，各自描述清楚输入边界。
+    - 用什么指标衡量收益：评审意见中被开发者标记为无效的条数占比。
+    - 什么时候不该用：评审规则完全确定，用静态检查工具比让模型判断更稳定。
+
+**行业实践**
+
+- MCP 官方文档的工具章节描述了工具的 `name`、`description`、`inputSchema` 字段。怎么借鉴到你的项目：把这三个字段做成注册函数的必填参数，漏填就编译期报错。
+- MCP 官方文档提到工具可以带 `annotations` 元数据提示只读或破坏性。怎么借鉴到你的项目：给所有写操作工具标注破坏性提示，让客户端有机会弹确认。
+- `modelcontextprotocol/servers` 仓库中的参考服务器把工具数量控制在可枚举范围内，并用统一前缀区分来源。怎么借鉴到你的项目：多服务来源的场景给工具名加服务前缀，避免命名冲突。
+
+**小结**
+
+- 工具定义是合同，描述写清边界能直接减少参数错误。
+- 客户端与服务端各校验一次，客户端校验为了体验，服务端校验为了安全。
+- 注册表要检查重名，覆盖式注册会让排查变得困难。
+
+## 6. 资源管理与提示模板
+
+**先想一个问题**
+
+商品字段表、配置项、日志文件这类数据，没有「执行」的语义，只有「读取」。把它们也做成工具合适吗？
+
+协议把这类只读数据单独归为资源，执行动作归为工具，两类能力分开列举。
+
+**心智模型**
+
+!!! tip "心智模型"
+
+    - 一句话模型：工具是手，资源是书架，提示模板是便签纸。
+    - 日常类比：去图书馆，你可以借书（读资源）、请管理员代查（调工具）、拿一张写好的检索清单（取提示模板）。
+    - 类比不成立的地方：图书馆的书是实体，资源可以是在读取时才生成的动态内容，比如按日期算出来的日志切片。
+
+!!! note "术语：资源模板"
+
+    资源模板是带占位符的资源标识，客户端填写占位符后得到具体资源的标识。例子：模板 `file://logs/2024-01-15` 中的日期部分可变，客户端传入具体日期后读取对应日志。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["能力发现阶段"] --> B["tools list 动作清单"]
+  A --> C["resources list 数据清单"]
+  A --> D["prompts list 模板清单"]
+  C --> E["resources read 按标识取内容"]
+  D --> F["prompts get 渲染出消息数组"]
+  B --> G["tools call 执行动作"]
+```
+
+1. 能力发现阶段分别请求三类清单，三者返回结构不同。
+2. `tools/list` 返回可执行的动作，带 `inputSchema`。
+3. `resources/list` 返回可读的数据，带标识、名称、内容类型。
+4. `prompts/list` 返回可用的提示模板，带参数说明。
+5. 读取资源走 `resources/read`，只传标识，不传其它定位参数。
+6. 取提示走 `prompts/get`，返回 `messages` 数组。
+7. 执行动作走 `tools/call`，会可能产生副作用。
+
+**一步一步来**
+
+**第 1 步：定义固定资源与模板资源**
+
+固定资源的标识里没有占位符，模板资源的标识里有。
+
+```js
+// 固定资源：标识里无占位符，内容在读取时才生成
+const configResource = {
+  uri: "config://app",
+  name: "Application Config",
+  mimeType: "application/json",
+  async load() {
+    // 列表阶段只返回元数据，真正内容在这里才读取，避免一次性把大文件读进内存
+    return { contents: [{ type: "resource", mimeType: "application/json", text: '{"setting":"value"}' }] };
+  },
+};
+
+// 模板资源：标识里带日期占位符，客户端填值后读取具体资源
+const logTemplate = {
+  uriTemplate: "file://logs/2024-01-15",
+  name: "Daily Logs",
+  description: "指定日期的应用日志",
+  mimeType: "text/plain",
+};
+```
+
+**这段代码在做什么**
+
+- `uri` 是资源的唯一标识，客户端按它读取，不携带其它定位信息。
+- `mimeType` 告诉客户端怎么渲染内容，是 JSON 还是纯文本。
+- `load()` 是惰性执行，列表阶段只返回元数据，避免启动即读大文件。
+- 模板资源的 `uriTemplate` 里含可变片段，客户端负责填值。
+- 固定资源与模板资源在 `resources/list` 里都能出现，客户端按是否含占位符区分。
+
+**第 2 步：注册提示模板并返回消息数组**
+
+提示模板只负责渲染文本，业务逻辑交给工具。
+
+```js
+import { readFile } from "node:fs/promises";
+
+// 最小服务端对象：保存方法处理器，替代外部 SDK，避免 server 未定义
+const server = {
+  handlers: new Map(),
+  setRequestHandler(method, handler) {
+    this.handlers.set(method, handler);
+  },
+};
+
+// prompts/get 的处理函数：按名字分支，返回 messages 数组
+server.setRequestHandler("prompts/get", async (request) => {
+  const { name, arguments: args } = request.params; // arguments 是保留字，必须重命名
+
+  if (name === "code_review") {
     const { file_path } = args;
-    const content = await readFile(file_path);
+    const content = await readFile(file_path); // 读取文件是异步操作
 
-    // 第 4 段：组装返回体——MCP 规定 messages 是「角色 + 内容」数组
-    // 把源码内联进 user 消息，让模型在同一轮里既拿到审查要求也拿到待审代码；
-    // 三反引号包裹 + 语言兜底（args.language 缺省时用「代码」）保证提示词可读。
     return {
       messages: [{
-        role: 'user',
-        content: `请审查以下 ${args.language || '代码'} 文件：
-
-\`\`\`
-${content}
-\`\`\`
-
-考虑：
-1. 代码质量和风格
-2. 潜在的 bug 和安全问题
-3. 性能优化建议
-4. 最佳实践符合度`,
+        role: "user",
+        content: `请审查以下文件：\n${content}\n考虑：代码风格、潜在 bug、安全、性能`, // 模板文本
       }],
     };
   }
 
-  // 第 5 段：兜底分支——未知提示词名必须显式抛错
-  // 边界条件：不抛错而返回 undefined 会让客户端拿到非法结构，协议层难以定位问题，
-  // 抛出带 name 的 Error 能直接把「名字写错」这条线索交还给调用方。
-  throw new Error(`Unknown prompt: ${name}`);
-});
-
-// 第 6 段：客户端调用示例（发起一次 prompts/get）
-// name 必须与服务端注册的分支字符串完全一致，否则会命中第 5 段抛错；
-// getPrompt 解包后的 prompt 即服务端返回对象，messages 里就是最终喂给模型的对话。
-const prompt = await client.getPrompt('code_review', { file_path: '/src/main.ts' });
-console.log(prompt.messages);
-```
-## 8. 安全考虑
-
-### 8.1 输入验证
-
-```typescript
-// 工具参数验证
-function validateToolInput(tool: ToolDefinition, args: any): ValidationResult {
-  const errors: string[] = [];
-
-  // 检查必需参数
-  for (const required of tool.inputSchema.required || []) {
-    if (args[required] === undefined) {
-      errors.push(`Missing required parameter: ${required}`);
-    }
-  }
-
-  // 类型检查
-  for (const [key, schema] of Object.entries(tool.inputSchema.properties)) {
-    if (args[key] !== undefined) {
-      if (!validateType(args[key], schema)) {
-        errors.push(`Invalid type for ${key}: expected ${schema.type}`);
-      }
-    }
-  }
-
-  // 范围检查
-  if (schema.type === 'number') {
-    if (schema.minimum !== undefined && args[key] < schema.minimum) {
-      errors.push(`${key} must be >= ${schema.minimum}`);
-    }
-    if (schema.maximum !== undefined && args[key] > schema.maximum) {
-      errors.push(`${key} must be <= ${schema.maximum}`);
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-```
-
-### 8.2 权限控制
-
-```typescript
-// 权限检查
-interface Permission {
-  tool: string;
-  allowed: boolean;
-  rateLimit?: { maxPerMinute: number };
-}
-
-class PermissionManager {
-  private permissions: Map<string, Permission> = new Map();
-
-  async checkPermission(tool: string): Promise<boolean> {
-    const permission = this.permissions.get(tool);
-    if (!permission) return false;
-    return permission.allowed;
-  }
-
-  async checkRateLimit(tool: string): Promise<boolean> {
-    const permission = this.permissions.get(tool);
-    if (!permission?.rateLimit) return true;
-
-    // 实现速率限制逻辑
-    return this.checkRateLimitImpl(tool, permission.rateLimit.maxPerMinute);
-  }
-}
-
-// 使用
-const permissionManager = new PermissionManager();
-
-server.setRequestHandler('tools/call', async (request) => {
-  const { name } = request.params;
-
-  if (!await permissionManager.checkPermission(name)) {
-    throw new Error(`Permission denied for tool: ${name}`);
-  }
-
-  if (!await permissionManager.checkRateLimit(name)) {
-    throw new Error(`Rate limit exceeded for tool: ${name}`);
-  }
-
-  // 执行工具...
+  throw new Error(`未知提示 ${name}`); // 未知名字显式报错，避免客户端拿到非法结构
 });
 ```
+**这段代码在做什么**
 
-### 8.3 审计日志
+- `arguments` 是语言保留字，解构时重命名为 `args` 才能使用。
+- 模板函数只做文本拼装，不做代码分析，分析应由工具承担。
+- 返回结构是 `messages` 数组，每项带 `role` 与 `content`。
+- 未知提示名抛异常，把「名字写错」这条线索交回调用方。
+- 文件内容被内联进消息，模型在同一轮里同时拿到要求与待审代码。
 
-```typescript
-// 第 1 段：审计条目数据结构（定义一条审计日志的字段契约）
-// 设计意图：把"谁、在什么时间、用什么参数、调了哪个工具、结果如何"压成一个可 JSON 序列化的扁平对象，
-// 便于后续落盘、检索与按 sessionId 回放整条操作链路。所有可选字段都是为了让同一结构能同时承载成功与失败两种记录。
-// 审计日志
-interface AuditEntry {
-  timestamp: string; // 由 AuditLogger 统一盖章（ISO 8601），调用方无权传入，见下方 Omit
-  tool: string; // 工具名，检索/聚合的主键之一
-  args: Record<string, unknown>; // 用 unknown 而非 any，强制消费方先做类型收窄，避免 any 在日志链路里扩散
-  result?: any; // 成功记录才有；此处刻意放宽为 any，因为工具的返回形态不受本模块控制，代价是丢失类型检查
-  error?: string; // 只存 message 字符串而非 Error 对象：Error 的 message/stack 不可枚举，直接 JSON 序列化会变成 {}
-  user?: string; // 可选：非鉴权场景或匿名调用时缺省
-  sessionId?: string; // 可选：用于把同一会话内的多次工具调用串成一条时间线
+**动手验证**
+
+```js
+// 依赖：无，仅用 Node 20+ 内置模块
+// 运行：node --input-type=module verify.mjs
+import assert from "node:assert/strict";
+
+// 展开资源模板：把占位符替换成实际值并做编码
+function expand(template, vars) {
+  return template.replace(/\{(\w+)\}/g, (whole, key) => {
+    if (vars[key] === undefined) throw new Error(`缺少模板变量 ${key}`);
+    return encodeURIComponent(vars[key]);
+  });
 }
 
-// 第 2 段：审计写入器（内存缓冲 + 批量落盘）
-// 为什么这样写：审计属于旁路能力，若每次调用都同步写磁盘，会把 I/O 延迟叠加到工具调用的关键路径上。
-// 因此先在内存里攒（O(1) 入队），再由 flush 批量落盘（O(n) 序列化 + 一次 I/O），用一次写放大换吞吐。
+const tpl = "file://logs/{date}/{level}";
+assert.equal(expand(tpl, { date: "2024-01-15", level: "error" }), "file://logs/2024-01-15/error");
+assert.throws(() => expand(tpl, { date: "2024-01-15" }), /缺少模板变量 level/);
+
+// 提示模板的返回形状：messages 数组里每项带 role 与 content
+const promptResult = { messages: [{ role: "user", content: "请审查 src/main.ts" }] };
+assert.equal(promptResult.messages[0].role, "user");
+assert.equal(typeof promptResult.messages[0].content, "string");
+
+// 资源返回形状：contents 数组里每项带 type
+const readResult = { contents: [{ type: "resource", mimeType: "text/plain", text: "log line" }] };
+assert.equal(readResult.contents[0].type, "resource");
+
+console.log("ok: 资源模板可展开，提示与资源返回形状正确");
+```
+
+**运行结果**
+
+```text
+ok: 资源模板可展开，提示与资源返回形状正确
+```
+
+**常见坑**
+
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 服务启动内存占用高 | `resources/list` 阶段就把所有资源内容读进内存 | 列表只返回元数据，内容留到 `resources/read` 时再读 |
+| 客户端拿到非法的提示结构 | 未知提示名时返回了空对象而不是抛错 | 未知名字一律抛异常，让错误在协议层可见 |
+| 模板占位符没被替换 | 客户端与服务端对占位符写法理解不一致 | 把模板字符串与占位符格式写进服务端返回的参数说明里 |
+
+**用在哪里**
+
+- 场景一：企业内部知识库助手
+    - 业务背景：员工提问要引用内部规范文档与最新公告。
+    - 这一节的知识怎么用：把规范文档登记为固定资源，把按部门检索登记为模板资源，提示模板负责拼装引用格式。
+    - 用什么指标衡量收益：回答里引用过期文档的次数，以及用户追问「出处在哪里」的比例。
+    - 什么时候不该用：文档更新频率高到资源清单维护不过来，此时应按查询动态生成内容。
+- 场景二：客服话术辅助
+    - 业务背景：客服要在对话中插入符合规范的话术，规范随活动变化。
+    - 这一节的知识怎么用：把话术模板登记为提示模板，运营改动模板不需要发版。
+    - 用什么指标衡量收益：话术模板从运营提交到线上生效的时间。
+    - 什么时候不该用：话术需要按用户身份做复杂分支，模板参数表达不了这种逻辑。
+
+**行业实践**
+
+- MCP 官方文档的资源章节描述了资源标识、名称、内容类型字段，以及带参数模板的存在。怎么借鉴到你的项目：把只读数据统一登记为资源，别都做成工具。
+- MCP 官方文档的提示章节描述了提示模板返回消息数组的结构。怎么借鉴到你的项目：把常用指令写成模板，改文案不用改代码。
+- `modelcontextprotocol/servers` 仓库中文件系统参考服务器把目录列举做成资源、把文件读写做成工具。怎么借鉴到你的项目：按「读数据还是改数据」这条线划分资源与工具。
+
+**小结**
+
+- 资源是只读数据端点，工具是可执行动作，两者在协议层分开列举。
+- 资源模板的占位符由客户端填值，服务端负责校验填值后的标识是否存在。
+- 提示模板只渲染文本，业务判断交给工具。
+
+## 7. 安全考虑与集成示例
+
+**先想一个问题**
+
+模型让工具去读一个项目目录之外的文件，服务端该不该执行？
+
+协议不替你回答这个问题。服务端要自己加校验、权限与记录三道闸。
+
+**心智模型**
+
+!!! tip "心智模型"
+
+    - 一句话模型：每次工具调用都要过三道闸，校验参数、判断权限、留下记录。
+    - 日常类比：像公司门禁，刷卡（权限）、登记访客（审计）、核对证件（校验）三步都走完才放行。
+    - 类比不成立的地方：门禁拦不住已经进门的人，工具调用的三道闸必须在同一次请求内全部生效，缺一道就等于没有。
+
+!!! note "术语：审计日志"
+
+    审计日志是记录每一次工具调用的时间、调用方、参数与结果的持久化记录。例子：一条记录写明某会话在某个时刻调用了 `read_file`，参数是某个路径，结果是成功还是失败。
+
+**图解**
+
+```mermaid
+flowchart TD
+  A["收到 tools call"] --> B["按 inputSchema 校验参数"]
+  B -->|"不通过"| E["返回参数非法错误"]
+  B -->|"通过"| C["查权限表与限速计数"]
+  C -->|"拒绝"| F["返回权限或限速错误"]
+  C -->|"放行"| D["执行 handler"]
+  D --> G["写审计记录 成功"]
+  D -->|"抛异常"| H["写审计记录 失败并重新抛出"]
+```
+
+1. 请求进来后先做参数校验，缺参或类型不符直接拒绝。
+2. 通过校验后查权限表，判断这个工具是否在允许清单内。
+3. 同时检查限速计数，超过窗口内的次数上限就拒绝。
+4. 两道闸都放行后执行 `handler`。
+5. 执行成功时写一条成功记录，包含工具名、参数与结果。
+6. 执行抛异常时写一条失败记录，并把异常重新抛出，不能吞掉。
+7. 写记录失败不应该改变调用结果的语义，因此记录放在旁路。
+
+**一步一步来**
+
+**第 1 步：参数校验与路径收敛**
+
+路径类参数要做归一化后判断是否落在允许目录内。
+
+```js
+// 依赖：node:path（Node 20+ 内置）
+import path from "node:path";
+
+const ALLOWED_ROOT = "/srv/data";
+
+function safePath(input) {
+  // resolve 把相对路径与 .. 段全部展开成绝对路径
+  const abs = path.resolve(ALLOWED_ROOT, input);
+  // 加分隔符再比较，避免 /srv/data-other 被误判为在 /srv/data 内
+  if (abs !== ALLOWED_ROOT && !abs.startsWith(ALLOWED_ROOT + path.sep)) {
+    throw new Error("路径越界");
+  }
+  return abs;
+}
+
+// 参数校验：先查必填，再查类型，最后查业务规则
+function validateParams(schema, args) {
+  const errors = [];
+  for (const key of schema.required ?? []) {
+    if (args[key] === undefined) errors.push(`缺少必填参数 ${key}`);
+  }
+  for (const [key, rule] of Object.entries(schema.properties ?? {})) {
+    if (args[key] !== undefined && typeof args[key] !== rule.type) {
+      errors.push(`${key} 类型应为 ${rule.type}`);
+    }
+  }
+  return errors;
+}
+```
+
+**这段代码在做什么**
+
+- `path.resolve` 把 `..` 与相对段展开，越过目录的尝试会暴露在结果里。
+- 拼接分隔符再比较前缀，避免前缀相同的兄弟目录被误放行。
+- 先校验必填再校验类型，错误信息能指出具体是哪一个字段。
+- 业务规则校验放在类型校验之后，因为要先保证类型正确才能做范围判断。
+- 校验函数只返回错误数组，不抛异常，便于一次报出全部问题。
+
+**第 2 步：权限、限速与审计**
+
+三道闸按顺序执行，审计放在最后但成功与失败都要记。
+
+```js
+// 滑动窗口限速：窗口内的命中时间戳超过上限就拒绝
+function makeLimiter(max, windowMs) {
+  const hits = [];
+  return (now) => {
+    while (hits.length && now - hits[0] > windowMs) hits.shift(); // 移除过期命中
+    if (hits.length >= max) return false;
+    hits.push(now);
+    return true;
+  };
+}
+
+// 审计：先把当前批次取走再清空，避免等待落盘期间新记录被一起清掉
 class AuditLogger {
-  private entries: AuditEntry[] = []; // 缓冲区；私有保证外部只能通过 log/flush 两条通路改动它
-
-  // Omit<AuditEntry, 'timestamp'> 把 timestamp 从入参类型里剔除：调用方既不能漏填，也不能伪造时间
-  log(entry: Omit<AuditEntry, 'timestamp'>) {
-    this.entries.push({
-      ...entry, // 展开必须在前
-      timestamp: new Date().toISOString(), // 时间戳必须在后：即使调用方绕过类型检查塞了 timestamp，也会被这里覆盖。顺序在此是关键
-    });
+  #entries = [];
+  log(entry) {
+    this.#entries.push({ ...entry, timestamp: new Date().toISOString() });
   }
-
-  // 易错点/边界：下面这种"先 persist 再清空同一个数组"的写法存在竞态 ——
-  // await 让出执行权期间如果又有 log() 入队，新条目会被追加进同一个 entries，随后被 this.entries = [] 一并清掉而从未落盘。
-  // 生产实现通常先做快照再清空：const batch = this.entries; this.entries = []; await this.persist(batch);
-  async flush() {
-    // 写入持久化存储
-    await this.persist(this.entries);
-    this.entries = []; // 用重新赋值而非 length = 0：切断与正在被 persist 持有的数组引用，避免后续写入污染同一实例
+  async flush(persist) {
+    const batch = this.#entries; // 先取快照
+    this.#entries = [];          // 再换新数组，切断引用
+    await persist(batch);
   }
 }
 
-// 第 3 段：模块级单例
-// 关键数据流：整个进程只共用这一份缓冲区，保证所有工具调用的审计记录写进同一个数组，
-// 否则 flush 只能清掉自己那部分，日志会碎片化且难以按 session 聚合。
-const auditLogger = new AuditLogger();
-
-// 第 4 段：注册工具调用处理器（审计旁路：只记录，不改变主流程语义）
-server.setRequestHandler('tools/call', async (request) => {
-  const { name, arguments: args } = request.params; // arguments 是语言保留字，必须重命名为 args 才能解构
-
+// 调用入口：执行 后 记账 的顺序不能反
+async function handleCall(name, args, deps) {
+  if (!deps.allowed.has(name)) throw new Error(`工具 ${name} 不在允许清单内`);
+  if (!deps.limiter(Date.now())) throw new Error(`工具 ${name} 触发限速`);
   try {
-    const result = await executeTool(name, args); // 先执行、后记账：只有真正拿到结果才写成功记录
-    auditLogger.log({ tool: name, args, result }); // 若反过来先记账再执行，执行失败就会留下一条"假成功"记录
-    return result; // 原样透传返回值，不额外包装——审计不应该改变调用方看到的协议形态
+    const result = await deps.execute(name, args);
+    deps.audit.log({ tool: name, args, result }); // 先拿到结果再写成功记录
+    return result;
   } catch (error) {
-    // 失败路径同样留痕：保留 args 便于复现问题现场，只记 error.message 以控制日志体积
-    // 易错点：catch 变量的类型取决于 tsconfig 的 useUnknownInCatchVariables；开启时为 unknown，
-    // 严格写法应为 error instanceof Error ? error.message : String(error)，否则可能访问 undefined。
-    auditLogger.log({ tool: name, args, error: error.message });
-    throw error; // 必须重新抛出：吞掉异常会让上游误判调用成功（拿到 undefined），破坏原有错误语义
-  }
-});
-```
-## 9. MCP 集成示例
-
-### 9.1 Claude Code 中的 MCP 使用
-
-```yaml
-# ~/.claude/settings.json 或项目 .claude/settings.json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed"],
-      "env": {
-        "ALLOWED_DIRECTORIES": "/path/to/allowed"
-      }
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-      }
-    },
-    "brave-search": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-      "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      }
-    }
+    deps.audit.log({ tool: name, args, error: error.message });
+    throw error; // 必须重新抛出，否则上游会误判成功
   }
 }
 ```
 
-### 9.2 配置后可用工具
+**这段代码在做什么**
 
+- `while` 循环移除窗口外的时间戳，让计数只保留窗口内的调用。
+- 达到上限直接返回 `false`，调用方据此拒绝请求。
+- 审计先取快照再清空，避免 `await` 期间新记录被一并清掉。
+- 先执行后记账，反过来会留下一条并未真正成功的记录。
+- 失败路径同样记账，保留参数便于复现问题现场。
+- `catch` 里必须重新抛出，吞掉异常会让调用方拿到 `undefined` 并误判成功。
+
+**动手验证**
+
+```js
+// 依赖：无，仅用 Node 20+ 内置模块
+// 运行：node --input-type=module verify.mjs
+import assert from "node:assert/strict";
+import path from "node:path";
+
+const ROOT = "/srv/data";
+function safePath(input) {
+  const abs = path.resolve(ROOT, input);
+  if (abs !== ROOT && !abs.startsWith(ROOT + path.sep)) throw new Error("路径越界");
+  return abs;
+}
+
+assert.equal(safePath("reports/a.csv"), "/srv/data/reports/a.csv");
+assert.throws(() => safePath("../../etc/passwd"), /路径越界/);
+assert.throws(() => safePath("../data-other/x"), /路径越界/);
+
+// 滑动窗口限速：窗口内最多 5 次
+function makeLimiter(max, windowMs) {
+  const hits = [];
+  return (now) => {
+    while (hits.length && now - hits[0] > windowMs) hits.shift();
+    if (hits.length >= max) return false;
+    hits.push(now);
+    return true;
+  };
+}
+
+const allow = makeLimiter(5, 60_000);
+assert.deepEqual([0, 1, 2, 3, 4, 5].map((i) => allow(i)), [true, true, true, true, true, false]);
+assert.equal(allow(61_000), true, "窗口滑过后重新放行");
+
+// 审计：先取快照再清空，等待期间的新记录不会丢
+const entries = [];
+const flush = async () => {
+  const batch = entries.slice();
+  entries.length = 0;
+  await new Promise((r) => setImmediate(r));
+  return batch;
+};
+entries.push({ tool: "read_file" });
+const batch = await flush();
+assert.equal(batch.length, 1, "批次里只有快照中的记录");
+
+console.log("ok: 路径白名单 限速 审计快照 三项都生效");
 ```
-文件系统 MCP:
-  - read_file - 读取文件
-  - write_file - 写入文件
-  - list_directory - 列出目录
 
-GitHub MCP:
-  - search_repositories - 搜索仓库
-  - get_repository - 获取仓库信息
-  - create_issue - 创建 Issue
-  - create_pull_request - 创建 PR
+**运行结果**
 
-Brave Search MCP:
-  - brave_web_search - 网络搜索
-  - brave_local_search - 本地搜索
+```text
+ok: 路径白名单 限速 审计快照 三项都生效
 ```
 
-## 10. 参考资源
+**常见坑**
 
-- [MCP 官方文档](https://modelcontextprotocol.io)
-- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
-- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [MCP Servers 仓库](https://github.com/modelcontextprotocol/servers)
+| 现象 | 原因 | 怎么修 |
+| --- | --- | --- |
+| 兄弟目录被误放行 | 只比较字符串前缀，没加路径分隔符 | 比较时拼接 `path.sep`，或先判断是否等于根目录本身 |
+| 日志里出现假成功记录 | 先记账再执行，执行失败也留下了成功记录 | 先拿到执行结果再写成功记录，失败走独立分支 |
+| 上游收到 `undefined` 却以为成功 | `catch` 里没有重新抛出异常 | 记账后 `throw error`，保持原有错误语义 |
+| 审计记录整批消失 | `await` 落盘期间新记录被同一个数组清空 | 先取数组快照，再把实例字段换成新数组 |
+
+**用在哪里**
+
+- 场景一：企业内网知识库助手
+    - 业务背景：助手要读内部文档，文档分级授权，不同员工可见范围不同。
+    - 这一节的知识怎么用：按用户角色过滤资源清单，工具调用前查权限表，全程写审计。
+    - 用什么指标衡量收益：越权读取被拦截的次数，以及审计记录覆盖的调用占比。
+    - 什么时候不该用：数据本身对所有内部员工公开，权限判定只会增加延迟。
+- 场景二：代码托管平台的评审机器人
+    - 业务背景：机器人要读仓库文件、写行级评论，写操作有副作用。
+    - 这一节的知识怎么用：仓库路径收敛到工作目录内，写操作单独限速，写评论记审计。
+    - 用什么指标衡量收益：误写评论被撤回的条数，以及写入操作触发的限速次数。
+    - 什么时候不该用：仓库内容本身不适合交给模型处理时，应先在流程上阻止。
+
+**行业实践**
+
+- MCP 官方文档中关于安全与授权模型的章节讨论了信任边界与用户同意，具体章节名需核对官方文档。怎么借鉴到你的项目：把「用户是否知情并同意」写成设计评审的一项必查内容。
+- `modelcontextprotocol/servers` 仓库中文件系统参考服务器把可访问目录限制在启动参数给定的范围内。怎么借鉴到你的项目：允许目录通过启动参数传入，不要写在代码常量里。
+- Claude Code 文档的 MCP 配置章节把密钥放在 `env` 字段并引用环境变量。怎么借鉴到你的项目：仓库里只放变量名，实际值由运行环境注入。
+
+**小结**
+
+- 三道闸的顺序是校验、权限、执行，审计旁路记录成功与失败。
+- 路径类参数必须归一化后再判断，字符串前缀比较容易漏。
+- 审计不能改变调用语义，也不能吞掉异常。
+
+## 应用地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 编辑器插件接入本地代码能力 | 第 1 节的协议描述、第 3 节的注册表 | TypeScript 加 stdio 传输 | 允许目录要作为启动参数，不要写死 |
+| 后台管理批量导入校验 | 第 5 节的 `inputSchema` 与 `enum` | Python 服务端加表单前端 | 校验失败要能指到具体行与列 |
+| 客服话术与知识引用 | 第 6 节的资源与提示模板 | 资源登记文档，提示登记话术 | 文档更新频率高时改为动态生成 |
+| 数据分析只读查询 | 第 5 节的只读标注、第 7 节的限速 | SQL 工具加滑动窗口限速 | `limit` 上限要在 schema 与实现里同时限制 |
+| 多租户工具网关 | 第 4 节的客户端实例隔离 | 每租户一个客户端实例 | 能力快照必须随实例保存，不能全局共享 |
+| 代码评审机器人 | 第 7 节的路径收敛与审计 | 写操作单独限速并记录 | 写评论失败要重试，重试前先查是否已写入 |
+| 内部系统能力开放给 Agent | 第 2 节的消息格式、第 3 节的分发 | HTTP 承载同一套消息 | 错误码要稳定，客户端按码做分支 |
+
+## 动手作业
+
+**目标**：写一个可运行的最小 MCP 服务端与客户端配对程序，服务端只从允许目录读文件，客户端能完成握手、发现、调用三步。
+
+**步骤**
+
+1. 写服务端脚本 `server.mjs`，用标准输入输出按行收发 JSON。支持 `initialize`、`tools/list`、`tools/call` 三个方法。
+2. 在服务端注册一个 `read_file` 工具，`inputSchema` 要求 `path` 为字符串且必填。
+3. 服务端对 `path` 做归一化，落在允许目录之外时返回错误响应，错误码自定但要固定。
+4. 写客户端脚本 `client.mjs`，用 `child_process.spawn` 启动服务端。
+5. 客户端依次发送握手请求、初始化通知、`tools/list` 请求。
+6. 客户端调用 `read_file` 两次，一次传允许目录内的路径，一次传越界路径。
+7. 客户端打印两次调用的结果，用 `node:assert` 断言第二次返回错误。
+
+**验收标准**
+
+- 运行 `node client.mjs` 后进程正常退出，退出码为 0。
+- 标准输出里能看到工具清单包含 `read_file` 一项。
+- 越界调用的返回里含 `error` 字段，且不含 `result` 字段。
+- 服务端标准输出中只有协议报文，日志全部写到标准错误。
+- 客户端把服务端子进程在程序结束时关闭，无残留进程。
+- 断言全部通过，无未捕获异常。
+
+## 综合对比
+
+| 维度 | 厂商私有工具调用 | MCP |
+| --- | --- | --- |
+| 描述字段名 | 由各厂商规定，换宿主需改写 | 由协议规定，`name`、`description`、`inputSchema` 固定 |
+| 能力发现 | 多为静态定义，写在宿主配置里 | 通过 `tools/list` 等方法在运行时获取 |
+| 消息格式 | HTTP 加自定义结构为主 | JSON-RPC 2.0，请求、响应、通知三类 |
+| 会话状态 | 由应用自行维护 | 协议有握手阶段，双方交换能力清单 |
+| 传输方式 | HTTP 或自定义 | stdio 与 HTTP 两类，消息格式一致 |
+| 只读数据 | 通常也做成一次调用 | 单独归为资源，与工具分开列举 |
+| 提示复用 | 写在应用代码里 | 登记为提示模板，改文案不用发版 |
+| 安全边界 | 由各宿主各自实现 | 协议规定信任边界，具体闸口仍由服务端实现 |
 
 ## 深入阅读与参考
 
@@ -1285,189 +1457,68 @@ Brave Search MCP:
 |---|---|---|
 | [Hugging Face MCP Course](https://huggingface.co/learn/mcp-course) | 体系化课程，从零实现一个服务器与客户端，覆盖完整开发闭环。 | 按单元跟做，实现一个服务器加一个客户端并互通，遇到不懂处回查规范对应章节。 |
 
-## 应用与行业实践
+## 自测题
 
-### 应用场景地图
+??? question "MCP 相比厂商私有工具调用，主要减少了哪一类重复劳动？"
 
-| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
-|:--|:--|:--|:--|
-| 后台管理的万行订单表，运营问"上周退款单多少" | 工具定义与注册、资源管理 | Python SDK + 只读数据库账号 | 分页上限写在服务端，不靠模型自觉 |
-| 多人协作白板的图元增量同步 | 资源管理（订阅与变更通知） | 可长连的 HTTP 传输 | 通知里只放 uri，正文按需读 |
-| CI 失败流水线的日志排障 | 工具定义与注册、提示模板、安全考虑 | 本机 stdio 服务器 + 只挂日志目录 | 工具不给 shell，凭据只读 |
-| 本地代码仓库检索助手 | MCP 服务器实现、MCP 客户端实现 | stdio 传输，进程由 IDE 拉起 | 大文件按行区间返回，别整文件塞上下文 |
-| 内部知识库问答 | 提示模板、资源管理 | 文档暴露为资源，提示模板固定引用格式 | 引用带文档 id 与版本，便于回溯 |
-| 财务月度对账数据导出 | 资源管理（MIME 类型与分页） | 服务器生成 CSV 资源，客户端落盘 | 导出走异步任务，别在工具调用里等 |
-| 桌面 IDE 里的数据库变更评审 | 安全考虑、MCP 客户端实现 | 写操作工具 + 客户端确认 | 破坏性语句二次确认并留审计日志 |
-| 多租户 SaaS 的租户隔离问答 | 协议架构（会话与能力协商）、安全考虑 | 每会话绑定租户凭据 | 租户 id 只能来自会话，不能来自工具参数 |
+    - 减少的是能力描述层的重复劳动，不是执行算法本身。
+    - 私有方式下，每换一个宿主就要改写参数声明与结果包装。
+    - MCP 把描述字段固定下来，同一份工具实现可被多个客户端读取。
+    - 注意：安全校验、权限判断这些工作仍然要自己做，协议不代劳。
 
-### 三个场景拆解
+??? question "请求、响应、通知三种消息靠什么区分？"
 
-#### 场景 1：后台管理的万行表格，做成只读分页查询
+    - 请求带 `id`、`method`、`params`，等待响应。
+    - 成功响应带同一个 `id` 与 `result`，失败响应带同一个 `id` 与 `error`。
+    - `result` 与 `error` 不能同时出现在一条响应里。
+    - 通知没有 `id`，收发双方都不能等它回复。
 
-**业务背景**：运营要回答"上周退款单多少"，得先学会组合筛选器，翻页几十次才敢下结论。在测试库造 1 万、10 万、100 万行三档订单表，就能复现这个问题。
+??? question "为什么握手必须排在所有业务请求之前？"
 
-**怎么用本页知识解决**：思路是只暴露"按状态分页查订单"这一个工具，把表结构做成资源，全程只读。
+    - 握手阶段双方交换 `capabilities`，这是判断能否调用某方法组的依据。
+    - 服务端返回的能力清单决定客户端后续可用哪些方法组。
+    - 跳过握手直接发业务请求，服务端行为未定义。
+    - 握手后还要补发一条初始化完成通知，协议规定这一步不可省略。
 
-```python
-from mcp.server.fastmcp import FastMCP          # 引入官方 Python SDK 的 FastMCP
+??? question "服务端的注册表为什么用 Map 而不是普通对象？"
 
-mcp = FastMCP("orders-readonly")                # 服务器名写明只读用途
+    - Map 按名字查找的耗时与工具数量无关，普通数组扫描是线性增长。
+    - Map 不能直接 `JSON.stringify`，会得到空对象，必须先摊平成数组。
+    - Map 天然保证键唯一，同名注册会覆盖，因此注册前要检查重名。
+    - 用私有字段保存注册表，可以避免外部就地改写。
 
-@mcp.tool()
-def query_orders(status: str, page: int = 1, page_size: int = 50) -> dict:
-    """按状态分页查订单，page_size 上限 50。"""
-    if page_size > 50:                          # 超限直接拒绝，挡住全表拉取
-        raise ValueError("page_size 不能超过 50")
-    rows, total = db.query(status, page, page_size)  # SQL 在服务端拼，不由模型拼
-    return {"total": total, "rows": rows}       # 返回结构化数据，不做自然语言改写
+??? question "资源与工具在设计上怎么划分？"
 
-@mcp.resource("orders://schema")
-def schema() -> str:
-    return open("schema.sql").read()            # 表结构做成资源，客户端按需读取
+    - 工具是可执行动作，可能产生副作用，通过 `tools/call` 调用。
+    - 资源是只读数据端点，按标识读取，通过 `resources/read` 读取。
+    - 列表阶段资源只返回元数据，内容留到读取时再加载。
+    - 带占位符的资源标识是资源模板，客户端填值后读取具体资源。
 
-if __name__ == "__main__":
-    mcp.run()                                   # stdio 传输，进程由客户端拉起
-```
+??? question "提示模板的函数里为什么不该写业务判断？"
 
-- 工具粒度按业务动作切，不按数据表切，"按状态查订单"就是一个完整动作。
-- 分页上限、排序字段白名单都在服务端定，客户端传什么都不越界。
-- 表结构这种静态信息走资源，走一次就不再进上下文，省 token。
-- 返回结构化字段而不是拼好的句子，客户端换展示形式不用改服务器。
-- 凭据用只读账号，服务器进程没有写权限，出错也改不了数据。
+    - 提示模板只负责渲染文本，返回 `messages` 数组给客户端。
+    - 业务判断需要读取数据或产生副作用，那属于工具职责。
+    - 把业务逻辑写进模板，会让同一段逻辑在两个地方维护。
+    - 未知模板名要抛异常，不要返回空结构让客户端误判。
 
-**怎么度量收益**：看三个指标，单次问答的工具调用次数、每次调用的返回行数、`tools/call` 的 P95 耗时。测量方法：服务端日志按 session id 聚合计数，数据库侧用 `EXPLAIN` 确认走了索引，客户端用 OpenTelemetry 的 span 记录每次调用耗时。
+??? question "审计记录为什么要先取快照再清空数组？"
 
-**什么时候不该用**：
-- 目标是导出全表做离线分析，直接走数据库导出任务，别把 Agent 当 ETL。
-- 查询字段含手机号、身份证等敏感列，且没有字段级脱敏，先脱敏再接。
-- 需求本来就是一张固定报表，直接做报表页面，多一层协议只增加排查面。
+    - 落盘是异步操作，`await` 期间执行权会交出去。
+    - 若直接清空原数组，等待期间新增的记录会被一起清掉且从未落盘。
+    - 正确顺序是先取数组快照，再把字段换成新数组，切断引用。
+    - 执行成功与失败都要记录，失败路径要保留参数便于复现。
 
-#### 场景 2：多人协作白板的资源订阅与增量同步
+??? question "路径类参数的安全校验容易漏掉哪一步？"
 
-**业务背景**：多人在同一块白板画图时，客户端各自轮询服务端，一次拖拽就触发整块画布重传。用 3 人同时拖动同一组图元、每秒 20 次变更事件，就能复现带宽被拉满的情况。
+    - 只用字符串前缀比较会被同前缀的兄弟目录绕过。
+    - 必须先做路径归一化，把相对段与上级段展开成绝对路径。
+    - 比较时要拼接路径分隔符，或先判断是否等于根目录本身。
+    - 允许目录从启动参数传入，不要写成代码里的固定常量。
 
-**怎么用本页知识解决**：思路是把白板状态做成资源，客户端订阅它，服务端改完只发变更通知，客户端收到通知再回来读。
+## 延伸阅读
 
-```python
-# 客户端连接时声明订阅能力，服务端据此记录这条会话
-caps = {"resources": {"subscribe": True}}
-session = await mcp_connect(url, capabilities=caps)
-
-# 订阅房间 42 的白板状态
-await session.request("resources/subscribe", {"uri": "board://room-42"})
-
-# 图元变更后只递增版本号，通知里不带画布正文
-board.version += 1
-await session.notify("notifications/resources/updated",
-                     {"uri": "board://room-42"})
-
-# 客户端收到通知才去读资源，按版本号决定是否应用
-snap = await session.request("resources/read", {"uri": "board://room-42"})
-if snap["version"] > local.version:
-    local.apply(snap["delta"])
-
-# 会话断开时取消订阅，服务端不留失效订阅
-await session.request("resources/unsubscribe", {"uri": "board://room-42"})
-```
-
-- 上面写的是协议层方法名，各语言 SDK 的封装函数名不同，按所用 SDK 版本核对。
-- 订阅代替轮询，空闲会话不再产生请求。
-- 通知只带 uri，正文由客户端主动读，服务端不必为每个会话准备推送负载。
-- 版本号比较让重复通知变成空操作，弱网重发不会重复应用。
-- 取消订阅要跟会话生命周期绑定，否则服务端订阅表会堆积失效项。
-
-**怎么度量收益**：看每会话消息数、从发出通知到本地渲染完成的延迟、版本号落后于服务端的会话占比。测量方法：浏览器开发者工具的 Network 面板导出 WebSocket 帧计数，服务端接入层按 session id 打点，客户端在通知回调和渲染完成处各调一次 `performance.now()`。
-
-**什么时候不该用**：
-- 变更细到每次指针移动，走专门的二进制同步通道，别把每个点都塞进资源通知。
-- 边缘节点不保存会话状态，维护不了订阅表，改用版本号轮询。
-- 白板只有单人使用，本地状态就够，订阅机制没有收益。
-
-#### 场景 3：CI 失败流水线的日志排障助手
-
-**业务背景**：流水线失败后，开发要在几百行日志里找根因，还要分辨是编译、测试还是环境问题。本地跑一个失败用例，把完整日志打开，就能复现这个翻日志的过程。
-
-**怎么用本页知识解决**：思路是先缩小范围再取细节，工具只做"列失败步骤"和"按关键字抓日志"，依赖清单走资源，提示模板固定排障顺序。
-
-```python
-from mcp.server.fastmcp import FastMCP       # 官方 Python SDK 的 FastMCP
-mcp = FastMCP("ci-triage")                   # 只读排障服务器
-
-@mcp.tool()
-def list_failed_steps(run_id: str) -> list:
-    return ci.failed_steps(run_id)           # 只返回步骤名与退出码，不返回日志
-
-@mcp.tool()
-def grep_log(run_id: str, step: str, pattern: str, limit: int = 200) -> list:
-    lines = ci.log_lines(run_id, step, pattern)
-    return lines[:limit]                     # 截断，避免灌满上下文窗口
-
-@mcp.resource("ci://runs/{run_id}/lockfile")
-def lockfile(run_id: str) -> str:
-    return ci.read_artifact(run_id, "lockfile")   # 依赖清单按资源暴露
-
-@mcp.prompt()
-def triage(run_id: str) -> str:
-    return "先列失败步骤，再按关键字 grep，最后对照 lockfile"   # 固定排障顺序
-```
-
-- 两个工具的返回量都被限制，"列步骤"给名字，"抓日志"给行数和 limit。
-- 依赖清单属于静态材料，放资源，需要时读一次。
-- 提示模板把排障顺序写死，模型不会一上来就拉全量日志。
-- 服务器进程只挂日志目录、只持只读令牌，排障助手改不了流水线。
-- 需要核对：`@mcp.prompt()` 的返回类型在你用的 SDK 版本里是否支持纯字符串。
-
-**怎么度量收益**：看从流水线失败到定位到具体步骤的时长、平均对话轮数、权限中间件拦截的调用次数。测量方法：CI 系统里取失败时间戳与修复提交时间戳求差，服务端日志统计每会话的 `tools/call` 次数，权限中间件对拒绝请求单独计数。
-
-**什么时候不该用**：
-- 日志里混有密钥或令牌且没有脱敏环节，先建脱敏管道再接。
-- 需要模型直接重跑流水线或改配置，写操作保留人工确认，别让模型直连 CI 写接口。
-- 失败原因不在日志里（例如集群容量、上游依赖限流），先接入监控指标再谈。
-
-### 行业先进实践
-
-工具输入用 JSON Schema 描述并设边界（出处：MCP 官方文档 Specification 的 Tools 章节）
-规范规定工具的 `inputSchema` 用 JSON Schema 描述，客户端在调用前就能校验参数。校验点落在模型输出与真实调用之间，非法参数到不了业务代码。可以借鉴的做法是给每个参数写明类型、取值范围、枚举值，服务端收到后再校验一次。
-
-参考服务器按单一职责拆分（出处：开源项目 modelcontextprotocol/servers）
-该项目把文件系统、Git、抓取等能力拆成各自独立的服务器，每个只暴露一类工具。这样权限边界和进程边界重合，读文件的服务器不需要网络权限，出问题时影响范围可控。可以借鉴的做法是按数据源拆服务器，不按业务页面拆。
-
-工具调用前向用户确认（出处：Claude Desktop 官方文档中关于连接 MCP 服务器的说明）
-客户端在调用工具前给出权限提示，用户可以选择本次允许或拒绝。控制权留在使用者手里，不可逆操作不会因为一次误触发而执行。可以借鉴的做法是把写操作、外发网络请求、跨目录读取标成需确认，读操作默认放行；提示的触发范围和配置项名称需核对官方文档。
-
-传输方式按部署位置选（出处：MCP 官方文档 Specification 的 Transports 章节）
-规范定义了 stdio 与基于 HTTP 的传输。stdio 的服务器进程由客户端在同一台机器上拉起，适合本机能力；团队共用的服务器走 HTTP 传输，多个客户端能连同一个端点。可以借鉴的做法是本机工具用 stdio，共享工具用 HTTP，不要用 stdio 做跨机器共享。
-
-授权走 OAuth 流程（出处：需核对官方文档：核对 Specification 中 Authorization 章节采用的 OAuth 版本、资源服务器角色与资源指示符字段名）
-远程服务器要代表用户访问第三方资源，凭据不能放在工具参数里随对话流传。核对清楚后再落到设计中，不要照抄旧版示例里的鉴权写法。
-
-### 从学到用：落地路线
-
-第 1 步试点：选一个只读、出错不影响生产的场景，在开发机上用 stdio 起服务器，由单个客户端接入。验收标准是团队照文档能在 15 分钟内跑通 `tools/list` 并成功调用一次工具。
-
-第 2 步验证：用固定任务集在接入前后各跑一遍，记录完成时间、工具调用次数、失败原因分布。验收标准是任务集里每条任务都有前后对照记录，每个失败都能归到具体工具或参数。
-
-第 3 步推广：把工具定义模板、凭据申请流程、审计日志字段固定成清单，新场景按清单提交评审。验收标准是新服务器的 schema、权限声明、日志字段三项能对着清单逐条勾选。
-
-第 4 步防回退：在 CI 里跑协议层契约测试，工具 schema 变更必须评审，同时保留一键关闭入口。验收标准是改坏 schema 的提交会被 CI 拦住，关闭开关的演练能在一分钟内生效。
-
-### 动手作业
-
-目标：为本地代码仓库写一个只读 MCP 服务器，提供"列目录""按行读文件""关键字检索"三个工具，再暴露一个仓库概览资源。
-
-步骤：
-1. 定边界：只读、限制在仓库根目录内、禁止符号链接跳出目录。
-2. 为三个工具写输入 schema，标明类型、取值范围、默认值。
-3. 实现列目录与按行读文件，行区间上限设为 200 行。
-4. 实现关键字检索，返回文件名加行号，限制命中条数。
-5. 把文件清单与 README 前若干行暴露成一个资源。
-6. 写一个提示模板，规定先列目录、再检索、最后读行。
-7. 用真实客户端接入，记录每次调用的耗时与返回字节数。
-
-验收标准：
-- 传入 `../../etc/passwd` 形式的路径时，服务器拒绝并返回可读的错误说明。
-- 请求超过 200 行的区间时，返回被截断的结果并标明上限。
-- 三个工具的 schema 都能被客户端解析，缺少必填参数时报错信息能指出是哪个参数。
-- 服务器日志能看到每次调用的工具名、参数摘要、耗时。
-- 关掉服务器进程后，客户端能识别连接断开并给出提示。
-
+- MCP 官方文档：介绍章节、架构章节、传输章节、工具章节、资源章节、提示章节、安全与授权模型章节（具体章节名需核对官方文档）。
+- MCP Python SDK 仓库 README：快速开始与 FastMCP 装饰器用法部分。
+- MCP TypeScript SDK 仓库 README：服务端与客户端最小示例部分。
+- MCP Servers 仓库：参考服务器列表与各服务器 README。
+- Claude Code 文档：MCP 配置章节中 `mcpServers` 字段的说明与环境变量注入方式（字段细节需核对官方文档）。

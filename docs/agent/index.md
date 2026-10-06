@@ -16,6 +16,8 @@ tags:
     - 在“文件记忆、向量检索、知识图”之间做选型，并用 pgvector 搭出一个可评测的检索系统。
     - 设计一套从“零权限”到“沙箱加审批加审计”的权限体系，并说明提示注入为什么没有银弹。
     - 判断一个任务该用单 Agent 还是多 Agent，并说出多 Agent 最常见的失败方式。
+    - 说清生产级编码 agent 如何存会话与记忆（例如 Codex 的 JSONL 加 SQLite 混合方案），并手写一个。
+    - 跟着七天课程，从零写出一个能读写文件、执行命令、带权限与压缩的编码智能体。
 
 ## 0. 学习路径图
 
@@ -25,7 +27,8 @@ flowchart TD
   B --> C["第 3 部分 另一种设计 DeepSeek Harness"]
   B --> D["第 4 部分 上下文与压缩"]
   D --> E["第 5 部分 记忆系统"]
-  E --> F["第 6 部分 RAG 与向量检索"]
+  E --> E2["第 5.5 部分 会话与记忆的存储"]
+  E2 --> F["第 6 部分 RAG 与向量检索"]
   B --> G["第 7 部分 权限 沙箱 安全"]
   B --> H["第 8 部分 推理 规划 工具"]
   D --> I["第 9 部分 多 Agent"]
@@ -33,6 +36,8 @@ flowchart TD
   I --> J["第 10 部分 评测 成本 运维"]
   H --> K["第 11 部分 架构与框架参考"]
   J --> L["第 12 部分 案例研究"]
+  B --> M["第 13 部分 七天手写 MiniCode"]
+  L --> M
 ```
 
 **怎么读这张图**：
@@ -42,7 +47,7 @@ flowchart TD
 - 第 9 部分（多 Agent）放在后面，是因为它依赖前面所有内容，而且很多场景根本不需要它。
 - 第 11、12 部分是参考资料，需要时查阅。
 
-## 1. 十二个部分分别解决什么问题
+## 1. 各部分分别解决什么问题
 
 | 部分 | 解决的问题 | 起点页面 |
 |---|---|---|
@@ -51,6 +56,7 @@ flowchart TD
 | 3. 另一种设计：DeepSeek Harness | 同样的问题，插件化的设计怎么做 | [DeepSeek Harness 架构](harness/deepseek-harness-architecture.md) |
 | 4. 上下文工程与压缩 | 窗口有限、越长越笨，怎么办 | [上下文膨胀](context/context-bloat-and-rot.md) |
 | 5. 记忆系统 | 跨会话怎么记住该记住的 | [Agent 记忆全景](memory/memory-taxonomy.md) |
+| 5.5 会话与记忆的存储 | 会话和记忆真正存在哪：JSONL、SQLite 还是两者结合 | [会话与记忆存储全景](storage/session-storage-overview.md) |
 | 6. RAG 与向量检索 | 知识太多放不进上下文，怎么检索 | [pgvector 从零开始](rag/pgvector-from-zero.md) |
 | 7. 权限、沙箱与安全 | agent 能做事，就能做坏事 | [权限模型光谱](security/permission-models-spectrum.md) |
 | 8. 推理、规划与工具 | 怎么让 agent 想得清楚、用得对工具 | [ReAct 模式](reasoning/react-pattern.md) |
@@ -58,6 +64,7 @@ flowchart TD
 | 10. 评测、成本与运维 | 怎么知道它变好了，花了多少钱 | [Agent 评测从零搭建](ops/agent-evals-from-scratch.md) |
 | 11. 架构与框架参考 | 分层架构、LangChain、LangGraph 等怎么选 | [分层架构总览](architecture/layered-architecture.md) |
 | 12. 案例研究 | 真实产品的架构怎么做的 | [Claude Code 源码剖析](case-studies/claude-code-analysis.md) |
+| 13. 七天手写 MiniCode | 动手从零做一个 Claude Code 式编码智能体 | [课程总览](../minicode/index.md) |
 
 ## 2. 每一页的固定结构
 
