@@ -904,10 +904,25 @@ class RetryBoundary extends Component {
 // 依赖：无。保存为 error-boundary.mjs，运行：node error-boundary.mjs
 import assert from 'node:assert/strict';
 
+let failingResource;                                     // 失败资源跨渲染复用，失败状态才能被后续读取看到
+
 function createFailingResource() {
-  const promise = Promise.reject(new Error('HTTP 500')); // 模拟接口失败
+  if (failingResource) return failingResource;           // 同一个资源：第一次读取挂起，失败后再读抛真错误
+  let settled = false;                                   // 底层 Promise 是否已经拒绝
+  let error;                                             // 保存真实错误
+  const promise = Promise.reject(new Error('HTTP 500')).catch(err => {
+    settled = true;
+    error = err;
+    throw err;                                           // 保留拒绝状态，交给调用方处理
+  });
   promise.catch(() => {});                               // 避免未处理的拒绝告警
-  return { read() { throw promise; } };
+  failingResource = {
+    read() {
+      if (settled) throw error;                          // 已失败：抛真错误，交给错误边界
+      throw promise;                                     // 挂起：抛 Promise 作为凭证
+    },
+  };
+  return failingResource;
 }
 
 function createOkResource(value) {

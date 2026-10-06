@@ -401,6 +401,37 @@ flowchart TD
 这一步要做什么：选择文件后，用 readAsDataURL 读取为 base64 数据地址用于预览。
 
 ```javascript
+// Node 20+ 没有 DOM，提供最小 document 与 FileReader 兼容实现
+class FileReader {
+  onload = null;
+  onerror = null;
+  error = null;
+  result = null;
+  readAsDataURL(blob) {
+    blob.arrayBuffer().then((arrayBuffer) => {
+      this.result = `data:${blob.type || "application/octet-stream"};base64,${Buffer.from(arrayBuffer).toString("base64")}`;
+      this.onload?.({ target: this });
+    }).catch((err) => {
+      this.error = err;
+      this.onerror?.();
+    });
+  }
+}
+const picker = {
+  files: [new Blob(["hello"], { type: "text/plain" })],
+  addEventListener(type, handler) {
+    if (type === "change") this.onChange = handler;
+  }
+};
+const preview = { src: "" };
+const document = {
+  getElementById(id) {
+    if (id === "picker") return picker;
+    if (id === "preview") return preview;
+    return null;
+  }
+};
+
 const input = document.getElementById("picker");
 input.addEventListener("change", () => {
   const reader = new FileReader(); // 新建读卡器
@@ -411,6 +442,9 @@ input.addEventListener("change", () => {
   reader.onerror = () => console.error(reader.error); // 失败回调
   reader.readAsDataURL(input.files[0]); // 开始读取
 });
+input.onChange(); // 触发 change 事件
+await new Promise((resolve) => setImmediate(resolve)); // 等待读取完成
+console.log(preview.src); // 输出预览地址
 ```
 
 **这段代码在做什么**
@@ -478,7 +512,7 @@ assert.equal(new TextDecoder().decode(ab), "读取测试");
 const chunks = [];
 for await (const chunk of blob.stream()) chunks.push(chunk);
 assert.equal(await new Blob(chunks).text(), "读取测试");
-assert.ok(chunks.every((c) => c instanceof Uint8Array));
+assert.ok(chunks.every((c) => Object.prototype.toString.call(c) === "[object Uint8Array]"));
 console.log("断言通过：两路读取结果一致，块均为 Uint8Array");
 ```
 
@@ -537,12 +571,17 @@ sequenceDiagram
 这一步要做什么：把 canvas 导出的图片 Blob 变成 img 可显示地址。
 
 ```javascript
-const canvas = document.getElementById("canvas");
+const canvas = {
+  toBlob(callback) {
+    callback(new Blob(["canvas"], { type: "image/png" })); // 模拟画布导出的 Blob
+  }
+};
+const img = typeof preview !== "undefined" ? preview : { src: "" }; // 复用已有预览对象或提供模拟元素
 canvas.toBlob((blob) => {
   const url = URL.createObjectURL(blob); // 生成临时地址
-  const img = document.getElementById("preview");
   img.src = url; // 引擎按地址取字节
   img.onload = () => URL.revokeObjectURL(url); // 加载后释放
+  img.onload(); // Node 没有图片加载事件，手动触发释放
 });
 ```
 

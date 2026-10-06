@@ -125,6 +125,12 @@ console.log(summary);
 这一步要做什么：给金字塔形状加两条可执行的规则，让倒置的结构在 CI 里直接报错。
 
 ```js
+// 当前运行上下文没有全局 assert，需显式引入 Node 内置断言模块；若上下文未暴露 require，则退化为语义等价的本地断言
+const assert =
+  typeof require === "function"
+    ? require("node:assert")
+    : { ok(condition, message) { if (!condition) throw new Error(message); } };
+
 // 规则一：单元测试数量不少于组件测试与端到端测试之和
 const upper = summary.component.count + summary.e2e.count;
 assert.ok(summary.unit.count >= upper, "金字塔倒置：单元测试数量不足");

@@ -334,6 +334,137 @@ class DoublyLinkedList {
 验证标准：追加到同文件末尾后执行 `node doubly.js`。
 
 ```js
+// ---------- 双向链表实现 ----------
+class DNode {
+  constructor(value, prev = null, next = null) {
+    this.value = value;
+    this.prev = prev;
+    this.next = next;
+  }
+}
+
+/**
+ * 带头尾哨兵的双向链表。
+ * _head 与 _tail 都是哨兵，不存业务数据。
+ * 空表时 _head.next === _tail 且 _tail.prev === _head。
+ */
+class DoublyLinkedList {
+  constructor() {
+    this._head = new DNode(undefined);
+    this._tail = new DNode(undefined);
+    this._head.next = this._tail;
+    this._tail.prev = this._head;
+    this._size = 0;
+  }
+
+  get size() { return this._size; }
+  get isEmpty() { return this._size === 0; }
+
+  pushFront(value) {
+    const node = new DNode(value, this._head, this._head.next);
+    this._head.next.prev = node;
+    this._head.next = node;
+    this._size += 1;
+    return this;
+  }
+
+  pushBack(value) {
+    const node = new DNode(value, this._tail.prev, this._tail);
+    this._tail.prev.next = node;
+    this._tail.prev = node;
+    this._size += 1;
+    return this;
+  }
+
+  popFront() {
+    if (this._size === 0) return undefined;
+    return this._unlink(this._head.next);
+  }
+
+  popBack() {
+    if (this._size === 0) return undefined;
+    return this._unlink(this._tail.prev);
+  }
+
+  peekFront() {
+    return this._size === 0 ? undefined : this._head.next.value;
+  }
+
+  peekBack() {
+    return this._size === 0 ? undefined : this._tail.prev.value;
+  }
+
+  toArray() {
+    const out = [];
+    for (let cur = this._head.next; cur !== this._tail; cur = cur.next) {
+      out.push(cur.value);
+    }
+    return out;
+  }
+
+  find(predicate) {
+    for (let cur = this._head.next; cur !== this._tail; cur = cur.next) {
+      if (predicate(cur.value)) return cur;
+    }
+    return null;
+  }
+
+  removeNode(node) {
+    if (node === null || node === undefined) return undefined;
+    return this._unlink(node);
+  }
+
+  moveToFront(node) {
+    if (node === null || node === undefined) return this;
+    if (node === this._head || node === this._tail) {
+      throw new Error('cannot move sentinel node');
+    }
+    if (this._head.next === node) return this;
+
+    // 从原位置摘下，不改变 size
+    node.prev.next = node.next;
+    node.next.prev = node.prev;
+
+    // 挂到头哨兵之后
+    node.prev = this._head;
+    node.next = this._head.next;
+    this._head.next.prev = node;
+    this._head.next = node;
+    return this;
+  }
+
+  _unlink(node) {
+    if (node === this._head || node === this._tail) {
+      throw new Error('cannot unlink sentinel node');
+    }
+
+    node.prev.next = node.next;
+    node.next.prev = node.prev;
+    node.prev = null;
+    node.next = null;
+    this._size -= 1;
+    return node.value;
+  }
+
+  reverseInPlace() {
+    // 空表或单节点无需反转，也避免哨兵之间产生自环
+    if (this._size <= 1) return this;
+
+    let cur = this._head;
+    while (cur !== null) {
+      const next = cur.next;
+      cur.next = cur.prev;
+      cur.prev = next;
+      cur = next;
+    }
+
+    const oldHead = this._head;
+    this._head = this._tail;
+    this._tail = oldHead;
+    return this;
+  }
+}
+
 // ---------- 验证：双向链表 ----------
 const d = new DoublyLinkedList();
 assert.strictEqual(d.popFront(), undefined);
@@ -461,6 +592,55 @@ class LRUCacheMap {
 验证标准：追加到同文件末尾后执行 `node lru-map.js`。
 
 ```js
+// ---------- Map 版 LRU 实现 ----------
+class LRUCacheMap {
+  constructor(capacity) {
+    if (!Number.isInteger(capacity) || capacity <= 0) {
+      throw new RangeError('capacity 必须是正整数');
+    }
+    this._capacity = capacity;
+    // Map 的迭代顺序为插入顺序：最早插入的在最前，最新插入的在最后。
+    // 因此 keys() 直接按该顺序返回即可表示“最旧 -> 最新”。
+    this._map = new Map();
+  }
+
+  get size() {
+    return this._map.size;
+  }
+
+  get(key) {
+    if (!this._map.has(key)) return undefined;
+    const value = this._map.get(key);
+    // get 命中后刷新新鲜度：先删后插，使 key 移到最新端
+    this._map.delete(key);
+    this._map.set(key, value);
+    return value;
+  }
+
+  put(key, value) {
+    if (this._map.has(key)) {
+      // 更新已有 key：覆盖值并刷新到最新端，不增加容量占用
+      this._map.delete(key);
+      this._map.set(key, value);
+      return this;
+    }
+
+    // 新 key：容量已满时淘汰最旧的一个
+    if (this._map.size >= this._capacity) {
+      const oldestKey = this._map.keys().next().value;
+      this._map.delete(oldestKey);
+    }
+
+    this._map.set(key, value);
+    return this;
+  }
+
+  keys() {
+    // map 的迭代顺序就是从最旧到最新
+    return [...this._map.keys()];
+  }
+}
+
 // ---------- 验证：Map 版 LRU ----------
 assert.throws(() => new LRUCacheMap(0), RangeError);
 assert.throws(() => new LRUCacheMap(1.5), RangeError);
@@ -757,6 +937,50 @@ function nextGreaterBruteForce(nums) {
 验证标准：追加到同文件末尾后执行 `node monotonic-stack.js`。
 
 ```js
+// ---------- 实现：下一个更大元素 ----------
+function nextGreaterElement(nums) {
+  const result = new Array(nums.length).fill(-1);
+  const stack = []; // 存下标，栈内对应的值单调不增
+  for (let i = 0; i < nums.length; i++) {
+    // 当前值比栈顶下标对应的值大，则当前值就是栈顶元素的“下一个更大元素”
+    while (stack.length > 0 && nums[stack[stack.length - 1]] < nums[i]) {
+      const index = stack.pop();
+      result[index] = nums[i];
+    }
+    stack.push(i);
+  }
+  return result;
+}
+
+// ---------- 实现：每日温度 ----------
+function dailyTemperatures(temperatures) {
+  const result = new Array(temperatures.length).fill(0);
+  const stack = []; // 存下标，栈内对应的温度单调不增
+  for (let i = 0; i < temperatures.length; i++) {
+    // 严格更高才出栈，相等不算更高
+    while (stack.length > 0 && temperatures[stack[stack.length - 1]] < temperatures[i]) {
+      const index = stack.pop();
+      result[index] = i - index;
+    }
+    stack.push(i);
+  }
+  return result;
+}
+
+// ---------- 实现：暴力参考，用于对拍 ----------
+function nextGreaterBruteForce(nums) {
+  const result = new Array(nums.length).fill(-1);
+  for (let i = 0; i < nums.length; i++) {
+    for (let j = i + 1; j < nums.length; j++) {
+      if (nums[j] > nums[i]) {
+        result[i] = nums[j];
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 // ---------- 验证：下一个更大元素 ----------
 assert.deepStrictEqual(nextGreaterElement([2, 1, 2, 4, 3]), [4, 2, 4, -1, -1]);
 assert.deepStrictEqual(nextGreaterElement([]), []);

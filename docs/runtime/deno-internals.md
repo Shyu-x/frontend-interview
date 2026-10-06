@@ -119,8 +119,8 @@ const entries = [
 
 // 原生函数以 op_ 开头
 assert.ok(entries.some((e) => e.name.startsWith("op_")));
-// 包装函数位于 .js 文件
-assert.ok(entries.some((e) => e.location.endsWith(".js")));
+// 包装函数位于 .js 文件（location 形如 "文件路径:行号"，需先取文件名部分再判断后缀）
+assert.ok(entries.some((e) => e.location.split(":")[0].endsWith(".js")));
 // 每个条目都有位置标注
 assert.ok(entries.every((e) => e.location.length > 0));
 

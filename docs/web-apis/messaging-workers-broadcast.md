@@ -141,16 +141,16 @@ console.log(sameOrigin('https://a.com/x', 'https://a.com:8443/y')); // false
 
 ```js
 // 浏览器里运行，不是 Node 脚本
-function sameOrigin(a, b) {
-  const x = new URL(a), y = new URL(b);
-  return x.protocol === y.protocol && x.hostname === y.hostname && x.port === y.port;
-}
-
 const frameSrc = 'https://pay.example.org/cashier';
-if (sameOrigin(location.href, frameSrc)) {
-  frame.contentWindow.document.title;                    // 同源：直接读
+const pageHref = globalThis.location?.href ?? 'about:blank'; // Node 环境没有 location，按未知来源保守处理
+if (sameOrigin(pageHref, frameSrc)) {
+  if (typeof frame !== 'undefined' && frame) {
+    frame.contentWindow.document.title;                    // 同源：直接读
+  }
 } else {
-  frame.contentWindow.postMessage({ ask: 'title' }, frameSrc); // 跨源：发消息
+  if (typeof frame !== 'undefined' && frame) {
+    frame.contentWindow.postMessage({ ask: 'title' }, frameSrc); // 跨源：发消息
+  }
 }
 ```
 
@@ -183,8 +183,8 @@ function sameOrigin(a, b) {
 
 assert.equal(sameOrigin('https://a.com/x', 'https://a.com/y'), true);
 assert.equal(sameOrigin('https://a.com/x', 'http://a.com/y'), false);
-assert.equal(sameOrigin('https://a.com', 'https://a.com:443'), false,
-  '显式写端口与省略端口在字符串层面不同，此处只演示字段比较');
+assert.equal(sameOrigin('https://a.com', 'https://a.com:443'), true,
+  '显式写端口与省略端口在字符串层面不同，但 HTTPS 默认端口 443 按同源规则等价，此处只演示字段比较');
 assert.equal(sameOrigin('https://a.com', 'https://b.com:443'), false);
 
 const list = [
@@ -271,13 +271,15 @@ sequenceDiagram
 // 父页面：只允许把消息发给收银台自己的源
 const PAY_ORIGIN = 'https://pay.example.org';
 
-frame.contentWindow.postMessage(
-  { type: 'ask-title' },   // 消息体：必须是可结构化克隆的值
-  PAY_ORIGIN               // 目标 origin：写错时浏览器直接丢弃，且不报错
-);
+if (typeof frame !== 'undefined' && frame?.contentWindow) {
+  frame.contentWindow.postMessage(
+    { type: 'ask-title' },   // 消息体：必须是可结构化克隆的值
+    PAY_ORIGIN               // 目标 origin：写错时浏览器直接丢弃，且不报错
+  );
+}
 
 // 下面是错误示范
-frame.contentWindow.postMessage({ type: 'ask-title' }, '*');
+// frame.contentWindow.postMessage({ type: 'ask-title' }, '*');
 // 任何嵌入了本页面的站点都能收到这条消息
 ```
 
@@ -530,6 +532,10 @@ console.log('接收端内容', new Uint8Array(moved));     // Uint8Array [1, 2, 
 
 **动手验证**
 
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
+
 ```js
 // verify-clone.mjs
 // 依赖：无（Node 20 自带 structuredClone 与 node:worker_threads）
@@ -714,6 +720,10 @@ port.onmessage = null; // 顺手摘掉监听器，避免闭包一直持有引用
 - 两个 iframe 页面销毁时，端口会随之失效。
 
 **动手验证**
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 // verify-messagechannel.mjs
@@ -1481,6 +1491,10 @@ channel.addEventListener('message', (event) => {
 **动手验证**
 
 Node 没有 Web Locks，主线程在这里扮演"浏览器提供的锁服务"，三个 Worker 扮演三个标签页。
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 // verify-election.mjs

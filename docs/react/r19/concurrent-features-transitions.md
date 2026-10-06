@@ -116,7 +116,6 @@ console.log('让出版本每片之间允许其他任务先运行')
 ```javascript
 // 目录：concurrent-basic/verify.js
 import assert from 'node:assert'
-import { setImmediate as setImmediatePromise } from 'node:timers/promises'
 
 let urgentRan = false
 let backgroundRan = false
@@ -125,7 +124,7 @@ async function scheduleWork() {
   setImmediate(() => {
     backgroundRan = true
   })
-  await setImmediatePromise()
+  await Promise.resolve()
   urgentRan = true
 }
 

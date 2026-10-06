@@ -84,14 +84,14 @@ function makeIterable(values) {
   assert.deepStrictEqual(log, ['next#1', 'next#2', 'return']);
 }
 
-// 用例 2：右侧值不够 -> 第 3 个标识符仍会再调用一次 next()，拿到 done: true
+// 用例 2：右侧值不够 -> 第 2 次 next() 就拿到 done: true，解构停止，剩余标识符直接赋 undefined
 {
   const { iterable, log } = makeIterable(['x']);
   const [a, b, c] = iterable;
   assert.strictEqual(a, 'x');
   assert.strictEqual(b, undefined);
   assert.strictEqual(c, undefined);
-  assert.deepStrictEqual(log, ['next#1', 'next#2', 'next#3']);
+  assert.deepStrictEqual(log, ['next#1', 'next#2']);
 }
 
 // 用例 3：纯类数组对象没有 Symbol.iterator -> TypeError

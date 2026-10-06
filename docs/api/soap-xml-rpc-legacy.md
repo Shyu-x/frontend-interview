@@ -185,7 +185,11 @@ async function call(method, args) {
     body: JSON.stringify(args),
   });
   if (res.status !== 200) throw new Error(`transport failed: ${res.status}`);
-  return (await res.json()).result;
+  // 取回文本后由当前运行环境自己的 JSON.parse 解析：
+  // fetch 内部使用宿主环境的 JSON.parse，产出的对象原型属于另一个 realm，
+  // 结构虽然相同，却通不过 deepStrictEqual 的原型比较。
+  const text = await res.text();
+  return JSON.parse(text).result;
 }
 
 assert.deepEqual(await call('/GetPoints', { userId: 7 }), { points: 70 });
@@ -727,6 +731,27 @@ flowchart TD
 第 2 步要做什么：写一个小提取器，从 WSDL 文本里取出端点和操作名。
 
 ```js
+const wsdl = `<?xml version="1.0"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:tns="urn:member"
+  targetNamespace="urn:member">
+  <portType name="MemberPortType">
+    <operation name="GetPoints"/>
+  </portType>
+  <binding name="MemberBinding" type="tns:MemberPortType">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="GetPoints">
+      <soap:operation soapAction="urn:member/GetPoints"/>
+    </operation>
+  </binding>
+  <service name="MemberService">
+    <port name="MemberPort" binding="tns:MemberBinding">
+      <soap:address location="http://127.0.0.1:3000/member"/>
+    </port>
+  </service>
+</definitions>`;  // WSDL 文档，包含服务地址、操作与 soapAction
+
 function extractService(wsdl) {
   const location = (wsdl.match(/<soap:address\s+location="([^"]+)"/) ?? [])[1];
   const portType = wsdl.match(/<portType[^>]*>([\s\S]*?)<\/portType>/);   // 取抽象操作区
@@ -947,6 +972,10 @@ async function fetchPoints(endpoint, userId) {
 运行结果：`userId` 等于 7 时返回 `70`；上游返回 Fault 时抛出 `upstream soap fault`。
 
 **动手验证**
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 // 运行环境：Node 20 或以上，无第三方依赖

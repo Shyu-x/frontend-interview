@@ -697,21 +697,51 @@ console.log(`标量点积 ${s} 耗时 ${(performance.now() - t0).toFixed(2)} ms`
 // 目的：四线程切片求和的调用形态
 import { Worker } from "node:worker_threads";
 
-const shared = new SharedArrayBuffer(8);      // 存放最终结果
-const out = new Float64Array(shared);         // 结果视图
+const THREADS = 4;                              // 线程数
+const TOTAL = 1_000_000;                        // 元素总数
+const a = new Float64Array(TOTAL);              // 左向量
+const b = new Float64Array(TOTAL);              // 右向量
+for (let i = 0; i < TOTAL; i++) {               // 构造便于核对的数据
+  a[i] = 1;
+  b[i] = 1;
+}
+
+const shared = new SharedArrayBuffer(THREADS * 8); // 每个线程一个 Float64 槽位
+const out = new Float64Array(shared);           // 结果视图
 
 const workerSrc = `                              // 每个 worker 执行的源码
-  import { parentPort, workerData } from "node:worker_threads";
-  const { a, b, start, end, shared } = workerData;
+  const { parentPort, workerData } = require("node:worker_threads");
+  const { a, b, start, end, shared, idx } = workerData;
   let sum = 0;
   for (let i = start; i < end; i++) sum += a[i] * b[i];
   const out = new Float64Array(shared);
-  Atomics.add(out, 0, sum);
+  out[idx] = sum;                               // 写入本线程槽位 避免 Float64 无法 Atomics.add
   parentPort.postMessage("done");
 `;
 
-const THREADS = 4;                              // 线程数
 const chunk = Math.floor(a.length / THREADS);   // 每段长度
+
+const jobs = [];                                // 所有 worker 的完成承诺
+for (let t = 0; t < THREADS; t++) {
+  const start = t * chunk;                      // 本线程起点
+  const end = t === THREADS - 1 ? a.length : start + chunk; // 最后一段接住余数
+  jobs.push(new Promise((resolve, reject) => {
+    const w = new Worker(workerSrc, {
+      eval: true,                               // 内联源码直接执行
+      workerData: { a, b, start, end, shared, idx: t },
+    });
+    w.once("message", resolve);                 // 收到 done 即完成
+    w.once("error", reject);                    // 任何错误都拒绝
+    w.once("exit", (code) => {                  // 非零退出码视为失败
+      if (code !== 0) reject(new Error("worker exit " + code));
+    });
+  }));
+}
+
+await Promise.all(jobs);                        // 等待四线程全部完成
+let total = 0;
+for (let t = 0; t < THREADS; t++) total += out[t];
+console.log(total);                             // 期望 1000000
 ```
 
 **这段代码在做什么**
@@ -1321,6 +1351,10 @@ assert.ok(jm > 0 && wm > 0);
 **动手验证**
 
 把四步合成一个文件，依赖只有 Node 20+ 自带模块。
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 // 依赖：无   运行：node bench.mjs

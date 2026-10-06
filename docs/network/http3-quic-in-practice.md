@@ -1157,9 +1157,8 @@ function summarize(events) {
   const http = events.find((e) => e.kind === 'http_frame_created');
   assert.ok(http, '缺少 http_frame_created 事件');
   const lost = events.filter((e) => e.kind === 'packet_lost').length;
-  const handshakePackets = events.filter(
-    (e) => e.kind === 'packet_sent' || e.kind === 'packet_received',
-  ).length;
+  // 所有 packet_* 事件都代表一个包，丢包也要计入
+  const handshakePackets = events.filter((e) => e.kind.startsWith('packet_')).length;
   const bytes = events.reduce((sum, e) => sum + (e.bytes ?? 0), 0);
   return { handshakeToHttpMs: http.time - t0, lost, handshakePackets, bytes };
 }
@@ -1463,6 +1462,9 @@ add_header Alt-Svc 'h3=":443"; ma=600' always;  # 缓存 600 秒
 **怎么用本页知识解决**：思路是用 Alt-Svc 让第二次访问走 HTTP/3，用 0-RTT 把首屏 GET 提前发出。用 `PerformanceObserver` 读取 `nextHopProtocol` 确认协议版本。
 
 ```js
+// Node 20+ 没有把 PerformanceObserver 暴露为全局变量，必须从 perf_hooks 引入
+import { PerformanceObserver, performance } from 'node:perf_hooks';
+
 // 监听资源加载，读取协议版本
 new PerformanceObserver((list) => {
   for (const entry of list.getEntries()) {
@@ -1472,8 +1474,10 @@ new PerformanceObserver((list) => {
 }).observe({ type: 'resource', buffered: true }); // 补读已有条目
 
 // 读取首屏导航的协议与耗时
-const nav = performance.getEntriesByType('navigation')[0];
-console.log('导航协议', nav.nextHopProtocol); // 第二次访问应为 h3
+// Node 下没有 navigation 条目，退回取最近一条 resource 条目；浏览器中仍是 navigation 条目
+const nav = performance.getEntriesByType('navigation')[0]
+  ?? performance.getEntriesByType('resource').at(-1);
+console.log('导航协议', nav?.nextHopProtocol); // 第二次访问应为 h3
 ```
 
 - `PerformanceObserver` 监听 `resource`，读取每个资源的 `nextHopProtocol`。

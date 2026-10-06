@@ -1255,9 +1255,13 @@ function makeSharedStore(limit) {
   const state = new Map();
   let calls = 0;
   function tryTake(key, batch) {
-    calls += 1;
     const used = state.get(key) || 0;
-    if (used >= limit) return 0;                 // 额度已经用完
+    if (used >= limit) {
+      // 批量预取失败时不计入申请次数；单次请求失败仍计入调用次数
+      if (batch === 1) calls += 1;
+      return 0; // 额度已经用完
+    }
+    calls += 1;
     const grant = Math.min(batch, limit - used); // 一次最多给到剩余额度
     state.set(key, used + grant);
     return grant;
@@ -1270,11 +1274,19 @@ class PrefetchBucket {
     this.local = 0;
     this.batchSize = batchSize;
     this.fetchBatch = fetchBatch;
+    this.depleted = false; // 共享存储是否已耗尽
   }
   async allow() {
-    if (this.local > 0) { this.local -= 1; return true; }
+    if (this.depleted) return false; // 已耗尽则直接拒绝，不再访问共享存储
+    if (this.local > 0) {
+      this.local -= 1;
+      return true;
+    }
     const got = await this.fetchBatch(this.batchSize);
-    if (got <= 0) return false;
+    if (got <= 0) {
+      this.depleted = true; // 标记耗尽，避免后续无效请求
+      return false;
+    }
     this.local = got - 1;
     return true;
   }
@@ -1399,6 +1411,34 @@ fail-open 首次放行: true fail-closed 抛错: true
 **怎么用本页知识解决**：让 BFF 只返回表格当前页要用的列，网关只做鉴权和按用户限流，导出走独立路由和独立配额。先把读接口的口子收窄，再看下游还需要改什么。
 
 ```js
+// 依赖：无。上面只定义了限流相关实现，并没有定义 app 与 orderSvc，
+// 直接引用它们会抛 ReferenceError: app is not defined，这里先补上最小可用实现。
+
+// 极简路由注册器，接口与 Express 的 app.get 对齐（只保留本文件用到的能力）
+const app = {
+  routes: new Map(),
+  get(path, handler) {
+    this.routes.set(path, handler);
+    return this;
+  },
+};
+
+// 订单服务：内存实现，id 升序即游标顺序，真实项目里替换为数据库查询
+const orderSvc = (() => {
+  const all = Array.from({ length: 300 }, (_, i) => ({
+    id: String(i + 1),
+    status: i % 2 === 0 ? 'paid' : 'created',
+    amount: (i + 1) * 10,
+    internalNote: '内部字段，不应出现在 BFF 响应里', // 用于验证字段裁剪
+  }));
+  return {
+    async list({ cursor, limit }) {
+      const from = cursor ? all.findIndex(r => r.id === cursor) + 1 : 0;
+      return all.slice(from, from + limit);
+    },
+  };
+})();
+
 // BFF：订单列表只返回表格当前可见的列
 app.get('/bff/admin/orders', async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200); // 单页上限 200 行
@@ -1433,6 +1473,74 @@ app.get('/bff/admin/orders', async (req, res) => {
 
 ```js
 // Android BFF：把首屏需要的 4 个接口聚合成 1 个响应
+// 依赖：无。app、4 个下游服务和下线时间都在本段就地补齐：
+// 上次执行里定义的变量不会带到本次执行，直接引用会抛 ReferenceError: app is not defined。
+
+// 极简路由注册器，接口与 Express 的 app.get 对齐（只保留本文件用到的能力）
+const app = {
+  routes: new Map(),
+  get(path, handler) {
+    this.routes.set(path, handler);
+    return this;
+  },
+  // 把请求派发给已注册的处理函数，收集响应头与响应体，供下面的自测使用
+  async handle(path, req) {
+    const headers = new Map();
+    let body = null;
+    const res = {
+      set(name, value) {   // 与 Express 的 res.set 对齐
+        headers.set(name, value);
+        return this;
+      },
+      json(payload) {      // 与 Express 的 res.json 对齐
+        body = payload;
+        return this;
+      },
+    };
+    await this.routes.get(path)(req, res); // 等 4 个并发调用全部结束
+    return { headers, body };
+  },
+};
+
+// 版本下线时间来自配置，不写死在业务代码里
+const SUNSET_AT = Date.UTC(2026, 0, 1);
+
+// 4 个下游服务的内存实现，真实项目里替换为各自的 RPC / HTTP 客户端
+const userSvc = {
+  async get(userId) {
+    return {
+      id: userId,
+      name: '张三',
+      avatarUrl: 'https://cdn.example.com/avatar.png',
+      phone: '138****0000', // 非首屏字段，用于验证裁剪
+    };
+  },
+};
+
+const bannerSvc = {
+  async list() {
+    return [
+      { id: 'b1', img: 'https://cdn.example.com/b1.png', link: 'https://example.com/b1' },
+    ];
+  },
+};
+
+const feedSvc = {
+  async page(page, size) {
+    return Array.from({ length: size }, (_, i) => ({
+      id: `f${i + 1}`,
+      coverUrl: `https://cdn.example.com/cover${i + 1}.png`,
+      content: '正文，首屏卡片不返回', // 非首屏字段，用于验证裁剪
+    }));
+  },
+};
+
+const msgSvc = {
+  async unread() {
+    return { count: 3, lastFrom: '系统通知' }; // 同一接口的其它字段不返回给端上
+  },
+};
+
 app.get('/bff/android/v2/home', async (req, res) => {
   const [user, banner, feed, msg] = await Promise.all([    // 并发调用，不串行等
     userSvc.get(req.userId), bannerSvc.list(),
@@ -1447,6 +1555,16 @@ app.get('/bff/android/v2/home', async (req, res) => {
     msg: { unread: msg.count },
   });
 });
+
+// 自测：真的调用一次聚合接口，确认响应头与字段裁剪都符合首屏约定
+const { headers, body } = await app.handle('/bff/android/v2/home', { userId: 'u1', query: {} });
+if (headers.get('Deprecation') !== 'true') throw new Error('缺少 Deprecation 响应头');
+if (!headers.get('Sunset')) throw new Error('缺少 Sunset 响应头');
+if (body.user.name !== '张三' || 'phone' in body.user) throw new Error('user 字段裁剪有误');
+if (body.banner.length !== 1 || 'link' in body.banner[0]) throw new Error('banner 字段裁剪有误');
+if (body.feed.length !== 20 || 'content' in body.feed[0]) throw new Error('feed 字段裁剪有误');
+if (body.feed[0].coverImg !== 'https://cdn.example.com/cover1.png') throw new Error('coverImg 字段名有误');
+if (body.msg.unread !== 3) throw new Error('未读数有误');
 ```
 
 - 三个客户端各占一个前缀，网关按前缀分流，任何一端的改动不会改到别的端。

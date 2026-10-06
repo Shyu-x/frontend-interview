@@ -1645,10 +1645,13 @@ function injectHtml(template, renderedAppHtml) {
 
 const vite = createStubViteServer();
 const order = [];
-vite.middlewares.use(() => order.push('vite'));
-order.push('ssr');
-
-assert.deepEqual(order, ['ssr', 'vite']); // 这里验证数组行为，实际挂载后 Vite 先执行
+vite.middlewares.use(() => order.push('vite')); // 先挂载 Vite 中间件
+// 模拟请求进入，中间件按挂载顺序执行
+for (const middleware of vite.middlewares.middlewares) {
+  middleware();
+}
+order.push('ssr'); // 请求继续进入 SSR 中间件
+assert.deepEqual(order, ['vite', 'ssr']); // 实际挂载后 Vite 先执行，SSR 后执行
 assert.equal(
   injectHtml('<div id="app"><!--ssr-outlet--></div>', '<p>server content</p>'),
   '<div id="app"><p>server content</p></div>',

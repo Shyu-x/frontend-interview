@@ -1164,7 +1164,7 @@ async function loadComponent(route) {
 }
 
 function prefetch(route) {
-  loadComponent(route).catch(() => componentCache.delete(route.path))
+  return loadComponent(route).catch(() => componentCache.delete(route.path))
 }
 
 const shop = {

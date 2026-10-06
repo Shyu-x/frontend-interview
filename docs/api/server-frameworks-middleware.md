@@ -368,13 +368,31 @@ const mw2 = async (ctx, next) => {
 第 3 步：接上 `http` 服务器，加一个把异常转成 500 的兜底。
 
 ```js
-const handler = async (ctx) => { order.push('handler'); ctx.res.end('ok'); };
-const run = compose([mw1, mw2, handler]);            // 折叠成单个函数
+const handler = async (ctx) => {
+  ctx.body = 'ok';                                   // 终端处理器：只设置响应体
+};
+const run = compose([
+  async (ctx, next) => {                             // 第 1 个中间件：记录耗时
+    const start = performance.now();                 // 记录开始时间
+    await next();                                    // 暂停，进入内层
+    const cost = Math.round(performance.now() - start);
+    ctx.res.setHeader('x-duration', String(cost));   // 内层全部返回后才执行
+  },
+  async (ctx, next) => {                             // 第 2 个中间件：继续放行
+    await next();
+  },
+  handler
+]);                                                  // 折叠成单个函数
 
 const server = http.createServer((req, res) => {
-  run({ req, res }).catch(() => {                    // 所有异常在一处收口
-    res.statusCode = 500;
-    res.end('error');
+  const ctx = { req, res };                          // 本次请求的上下文
+  run(ctx).then(() => {
+    if (!res.writableEnded) res.end(ctx.body || ''); // 链条结束后统一发送响应
+  }).catch(() => {                                   // 所有异常在一处收口
+    if (!res.writableEnded) {
+      res.statusCode = 500;
+      res.end('error');
+    }
   });
 });
 ```
@@ -432,11 +450,16 @@ const mw1 = async (ctx, next) => {
   order.push('1-exit');
 };
 const mw2 = async (ctx, next) => { order.push('2-enter'); await next(); order.push('2-exit'); };
-const handler = async (ctx) => { order.push('handler'); ctx.res.end('ok'); };
+const handler = async (ctx) => { order.push('handler'); ctx.body = 'ok'; };
 
 const run = compose([mw1, mw2, handler]);
 const server = http.createServer((req, res) => {
-  run({ req, res }).catch(() => { res.statusCode = 500; res.end('error'); });
+  const ctx = { req, res };
+  run(ctx).then(() => {
+    if (!res.writableEnded) res.end(ctx.body || '');
+  }).catch(() => {
+    if (!res.writableEnded) { res.statusCode = 500; res.end('error'); }
+  });
 });
 
 await new Promise((r) => server.listen(0, r));
@@ -610,6 +633,10 @@ POST /users/42 -> 405 {"error":405}
 ```
 
 **动手验证**
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 // 依赖：仅 Node 20+ 内置模块
@@ -1342,6 +1369,10 @@ for (let i = 0; i < N; i++) {
 - 路径数量固定，这样耗时的变化只来自查找方式。
 
 第 2 步：写两种查找并各跑 1000 次。
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 function scan(p) {

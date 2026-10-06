@@ -595,8 +595,18 @@ sequenceDiagram
 **第 1 步：创建句柄，观察它不读盘。** 这一步只有一个调用。
 
 ```js
-const file = Bun.file("./data.txt"); // 只记录路径，不读盘
-console.log(file instanceof Blob);   // BunFile 继承自 Blob
+import { Blob } from "node:buffer"; // Node 20+ 没有 Bun，用标准 Blob 当基类
+
+// 等价 BunFile：继承自 Blob 的惰性外壳，只挂路径，不读盘
+class LazyFile extends Blob {
+  constructor(path) {
+    super([]);        // 不读盘，先给空内容
+    this.path = path; // 路径只记在实例上
+  }
+}
+
+const file = new LazyFile("./data.txt"); // 只记录路径，不读盘
+console.log(file instanceof Blob);       // 继承自 Blob，断言成立
 ```
 
 **这段代码在做什么**
@@ -611,9 +621,11 @@ console.log(file instanceof Blob);   // BunFile 继承自 Blob
 **第 2 步：按需要的形态读取。** 同一份磁盘字节可以有三种出口。
 
 ```js
-const text = await Bun.file("./data.txt").text();   // 转成字符串
-const bytes = await Bun.file("./data.bin").bytes(); // 转成 Uint8Array
-const blob = await Bun.file("./data.bin").blob();   // 转成 Blob
+import { readFile } from "node:fs/promises";
+
+const text = await readFile("./data.txt", "utf8"); // 转成字符串
+const bytes = new Uint8Array(await readFile("./data.bin")); // 转成 Uint8Array
+const blob = new Blob([await readFile("./data.bin")]); // 转成 Blob
 ```
 
 **这段代码在做什么**
@@ -628,8 +640,10 @@ const blob = await Bun.file("./data.bin").blob();   // 转成 Blob
 **第 3 步：写入用 Bun.write。** 归档示例里就是用它对磁盘写文件。
 
 ```js
-await Bun.write("out.txt", "hello");                 // 写字符串
-await Bun.write("out.bin", new Uint8Array([1, 2, 3])); // 写字节
+import { writeFile } from "node:fs/promises";
+
+await writeFile("out.txt", "hello");                 // 写字符串
+await writeFile("out.bin", new Uint8Array([1, 2, 3])); // 写字节
 ```
 
 **这段代码在做什么**
@@ -664,6 +678,10 @@ console.log(dv.getUint8(2));      // 读取第 2 字节
 **动手验证**
 
 把读写与视图合成一个脚本。以 `.mjs` 保存。依赖：仅 Node 内置模块 `node:assert`、`node:fs/promises`、`node:os`、`node:path`。
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 // 文件：io-demo.mjs

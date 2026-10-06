@@ -970,7 +970,10 @@ function run(count) {
   });
 }
 
-const one = await run(1);      // 第一次运行会创建线程池线程
+// 第一次运行会创建线程池线程，所以先预热，避免创建开销计入 1 个任务的耗时
+await run(4);
+
+const one = await run(1);      // 预热后测量单个任务
 const many = await run(8);     // 8 个任务在 4 线程下分成两批
 
 assert.ok(many >= one * 1.5, `1 个任务 ${one} 毫秒，8 个任务 ${many} 毫秒`);
@@ -1287,6 +1290,42 @@ async function runReal(body) {
 
 ```js
 // order20-step2.mjs —— 用例 01 到 10
+
+// det 测试框架：让每个用例串行运行，跑完事件循环后按期望数组断言
+let detChain = Promise.resolve();
+
+function det(name, expected, fn) {
+  detChain = detChain.then(async () => {
+    const log = [];
+    const t = {
+      log(value) {
+        log.push(value);
+      },
+      nextTick(callback) {
+        process.nextTick(callback);
+      },
+      micro(callback) {
+        queueMicrotask(callback);
+      },
+      timer(callback) {
+        setTimeout(callback, 0);
+      },
+    };
+
+    fn(t);
+
+    // 等待本轮以及嵌套的零毫秒定时器都执行完
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    const actual = log.join(" -> ");
+    const want = expected.join(" -> ");
+    if (actual !== want) {
+      throw new Error(`${name} 顺序错误：实际 ${actual}，期望 ${want}`);
+    }
+    console.log(`通过 ${name}：${actual}`);
+  });
+}
+
 det("01 同步与队列", ["sync", "n", "m"], (t) => {
   t.log("sync");
   t.nextTick(() => t.log("n"));
@@ -1343,6 +1382,8 @@ det("10 两个零毫秒定时器", ["a", "b"], (t) => {
   t.timer(() => t.log("a"));
   t.timer(() => t.log("b"));
 });
+
+await detChain;
 ```
 
 **这段代码在做什么**

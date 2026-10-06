@@ -262,7 +262,8 @@ function fnv1a(input) {
     hash ^= input.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
-  return (hash >>> 0).toString(36);
+  // 转无符号整数再转 36 进制，并截取/补齐为 6 位，确保隔离名长度可控
+  return (hash >>> 0).toString(36).padStart(6, '0').slice(-6);
 }
 
 function scopedName(file, local) {
@@ -641,9 +642,31 @@ function getStyleTag() {
 第二步，模拟按 props 生成样式，并检查插入顺序。
 
 ```js
+// 收集器：保存类名与最终规则，重复规则不重复插入
+const collected = [];
+
+// 标签模板：把插值拼成 CSS 规则文本
+function ruleCss(strings, ...values) {
+  return strings.reduce((out, part, i) => out + part + (i < values.length ? values[i] : ''), '');
+}
+
+// 注入规则：根据规则文本生成稳定类名，替换原类选择器后收集
+function inject(rule) {
+  const cls = `x_${fnv1a(rule)}`;
+  if (!collected.some((item) => item.cls === cls)) {
+    collected.push({ cls, css: rule.replace(/\.([A-Za-z_][\w-]*)/, `.${cls}`) });
+  }
+  return cls;
+}
+
+// 取出当前已收集的样式标签
+function getStyleTag() {
+  return `<style>${collected.map((item) => item.css).join('')}</style>`;
+}
+
 // 颜色来自入参，类名与规则一起进入收集器
 function button(color) {
-  const cls = inject(css`.${'x'}{color:${color}}`);
+  const cls = inject(ruleCss`.${'x'}{color:${color}}`);
   return { cls, html: `<button class="${cls}">ok</button>` };
 }
 const one = button('#2563eb');
@@ -1101,6 +1124,23 @@ function resolve(token) {
 第三步，生成最终文本并排序去重。
 
 ```js
+// 候选类规则表：从刻度规则构建，供 resolve 查询
+var candidates = new Map([
+  ['p-0', 'padding:0px'],
+  ['m-0', 'margin:0px'],
+  ['p-1', 'padding:4px'],
+  ['m-1', 'margin:4px'],
+  ['p-2', 'padding:8px'],
+  ['m-2', 'margin:8px'],
+  ['p-4', 'padding:16px'],
+  ['m-4', 'margin:16px'],
+]);
+// 变体包装器：处理 hover、md 等前缀
+var variants = {
+  hover: (selector, body) => `${selector}:hover{${body}}`,
+  md: (selector, body) => `@media (min-width:768px){${selector}{${body}}}`,
+};
+
 // 生成入口：扫描、解析、去重、排序、拼接
 function generate(source) {
   const rules = [];

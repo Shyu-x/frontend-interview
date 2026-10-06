@@ -428,6 +428,10 @@ console.log(JSON.stringify(run(rows, parseQuery(new URLSearchParams('status=paid
 
 **动手验证**
 
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
+
 ```js
 // 依赖：无第三方依赖，Node 20 以上，保存为 query.mjs 后执行 node query.mjs
 import http from 'node:http';
@@ -1747,6 +1751,10 @@ async function poll(fetchStatus, { maxAttempts = 10 } = {}) {
 ```
 
 **动手验证**
+
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
 
 ```js
 // 依赖：无第三方依赖，Node 20 以上，保存为 batch.mjs 后执行 node batch.mjs

@@ -1187,6 +1187,16 @@ sequenceDiagram
 
 ```js
 // 做法 A：用中文原文当键，改文案就换键
+const MESSAGES = Object.create(null);             // 翻译表：同时支持原文键与语义键
+MESSAGES["你好"] = "你好";
+MESSAGES["home.greeting"] = "你好";               // 对应 "你好"，以后改成 "您好" 键不动
+MESSAGES["cart.items"] = "购物车条目数";          // 购物车条目数
+
+function t(key) {
+  if (Object.prototype.hasOwnProperty.call(MESSAGES, key)) return MESSAGES[key];
+  return key;                                      // 未登记时回退到键本身
+}
+
 t("你好");
 
 // 做法 B：用命名空间加语义键，文案改动词不变
@@ -1989,11 +1999,15 @@ function parse(h) {
   }).sort((a, b) => b.q - a.q).map(i => i.tag);
 }
 // 回退链：完整标签 -> 主语言 -> 站点默认
+// BCP 47 语言标签大小写不敏感：parse 已统一成小写，所以比较时也要把 supported 归一化，
+// 命中后返回 supported 中登记的原始写法（如 'zh-CN'），而不是小写形式
 function negotiate(h, supported, fallback = 'en') {
+  const canonical = new Map(supported.map((s) => [s.toLowerCase(), s]));
   for (const tag of parse(h)) {
-    if (supported.includes(tag)) return tag;
-    const base = tag.split('-')[0];
-    if (supported.includes(base)) return base;
+    const full = canonical.get(tag);
+    if (full !== undefined) return full;
+    const base = canonical.get(tag.split('-')[0]);
+    if (base !== undefined) return base;
   }
   return fallback;
 }

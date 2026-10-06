@@ -146,6 +146,10 @@ ArrayBuffer 32
 
 **动手验证**
 
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
+
 ```js
 // 文件：env-check.mjs 依赖：无（Node 20+ 内置 Web Crypto）
 import assert from 'node:assert/strict';

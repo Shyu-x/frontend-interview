@@ -355,6 +355,10 @@ loafObserver.observe({ type: 'long-animation-frame', buffered: true });
 
 依赖：无，仅 Node 20+ 内置模块。下面脚本用一份模拟的 LoAF 数据做同样的归因计算。
 
+!!! warning "示意代码：未通过自动验证"
+    下面这段代码在本站的自动运行校验中有断言未通过，请把它当作示意而不是可直接复用的实现；
+    如果你修好了，欢迎提交改动。
+
 ```js
 // 依赖：无，仅 Node 20+ 内置模块
 const assert = require('node:assert/strict');
