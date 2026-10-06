@@ -11,7 +11,7 @@ date: 2026-05-17
 
 > Deno 是现代 JavaScript 和 TypeScript 的安全运行时，默认启用沙箱，提供开箱即用的工具链。
 
-## 核心哲学
+## 1. 核心哲学
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -36,7 +36,7 @@ date: 2026-05-17
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 与 Node.js 的关键差异
+### 1.1 与 Node.js 的关键差异
 
 | 特性 | Node.js | Deno |
 |------|---------|------|
@@ -50,9 +50,9 @@ date: 2026-05-17
 
 ---
 
-## 快速上手
+## 2. 快速上手
 
-### 安装
+### 2.1 安装
 
 ```bash
 # macOS / Linux
@@ -68,7 +68,7 @@ npm install -g deno
 brew install deno
 ```
 
-### 基础命令
+### 2.2 基础命令
 
 ```bash
 # 运行脚本
@@ -104,9 +104,9 @@ deno eval "console.log(Deno.version)"  # 查看版本
 
 ---
 
-## 安全沙箱模型
+## 3. 安全沙箱模型
 
-### 权限系统详解
+### 3.1 权限系统详解
 
 ```typescript
 // Deno 的安全模型基于权限标志
@@ -141,7 +141,7 @@ if (Deno.permissions.querySync({ name: 'read', path: '/etc' }).state === 'grante
 const permission = await Deno.permissions.request({ name: 'net', host: 'example.com' });
 ```
 
-### 安全最佳实践
+### 3.2 安全最佳实践
 
 ```typescript
 // 1. 最小权限原则 - 只授予需要的权限
@@ -179,9 +179,9 @@ const user = await kv.get(['users', '123']);
 
 ---
 
-## HTTP 服务
+## 4. HTTP 服务
 
-### 原生 Deno.serve
+### 4.1 原生 Deno.serve
 
 ```typescript
 // Deno 2.x 原生 HTTP 服务
@@ -220,7 +220,7 @@ Deno.serve({ port: 8000 }, async (req) => {
 console.log('Server running on http://localhost:8000');
 ```
 
-### 使用 Fresh 框架
+### 4.2 使用 Fresh 框架
 
 ```typescript
 // Fresh 是 Deno 的全栈框架
@@ -260,9 +260,9 @@ export default function Home() {
 
 ---
 
-## 内置工具链
+## 5. 内置工具链
 
-### 格式化工具
+### 5.1 格式化工具
 
 ```bash
 # 格式化所有代码
@@ -290,7 +290,7 @@ deno fmt --ignore=vendor,dist
 }
 ```
 
-### Lint 检查
+### 5.2 Lint 检查
 
 ```bash
 # 运行 lint
@@ -314,7 +314,7 @@ deno lint --ignore=vendor,dist
 }
 ```
 
-### 测试框架
+### 5.3 测试框架
 
 ```typescript
 import { assertEquals, assertExists, assertThrows } from '@std/assert';
@@ -364,7 +364,7 @@ Deno.test({
 });
 ```
 
-### Bundle 打包
+### 5.4 Bundle 打包
 
 ```bash
 # 打包为单个 JS 文件
@@ -380,9 +380,9 @@ deno compile src/app.ts -o app.exe
 
 ---
 
-## Node.js 兼容性
+## 6. Node.js 兼容性
 
-### npm 包使用
+### 6.1 npm 包使用
 
 ```typescript
 // 使用 npm: 前缀导入 npm 包
@@ -404,7 +404,7 @@ app.listen(3000, () => {
 });
 ```
 
-### Node.js 内置模块兼容
+### 6.2 Node.js 内置模块兼容
 
 ```typescript
 // Deno 2.x 兼容大部分 Node.js 内置模块
@@ -432,7 +432,7 @@ console.log(Deno.version.v8);     // V8 版本
 console.log(Deno.version.typescript); // TypeScript 版本
 ```
 
-### 从 Node.js 迁移
+### 6.3 从 Node.js 迁移
 
 ```typescript
 // ============================================
@@ -494,7 +494,7 @@ const __dirname = dirname(fromFileUrl(import.meta.url));
 
 ---
 
-## Deno KV 内置存储
+## 7. Deno KV 内置存储
 
 ```typescript
 // Deno KV - 内置键值存储
@@ -574,7 +574,7 @@ async function queueExample() {
 
 ---
 
-## 常用标准库
+## 8. 常用标准库
 
 ```typescript
 // ============================================
@@ -649,9 +649,9 @@ console.log(records);
 
 ---
 
-## 常见问题与解决方案
+## 9. 常见问题与解决方案
 
-### Q1: 如何管理依赖版本？
+### 9.1 Q1: 如何管理依赖版本？
 
 ```typescript
 // 方法 1: 直接 URL 锁定版本
@@ -673,7 +673,7 @@ import { encodeBase64 } from '$std/encoding/base64';
 import express from 'express';
 ```
 
-### Q2: 如何查看依赖关系？
+### 9.2 Q2: 如何查看依赖关系？
 
 ```bash
 # 查看缓存信息
@@ -687,7 +687,7 @@ deno test --coverage=coverage
 deno coverage coverage/
 ```
 
-### Q3: Deno 在生产环境的表现？
+### 9.3 Q3: Deno 在生产环境的表现？
 
 ```typescript
 // Deno Deploy 边缘部署
@@ -708,7 +708,7 @@ deno deploy deploy --project=my-app
 
 ---
 
-## 参考链接
+## 10. 参考链接
 
 - [Deno 官方文档](https://docs.deno.com/)
 - [Deno 2.0 发行说明](https://deno.com/blog/v2.0)
@@ -717,3 +717,232 @@ deno deploy deploy --project=my-app
 - [Deno 与 Node.js 差异](https://docs.deno.com/runtime/fundamentals/node_js_deno/)
 - [Deno KV 文档](https://docs.deno.com/runtime/fundamentals/kv/)
 - [npm 兼容模式](https://docs.deno.com/runtime/fundamentals/npm_nodejs_compatibility/)
+
+## 深入阅读与参考
+
+!!! tip "怎么用这些资料"
+    先读「官方文档与规范」建立准确的概念，再读「源码与示例」核对细节，最后用「教程、书籍与视频」换一种讲法加深理解。每条都写明了读哪一节、带着什么问题读。
+
+### 官方文档与规范
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [Deno 1.x to 2.x Migration Guide](https://docs.deno.com/runtime/reference/migration_guide/) | 官方迁移清单，标出 2.x 破坏性变更与替代 API。 | 按小节对照自己项目，用 deno check 与 deno test 逐项验证迁移结果。 |
+| [Configuration file (deno.json)](https://docs.deno.com/runtime/reference/deno_json/) | 讲清 deno.json 各字段，工具链与权限配置都收在这里。 | 先读 tasks、imports、permissions 三节，为示例项目补一份 deno.json。 |
+| [Writing an HTTP Server](https://docs.deno.com/runtime/fundamentals/http_server/) | 最短路径跑通 Deno HTTP 服务，涵盖响应与流式处理。 | 照着写一遍，再用 curl 测 POST 与流式响应，观察 req.signal 行为。 |
+| [Node.js Compatibility](https://bun.sh/docs/runtime/nodejs-compat) | 逐项列出 node: 内置模块的兼容程度与缺口。 | 迁移前先查用到的模块是否打勾；缺的用 npm: 包或 Deno 原生 API 顶上。 |
+| [Migrate from Node.js](https://docs.deno.com/runtime/migrate/) | 从 Node 迁到 Deno 的实操路线，含依赖与配置对照。 | 带着自己的 package.json 逐节走，把 npm scripts 映射成 deno task。 |
+| [Deno 文档](https://docs.deno.com/) | 权限标志与内置工具链的入口，沙箱模型从这里讲起。 | 读权限一节，跑 --allow-net 与 --deny-read 对比，体会最小授权。 |
+| [deno compile](https://docs.deno.com/runtime/reference/cli/compile/) | 把 TS 项目编译成单文件可执行程序，部署时最常用。 | 按示例 compile 一个 CLI，用 --allow-* 显式声明运行时权限后分发。 |
+| [deno lint](https://docs.deno.com/runtime/reference/cli/lint/) | 了解默认规则集与配置方式，配合编辑器即时反馈。 | 跑 deno lint 修完示例项目，再把规则开关写进 deno.json。 |
+| [Node.js 内置测试运行器](https://nodejs.org/en/learn/test-runner/introduction) | 免依赖写测试的标准做法，与 deno test 思路相通。 | 为一个工具函数写 node:test 用例，再改写成 Deno.test 对比差异。 |
+
+### 源码与示例
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [Node.js 贡献文档](https://github.com/nodejs/node/blob/main/doc/contributing) | 想读 Node 源码前先看它，了解目录结构与构建流程。 | 读仓库概览与构建一节，再带着兼容问题定位 lib/ 下的实现。 |
+
+### 教程、书籍与视频
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [Node.js in Action（第 2 版，Manning）](https://www.manning.com/books/node-js-in-action-second-edition) | Node 服务端开发经典，迁移前先建立 HTTP 服务心智模型。 | 完成书中示例服务，再用 Deno 与 Hono 重写一遍对比代码。 |
+| [Philip Roberts：What the heck is the event loop anyway?（JSConf EU）](https://www.youtube.com/watch?v=8aGhZQkoFbQ) | 十分钟讲清事件循环，直观理解 Deno 的异步调度。 | 看完用 Loupe 单步执行 Promise 示例，解释微任务与宏任务顺序。 |
+
+## 应用与行业实践
+
+### 应用场景地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 后台管理的万行表格（分页接口） | HTTP 服务、常用标准库 | `Deno.serve` + `@std/http` 的响应工具 | 单次响应只返回当前页，别把整表读进内存 |
+| 低端安卓的首屏加载 | 内置工具链、Node.js 兼容性 | `deno info` 看依赖图，`npm:` 前缀按需引入 | 只把首屏用到的包放进入口文件，避免拉入整棵依赖树 |
+| 多人协作白板 | Deno KV 内置存储、HTTP 服务 | `Deno.serve` + `Deno.upgradeWebSocket` + `kv.atomic()` | KV 只放房间快照与版本号，高频笔迹走增量广播 |
+| 第三方 Webhook 接收与验签 | 安全沙箱模型、HTTP 服务 | `--allow-net` 白名单 + Web Crypto 的 HMAC | 验签失败返回 4xx，不写 KV、不碰业务数据 |
+| 内部运维脚本分发 | 安全沙箱模型、内置工具链 | `deno run --allow-read=/var/log/app`、`deno task` | 读权限写路径白名单，替换整盘读权限 |
+| 定时抓取 RSS 并入库 | Deno KV、内置工具链 | 系统 crontab 触发 `deno task fetch` | 任务入口写进 `deno.json`，命令行参数放任务里 |
+| CI 中的格式化与检查 | 内置工具链 | `deno fmt --check`、`deno lint`、`deno test` | 把 `deno.lock` 提交进仓库，让本地与 CI 解析同一份依赖 |
+| 事件转发服务（复用 npm 签名库） | Node.js 兼容性、HTTP 服务 | `npm:` 前缀引入，`Deno.serve` 暴露接口 | 被引包做动态加载时要补对应权限 |
+| 本地优先的笔记同步 | Deno KV、常用标准库 | 本地 KV 存离线队列，版本号合并冲突 | 需核对官方文档：KV 本地文件后端的并发写入语义 |
+
+### 三个场景拆解
+
+#### 场景 1：内部运维脚本分发
+
+**业务背景**
+运维同学把脚本贴到聊天窗口分发，各人本机 Node 版本不一致，跑不起来要排查半天。机器数量从十台涨到上百台后，脚本版本靠口头同步会漏改。
+
+**怎么用本页知识解决**
+思路是收成单文件入口，权限在启动命令里逐项列明，脚本本身不改。
+
+```ts
+// scripts/collect.ts
+const dir = Deno.args[0] ?? "/var/log/app"; // 允许调用方覆盖默认目录
+const rows: string[] = [];
+for await (const entry of Deno.readDir(dir)) { // 只列出目录项，不递归
+  if (!entry.isFile || !entry.name.endsWith(".log")) continue; // 过滤非日志文件
+  const text = await Deno.readTextFile(`${dir}/${entry.name}`); // 读取单个文件
+  rows.push(`${entry.name}\t${text.split("\n").length}`); // 记录文件名与行数
+}
+console.log(rows.join("\n")); // 结果打到标准输出，便于重定向
+```
+
+- 启动命令是 `deno run --allow-read=/var/log/app scripts/collect.ts`，只开放一个目录。
+- 默认不下发写权限，脚本误删文件这一步在权限层就被挡住。
+- 分发方式是发文件或发仓库路径，接收方不用装 Node，也不用对齐版本。
+- `deno.json` 里登记 `collect` 任务，各人敲的命令一致，默认目录写在任务里。
+- 需要联网时再补 `--allow-net=内部域名`，一次只加一项权限。
+
+**怎么度量收益**
+指标看首次跑通耗时、权限拒绝次数、脚本退出码。测量用 `hyperfine 'deno run --allow-read=/var/log/app scripts/collect.ts'` 记录冷启动与运行时间；用 `deno task ci` 的退出码判断脚本在 CI 里是否稳定。
+
+**什么时候不该用**
+- 脚本要写回数据库或改动远端机器状态时，只读白名单会反复挡住流程，应改成带鉴权的服务端接口。
+- 团队已统一 Node 版本并在 CI 里锁定，迁移只增加一套运行时的维护成本。
+
+#### 场景 2：多人协作白板的房间状态同步
+
+**业务背景**
+一个房间几十个人同时画，笔迹事件按毫秒到达，服务端要留房间快照给新加入者。在线人数从个位数涨到几十人时，全量广播会拖垮连接。
+
+**怎么用本页知识解决**
+思路是快照走 KV，增量走 WebSocket，写入用事务拼成同一个版本号。
+
+```ts
+// server.ts
+const kv = await Deno.openKv(); // 打开 KV，本地默认落盘
+const rooms = new Map<string, Set<WebSocket>>(); // 房间号 -> 连接集合
+Deno.serve(async (req) => { // 内置 HTTP 服务，无需框架
+  const room = new URL(req.url).pathname.slice(1); // 路径即房间号
+  if (req.headers.get("upgrade") !== "websocket") { // 普通请求返回快照
+    const snap = await kv.get(["room", room]); // 新加入者拉取快照
+    return Response.json(snap.value ?? { version: 0, strokes: [] });
+  }
+  const { socket, response } = Deno.upgradeWebSocket(req); // 升级连接
+  socket.onmessage = async (e) => { // 增量笔迹到达
+    const res = await kv.atomic() // 事务写入，避免并发覆盖
+      .sum(["room", room, "version"], 1n) // 版本号自增
+      .set(["room", room, "last"], e.data) // 只留最后一段增量
+      .commit();
+    if (!res.ok) socket.send('{"retry":true}'); // 冲突时让客户端重发
+    for (const s of rooms.get(room) ?? []) s.send(e.data); // 广播给同房间
+  };
+  return response;
+});
+```
+
+- 新加入者先发一个普通 GET 拿快照，不用重放整房间的笔迹。
+- 版本号用 `sum` 自增，两个客户端同时写入时只有一个事务能提交成功。
+- 提交失败回 `retry`，客户端重发，避免静默丢笔迹。
+- 连接集合只存内存，进程重启后清空，快照仍从 KV 恢复。
+- `socket.onopen` 里把连接加进 `rooms`，这段为控制行数省略。
+
+**怎么度量收益**
+指标看首屏拿快照的耗时（P50 与 P95）、广播延迟、事务冲突率。测量用 `Deno.bench` 跑本地写入压测；用浏览器 DevTools 的 Network 面板看 WebSocket 帧时间；冲突率用计数器打日志后聚合。
+
+**什么时候不该用**
+- 笔迹要求严格顺序且不能丢帧时，事务重试会引入延迟，应改用有序日志。
+- 房间快照超过 KV 单条值上限时（需核对官方文档：键与值的大小上限），应把快照放对象存储。
+
+#### 场景 3：第三方 Webhook 接收与验签
+
+**业务背景**
+支付平台和代码托管平台会往你的地址推事件，失败重试会重复投递同一条。日事件量从几百涨到几万时，重复处理会写出重复订单。
+
+**怎么用本页知识解决**
+思路是先验签再查重，两步都不过就不碰业务数据。
+
+```ts
+// webhook.ts
+const SECRET = Deno.env.get("HOOK_SECRET")!; // 从环境变量读密钥
+const kv = await Deno.openKv(); // 用 KV 存已处理的事件 ID
+Deno.serve(async (req) => {
+  const body = await req.text(); // 先读原始报文，验签必须用原文
+  const sig = req.headers.get("x-signature") ?? ""; // 平台签名头
+  const key = await crypto.subtle.importKey( // Web Crypto 全局可用
+    "raw", new TextEncoder().encode(SECRET),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  if (hex !== sig) return new Response("bad signature", { status: 401 }); // 验签不过直接拒绝
+  const id = req.headers.get("x-event-id")!; // 平台的事件 ID
+  const seen = await kv.get(["event", id]); // 查重
+  if (seen.value) return new Response("duplicate", { status: 200 }); // 重复投递直接返回
+  await kv.set(["event", id], Date.now(), { expireIn: 86400_000 }); // 保留一天
+  return new Response("ok"); // 再交给后续处理
+});
+```
+
+- 验签用原始报文字符串，先解析成 JSON 再验签会因空格差异失败。
+- 密钥走环境变量，启动时用 `--allow-env=HOOK_SECRET` 把环境权限收窄。
+- 查重放在处理之前，同一事件 ID 第二次到达直接返回 200，平台不再重试。
+- `expireIn` 让查重记录自动过期，KV 不会因事件堆积无限增长。
+- 网络权限收窄到平台域名，验签失败不写 KV。
+
+**怎么度量收益**
+指标看重复入库条数、验签失败率、处理耗时 P95。测量用 `deno test --coverage` 覆盖验签分支；线上用计数器日志统计 401 与 `duplicate` 的次数。
+
+**什么时候不该用**
+- 事件处理里有秒级以上的外部调用时，应先入队再返回 200，别把重活压在请求里。
+- 平台签名算法不是 HMAC-SHA256 时（需核对平台文档：签名算法与头名称），照抄这段会一直验签失败。
+
+### 行业先进实践
+
+1. **权限白名单代替全量授权**（出处：Deno 官方文档 Permissions 章节）
+   - 做法：启动命令把 `--allow-net`、`--allow-read` 指到域名和目录，未列出的能力直接拒绝。
+   - 为什么有效：依赖被替换或代码被注入时，进程能拿到的能力被限制在清单内。
+   - 如何借鉴：把生产启动命令写进 `deno.json` 的 tasks，评审时只审这一行。
+
+2. **Node 兼容层按文件标记**（出处：Deno 官方文档 Node.js 兼容性章节）
+   - 做法：内置模块用 `node:` 前缀引入，npm 包用 `npm:` 前缀引入，迁移时逐文件替换。
+   - 为什么有效：明确标出哪些代码依赖 Node 语义，排查兼容问题有边界。
+   - 如何借鉴：先迁纯计算模块，把依赖原生扩展的部分留在原运行时。
+
+3. **依赖锁文件进仓库**（出处：JSR 官方文档）
+   - 做法：用带版本的 `jsr:@std/http` 形式引入，配合 `deno.lock` 锁定解析结果。
+   - 为什么有效：锁定文件让本地与 CI 解析到同一份依赖。
+   - 如何借鉴：CI 里跑冻结安装（需核对官方文档：该开关在当前版本的名称与行为）。
+
+4. **KV 事务与过期时间组合**（出处：Deno 官方文档 Deno KV 章节）
+   - 做法：多键写入用 `kv.atomic()`，缓存类数据用 `expireIn` 设定存活时间。
+   - 为什么有效：原子写避免并发覆盖，过期时间省掉手工清理任务。
+   - 如何借鉴：可重算的数据都加过期时间，只给业务实体保留长期键。
+
+5. **任务入口集中声明**（出处：Deno 官方文档 deno task 章节）
+   - 做法：启动、测试、格式化、检查都写进 `deno.json` 的 `tasks`，CI 只调 `deno task ci`。
+   - 为什么有效：本地与 CI 命令一致，参数变更只改一处。
+   - 如何借鉴：任务名固定用 `dev`、`test`、`ci` 三个，新人不用查文档。
+
+### 从学到用：落地路线
+
+1. **试点**：挑一个只读的运维脚本，用 `deno run` 跑通，启动时加权限白名单。
+   - 验收标准：同一脚本在两位同事的机器上不经改动跑出相同输出。
+2. **验证**：给脚本补 `deno task` 入口和 `deno test` 用例，CI 跑格式化、检查、测试三条命令。
+   - 验收标准：三条命令退出码为 0，且删掉任一权限后测试能失败。
+3. **推广**：把带 HTTP 服务或 KV 存储的小服务迁过来，权限逐项加，锁文件提交进仓库。
+   - 验收标准：任何人 clone 后一条 `deno task dev` 能起服务。
+4. **防回退**：把权限清单、锁文件、任务入口写进 code review 检查项，改动启动命令要第二人确认。
+   - 验收标准：连续四周的合并请求里，权限变更都有评审记录。
+
+### 动手作业
+
+**目标**
+做一个内部小服务：接收第三方 Webhook，验签后去重写入 Deno KV，并提供查询接口。
+
+**步骤**
+1. 建目录并写 `deno.json`，登记 `dev` 与 `test` 两个任务。
+2. 用 `Deno.serve` 起服务，`GET /events/:id` 读 KV 返回记录，找不到返回 404。
+3. `POST /events` 先读原始报文，用 HMAC-SHA256 验签，不通过返回 401。
+4. 用事件 ID 在 KV 查重，重复返回 200，不重复则写入并设 `expireIn`。
+5. 启动时只给 `--allow-net=127.0.0.1:8000` 与 `--allow-env=HOOK_SECRET`，KV 落盘所需读写权限按启动报错提示补齐。
+6. 写三个测试：正确签名、错误签名、重复事件 ID。
+7. 本地连发两次同一事件，确认 KV 里只留一条记录。
+
+**验收标准**
+- 不带 `--allow-*` 启动时进程报错，报错信息指出缺少哪项权限。
+- 错误签名返回 401，KV 里查不到该事件 ID。
+- 同一事件 ID 连发两次，第二次返回 200，KV 中只存在一条记录。
+- `deno fmt --check`、`deno lint`、`deno test` 三条命令退出码为 0。
+- 服务端日志能区分 `bad-signature` 与 `duplicate` 两种拒绝原因。
+

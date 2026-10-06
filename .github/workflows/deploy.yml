@@ -37,7 +37,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0   # 完整历史：sitemap 与结构化数据的 lastmod 依赖 git log
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -60,6 +60,9 @@ jobs:
             exit 1
           fi
           echo "✓ Build successful with 0 link warnings"
+
+      - name: SEO / GEO check
+        run: python3 scripts/seo-check.py site
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

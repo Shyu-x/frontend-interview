@@ -842,3 +842,239 @@ export default defineConfig({
 - [esbuild 文档](https://esbuild.github.io/)
 - [Vite 文档](https://vite.dev/)
 - [Bundle 分析工具](https://github.com/webpack-contrib/webpack-bundle-analyzer)
+
+## 深入阅读与参考
+
+!!! tip "怎么用这些资料"
+    先读「官方文档与规范」建立准确的概念，再读「源码与示例」核对细节，最后用「教程、书籍与视频」换一种讲法加深理解。每条都写明了读哪一节、带着什么问题读。
+
+### 官方文档与规范
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [Rollup 文档](https://cn.rollupjs.org/) | Tree-shaking 与 ES 模块打包的权威说明，原理讲得最清楚。 | 先读 Tree-shaking 与 output 两节，带着「哪些导出会被删」的问题读，再跑官方示例验证。 |
+| [webpack 文档](https://webpack.js.org/concepts/) | 核心概念与 loader/plugin 机制的第一手资料，面试高频。 | 按概念、配置、插件顺序通读，重点看依赖图与 chunk 生成，读完复述一次编译流程。 |
+| [Rollup 配置选项](https://rollupjs.org/configuration-options/) | output 与 treeshake 两节是理解产物格式与摇树开关的关键。 | 对照配置逐项试：改 format、开关 treeshake，比较产物差异并记录结论。 |
+| [esbuild 文档](https://esbuild.github.io/) | API、CLI 与限制说明齐全，快速掌握 esbuild 能力边界。 | 先看 CLI 与 JS API 两节，亲手跑一次 build，记下它明确不支持的配置项。 |
+| [esbuild 架构说明](https://github.com/evanw/esbuild/blob/main/docs/architecture.md) | 从并行、少遍历、内存布局三点解释 esbuild 为何快。 | 通读架构文档并做笔记，读完用一句话回答它为了速度牺牲了什么。 |
+
+### 源码与示例
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [rollup](https://github.com/rollup/rollup) | 看 Rollup 如何构建模块图，理解打包器的核心数据结构。 | 先读类定义与注释，再顺调用链找模块解析入口，动手画出模块图流程。 |
+| [Rolldown 入门](https://rolldown.rs/guide/getting-started) | Rust 版 Rollup 兼容实现，最小示例看清打包器接口。 | 按文档跑通最小示例，改一处配置看输出，再与 Rollup 行为对比。 |
+| [webpack 模块联邦](https://webpack.js.org/concepts/module-federation/) | 两个应用共享远程模块，直观理解运行时加载与代码分割。 | 照着搭两个应用，看远程 chunk 何时加载，读完总结适用场景与代价。 |
+| [esbuild 插件](https://esbuild.github.io/plugins/) | onResolve 与 onLoad 示例，亲手体验 esbuild 插件模型。 | 先抄示例跑通，再自己写一个虚拟模块插件，观察解析与加载顺序。 |
+
+### 教程、书籍与视频
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [webpack 入门指南](https://webpack.js.org/guides/getting-started/) | 手把手从零配置，把抽象概念落到可运行的配置文件上。 | 跟着走完整个流程，每加一个 loader 或 plugin 就记录它解决了什么问题。 |
+| [Rollup 简介（中文）](https://cn.rollupjs.org/introduction/) | 中文入门，快速跑通 esm 与 cjs 双格式库打包。 | 按步骤配置多格式输出，读完对比两种产物差异与其各自用途。 |
+| [Rspack 文档](https://rspack.rs/) | 迁移案例揭示 webpack 生态的性能瓶颈与替代路线。 | 挑一个已有 webpack 项目试迁移，记录兼容问题与构建耗时变化。 |
+
+## 应用与行业实践
+
+### 应用场景地图
+
+下表按工程现场的具体场景，对照本页知识点给出选型与注意点。
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|:--|:--|:--|:--|
+| 后台管理系统的万行表格首屏 | 代码分割、动态 import | Webpack `splitChunks` 配合动态 `import()` | 表格依赖不要混进路由主包，块名固定才有利于长期缓存 |
+| 低端安卓上的营销活动首屏 | Tree-shaking、产物压缩 | esbuild `bundle` 配合 `minify` | `target` 定得越低，插入的降级代码越多，先量体积再定档 |
+| 多人协作白板 | 代码分割边界 | Webpack 动态 import 加常驻长连接模块 | 协同内核不要放进懒加载块，重连时不该重新下载 |
+| 组件库发布到 npm | Tree-shaking、输出格式 | Rollup 多格式输出加 `external` | 声明无副作用之前，先确认样式是怎么引入的 |
+| SSR 的电商详情页 | 输出格式、外部依赖 | Webpack `externals` 或 Rollup `external` | 服务端与客户端产物要指向同一份模块实例 |
+| Chrome 扩展的 content script | 输出格式 | esbuild `--format=iife` | 该环境不能直接加载 ESM，也拿不到运行时按需加载 |
+| 埋点 SDK 发到 CDN | 产物体积、摇树 | esbuild `--format=iife --minify` | SDK 要自包含，第三方依赖必须打进产物 |
+| 微前端子应用 | 代码分割、共享依赖 | Webpack Module Federation | 共享依赖版本要统一，否则运行时会同时存在多份实例 |
+| 遗留 Webpack 4 项目升级 | 分割策略、缓存 | Webpack 5 的 `optimization.splitChunks` | 先让构建跑通，再调分割，别把两件事放在同一次改动里 |
+
+### 三个场景拆解
+
+#### 场景 1：后台管理系统的万行表格首屏
+
+**业务背景**：表格首屏要渲染上万行，用户进页面就滚动查看，脚本求值占掉主要等待时间。项目路由有几十个，主包体积随页面数量一起增长。
+
+**怎么用本页知识解决**：思路是按路由和依赖体积切块，把只为表格服务的依赖单独成块，首屏只下载主包与表格块。
+
+```js
+// 1. 路由级懒加载：进入表格页才下载对应代码
+const TablePage = () => import(/* webpackChunkName: "table-page" */ './TablePage');
+
+// 2. 把虚拟滚动库单独成块，避免它被重复打进多个页面
+module.exports = {
+  optimization: {
+    splitChunks: {
+      cacheGroups: {
+        virtualList: {
+          test: /[\\/]node_modules[\\/]react-window/, // 命中虚拟滚动库
+          name: 'vendor-virtual-list',                // 固定块名，利于长期缓存
+          chunks: 'all',                              // 同步与异步块都参与提取
+        },
+      },
+    },
+  },
+};
+```
+
+- 动态 import 把表格页拆成独立块，首屏不必解析表格代码。
+- cacheGroups 按路径命中虚拟滚动库，块名固定后内容不变就不失效。
+- chunks 设为 all，让同步引入该库的页面也复用它，避免重复下载。
+- 入口主包只留路由表和布局，页面数量增加不会推高首屏体积。
+- 懒加载块的依赖要自洽，别让它在运行时再去拉别的公共块。
+
+**怎么度量收益**：
+
+- 用 webpack-bundle-analyzer 看主包与 table-page 块的体积构成。
+- 用 Chrome DevTools 的 Network 面板看首屏请求数与 transfer size。
+- 用 Lighthouse 移动端模式看 FCP、LCP。
+- 用 Performance 面板录制首屏，看主线程长任务的数量与时长。
+
+**什么时候不该用**：
+
+- 表格页是用户登录后的唯一落地页，再拆一块只是多一次请求往返。
+- 表格数据要在首屏一次性导出或打印全量内容，懒加载省不下解析时间。
+- 项目没接入 Webpack，只为拆包引入它属于增加维护面。
+
+#### 场景 2：低端安卓上的营销活动首屏
+
+**业务背景**：活动页投放到低端安卓机型，网络与 CPU 都受限，首屏等待直接掉转化。页面上线周期短，代码里沉淀了多个版本的组件。
+
+**怎么用本页知识解决**：思路是压小产物、只做目标浏览器需要的语法降级，并用副作用声明让摇树真正生效。
+
+```js
+// esbuild 构建脚本：首屏产物给低端安卓浏览器加载
+await esbuild.build({
+  entryPoints: ['src/main.js'],
+  bundle: true,       // 合并依赖，减少首屏请求数
+  minify: true,       // 压缩标识符与空白，降低传输体积
+  format: 'iife',     // 单文件自执行，不依赖浏览器模块加载
+  target: ['es2017'], // 只插入目标浏览器需要的语法降级
+  outfile: 'dist/main.js',
+});
+```
+
+- bundle 把依赖合成一个文件，首屏请求数从多次降到一次。
+- minify 压小传输体积，配合服务端 gzip 后效果叠加。
+- target 只做必要降级，不写 es5 就不会插入大段垫片。
+- 依赖包的 package.json 里声明 sideEffects 为 false，工具才敢删未使用的导出。
+- 活动页避免动态 import，弱网下多一次往返的代价高于切块收益。
+
+**怎么度量收益**：
+
+- 用 Lighthouse 移动端模式看 FCP、LCP、TBT，并开启 Slow 4G 与 CPU 降速。
+- 用 Network 面板看首屏 JS 的 transfer size 与请求数。
+- 用 Performance 面板看 Evaluate Script 的耗时。
+- 改前改后固定同一台真机或同一档降速设置，避免换设备让结论失真。
+
+**什么时候不该用**：
+
+- 要支持只认 ES5 的内嵌 WebView 时，降级代码与 polyfill 会把体积推回去。
+- 页面内容由 SSR 直出且首屏已有可读内容，压缩 JS 对 LCP 的影响变小。
+- 页面依赖大量运行时按需加载的模块，比如地图与直播，强行合成单文件会拉长解析。
+
+#### 场景 3：组件库发布到 npm
+
+**业务背景**：组件库被多个业务项目引用，使用方只用一个按钮，产物里却带进整包代码。发布物要同时服务打包工具和 Node 环境。
+
+**怎么用本页知识解决**：思路是输出多格式产物、把宿主框架列为外部依赖，并声明模块无副作用。
+
+```js
+// rollup.config.js：组件库输出 ESM 与 CJS 两份产物
+export default {
+  input: 'src/index.js',
+  external: ['react', 'react-dom'],        // 框架由使用方提供，不重复打包
+  treeshake: { moduleSideEffects: false }, // 声明模块无副作用，便于消费端摇树
+  output: [
+    { file: 'dist/index.esm.js', format: 'es' },  // 给打包工具消费
+    { file: 'dist/index.cjs.js', format: 'cjs' }, // 给 Node 与旧工具链消费
+  ],
+};
+```
+
+- 两个 format 覆盖打包工具与 Node 两类消费方。
+- external 把 React 交给使用方，产物里不会出现第二份实例。
+- treeshake 与 package.json 的 sideEffects 一起声明，摇树才敢删代码。
+- 想让消费端按文件摇树，可用 preserveModules 保留模块结构，代价是产物文件数上升。
+- 声明无副作用前，要确认样式不是靠 import 的副作用引入的。
+
+**怎么度量收益**：
+
+- 用 rollup-plugin-visualizer 看两份产物的模块构成。
+- 用 npm pack --dry-run 看发布包的文件数与体积。
+- 建一个空工程只 import 一个组件，构建后检索产物里是否出现其他组件代码。
+- 在消费端用 webpack-bundle-analyzer 或 rollup-plugin-visualizer 复核。
+- tarball 体积与 gzip 后体积分别记录，两个数字不能互相替代。
+
+**什么时候不该用**：
+
+- 使用方全部走 CDN 直接引 IIFE，ESM 与 CJS 两份产物都是冗余。
+- 组件之间共享一个运行时单例，比如全局 store，拆成多入口会破坏单例。
+- 样式靠副作用 import 引入时，声明无副作用会把样式一起摇掉。
+- 只有内部项目使用且都走构建工具处理源码，直接发源码可以省掉多格式构建。
+
+### 行业先进实践
+
+**依赖预构建（出处：Vite 官方文档 Dependency Pre-Bundling）**
+
+Vite 用 esbuild 把 CommonJS 依赖预构建成 ESM，并把一个依赖的多个模块合并成一份文件。这样请求数下降，依赖内部也不会散成多文件。
+
+你的项目可以在构建前加一步预构建，把第三方 CJS 依赖先转成 ESM。
+
+**sideEffects 声明（出处：webpack 官方文档 Tree Shaking 章节）**
+
+package.json 里写 sideEffects 为 false，或者列出有副作用的文件，构建工具才敢删未使用的导出。它把能删和删了会出错两类模块分开。
+
+你的项目先列出样式与注册类文件，再对剩余模块声明无副作用。
+
+**模块结构保留输出（出处：Rollup 官方文档 output.preserveModules）**
+
+preserveModules 让产物保留源文件结构，使用方按需引入时只处理被引用到的文件，摇树的责任落到消费端。
+
+组件库按一文件一组件组织，再用 preserveModules 输出，接入方不必改引入方式。
+
+**模块共享（出处：webpack 官方文档 Module Federation）**
+
+多个独立构建的应用在运行时共享同一份依赖代码，各自不再打包一份，解决的是多应用重复加载同一依赖的问题。
+
+你的项目先统一子应用依赖版本，再圈定共享范围，版本不统一会让共享退化成多实例。
+
+**作用域提升（出处：Parcel 官方文档 Scope Hoisting）**
+
+Parcel 在生产构建中把模块合并进同一作用域，模块包装函数的数量随之下降，产物结构接近手写代码。
+
+你可以对照产物里包装函数的数量，判断哪些模块边界还有合并空间。
+
+### 从学到用：落地路线
+
+1. **试点**：选一个路由数量多、首屏体积有增长曲线的页面，只改它的加载方式。验收标准是改动只涉及该页面入口与配置，其他页面产物哈希不变。
+2. **验证**：在固定降速档位下，用 webpack-bundle-analyzer 与 Lighthouse 采集改前改后两组数据。验收标准是能给出两次测量的指标表，且测量条件写清楚。
+3. **推广**：把试点结论整理成配置模板与检查清单，其他页面按同一模板接入。验收标准是新页面接入后检查清单逐项可勾选。
+4. **防回退**：把首屏产物体积与块数量做成构建期检查，超阈值时让构建报警。验收标准是人为引入一个体积偏大的依赖后，CI 能拦住这次提交。
+
+### 动手作业
+
+**目标**：为一个含四个路由的示例应用做代码分割与摇树验证，产出一份改前改后的对照记录。
+
+**步骤**：
+
+1. 用 Webpack 建一个含四个路由的应用，其中一个路由引入一个体积偏大的图表库。
+2. 记录改前数据：入口产物体积、首屏请求数、Lighthouse 移动端 FCP 与 LCP。
+3. 把该路由改成动态 import，并在配置里为图表库写一个 cacheGroup。
+4. 检查依赖包的 package.json 是否声明 sideEffects，用 webpack-bundle-analyzer 对比前后构成。
+5. 在固定降速档位下重新采集同一组指标，填进对照表。
+6. 在入口引入一个未被使用的工具库导出，确认产物里检索不到它。
+7. 把配置文件与结论写成一份 README，写清测量条件与已知限制。
+
+**验收标准**：
+
+- 首屏产物体积与首屏请求数都有改动前后的记录，且两次测量条件一致。
+- webpack-bundle-analyzer 的截图里能指出图表库被移到了独立块。
+- 未使用的导出在产物中检索不到对应函数名。
+- README 写清了测试机或降速档位，别人能复现同一组数字。
+- 改动只影响目标路由，其他路由的产物哈希保持不变。
+

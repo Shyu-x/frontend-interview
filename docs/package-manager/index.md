@@ -13,7 +13,26 @@ date: 2026-05-17
 
 ---
 
-## 一、三大包管理器概览
+## 1. 本章范围
+
+本章讲解 npm、pnpm、Yarn 的核心机制差异：先看三者全景与选型，再分别深入 pnpm 的内容寻址存储与 workspace，以及 Yarn Berry 的 PnP 与 Zero-install。
+
+## 2. 学习路径
+
+1. 阅读本页，建立整体认识
+2. [pnpm 深度解析](pnpm-deep-dive.md)：Hard Link/Symlink、内容寻址存储、幽灵依赖、workspace
+3. [Yarn Berry 解析](yarn-berry.md)：PnP、Zero-install、插件系统、TypeScript 配置
+
+## 3. 页面一览
+
+| 页面 | 你将学到 | 难度 |
+|------|----------|------|
+| [pnpm 深度解析](pnpm-deep-dive.md) | Hard Link/Symlink、内容寻址存储、幽灵依赖、workspace | 进阶 |
+| [Yarn Berry 解析](yarn-berry.md) | PnP、Zero-install、插件系统、TypeScript 配置 | 进阶 |
+
+---
+
+## 4. 三大包管理器概览
 
 | 特性 | npm | pnpm | Yarn |
 |------|-----|------|------|
@@ -27,9 +46,9 @@ date: 2026-05-17
 
 ---
 
-## 二、核心机制对比
+## 5. 核心机制对比
 
-### 2.1 node_modules 结构
+### 5.1 node_modules 结构
 
 ```mermaid
 graph TB
@@ -58,7 +77,7 @@ graph TB
     end
 ```
 
-### 2.2 关键差异点
+### 5.2 关键差异点
 
 | 差异点 | npm | pnpm | Yarn |
 |--------|-----|------|------|
@@ -69,9 +88,9 @@ graph TB
 
 ---
 
-## 三、各工具核心优势
+## 6. 各工具核心优势
 
-### 3.1 npm 的优势
+### 6.1 npm 的优势
 
 - **生态最大**：包数量最多，兼容性最好
 - **无需额外依赖**：Node.js 自带
@@ -85,7 +104,7 @@ npm run build        # 运行脚本
 npm outdated         # 检查更新
 ```
 
-### 3.2 pnpm 的优势
+### 6.2 pnpm 的优势
 
 - **极速安装**：Hard Link 避免重复下载
 - **节省磁盘**：全局 Store 共享内容
@@ -99,7 +118,7 @@ pnpm remove react   # 移除包
 pnpm store prune     # 清理未引用包
 ```
 
-### 3.3 Yarn Berry 的优势
+### 6.3 Yarn Berry 的优势
 
 - **Zero-install**：Git 仓库存储缓存，无需网络
 - **PnP 模式**：无 node_modules，解析速度极快
@@ -115,51 +134,51 @@ yarn dlx <package>   # 临时运行包
 
 ---
 
-## 四、面试常考点索引
+## 7. 面试常考点索引
 
-### 4.1 pnpm 相关
-
-| 题目 | 答案位置 |
-|------|----------|
-| pnpm 如何实现节省磁盘？ | [pnpm-deep-dive.md - Content-addressable Store](pnpm-deep-dive.md#content-addressable-store) |
-| Hard Link vs Symlink 区别？ | [pnpm-deep-dive.md - 链接机制](pnpm-deep-dive.md#hard-link-vs-symlink) |
-| 什么是幽灵依赖？pnpm 如何解决？ | [pnpm-deep-dive.md - 幽灵依赖](pnpm-deep-dive.md#_2) |
-| pnpm workspace 如何配置？ | [pnpm-deep-dive.md - workspace](pnpm-deep-dive.md#workspace) |
-
-### 4.2 Yarn Berry 相关
+### 7.1 pnpm 相关
 
 | 题目 | 答案位置 |
 |------|----------|
-| Yarn PnP 原理是什么？ | [yarn-berry.md - PnP 机制](yarn-berry.md#yarn-pnp) |
-| Zero-install 如何实现？ | [yarn-berry.md - Zero-install](yarn-berry.md#zero-install) |
-| Yarn Berry 与 1.x 核心区别？ | [yarn-berry.md - 版本对比](yarn-berry.md#yarn-1x-vs-berry) |
-| PnP 模式下 TypeScript 如何配置？ | [yarn-berry.md - TS 配置](yarn-berry.md#typescript) |
+| pnpm 如何实现节省磁盘？ | [pnpm-deep-dive.md - Content-addressable Store](pnpm-deep-dive.md#3-content-addressable-store) |
+| Hard Link vs Symlink 区别？ | [pnpm-deep-dive.md - 链接机制](pnpm-deep-dive.md#2-hard-link-vs-symlink-原理) |
+| 什么是幽灵依赖？pnpm 如何解决？ | [pnpm-deep-dive.md - 幽灵依赖](pnpm-deep-dive.md#4-幽灵依赖问题) |
+| pnpm workspace 如何配置？ | [pnpm-deep-dive.md - workspace](pnpm-deep-dive.md#5-workspace-配置) |
 
-### 4.3 通用场景
+### 7.2 Yarn Berry 相关
 
 | 题目 | 答案位置 |
 |------|----------|
-| monorepo 选型建议？ | [pnpm-deep-dive.md - monorepo 最佳实践](pnpm-deep-dive.md#monorepo) |
-| 依赖管理最佳实践？ | [pnpm-deep-dive.md - 最佳实践](pnpm-deep-dive.md#_3) |
+| Yarn PnP 原理是什么？ | [yarn-berry.md - PnP 机制](yarn-berry.md#3-yarn-pnp-机制) |
+| Zero-install 如何实现？ | [yarn-berry.md - Zero-install](yarn-berry.md#4-zero-install-原理) |
+| Yarn Berry 与 1.x 核心区别？ | [yarn-berry.md - 版本对比](yarn-berry.md#2-yarn-1x-vs-berry) |
+| PnP 模式下 TypeScript 如何配置？ | [yarn-berry.md - TS 配置](yarn-berry.md#6-typescript-配置) |
+
+### 7.3 通用场景
+
+| 题目 | 答案位置 |
+|------|----------|
+| monorepo 选型建议？ | [pnpm-deep-dive.md - monorepo 最佳实践](pnpm-deep-dive.md#6-monorepo-最佳实践) |
+| 依赖管理最佳实践？ | [pnpm-deep-dive.md - 最佳实践](pnpm-deep-dive.md#7-最佳实践) |
 
 ---
 
-## 五、选型建议
+## 8. 选型建议
 
-### 5.1 按场景选择
+### 8.1 按场景选择
 
 ```mermaid
 flowchart LR
-    A[项目类型] --> B{micro-apps?}
-    B -->|单仓库| C{npm / pnpm|
-    B -->|monorepo| D{pnpm / Yarn Berry|
-    D -->|追求速度| E[pnpm]
-    D -->|追求缓存| F[Yarn Berry]
-    C -->|企业内网| G[npm]
-    C -->|追求速度| H[pnpm]
+    A["项目类型"] --> B{"micro-apps?"}
+    B -->|单仓库| C{"npm / pnpm"}
+    B -->|monorepo| D{"pnpm / Yarn Berry"}
+    D -->|追求速度| E["pnpm"]
+    D -->|追求缓存| F["Yarn Berry"]
+    C -->|企业内网| G["npm"]
+    C -->|追求速度| H["pnpm"]
 ```
 
-### 5.2 性能对比参考
+### 8.2 性能对比参考
 
 | 操作 | npm | pnpm | Yarn (Berry) |
 |------|-----|------|--------------|
@@ -169,7 +188,7 @@ flowchart LR
 
 ---
 
-## 六、延伸阅读
+## 9. 延伸阅读
 
 - [pnpm 深度解析](./pnpm-deep-dive.md)
 - [Yarn Berry 解析](./yarn-berry.md)

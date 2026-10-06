@@ -754,3 +754,204 @@ export default defineConfig(({ mode }) => ({
 - [Rolldown GitHub](https://github.com/rolldown/rolldown)
 - [Rollup 插件开发文档](https://rollupjs.org/plugin-development/)
 - [Vite 插件合集 awesome-vite](https://github.com/vitejs/awesome-vite)
+
+## 深入阅读与参考
+
+!!! tip "怎么用这些资料"
+    先读「官方文档与规范」建立准确的概念，再读「源码与示例」核对细节，最后用「教程、书籍与视频」换一种讲法加深理解。每条都写明了读哪一节、带着什么问题读。
+
+### 官方文档与规范
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [Why Vite](https://vite.dev/guide/why) | 官方阐述原生 ESM 开发服务器与依赖预构建的设计动机 | 先读 Native ESM 与 Bundler 两节，读完能解释 dev 为何不打包、预构建解决什么 |
+| [HMR API](https://vite.dev/guide/api-hmr) | HMR 客户端 API 的一手说明，界定模块更新的边界 | 重点读 accept、dispose、invalidate，读完给一个组件写自定义 accept 回调 |
+| [Plugin API](https://rolldown.rs/apis/plugin-api) | 插件 Hook 类型与执行顺序的权威定义，写插件前必读 | 按 dev 与 build 两阶段梳理 hook 表，带着“谁先执行”读，读完写打印顺序的插件 |
+| [Environment API](https://vite.dev/guide/api-environment) | 环境 API 总览，理解 dev 与 build 共享及多环境运行时 | 先读概念图与环境生命周期，再对照配置里的 environments 字段逐项验证 |
+| [Server Options](https://vite.dev/config/server-options) | dev server 端口、代理、WebSocket、监听等选项的完整语义 | 查 proxy 与 hmr 两节，带着“代理和 ws 怎么配”读，改一项看终端输出 |
+| [Bundler API](https://rolldown.rs/apis/bundler-api) | 官方 Bundler API 文档，展示以编程方式调用打包能力 | 读创建实例的示例并跑通最小构建，再与 vite build 的产物做对比 |
+| [Vite：Rolldown 集成](https://vite.dev/guide/rolldown.html) | Rolldown 集成与迁移路径，对应构建流程的核心变化 | 读迁移步骤与差异说明，在测试分支试跑，对比构建耗时与产物差异 |
+| [JavaScript API](https://vite.dev/guide/api-javascript) | createServer、build、preview 等编程入口，串起 dev 与 build | 读 createServer 与 build 两节，写脚本以编程方式启动服务并正确关闭 |
+
+### 源码与示例
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [vite](https://github.com/vitejs/vite) | 从 server/index.ts 看 createServer 如何组装中间件与 ws 服务 | 读 createServer 与中间件链，带着“请求如何走到 transform”读，读完画请求流程图 |
+
+### 教程、书籍与视频
+
+| 资源 | 为什么读 | 怎么读 |
+|---|---|---|
+| [Vite：插件 API（中文）](https://cn.vitejs.dev/guide/api-plugin.html) | 中文插件教程，用 transform 钩子直观感受执行顺序 | 照教程写 transform 插件打印日志，再用 debug 输出核对 hook 排序 |
+| [Vite：构建生产版本（中文）](https://cn.vitejs.dev/guide/build.html) | 中文讲解生产构建与分包配置，衔接构建流程与产物分析 | 配置 manualChunks 后构建一次，读产物报告并解释每个 chunk 的拆分依据 |
+| [Vite：依赖预构建](https://vite.dev/guide/dep-pre-bundling.html) | 中文讲清依赖预构建的时机与缓存，补足 dev server 链路 | 用 optimizeDeps 观察缓存目录，修改依赖后解释何时会重新预构建 |
+
+## 应用与行业实践
+
+### 应用场景地图
+
+| 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+| --- | --- | --- | --- |
+| 后台管理的万行表格 | HMR 边界（import.meta.hot.accept） | Vue 3 + 虚拟滚动库 | 列定义改动不要触发整页刷新，否则滚动位置与选中行丢失 |
+| 低端安卓的首屏加载 | 构建流程的代码分割与压缩体积 | Vite build + 动态 import | 先量 LCP 再动分包，只压体积不改首屏路径看不到变化 |
+| 多人协作白板 | 模块图与 HMR 状态保持（hot.data） | Canvas + WebSocket | 编辑态仍需服务端落盘，内存快照只服务于开发期 |
+| monorepo 组件库联调 | 依赖预构建（optimizeDeps） | pnpm workspace + link 源码 | 链接源码后要走 exclude，改动才落到源码模块 |
+| SSR 内容站首屏 | Environment API 与 SSR 加载 | Vite 的 SSR 条目 | 客户端与服务端模块图不同，不要共用同一份全局状态 |
+| 微前端子应用独立开发 | Dev Server 按需编译与端口代理 | Vite 子应用 + 主应用基座 | 单独起服时跨域与静态资源前缀要另配 |
+| 营销页高频改版 | Dev Server 冷启动与 HMR | Vite + 静态托管 | 只有开发期享受 HMR，线上仍走完整构建 |
+| 大型 monorepo 冷启动 | 依赖预构建缓存、server.warmup | Vite + 持久化缓存 | 预热清单要跟着入口变化维护 |
+
+### 三个场景拆解
+
+#### 场景 1：后台管理的万行表格
+
+**业务背景**：一个后台页面要渲染上万行数据，列数在几十列，运营每天改列定义与单元格渲染函数。开发时改一列就整页刷新，滚动位置、筛选条件、选中行全部归零。
+
+**怎么用本页知识解决**：把列定义拆成独立模块并声明为 HMR 边界，让 Vite 只替换这个模块；把导出用的重依赖改成动态 import，从首屏链路上摘掉。
+
+```js
+// src/table/columns.js
+import { statusTag } from './cells/status.js'
+
+export const columns = [
+  { key: 'id', title: '编号' },
+  { key: 'status', title: '状态', render: statusTag }
+]
+
+// 声明 HMR 边界：只替换本模块，不刷新整张表格
+if (import.meta.hot) {
+  import.meta.hot.accept((next) => {
+    // 把新列定义交给表格实例，保留滚动位置与选中行
+    tableApi.setColumns(next.columns)
+  })
+}
+
+// 导出逻辑改成动态 import，首屏不下载 xlsx
+export async function exportVisible() {
+  const { utils, writeFile } = await import('xlsx')
+  writeFile(utils.book_new(), 'rows.xlsx')
+}
+```
+
+- `import.meta.hot.accept` 把 columns.js 变成边界，Vite 只替换该模块，表格实例不重建。
+- 回调里调用实例方法更新列，而不是重新 mount，DOM 上的滚动位置与选中行保留。
+- 动态 import 让 xlsx 落到独立 chunk，首屏请求里不含这份体积。
+- 若 columns.js 被没有 accept 的父模块直接引用，更新会沿模块图向上冒泡到最近的边界。
+- 回调里只做增量赋值，不要复制整个表格数据，避免一次更新触发全量重渲染。
+
+**怎么度量收益**：用 Chrome DevTools Performance 录制"改一行代码到界面更新完成"的耗时，分别录整页刷新与 HMR 两种情况。用 Network 面板确认改代码后文档请求数没有增加。用 `vite build` 日志记录入口 chunk 的 gzip 体积变化。
+
+**什么时候不该用**：
+- 列定义与表格组件写在同一个文件里，改动必然牵动整棵模块树，边界起不到隔离作用。
+- 页面数据来自服务端分页且只渲染几十行，改代码不损失任何状态，边界代码增加维护面。
+- 模块会被测试环境直接跑源码，`import.meta.hot` 为 undefined，没有兜底分支会直接报错。
+
+#### 场景 2：低端安卓的首屏加载
+
+**业务背景**：面向千元安卓机的 H5 活动页，用户处在波动的 4G 网络下，首屏要在 3 秒内出现可用内容。团队先量 LCP，再决定动哪一块。
+
+**怎么用本页知识解决**：把非首屏必需的库从入口摘出去，用动态 import 拆成独立 chunk；把构建 target 对齐到项目实际支持的最低内核，避免产出用不到的降级代码。
+
+```js
+// vite.config.js
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  build: {
+    // 对齐项目实际支持的最低浏览器内核，语法降级范围收窄
+    target: 'chrome90',
+    // 保留压缩后体积报告，用来定位拖慢首屏的 chunk
+    reportCompressedSize: true
+  }
+})
+```
+
+- `target` 决定语法降级的下限，设得过低会把可选链等写法改成体积更大的降级代码。
+- `reportCompressedSize` 打开后，构建日志会打印每个 chunk 的 gzip 体积，先定位再动手。
+- 动态 import 的模块在产物里是独立文件，入口文件不含其代码，首屏请求数不会因此增加。
+- 首屏骨架用 HTML 与独立 CSS 给出，交互逻辑放到空闲回调里启动，让 LCP 先完成。
+- 埋点与错误上报这类必须早于渲染执行的小体积库，留在同步链路，不要为了拆而拆。
+
+**怎么度量收益**：用 Lighthouse 的移动端模式加 4G 模拟，取 LCP、TBT、Speed Index。用 Network 面板勾选 Disable cache 与 Fast 4G，记录首屏请求数与传输体积。用 `vite build` 输出对比入口 chunk 的 gzip 体积。用 WebPageTest 在多地区节点复测同一地址，看 LCP 分布。
+
+**什么时候不该用**：
+- 项目是内网后台，用户都在桌面浏览器，带宽不是约束，投入应转到交互改造上。
+- 首屏慢的原因是接口串行请求或图片未压缩，JS 体积不是瓶颈，改分包看不到 LCP 变化。
+- 目标环境必须支持旧内核，动态 import 与 ESM 产物都要额外降级方案，改造成本高于收益。
+
+#### 场景 3：多人协作白板
+
+**业务背景**：白板页面同时承载画布、协作者光标与历史记录，开发时改一处渲染逻辑就整页刷新，画布内容与 WebSocket 连接一起断开。房间内协作者越多，重连等待越明显。
+
+**怎么用本页知识解决**：用 `import.meta.hot.dispose` 在替换前把内存态交给 Vite 暂存，在新模块的 accept 回调里回填，连接层模块不进边界。
+
+```js
+// src/board/state.js
+export const state = { strokes: [], cursors: new Map(), selected: null }
+
+if (import.meta.hot) {
+  // 替换前把画布内容交给 Vite 暂存
+  import.meta.hot.dispose((data) => {
+    data.snapshot = { strokes: state.strokes, selected: state.selected }
+  })
+  // 新模块接管后回填，WebSocket 连接不断开
+  import.meta.hot.accept((next) => {
+    next.state.strokes = import.meta.hot.data.snapshot.strokes
+    next.state.selected = import.meta.hot.data.snapshot.selected
+    next.repaint()
+  })
+}
+```
+
+- `dispose` 在旧模块被替换前执行，传入的 data 对象会跨这次更新保留下来。
+- `accept` 回调拿到新模块，回填绘制所需的最小状态，画面不闪断。
+- WebSocket 连接所在的模块没有被 accept，替换过程中连接保持不动。
+- `cursors` 由服务端推送、可随时重拉，不放进快照，避免快照随协作者数量膨胀。
+- 回填后要显式触发一次重绘，否则状态换了但画布还停在上一帧。
+
+**怎么度量收益**：用 Performance 录制"改一次渲染函数到画面恢复"的耗时，并对照整页刷新的耗时。用 Network 面板看改代码后文档请求是否重发。用服务端日志统计单位时间内的 WebSocket 重连次数，比较改造前后。用 Performance 录制拖动笔迹时的帧率与长任务数量。
+
+**什么时候不该用**：
+- 状态已经由外部文档模型（例如 CRDT 库）持有，模块替换后本来就能重建，写快照只增加维护面。
+- 改动只涉及样式，CSS 走 Vite 自带的热更新，不需要为它加 accept 分支。
+- 页面只有一位开发者偶尔打开，整页刷新的代价低于快照代码长期维护的代价。
+
+### 行业先进实践
+
+**依赖预构建的冷启动扫描与运行期补扫（出处：Vite 官方文档《Dependency Pre-Bundling》）**：预构建把 CJS/UMD 依赖转成 ESM 并合并请求，减少浏览器侧的模块请求数量。首次访问遇到未收录的依赖时触发补扫并重新预构建。借鉴方式是把动态 import 的入口写进 optimizeDeps 的扫描范围，避免运行期才发现新依赖。
+
+**按需编译配合 server.warmup（出处：Vite 官方文档《Performance》）**：开发服务器只编译被真正请求到的模块，warmup 让启动阶段提前编译指定文件。借鉴方式是把首屏路由与常改的组件列进预热清单，冷启动后的第一次点击少一次等待。
+
+**库模式产出多格式产物（出处：Vite 官方文档《Library Mode》）**：用 build.lib 输出 ES 与 UMD，并把 peer 依赖放进 external。借鉴方式是在 monorepo 里让组件库走库模式发布，同时用链接源码的方式做联调，两套路径共用同一份插件配置。
+
+**用 vite-plugin-inspect 观察插件 Hook 顺序（出处：开源项目 vite-plugin-inspect）**：该插件提供一个页面，展示 resolveId、load、transform 的执行顺序与耗时。借鉴方式是插件互相覆盖配置时先看顺序，再决定用 enforce 调整位置，而不是逐个试。
+
+**打包器替换后的分包配置迁移（需核对官方文档：核对 Vite 8 的迁移指南与 build 选项页，确认默认打包器、manualChunks 的对应配置，以及第三方插件 Hook 的兼容层范围）**：Vite 8 的构建管线与旧版本存在差异，分包写法与插件兼容性需要以官方迁移文档为准。核对完成前，不要把旧配置直接照搬到新版本。
+
+### 从学到用：落地路线
+
+1. 试点：挑一个开发期反馈最慢的子应用，只加 HMR 边界与动态 import，不改构建配置。验收标准：该子应用连续开发两天，整页刷新只在依赖变更时出现。
+2. 验证：在同一台机器、同一浏览器上跑改动前后的对照记录，覆盖冷启动耗时、首屏 JS 体积、一次改动的可见耗时。验收标准：三项都有前后两组数据，且没有一项劣化。
+3. 推广：把试点确认的配置抽成共享 preset，接到其余子应用上。验收标准：preset 被至少两个子应用接入，各自的 CI 构建全部通过。
+4. 防回退：把体积与冷启动指标接进 CI，超阈值即失败，并在 PR 模板里加勾选项。验收标准：连续 10 次合并不触发阈值告警，触发时日志能定位到具体 chunk。
+
+### 动手作业
+
+**目标**：给一个已有页面加上 HMR 边界与动态 import，并用测量数据说明改动带来的变化。
+
+**步骤**：
+1. 起一个 Vite 项目，加一个依赖体积较大的页面（例如引入一个表格库或图表库），跑一次 `vite build` 记录入口 chunk 的 gzip 体积。
+2. 用 DevTools Network 面板勾选 Fast 4G 与 Disable cache，记录首屏的 JS 请求数与传输体积。
+3. 把重依赖改成动态 import，并把改动点收敛到一个模块，重复第 2 步的记录。
+4. 给这个模块加 `import.meta.hot.accept`，回调里更新已有实例或 DOM，不重新挂载。
+5. 用 Performance 面板录制"改一行代码到界面更新完成"的耗时，整页刷新与 HMR 各录一次。
+6. 用静态服务器打开 dist 目录，确认生产产物里不含热更新分支，动态 import 的模块仍能正常加载。
+
+**验收标准**：
+- 首屏 JS 传输体积低于改动前，且降幅能在构建日志里对应到某个 chunk。
+- 改代码后页面不整页刷新，Network 面板里文档请求数不增加。
+- 生产产物的入口文件不含被动态 import 的那个依赖的代码。
+- Performance 记录里"改代码到界面更新"的耗时低于整页刷新的耗时，两次录制条件相同。
+- 关掉 Dev Server、用静态服务器打开 dist，页面功能完整可用。
+

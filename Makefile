@@ -1,4 +1,4 @@
-.PHONY: help install dev build clean lint test
+.PHONY: help install dev build clean lint test seo
 
 help:
 	@echo "前端面试全家桶 - Makefile"
@@ -9,6 +9,7 @@ help:
 	@echo "  make build      构建生产版本"
 	@echo "  make clean      清理构建产物"
 	@echo "  make lint       检查文档"
+	@echo "  make seo        构建并校验 SEO/GEO（sitemap、llms.txt、结构化数据等）"
 
 install:
 	uv sync
@@ -25,3 +26,7 @@ clean:
 
 lint:
 	uv run mkdocs build 2>&1 | grep -E "(WARNING|ERROR)" || echo "构建通过，无警告"
+
+seo:
+	uv run mkdocs build --clean
+	python3 scripts/seo-check.py site

@@ -1,59 +1,62 @@
 site_name: 前端面试全家桶
-site_description: 前端面试高频知识点配套代码示例与图解，助你系统复习、斩获 Offer
-site_author: Frontend Interview Study
+site_description: 面向前端工程师的中文系统化教程：从 JavaScript、TypeScript、浏览器、网络到 React/Vue、工程化、性能优化、API 设计、WebAssembly 与 AI Agent，每页都有图解、分步讲解、可运行代码与自测题。
+site_author: Shyu-x
 site_url: https://shyu-x.github.io/frontend-interview
 
 repo_name: frontend-interview
-repo_url: https://github.com/example/frontend-interview
+repo_url: https://github.com/Shyu-x/frontend-interview
+edit_uri: ""
 
 theme:
   name: material
+  custom_dir: overrides
+  favicon: assets/favicon.svg
   language: zh
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-sunny
         name: 切换到深色模式
 
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-night
         name: 切换到浅色模式
 
   font:
-    text: "Noto Sans SC"
+    text: "Inter"
     code: "JetBrains Mono"
     fallback: true
 
   icon:
     repo: fontawesome/brands/github
+    logo: material/book-open-page-variant-outline
     annotate: material/sticky-note-outline
 
   features:
     - navigation.instant
     - navigation.instant.prefetch
     - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
+    - navigation.path
+    - navigation.prune
     - navigation.top
     - search.suggest
     - search.highlight
     - content.code.copy
     - content.code.annotate
-    - toc.integrate
-    - header.autohide
+    - toc.follow
 
 plugins:
   - search
-  - social:
-      cards_layout_options:
-        font_family: Noto Sans SC
 
 markdown_extensions:
   - abbr
@@ -66,6 +69,7 @@ markdown_extensions:
   - toc:
       permalink: true
       toc_depth: 4
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
 
   - pymdownx.arithmatex:
       generic: true
@@ -96,111 +100,556 @@ markdown_extensions:
   - pymdownx.tilde
 
 nav:
-  - Home: index.md
-  - HTML 篇:
-    - html/hyper-frequencies.md
-  - CSS 篇:
-    - css/hyper-frequencies.md
-    - 核心原理:
-      - css/section-1-5.md
+- 首页: index.md
+- 前端基础:
+  - HTML:
+    - 概览: html/index.md
+    - 基础与语义化:
+      - HTML5 新特性: html/html5-new-features.md
+      - 语义化与无障碍: html/semantic-and-accessibility.md
+      - meta 与 viewport: html/meta-and-viewport.md
+      - HTML/XML/JSON: html/xhtml-html-xml-json.md
+      - 默认样式重置: html/default-styles-reset.md
+    - 脚本与加载:
+      - 脚本加载与阻塞: html/script-loading.md
+      - 资源提示与首屏优化: html/resource-hints-and-first-screen.md
+      - SEO 与 Web Vitals: html/seo-and-web-vitals.md
+    - 文档与 DOM:
+      - DOM 与 BOM: html/dom-vs-bom.md
+      - innerHTML 与 textContent: html/inner-html-text-content.md
+      - 集合与 document.write: html/dom-collections-and-document-write.md
+      - data-* 属性: html/data-attributes.md
+      - Web Components: html/web-components.md
+      - 可编辑与拖拽: html/contenteditable-and-drag.md
+    - 表单:
+      - 表单提交: html/form-submission.md
+      - label 与 input 状态: html/label-and-input-states.md
+    - 嵌入与媒体:
+      - iframe: html/iframe.md
+      - Canvas、SVG 与多媒体: html/media-canvas-svg.md
+    - 无障碍:
+      - 无障碍：可访问性树、ARIA 与键盘交互: html/accessibility-aria-deep.md
+  - CSS:
+    - 概览: css/index.md
+    - 基础:
+      - 盒模型与单位: css/box-model-and-units.md
+      - 选择器与优先级: css/selectors-specificity.md
+      - 浮动: css/float.md
+      - Flex 布局: css/flexbox.md
+      - 响应式布局: css/responsive-layout.md
     - 布局进阶:
-      - css/section-6-10.md
-  - JavaScript 篇:
-    - js/hyper-frequencies.md
-    - js/section-13-18.md
-    - js/section-19-25.md
-    - js/event-loop-questions.md
-  - 算法篇:
-    - algorithm/index.md
-  - TypeScript 篇:
-    - TypeScript 核心概念与面试题: typescript/index.md
-  - 构建工具篇:
-    - 构建工具全景图: build-tools/index.md
-    - Vite 8.x 深度解析: build-tools/vite-deep-dive.md
-    - 打包工具对比: build-tools/bundler-comparison.md
-  - 包管理器篇:
-    - 包管理器总览: package-manager/index.md
-    - pnpm 深度解析: package-manager/pnpm-deep-dive.md
-    - Yarn Berry: package-manager/yarn-berry.md
-  - 网络篇:
-    - network/section-5-12.md
-    - network/section-13-20.md
-  - 性能优化:
-    - 前端性能优化全攻略: performance/index.md
-  - 手写代码:
-    - 手写代码题库: coding/index.md
-    - 高级模式: coding/advanced-patterns.md
-  - React 篇:
-    - 核心基础:
-      - React 18 核心概念: react/react-18-core.md
-      - React Hooks 深入原理: react/react-hooks-deep.md
-      - React Fiber 架构: react/fiber-architecture.md
+      - BFC 与 margin 塌陷: css/bfc-margin-collapse.md
+      - 格式化上下文: css/formatting-contexts.md
+      - 定位与层叠: css/position-stacking.md
+      - Grid 布局: css/grid.md
+      - 居中与多栏布局: css/centering-and-column-layouts.md
+    - 视觉、动效与性能:
+      - 过渡与动画: css/transition-animation.md
+      - 回流重绘与性能: css/rendering-performance.md
+      - 实用技巧与暗黑模式: css/practical-techniques.md
+    - 工程化:
+      - 工程化架构: css/css-architecture.md
+      - 预处理与工具链: css/css-toolchain.md
+      - 底层原理手写:
+        - pnpm 与 Workspace Monorepo：幽灵依赖与依赖隔离: engineering/pnpm-workspace-monorepo.md
+        - Node 模块解析算法与依赖提升原理: engineering/node-resolution-hoisting.md
+        - Monorepo 任务编排：Turborepo、Nx 与缓存原理: engineering/monorepo-task-runner.md
+        - 手写迷你打包器：模块图、运行时、Tree Shaking: engineering/mini-bundler-handwritten.md
+        - Vite 底层：预构建、按需编译、HMR 与插件容器: engineering/vite-hmr-internals.md
+        - Babel/AST 底层与手写迷你编译器: engineering/babel-ast-handwritten.md
+        - Tapable 与 Webpack 插件体系手写: engineering/tapable-plugin-system.md
+        - Source Map 原理：VLQ 编码与手写解析器: engineering/sourcemap-vlq.md
+        - 微前端原理：沙箱、样式隔离与 Module Federation: engineering/micro-frontend-sandbox.md
+        - 依赖管理与供应链安全: engineering/supply-chain-lockfile-security.md
+        - 测试框架原理：手写 mini-jest 与 mock/快照/覆盖率: engineering/testing/test-runner-handwritten.md
+        - 渲染策略：CSR、SSR、SSG、ISR 与水合: engineering/ssr-ssg-isr-hydration.md
+      - 状态管理:
+        - Redux 与 Redux Toolkit 底层与手写: engineering/state-management/redux-internals.md
+        - 前端状态管理选型指南: engineering/state-management/selection-guide.md
+        - 服务端状态：TanStack Query、SWR 与缓存手写: engineering/state-management/server-state-query.md
+        - Signals 与细粒度响应式手写: engineering/state-management/signals-fine-grained.md
+        - 状态机与 XState：把流程建模为有限状态: engineering/state-management/state-machines-xstate.md
+        - Zustand、Jotai 与 useSyncExternalStore 手写: engineering/state-management/zustand-jotai-external-store.md
+    - 题目索引: css/question-index.md
+    - MDN 精读:
+      - 动画、滚动驱动动画与 View Transitions：MDN 精读: css/deep-dive/animations-view-transitions.md
+      - 层叠、@layer、嵌套与容器查询：MDN 精读: css/deep-dive/cascade-layers-nesting-containers.md
+      - Grid 与 Flexbox：MDN 精读: css/deep-dive/grid-flex-mdn.md
+  - JavaScript:
+    - 概览: js/index.md
+    - 语言基础:
+      - 数据类型与转换: js/data-types.md
+      - 闭包与作用域: js/closure-scope.md
+      - this 与函数调用: js/this-binding.md
+      - 原型与继承: js/prototype-inheritance.md
+      - 函数式编程: js/functional-programming.md
+    - 异步编程:
+      - Promise 与 async/await: js/promise-async.md
+      - 事件循环与定时器: js/event-loop.md
+      - 事件循环题库: js/event-loop-practice.md
+    - 数据与对象:
+      - 深浅拷贝: js/deep-copy.md
+      - Map 与 Set: js/map-set.md
+      - 迭代器与生成器: js/iterator-generator.md
+      - Proxy 与 Reflect: js/proxy-reflect.md
+    - 模块与运行:
+      - ESM 与 CommonJS: js/esm-commonjs.md
+      - 垃圾回收: js/garbage-collection.md
+      - Web Worker: js/web-worker.md
+      - 防抖与节流: js/debounce-throttle.md
+      - 参考资料: js/references.md
+    - ES6+ 语言底层:
+      - let/const、TDZ 与作用域底层: js/es6-scope-tdz-environment.md
+      - 解构、展开、模板字符串与标签模板: js/destructuring-spread-template.md
+      - Symbol 与内置 well-known Symbols: js/symbol-well-known.md
+      - 迭代器、生成器与协程：手写 co 与 async/await: js/iterator-generator-coroutine.md
+      - Class 进阶：私有字段、静态块与装饰器: js/class-private-static-decorators.md
+      - ES2023–ES2025 新特性全解: js/es2023-2025-new-features.md
+      - Array API 全景：ES6 到 ES2025 与手写 polyfill: js/array-api-es6-to-es2025.md
+      - Object API 与属性描述符: js/object-api-property-descriptor.md
+      - 字符串、Unicode 与 Intl: js/string-unicode-intl.md
+      - 正则表达式：语法进阶与回溯引擎手写: js/regexp-engine.md
+      - Number、BigInt 与浮点精度: js/number-bigint-precision.md
+      - Date 的陷阱与 Temporal API: js/date-temporal.md
+    - 内存、并发与引擎:
+      - ArrayBuffer、TypedArray 与 DataView: js/typed-array-arraybuffer.md
+      - SharedArrayBuffer、Atomics 与内存模型: js/sharedarraybuffer-atomics.md
+      - V8 对象模型：隐藏类、内联缓存与数组元素种类: js/v8-object-model.md
+      - WeakMap、WeakRef 与内存泄漏排查: js/weakref-memory-leak.md
+      - 异步编程进阶：AbortController 与 Streams API: js/async-streams-abort.md
+    - 手写数据结构:
+      - 手写数据结构（一）：链表、栈、队列、双端队列、环形缓冲: js/ds-linear-structures.md
+      - 手写数据结构（二）：哈希表、堆、Trie、并查集: js/ds-hash-heap-trie.md
+      - 手写数据结构（三）：二叉搜索树、AVL、跳表、图: js/ds-tree-graph-skiplist.md
+    - MDN 精读:
+      - Class 与原型继承：MDN 精读: js/deep-dive/classes-inheritance-mdn.md
+      - 相等性、类型转换与数字字符串：MDN 精读: js/deep-dive/equality-types-coercion.md
+      - 迭代协议与生成器：MDN 精读: js/deep-dive/iterators-generators-mdn.md
+      - 内存管理与闭包：MDN 精读: js/deep-dive/memory-management-closures.md
+      - JavaScript 模块：MDN 精读: js/deep-dive/modules-esm-mdn.md
+      - Promise 与异步：MDN 精读与手写: js/deep-dive/promises-async-mdn.md
+      - Proxy、Reflect 与元编程：MDN 精读: js/deep-dive/proxy-reflect-metaprogramming.md
+      - Streams、Fetch 与 Web Workers：MDN 精读: js/deep-dive/streams-fetch-workers.md
+  - TypeScript:
+    - 概览: typescript/index.md
+    - 基础:
+      - 基础与类型: typescript/basics.md
+      - 接口与泛型: typescript/generics.md
+    - 进阶:
+      - 高级类型: typescript/advanced-types.md
+      - 协变逆变与兼容: typescript/type-compatibility.md
+    - 工程实践:
+      - 枚举与声明文件: typescript/enums-declarations.md
+      - 框架与编译性能: typescript/frameworks-performance.md
+    - 新版本与底层:
+      - TypeScript 5.x 特性时间线（5.0–5.9）: typescript/ts5-feature-timeline.md
+      - TypeScript 6.0：桥梁版本与迁移指南: typescript/ts6-bridge-release.md
+      - TypeScript 7.0：Go 原生编译器: typescript/ts7-native-compiler.md
+      - 类型系统底层：结构化类型、可赋值性与型变: typescript/type-system-internals.md
+      - 类型体操实战：从 type-challenges 到工程: typescript/type-gymnastics-handwritten.md
+      - tsconfig 与模块解析全解: typescript/tsconfig-module-resolution.md
+      - 编译器管线与手写迷你 TypeScript 转译器: typescript/compiler-pipeline-handwritten.md
+- 浏览器与网络:
+  - 浏览器原理:
+    - 概览: browser/index.md
+    - 架构与渲染:
+      - 多进程架构、站点隔离与 V8: browser/multi-process-architecture.md
+      - 输入 URL 到页面展示: browser/url-to-page.md
+      - 渲染流水线与阻塞: browser/rendering-pipeline.md
+    - 缓存与存储:
+      - HTTP 缓存: browser/http-cache.md
+      - Cookie 与 Web Storage: browser/storage.md
+      - 跨 Tab 通信: browser/cross-tab-communication.md
+    - 运行时与调优:
+      - 事件、内存与性能: browser/events-memory-performance.md
+    - 进阶专题:
+      - Observer 家族与 Web Components：MDN 精读: browser/deep-dive/observers-web-components.md
+      - 浏览器存储与离线：IndexedDB、Service Worker、Cache: browser/deep-dive/storage-service-worker-idb.md
+      - WebAssembly 入门：它是什么、怎么跑、什么时候该用: browser/webassembly-basics.md
+    - WebAssembly 与 Rust:
+      - Wasm 与 JS 互操作：线性内存、字符串与 wasm-bindgen 原理: browser/wasm-js-interop-memory.md
+      - Rust 写 Web 前端：Yew、Leptos、Dioxus 是怎么实现的: browser/rust-wasm-web-frameworks.md
+      - Wasm 何时比 JS 快：性能模型与真实场景: browser/wasm-when-to-use-performance.md
+    - 图形与多媒体:
+      - Canvas 与 WebGL：渲染管线与手写示例: browser/canvas-webgl-pipeline.md
+  - 网络协议:
+    - 概览: network/index.md
+    - HTTP 应用层:
+      - HTTP 版本与连接复用: network/http-versions.md
+      - 状态码、重定向与方法: network/http-semantics.md
+      - REST 与 GraphQL: network/rest-graphql.md
+    - 传输层:
+      - TCP、UDP 与 QUIC: network/tcp-udp-quic.md
+      - 握手、挥手与 SYN Flood: network/tcp-connection-lifecycle.md
+      - TCP 拥塞与流量控制: network/tcp-congestion-control.md
+    - 加密与域名:
+      - HTTPS 与 TLS 握手: network/tls-handshake.md
+      - CA 证书链与 HSTS: network/certificates-hsts.md
+      - DNS: network/dns.md
+    - 实时通信与基础设施:
+      - WebSocket 与 SSE: network/websocket-sse.md
+      - CDN: network/cdn.md
+      - nginx 代理与负载均衡: network/nginx-proxy.md
+    - 复习:
+      - 速查卡与参考来源: network/cheatsheet.md
+    - 进阶专题:
+      - HTTP 缓存、条件请求与范围请求：MDN 精读: network/deep-dive/http-caching-conditional-range.md
+      - Nginx、CDN 与边缘：流量是怎么到你的服务器的: network/nginx-cdn-edge.md
+      - HTTP/3 与 QUIC 实战: network/http3-quic-in-practice.md
+      - GraphQL 与 API 设计：执行模型、N+1 与缓存: network/graphql-api-design.md
+      - WebSocket 协议：握手、帧格式与手写服务器: network/websocket-protocol-handwritten.md
+  - 网络安全:
+    - 概览: security/index.md
+    - 同源与跨域:
+      - 浏览器安全模型与同源策略: security/same-origin-policy.md
+      - CORS 与跨源隔离: security/cors.md
+    - 页面层攻防:
+      - XSS: security/xss.md
+      - CSRF: security/csrf.md
+      - CSP、iframe 与点击劫持: security/csp-and-framing.md
+    - 认证与服务端:
+      - OAuth2 与 Token 安全: security/oauth2-and-tokens.md
+      - 服务端攻击与传输安全: security/server-side-attacks.md
+    - MDN 精读:
+      - CORS、CSP 与 Cookie：MDN 精读: security/deep-dive/cors-csp-cookies-mdn.md
+      - Web 攻击与防御：MDN 精读: security/deep-dive/web-attacks-defenses-mdn.md
+  - API 设计与通信:
+    - REST 与契约:
+      - REST 基础：资源、方法、状态码: api/rest-fundamentals.md
+      - REST 设计实践：分页、过滤、版本、错误与幂等: api/rest-design-practices.md
+      - OpenAPI：契约优先的接口开发: api/openapi-contract-first.md
+      - HTTP 客户端库：fetch、axios、ky、ofetch 与手写实现: api/http-clients-libraries.md
+      - 服务端框架：Express、Koa、Fastify、Hono、NestJS 的中间件模型: api/server-frameworks-middleware.md
+    - API 风格全景：REST、GraphQL、RPC、实时与事件: api/index.md
+    - GraphQL:
+      - GraphQL 入门到精通（一）：Schema 与查询语言: api/graphql-schema-and-queries.md
+      - GraphQL 入门到精通（二）：服务端与客户端库: api/graphql-servers-and-clients.md
+      - GraphQL 入门到精通（三）：性能与安全: api/graphql-performance-security.md
+    - RPC 与类型安全:
+      - gRPC 与 Protocol Buffers：二进制 RPC 的完整原理: api/grpc-protobuf.md
+      - tRPC 与端到端类型安全：类型是怎么'穿过网络'的: api/trpc-type-safe-rpc.md
+      - JSON-RPC 2.0：LSP 与 MCP 背后的协议: api/json-rpc-and-mcp.md
+      - SOAP、XML-RPC 与遗留系统：你可能会遇到的老接口: api/soap-xml-rpc-legacy.md
+    - 实时与事件:
+      - 实时通信库：ws、Socket.IO、uWebSockets 与房间模型: api/websocket-realtime-libs.md
+      - SSE、长轮询与 WebTransport：单向推送与新协议: api/sse-longpolling-webtransport.md
+      - Webhook 与事件驱动 API：签名、重试与幂等: api/webhooks-and-event-driven-apis.md
+    - 认证、网关与测试:
+      - API 认证与授权：Key、JWT、OAuth2、OIDC、PKCE: api/api-authentication-authorization.md
+      - API 网关、BFF 与限流：入口层的设计: api/gateway-bff-rate-limiting.md
+      - API 测试与 Mock：契约、MSW 与压测: api/api-testing-mocking.md
+    - 选型:
+      - API 风格怎么选：对比矩阵与决策树: api/api-style-decision.md
+  - 浏览器 API:
+    - Web 平台 API:
+      - 剪贴板与拖放 API: web-apis/clipboard-drag-drop.md
+      - DOM 事件系统：捕获、冒泡、委托与自定义事件: web-apis/dom-events-delegation.md
+      - File、Blob、FormData 与文件上传: web-apis/file-blob-formdata.md
+      - URL、History 与 Navigation API：前端路由是怎么做出来的: web-apis/history-navigation-url-routing.md
+      - 媒体：音视频采集、全屏与画中画: web-apis/media-capture-fullscreen-pip.md
+      - 跨上下文通信：postMessage、BroadcastChannel 与 SharedWorker: web-apis/messaging-workers-broadcast.md
+      - PWA、Service Worker 与推送通知: web-apis/notifications-push-pwa.md
+      - 指针、触摸与手势事件: web-apis/pointer-touch-gesture-events.md
+      - Web Crypto API：浏览器里的密码学: web-apis/web-crypto-api.md
+      - WebAuthn 与 Passkeys：无密码登录: web-apis/webauthn-passkeys.md
+      - WebRTC：浏览器里的点对点通信: web-apis/webrtc-p2p.md
+- 框架:
+  - React:
+    - 概览: react/index.md
+    - React 19 专题:
+      - React 19 全景：一张图看懂新特性与心智模型: react/r19/react19-overview-mental-model.md
+      - 数据驱动视图的心智模型：UI = f(state): react/r19/ui-as-function-of-state.md
+      - React 渲染全流程：从 setState 到屏幕上的像素: react/r19/render-commit-pipeline.md
+      - React 为什么要拆成 react、react-dom、react-reconciler、react-native 等包: react/r19/why-split-packages-renderers.md
+      - 手写一个 React 自定义渲染器：用 react-reconciler 渲染到控制台: react/r19/custom-renderer-react-reconciler.md
+      - Actions 与表单：useActionState、useFormStatus、useOptimistic: react/r19/actions-forms-optimistic.md
+      - use() 与 Suspense：数据读取的新范式: react/r19/use-api-suspense-data.md
+      - 并发特性：Transition、useDeferredValue、Suspense 与 Activity: react/r19/concurrent-features-transitions.md
+      - React Compiler：自动记忆化如何工作: react/r19/react-compiler-auto-memoization.md
+      - Server Components 与 Server Actions：边界、序列化与安全: react/r19/server-components-server-actions.md
+      - react-dom 的服务端与静态 API：流式渲染、prerender 与 resume: react/r19/react-dom-server-static-apis.md
+      - React 19 的 API 变化与从 18 升级指南: react/r19/react19-api-changes-upgrade.md
+      - useEffect 的正确心智模型：同步而不是生命周期: react/r19/effects-synchronization-model.md
+      - 状态设计最佳实践：放哪里、存什么、怎么拆: react/r19/state-design-best-practices.md
+      - 组件设计最佳实践：组合优先: react/r19/component-patterns-best-practices.md
+      - React 性能优化最佳实践：先度量，再优化: react/r19/performance-best-practices.md
+      - React 19 的错误处理：错误边界与根级回调: react/r19/error-handling-boundaries.md
+      - 测试 React 19 应用：act、异步与 Server Components: react/r19/testing-react-19.md
+      - 虚拟 DOM 有没有必要？React、Signals 与编译期框架的对比: react/r19/virtual-dom-vs-signals-compiler.md
+      - React Native 新架构：为什么 react-native 与 react-dom 是两个世界: react/r19/react-native-architecture.md
+    - 基础原理:
+      - React 18 核心概念: react/foundations/react-18-core-concepts.md
+    - Hooks:
+      - Hooks 深入原理: react/hooks/hooks-internals.md
+    - 架构与 Fiber:
+      - Fiber 架构: react/architecture/fiber.md
     - 版本特性:
-      - React 18 新特性完全指南: react/react-18-new-features.md
-      - React 19 新特性预览: react/react-19-preview.md
+      - React 18 新特性: react/versions/react-18-features.md
+      - React 19 新特性: react/versions/react-19-features.md
+    - 状态与模式:
+      - 状态管理方案: react/patterns/state-management.md
+      - 组件模式大全: react/patterns/component-patterns.md
+    - 性能:
+      - 性能优化实战: react/performance/optimization.md
     - 手写代码:
-      - React 手写代码题 (上): react/react-coding-part1.md
-      - React 手写代码题 (下): react/react-coding-part2.md
-    - 性能与架构:
-      - React 性能优化实战: react/performance-optimization.md
-      - React 状态管理方案: react/state-management.md
-      - React 组件模式大全: react/component-patterns.md
-  - 运行时篇:
-    - 运行时全景图: runtime/index.md
-    - Node.js 核心原理: runtime/nodejs-core.md
-    - Bun 2.x 使用指南: runtime/bun-guide.md
-    - Deno 2.x 使用指南: runtime/deno-guide.md
+      - 手写 Hooks: react/coding/hooks-implementation.md
+      - 手写自定义 Hooks: react/coding/custom-hooks-implementation.md
+    - 面试题库:
+      - 虚拟 DOM、Fiber 与 Diff: react/interview-qa/rendering-fiber-diff.md
+      - Hooks 与更新机制: react/interview-qa/hooks-and-updates.md
+      - 状态管理与性能优化: react/interview-qa/state-and-performance.md
+      - SSR、路由与应用架构: react/interview-qa/ssr-routing-architecture.md
+    - 内部原理:
+      - 并发渲染：Transition、Suspense 与 useDeferredValue: react/internals/concurrent-rendering-transitions.md
+      - React 调度器与 Fiber：时间切片与优先级的手写实现: react/internals/fiber-scheduler-handwritten.md
+      - Hooks 的实现原理：链表、闭包与依赖比较: react/internals/hooks-implementation-handwritten.md
+      - Server Components 与流式 SSR：原理与手写协议: react/internals/rsc-streaming-ssr.md
+      - Reconciliation 与 Diff：key 的作用与手写 patch: react/internals/reconciliation-diff-handwritten.md
+  - Vue:
+    - 概览: vue/index.md
+    - Vue 响应式系统: vue/reactivity.md
+    - 渲染与编译: vue/rendering-compiler.md
+    - 组件与组合式 API: vue/components-composition.md
+    - 生态与项目架构: vue/ecosystem-and-architecture.md
+    - 编译与渲染:
+      - Vue 3 编译与渲染：模板编译器与 patch 手写: vue/vue-compiler-vdom-handwritten.md
+  - 框架生态:
+    - 心智模型与全栈框架:
+      - 主流前端框架的心智模型：React、Vue、Svelte、Solid、Angular: frameworks/framework-mental-models.md
+      - Next.js App Router：服务端组件、缓存与路由: frameworks/nextjs-app-router.md
+      - Nuxt：Vue 的全栈框架: frameworks/nuxt-vue-ssr.md
+      - Svelte 与 Solid：编译期与细粒度响应式: frameworks/svelte-solid-compile-time.md
+      - 现代 Angular：Signals、独立组件与依赖注入: frameworks/angular-modern.md
+      - Astro 岛屿架构与 Remix/React Router: frameworks/astro-islands-remix.md
+      - 客户端路由原理：React Router 与 Vue Router 怎么匹配路径: frameworks/client-routing-handwritten.md
+    - 表单、UI 与样式:
+      - 表单与校验：受控、非受控与 Schema 校验: frameworks/forms-validation.md
+      - UI 组件库与设计系统：Radix、shadcn/ui、Ant Design、MUI: frameworks/ui-libraries-design-systems.md
+      - CSS 方案对比：Tailwind、CSS Modules、CSS-in-JS、UnoCSS、Vanilla Extract: frameworks/css-solutions-compared.md
+      - 动画库：Framer Motion、GSAP、Lottie 与 View Transitions: frameworks/animation-libraries.md
+      - 数据可视化：D3、ECharts、Chart.js 与 Canvas/SVG 选择: frameworks/charts-visualization.md
+      - 富文本编辑器：ProseMirror、Slate、Lexical、Tiptap 的数据模型: frameworks/rich-text-editors.md
+- 工程化与性能:
+  - 工程化:
+    - 概览: engineering/index.md
+    - 构建工具原理: engineering/bundlers.md
+    - 编译链路: engineering/compile-pipeline.md
+    - 开发体验与构建优化: engineering/dev-and-optimization.md
+    - 包管理与交付: engineering/package-and-delivery.md
+    - 微前端与代码质量: engineering/microfrontend-and-quality.md
+    - 测试与质量:
+      - 单元与组件测试：Vitest、Jest 与 Testing Library: engineering/testing/unit-component-testing.md
+      - 端到端与视觉回归：Playwright 与 Cypress: engineering/testing/e2e-visual-testing.md
+      - 前端监控：错误、性能与用户行为: engineering/monitoring-observability.md
+    - 工程实践与心智模型:
+      - Git 内部原理与协作流程: engineering/git-internals-workflow.md
+      - 功能开关与 A/B 测试: engineering/feature-flags-ab-testing.md
+      - 前端认证模式：Cookie、Token 与 BFF: engineering/frontend-auth-patterns.md
+      - 桌面与跨端：Electron、Tauri、React Native 与小程序的原理: engineering/cross-platform-electron-tauri.md
+      - 前端工程师的后端基础：Node 服务、数据库与缓存: engineering/node-backend-for-frontend.md
+      - 前端的十个心智模型: engineering/mental-models-frontend.md
+    - 国际化与交付:
+      - 国际化工程：ICU MessageFormat、复数规则与字符串提取: engineering/i18n-icu-message-format.md
+      - 前端的 CI/CD 与容器化：缓存、产物与发布策略: engineering/ci-cd-docker-frontend.md
+  - 构建工具:
+    - 概览: build-tools/index.md
+    - Vite 深度解析: build-tools/vite-deep-dive.md
+    - 打包工具对比: build-tools/bundler-comparison.md
+    - Vite 与 Rolldown:
+      - Vite 开发服务器的真实行为：一个请求从进来到出去: engineering/vite-dev-server-behavior.md
+      - Vite 构建与插件：生产构建怎么跑、插件钩子的执行顺序: engineering/vite-build-and-plugins.md
+      - Rolldown 的行为与原理：Rust 打包器的三个阶段: engineering/rolldown-internals.md
+      - ESM 打包原理：从 import 到一个可运行文件: engineering/esm-bundling-principles.md
+  - 包管理器:
+    - 概览: package-manager/index.md
+    - pnpm: package-manager/pnpm-deep-dive.md
+    - Yarn Berry: package-manager/yarn-berry.md
+  - 运行时:
+    - 概览: runtime/index.md
+    - Node.js: runtime/nodejs-core.md
+    - Bun: runtime/bun-guide.md
+    - Deno: runtime/deno-guide.md
+    - Node.js 底层:
+      - Node.js 事件循环与 libuv：六个阶段的精确语义: runtime/nodejs-event-loop-libuv.md
+      - Node.js Stream 与背压：highWaterMark 与 pipeline: runtime/nodejs-streams-backpressure.md
+      - Node.js 模块加载内部：CJS 包装、缓存与 ESM 加载阶段: runtime/nodejs-modules-loader.md
+    - JS 运行时对比:
+      - JavaScript 运行时全景：浏览器、Node、Bun、Deno、边缘运行时: runtime/js-runtimes-comparison.md
+      - Node.js 架构总览：V8、libuv 与 C++ 绑定怎么协作: runtime/node-architecture-overview.md
+      - Bun 内部原理：为什么快、快在哪、有哪些取舍: runtime/bun-internals.md
+      - 边缘运行时：Isolate、Workers 与它们的限制: runtime/edge-runtimes-workers.md
+      - Deno 内部原理：权限模型、Rust 内核与 Node 兼容: runtime/deno-internals.md
+  - 性能优化:
+    - 概览: performance/index.md
+    - 指标与诊断: performance/core-web-vitals.md
+    - 加载优化: performance/loading-optimization.md
+    - 资源优化: performance/resource-optimization.md
+    - 渲染性能优化：布局、绘制与合成: performance/rendering-optimization.md
+    - 框架优化: performance/framework-optimization.md
+    - 大文件上传: performance/large-file-upload.md
+    - 前端监控: performance/monitoring.md
+    - 虚拟列表与度量:
+      - Web 性能：MDN 精读: performance/deep-dive/web-performance-mdn.md
+    - 分析与度量:
+      - 性能分析方法论（一）：从火焰图开始: performance/profiling-flamegraphs.md
+      - 性能分析方法论（二）：现代工具链: performance/chrome-devtools-performance.md
+      - Web Vitals 与线上监控：实验室数据与真实用户数据: performance/web-vitals-rum-monitoring.md
+      - 内存分析：Heap Snapshot、分配时间线与泄漏定位: performance/memory-profiling.md
+    - 优化实践:
+      - 加载性能优化：从请求到首屏: performance/network-loading-optimization.md
+      - 性能优化的心智模型: performance/performance-mental-model.md
+      - 虚拟列表：定高、动态高度与回收池的手写实现: performance/virtual-list-handwritten.md
+- 编程实战:
+  - 手写代码:
+    - 概览: coding/index.md
+    - 异步与原生方法:
+      - 原生方法: coding/native-methods.md
+      - Promise 与异步控制: coding/promise-implementations.md
+      - 工具函数: coding/utility-functions.md
+    - 模式与框架:
+      - 柯里化与中间件: coding/functional-middleware.md
+      - 响应式与观察者: coding/reactive-observer.md
+      - 发布订阅与 Proxy: coding/pubsub-proxy-reflect.md
+      - 框架原理: coding/framework-implementations.md
+      - 浏览器特性: coding/browser-features.md
+    - 系统设计与模式:
+      - 前端系统设计题：虚拟列表、无限滚动、拖拽、富文本与低代码: coding/frontend-system-design.md
+      - 设计模式在前端：观察者、策略、状态、装饰器、依赖注入: coding/design-patterns-frontend.md
+  - 算法:
+    - 概览: algorithm/index.md
+    - 模板速查: algorithm/templates.md
+    - 基础题型:
+      - 数组: algorithm/array.md
+      - 字符串: algorithm/string.md
+      - 链表: algorithm/linked-list.md
+      - 栈与队列: algorithm/stack-queue.md
+    - 进阶题型:
+      - 二叉树: algorithm/binary-tree.md
+      - 动态规划: algorithm/dynamic-programming.md
+      - 回溯: algorithm/backtracking.md
+      - 图论: algorithm/graph.md
+    - 前端场景算法:
+      - 前端场景算法：Diff、调度、LRU、虚拟滚动与文本处理: algorithm/frontend-oriented-algorithms.md
+- AI 与开源:
   - AI Agent 篇:
-    - 概述与入门:
-      - agent/index.md
-      - agent/agent-comparison.md
-      - agent/agent-frameworks.md
+    - 概览: agent/index.md
+    - 基础入门:
+      - Agent 框架对比: agent/foundations/agent-frameworks.md
+      - Coding Agent 对比: agent/foundations/coding-agent-comparison.md
+      - 流式对话应用设计: agent/foundations/streaming-chat-app.md
     - 核心架构:
-      - agent/layered-architecture.md
-      - agent/state-machine-patterns.md
-      - agent/memory-system.md
-    - 推理与执行模式:
-      - agent/react-pattern.md
-      - agent/plan-execute-pattern.md
-    - 工具系统:
-      - agent/tool-patterns.md
-      - agent/tool-orchestration.md
+      - 分层架构:
+        - 分层架构总览: agent/architecture/layered-architecture.md
+        - 感知层: agent/architecture/layer-perception.md
+        - 认知层: agent/architecture/layer-cognition.md
+        - 决策层: agent/architecture/layer-decision.md
+        - 执行层: agent/architecture/layer-execution.md
+        - 通信层: agent/architecture/layer-communication.md
+        - 扩展层: agent/architecture/layer-extension.md
+      - 状态机与编排: agent/architecture/state-machine-patterns.md
+      - 记忆系统: agent/architecture/memory-system.md
+    - 推理与规划:
+      - ReAct 模式: agent/reasoning/react-pattern.md
+      - 规划-执行：原理与规划器: agent/reasoning/plan-execute-planner.md
+      - 规划-执行：执行器与完整实现: agent/reasoning/plan-execute-executor.md
+      - 规划-执行：混合模式与优化: agent/reasoning/plan-execute-hybrid.md
+    - 工具系统与 MCP:
+      - 工具调用模式: agent/tools/tool-patterns.md
+      - 工具编排：并行与串行: agent/tools/tool-orchestration-basics.md
+      - 工具编排：混合与选择策略: agent/tools/tool-orchestration-hybrid.md
+      - 工具编排：实现与高级话题: agent/tools/tool-orchestration-implementation.md
+      - MCP 协议集成: agent/mcp/mcp-integration.md
+      - MCP 服务器生态与开发: agent/mcp/mcp-servers-ecosystem.md
+      - MCP 安全与配置示例: agent/mcp/mcp-security-config.md
     - 框架深度:
-      - agent/langchain-deep-dive.md
-      - agent/langgraph-checkpointing.md
-      - agent/crewai-flows.md
-      - agent/autogen-groupchat.md
+      - LangChain 深度指南: agent/frameworks/langchain-deep-dive.md
+      - LangGraph 检查点机制: agent/frameworks/langgraph-checkpointing.md
+      - CrewAI Flows 编排: agent/frameworks/crewai-flows.md
+      - AutoGen 群聊协作: agent/frameworks/autogen-groupchat.md
     - 高级应用:
-      - agent/rag-deep-dive.md
-      - agent/multi-model-integration.md
-      - agent/multi-agent-patterns.md
-      - agent/streaming-patterns.md
-    - 生态集成:
-      - agent/mcp-integration.md
-      - agent/mcp-servers-ecosystem.md
-    - 评测与部署:
-      - agent/agent-evaluation.md
-      - agent/production-deployment.md
-    - 实战参考:
-      - agent/claude-code-analysis.md
-      - agent/claude-code-deep-analysis.md
-      - agent/opencode-analysis.md
-      - agent/research-findings.md
+      - RAG：原理与检索系统: agent/applications/rag-principles-retrieval.md
+      - RAG：知识库构建: agent/applications/rag-knowledge-base.md
+      - RAG：Agent 集成与高级 RAG: agent/applications/rag-agent-advanced.md
+      - RAG：代码实现与展望: agent/applications/rag-implementation.md
+      - 多模型集成: agent/applications/multi-model-integration.md
+      - 多 Agent 协作模式: agent/applications/multi-agent-patterns.md
+      - 流式传输模式: agent/applications/streaming-patterns.md
+    - 生产与实战:
+      - Agent 评测与基准: agent/production/agent-evaluation.md
+      - 生产部署: agent/production/production-deployment.md
+      - Claude Code 源码剖析: agent/case-studies/claude-code-analysis.md
+      - Claude Code 架构深度解析: agent/case-studies/claude-code-deep-analysis.md
+      - OpenCode 架构分析: agent/case-studies/opencode-analysis.md
+      - 教程资源研究报告: agent/case-studies/research-findings.md
+    - Harness 与 Agent Loop:
+      - Agent Loop 解剖：一次对话到底发生了什么: agent/harness/agent-loop-anatomy.md
+      - 手写 Harness：200 行跑通 Agent Loop: agent/harness/build-mini-harness.md
+      - 上下文工程：窗口有限时怎么办: agent/harness/context-engineering-compaction.md
+      - DeepSeek Harness 的 Agent Loop 源码精读: agent/harness/deepseek-harness-agent-loop.md
+      - DeepSeek Harness 架构：一切皆插件: agent/harness/deepseek-harness-architecture.md
+      - DeepSeek Harness 核心包：agent、tools、session、system-prompt: agent/harness/deepseek-harness-core-packages.md
+      - DeepSeek Harness 的能力接缝与事件: agent/harness/deepseek-harness-seams-events.md
+      - 可扩展性：Extensions、Skills 与 Hooks: agent/harness/extensions-skills-hooks.md
+      - Harness 横向对比：pi、DeepSeek Harness 与最简实现: agent/harness/harness-comparison-pi-deepseek.md
+      - Harness 评测与可观测性: agent/harness/harness-evals-observability.md
+      - Agent Harness 全景：模型之外的一切: agent/harness/harness-overview.md
+      - Harness 安全：权限、沙箱与提示注入: agent/harness/harness-security-permissions.md
+      - 最简 Harness 架构：五个概念就够: agent/harness/minimal-harness-architecture.md
+      - 会话持久化：把对话存成一棵树: agent/harness/sessions-branching-persistence.md
+      - 运行中打断：steering、follow-up 与 abort: agent/harness/steering-queues-abort.md
+      - 子 Agent 与编排: agent/harness/subagents-orchestration.md
+      - 工具调用协议：模型是怎么'用工具'的: agent/harness/tool-calling-protocol.md
+    - 流式与工具调用:
+      - LLM 流式输出与工具调用：SSE 解析与增量 JSON: agent/foundations/llm-streaming-tool-use-parsing.md
   - 开源项目赏析:
-    - open-source/index.md
-    - AI Agent 框架:
-      - open-source/ai-agents.md
+    - 概览: open-source/index.md
     - 前端框架:
-      - open-source/frontend-frameworks.md
-    - 工具链:
-      - open-source/tooling.md
+      - 元框架: open-source/frontend-frameworks/meta-frameworks.md
+      - 新范式: open-source/frontend-frameworks/rendering-paradigms.md
+      - Bun 与框架选型: open-source/frontend-frameworks/runtime-and-selection.md
+    - 构建工具:
+      - 主流打包器: open-source/build-tools/mainstream-bundlers.md
+      - 原生工具链: open-source/build-tools/native-toolchains.md
+      - 新兴方案与选型: open-source/build-tools/emerging-and-selection.md
     - 工程化库:
-      - open-source/engineering.md
+      - API 与数据层: open-source/engineering-libs/api-and-data.md
+      - 函数式与状态管理: open-source/engineering-libs/functional-and-state.md
+    - AI Agent 生态:
+      - Agent 开发框架: open-source/ai-agents/agent-frameworks.md
+      - Agent 工具与基础设施: open-source/ai-agents/agent-infrastructure.md
     - 新兴趋势:
-      - open-source/trending.md
+      - AI 开发工具与协议: open-source/trending/ai-dev-tools.md
+      - 全栈与后端框架: open-source/trending/fullstack-backend.md
+      - 构建与工具链: open-source/trending/build-and-toolchain.md
+      - 前端库与服务生态: open-source/trending/frontend-libraries.md
+- 教学资源:
+  - 概览: resources/index.md
+  - 前端学习路线: resources/learning-paths.md
+  - HTML 与 CSS 资料: resources/html-css.md
+  - JavaScript 与 TypeScript 资料: resources/javascript-typescript.md
+  - 浏览器、网络与安全资料: resources/browser-network-security.md
+  - Web 平台 API 资料: resources/web-platform-apis.md
+  - 前端框架资料: resources/frameworks.md
+  - 工程化与工具链资料: resources/engineering-tooling.md
+  - 测试与监控资料: resources/testing-monitoring.md
+  - 运行时、WebAssembly 与 Rust 资料: resources/runtimes-wasm-rust.md
+  - 性能与质量资料: resources/performance-quality.md
+  - API 设计与通信协议资料: resources/api-design-communication.md
+  - 后端与数据库资料: resources/backend-database.md
+  - 算法与面试题库资料: resources/algorithms-interview.md
+  - AI 与 Agent 资料: resources/ai-agent.md
+  - 书籍、课程与视频: resources/books-courses-videos.md
+  - 源码阅读路线: resources/source-code-reading.md
+  - 面试练习: resources/interview-practice.md
+  - 社区与资讯: resources/community-and-news.md
+  - 在线工具: resources/tools.md
+
+hooks:
+  - hooks/seo.py
 
 extra:
   generator: false
 
 extra_css:
+  - https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap
   - stylesheets/extra.css

@@ -11,7 +11,28 @@ date: 2026-05-17
 
 > JavaScript 运行时生态三足鼎立：Node.js 稳坐江山，Bun 异军突起，Deno 另辟蹊径。
 
-## 运行时三国争霸
+## 1. 本章范围
+
+本章讲解 JavaScript 服务端运行时：先了解 Node.js、Bun、Deno 的定位与差异，再深入 Node.js 事件循环与模块系统，最后学习 Bun 与 Deno 的特性与迁移策略。
+
+## 2. 学习路径
+
+1. 阅读本页，建立整体认识
+2. [Node.js 核心原理](nodejs-core.md)：事件循环、libuv、CJS/ESM、Stream 与 Buffer
+3. [Bun 2.x 使用指南](bun-guide.md)：原生 HTTP、内置数据库、测试框架、Node.js 迁移
+4. [Deno 2.x 使用指南](deno-guide.md)：权限沙箱、内置工具链、Node.js 兼容、Deno KV
+
+## 3. 页面一览
+
+| 页面 | 你将学到 | 难度 |
+|------|----------|------|
+| [Node.js 核心原理](nodejs-core.md) | 事件循环、libuv、CJS/ESM、Stream 与 Buffer | 进阶 |
+| [Bun 2.x 使用指南](bun-guide.md) | 原生 HTTP、内置数据库、测试框架、Node.js 迁移 | 基础 |
+| [Deno 2.x 使用指南](deno-guide.md) | 权限沙箱、内置工具链、Node.js 兼容、Deno KV | 基础 |
+
+---
+
+## 4. 运行时三国争霸
 
 | 运行时 | 版本 | 发布年份 | 主导公司 | 定位 |
 |--------|------|----------|----------|------|
@@ -19,7 +40,7 @@ date: 2026-05-17
 | **Bun** | v1.x | 2023 | Oven | 极速 all-in-one 运行时 |
 | **Deno** | v2.x | 2020 | Deno Land Inc | 安全优先的现代替代 |
 
-### 市场份额与生态对比
+### 4.1 市场份额与生态对比
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -43,9 +64,9 @@ date: 2026-05-17
 
 ---
 
-## 各运行时定位详解
+## 5. 各运行时定位详解
 
-### Node.js：行业标准
+### 5.1 Node.js：行业标准
 
 - **优势**：生态最完善，npm 包数量最多（200,000+），社区成熟，招聘需求大
 - **劣势**：CJS/ESM 混用复杂，部分 API 设计历史包袱
@@ -68,7 +89,7 @@ server.listen(3000, () => {
 });
 ```
 
-### Bun：性能怪兽
+### 5.2 Bun：性能怪兽
 
 - **优势**：启动快、执行快，内置 SQLite/ORM/打包器，TypeScript 原生支持
 - **劣势**：生态相对较新，部分 npm 包兼容性待验证
@@ -86,7 +107,7 @@ const server = Bun.serve({
 console.log(`Bun listening on http://localhost:${server.port}`);
 ```
 
-### Deno：安全先行
+### 5.3 Deno：安全先行
 
 - **优势**：默认安全沙箱、原生 TypeScript、Web API 兼容、内置工具链
 - **劣势**：生态较小，npm 兼容模式有学习曲线
@@ -103,7 +124,7 @@ Deno.serve({ port: 3000 }, (req) => {
 
 ---
 
-## 核心特性对比
+## 6. 核心特性对比
 
 | 特性 | Node.js | Bun | Deno |
 |------|---------|-----|------|
@@ -120,19 +141,19 @@ Deno.serve({ port: 3000 }, (req) => {
 
 ---
 
-## 面试常考点索引
+## 7. 面试常考点索引
 
-### 必考知识点
+### 7.1 必考知识点
 
 | 主题 | 相关文档 | 重要性 |
 |------|----------|--------|
-| **Node.js 事件循环** | [Node.js 核心原理](nodejs-core.md) | ⭐⭐⭐ 高频 |
-| **libuv 工作原理** | [Node.js 核心原理](nodejs-core.md) | ⭐⭐⭐ 高频 |
-| **CommonJS vs ESM** | [Node.js 核心原理](nodejs-core.md) | ⭐⭐⭐ 高频 |
-| **Stream 流处理** | [Node.js 核心原理](nodejs-core.md) | ⭐⭐ 进阶 |
-| **Buffer 二进制** | [Node.js 核心原理](nodejs-core.md) | ⭐⭐ 进阶 |
+| **Node.js 事件循环** | [Node.js 核心原理](nodejs-core.md) | 高频 |
+| **libuv 工作原理** | [Node.js 核心原理](nodejs-core.md) | 高频 |
+| **CommonJS vs ESM** | [Node.js 核心原理](nodejs-core.md) | 高频 |
+| **Stream 流处理** | [Node.js 核心原理](nodejs-core.md) | 进阶 |
+| **Buffer 二进制** | [Node.js 核心原理](nodejs-core.md) | 进阶 |
 
-### 运行时选型
+### 7.2 运行时选型
 
 | 场景 | 推荐选择 | 理由 |
 |------|----------|------|
@@ -144,7 +165,7 @@ Deno.serve({ port: 3000 }, (req) => {
 
 ---
 
-## 学习路径建议
+## 8. 学习路径建议
 
 ```
 入门路线
@@ -163,7 +184,7 @@ Deno.serve({ port: 3000 }, (req) => {
 
 ---
 
-## 参考链接
+## 9. 参考链接
 
 - [Node.js 官方文档](https://nodejs.org/docs/)
 - [Bun 官方文档](https://bun.sh/docs)

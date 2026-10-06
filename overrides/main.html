@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  {% if seo %}
+  {% set s = seo %}
+  <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1">
+  <meta property="og:type" content="{{ 'website' if s.home else 'article' }}">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="{{ s.title }}">
+  <meta property="og:description" content="{{ s.description }}">
+  <meta property="og:url" content="{{ s.url }}">
+  <meta property="og:image" content="{{ s.image }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  {% if not s.home %}
+  <meta property="article:published_time" content="{{ s.published }}">
+  <meta property="article:modified_time" content="{{ s.updated }}">
+  <meta property="article:author" content="https://github.com/Shyu-x">
+  {% endif %}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ s.title }}">
+  <meta name="twitter:description" content="{{ s.description }}">
+  <meta name="twitter:image" content="{{ s.image }}">
+  <link rel="alternate" type="application/atom+xml" title="{{ config.site_name }}" href="{{ s.base }}feed.xml">
+  <link rel="alternate" type="text/plain" title="llms.txt" href="{{ s.base }}llms.txt">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="{{ s.base }}sitemap.xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script type="application/ld+json">{{ s.ld | safe }}</script>
+  {% endif %}
+{% endblock %}

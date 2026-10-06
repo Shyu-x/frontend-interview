@@ -1,6 +1,6 @@
 ---
 title: 前端面试全家桶
-description: 涵盖前端面试高频知识点，配套代码示例与图解，助你系统复习、斩获 Offer。覆盖 HTML/CSS/JavaScript/TypeScript/网络/React/AI Agent 等模块。
+description: 系统整理前端面试知识：从 HTML/CSS/JavaScript 基础，到浏览器、网络、框架、工程化与 AI Agent，配套代码示例与图解。
 tags:
   - docs
   - index
@@ -9,171 +9,133 @@ date: 2026-05-17
 
 # 前端面试全家桶
 
-> 本文档涵盖前端面试中的高频知识点，配套代码示例与图解，助你系统复习、斩获 Offer。
+本站按学习顺序整理前端面试所需的知识，每个专题都配有代码示例与图解，并给出面试常考点索引。你可以从头顺序学习，也可以直接跳到薄弱的专题。
 
-!!! info "文档信息"
-    **最后更新：** 2026-05-16 | **版本：** 2.1 | **覆盖：** HTML / CSS / JavaScript / TypeScript / 网络 / React / AI Agent / 工程化 / 性能优化
+## 1. 学习路线
 
----
+建议按「基础 → 进阶 → 框架 → 工程化 → AI」的顺序推进。每个专题的概览页都列出了页面顺序与难度。
 
-## 🎯 模块总览
+### 1.1 基础
+
+<div class="grid cards" markdown>
+
+- **[HTML](html/index.md)**
+
+    语义化、表单、媒体与常见面试题。
+
+- **[CSS](css/index.md)**
+
+    选择器、盒模型、布局与动画。
+
+- **[JavaScript](js/index.md)**
+
+    作用域、闭包、原型、异步与模块化。
+
+</div>
+
+### 1.2 进阶
+
+<div class="grid cards" markdown>
+
+- **[TypeScript](typescript/index.md)**
+
+    类型系统、泛型与工程实践。
+
+- **[浏览器](browser/index.md)**
+
+    渲染流程、事件机制与存储。
+
+- **[网络](network/index.md)**
+
+    HTTP、TCP、DNS 与 WebSocket。
+
+- **[安全](security/index.md)**
+
+    常见攻击与防御手段。
+
+</div>
+
+### 1.3 框架
+
+<div class="grid cards" markdown>
+
+- **[React](react/index.md)**
+
+    组件、Hooks、Fiber 与新特性。
+
+- **[Vue](vue/index.md)**
+
+    响应式原理、组件与生态。
+
+</div>
+
+### 1.4 工程化
+
+<div class="grid cards" markdown>
+
+- **[工程化](engineering/index.md)**
+
+    规范、测试、CI/CD 与架构实践。
+
+- **[性能优化](performance/index.md)**
+
+    指标、加载、渲染与监控。
+
+- **[构建工具](build-tools/index.md)**
+
+    Vite、Webpack 等工具的原理与选型。
+
+- **[包管理器](package-manager/index.md)**
+
+    npm、pnpm 与 Yarn 的机制对比。
+
+- **[运行时](runtime/index.md)**
+
+    Node.js、Bun 与 Deno。
+
+- **[手写代码](coding/index.md)**
+
+    高频手写题与实现思路。
+
+- **[算法](algorithm/index.md)**
+
+    面试算法与 LeetCode 热题。
+
+</div>
+
+### 1.5 AI 与拓展
+
+<div class="grid cards" markdown>
+
+- **[AI Agent](agent/index.md)**
+
+    Agent 架构、工具系统、MCP 与流式交互。
+
+- **[开源项目](open-source/index.md)**
+
+    优秀开源项目的设计分析。
+
+- **[学习资源](resources/index.md)**
+
+    延伸阅读与参考资料。
+
+</div>
+
+## 2. 如何使用本站
+
+1. 先读各专题的概览页，了解范围、学习路径与每页难度。
+2. 按页面顺序阅读，先理解原理，再看面试常考点索引。
+3. 动手运行示例代码，并用手写代码与算法专题检验掌握程度。
+4. 使用顶部搜索框快速定位知识点，右上角可切换深色与浅色模式。
 
 !!! tip "难度说明"
-    - ⭐ 基础 — 面试必问，必须掌握
-    - ⭐⭐ 进阶 — 深入理解，展示深度
-    - ⭐⭐⭐ 高级 — 原理剖析，高分必备
+    各概览页中的难度分为基础、进阶、高级：基础是面试必问，进阶用于展示理解深度，高级涉及原理剖析。
 
-### ⭐ 基础篇
-
-| 模块 | 文档 | 主题 |
-|------|------|------|
-| HTML | [超高频八股](html/hyper-frequencies.md) | 语义化、meta、viewport |
-| CSS | [超高频八股](css/hyper-frequencies.md) | 选择器、盒模型、优先级 |
-| JavaScript | [超高频八股](js/hyper-frequencies.md) | 作用域、闭包、原型 |
-
-### ⭐⭐ 进阶级
-
-| 模块 | 文档 | 主题 |
-|------|------|------|
-| JavaScript | [专题 13-18](js/section-13-18.md) | 异步、Event Loop、手写 Promise |
-| JavaScript | [专题 19-25](js/section-19-25.md) | 代理、反射、模块化 |
-| CSS | [核心原理](css/section-1-5.md) | BFC、IFC、Position、Flexbox |
-| CSS | [布局进阶](css/section-6-10.md) | Grid、响应式、动画 |
-| 网络 | [协议专题 5-12](network/section-5-12.md) | HTTP、TCP、DNS |
-| 网络 | [协议专题 13-20](network/section-13-20.md) | WebSocket、HTTP/2、安全 |
-
-### ⭐⭐⭐ 高级篇
-
-| 模块 | 文档 | 主题 |
-|------|------|------|
-| React | [核心基础](react/react-18-core.md) | 组件、Hooks、Fiber |
-| React | [新特性](react/react-18-new-features.md) | Concurrent、Server Components |
-| 性能优化 | [终极题库](performance/index.md) | Core Web Vitals、懒加载 |
-| 手写代码 | [终极题库](coding/index.md) | 数组、字符串、树结构 |
-| TypeScript | [核心概念](typescript/index.md) | 类型系统、泛型、装饰器 |
-
----
-
-## 📚 专项模块
-
-### 🤖 AI Agent 篇
-
-!!! abstract "新增长篇"
-    深度解析 AI Agent 开发，包括架构设计、工具系统、流式对话。
-
-| 文档 | 说明 |
-|------|------|
-| [Agent 概述](agent/index.md) | Agent 基本概念与分类 |
-| [Agent 对比](agent/agent-comparison.md) | 主流框架对比分析 |
-| [状态机模式](agent/state-machine-patterns.md) | Agent 执行流程控制 |
-| [工具系统](agent/tool-patterns.md) | 工具定义与编排 |
-| [MCP 协议](agent/mcp-integration.md) | Model Context Protocol |
-| [流式模式](agent/streaming-patterns.md) | SSE/流式响应实现 |
-| [Claude Code 分析](agent/claude-code-analysis.md) | 源码深度解析 |
-
-### 🛠️ 构建工具篇
-
-| 文档 | 说明 |
-|------|------|
-| [全景图](build-tools/index.md) | 构建工具总览 |
-| [Vite 深度解析](build-tools/vite-deep-dive.md) | Vite 8.x 核心原理 |
-| [打包工具对比](build-tools/bundler-comparison.md) | 工具选型指南 |
-
-### ⚡ 运行时篇
-
-| 文档 | 说明 |
-|------|------|
-| [Node.js 核心](runtime/nodejs-core.md) | 事件循环、模块系统 |
-| [Bun 使用指南](runtime/bun-guide.md) | Bun 2.x 新特性 |
-| [Deno 使用指南](runtime/deno-guide.md) | Deno 2.x 新特性 |
-
-### 📊 算法篇
-
-| 文档 | 说明 |
-|------|------|
-| [算法索引](algorithm/index.md) | 面试算法总览 |
-| [LeetCode 热题 - 基础](algorithm/leetcode-hot100-basics.md) | 必刷基础题 |
-| [LeetCode 热题 - 进阶](algorithm/leetcode-hot100-advanced.md) | 高频难题 |
-
-### 🏆 开源项目赏析
-
-!!! success "新增章节"
-    52 个高质量开源项目深度分析，17000+ 行内容。
-
-| 分类 | 项目数 | 说明 |
-|------|--------|------|
-| [AI Agent 框架](open-source/ai-agents.md) | 11 | Claude Code、LangChain.js、MCP |
-| [前端框架](open-source/frontend-frameworks.md) | 8 | Next.js、Astro、Svelte 5 |
-| [工具链](open-source/tooling.md) | 11 | Vite、Rolldown、esbuild |
-| [工程化库](open-source/engineering.md) | 10 | tRPC、Prisma、Zustand |
-| [新兴趋势](open-source/trending.md) | 12 | HTMX、Bun、shadcn/ui |
-
----
-
-## 🚀 快速导航
-
-### 按难度选择
-
-```mermaid
-flowchart LR
-    A[面试准备] --> B{基础扎实?}
-    B -->|是| C[深入进阶]
-    B -->|否| D[先打基础]
-    C --> E[攻克高级]
-    D --> F[HTML/CSS/JS八股]
-    F --> C
-    E --> G[拿到Offer]
-```
-
-### 推荐学习路径
-
-| 阶段 | 建议 | 目标 |
-|------|------|------|
-| 1 | HTML/CSS 基础 + 八股 | ⭐ 基础扎实 |
-| 2 | JavaScript 核心 + 专题 | ⭐⭐ 进阶理解 |
-| 3 | React/网络 + 手写代码 | ⭐⭐⭐ 高级掌握 |
-
----
-
-## 📖 使用指南
-
-!!! note "学习建议"
-    1. 先刷超高频八股，建立知识框架
-    2. 按专题深入，理解原理
-    3. 手写代码题，锻炼实现能力
-    4. 结合开源项目，提升工程视角
-
-### 本地开发
+## 3. 本地运行
 
 ```bash
-# 安装依赖
 pip install mkdocs mkdocs-material
-
-# 启动开发服务器
 mkdocs serve --dev-addr 127.0.0.1:8000
-
-# 构建静态站点
-mkdocs build --clean
 ```
 
-### 在线阅读
-
-**🌐 [https://shyu-x.github.io/frontend-interview](https://shyu-x.github.io/frontend-interview)**
-
-支持深色/浅色模式切换、代码一键复制、全文搜索。
-
----
-
-## 📊 内容统计
-
-| 指标 | 数值 |
-|------|------|
-| 文档数量 | 80+ |
-| 代码示例 | 500+ |
-| 面试题 | 1000+ |
-| Mermaid 图表 | 200+ |
-
----
-
-!!! quote "祝拿到满意 Offer"
-    系统复习，稳步提升，前端面试全家桶助你一臂之力！
+在线阅读：[shyu-x.github.io/frontend-interview](https://shyu-x.github.io/frontend-interview)

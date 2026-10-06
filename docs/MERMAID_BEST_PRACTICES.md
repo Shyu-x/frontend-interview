@@ -109,8 +109,8 @@ flowchart LR
 ### 5.1 使用 classDef 定义样式
 ```mermaid
 flowchart LR
-    classDef highlight fill:#f9f,stroke:#333,stroke-width:4px
-    classDef warning fill:#ff6,stroke:#f00
+    classDef highlight fill:#f9f,stroke:#333,stroke-width:4px,color:#1d1d1f
+    classDef warning fill:#ff6,stroke:#f00,color:#1d1d1f
 
     A["Normal"]
     B["Important"]:::highlight
@@ -121,7 +121,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     A["Node"]:::highlight
-    style A fill:#f9f
+    style A fill:#f9f,color:#1d1d1f
 ```
 
 ## 6. 常用图表类型
