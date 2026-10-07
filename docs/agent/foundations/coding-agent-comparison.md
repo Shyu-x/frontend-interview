@@ -234,17 +234,17 @@ console.log(byForm);
 
 ```mermaid
 sequenceDiagram
-  participant U as "开发者"
-  participant A as "Agent 主循环"
-  participant M as "模型"
-  participant S as "会话状态"
-  U->>A: "提交任务 修复登录超时"
-  A->>S: "读取历史消息与工作区状态"
-  S-->>A: "返回消息数组"
-  A->>M: "发送消息数组与工具定义"
-  M-->>A: "返回工具调用请求"
-  A->>A: "执行工具并回灌结果"
-  A-->>U: "输出补丁与说明"
+  participant U as 开发者
+  participant A as Agent 主循环
+  participant M as 模型
+  participant S as 会话状态
+  U->>A: 提交任务 修复登录超时
+  A->>S: 读取历史消息与工作区状态
+  S-->>A: 返回消息数组
+  A->>M: 发送消息数组与工具定义
+  M-->>A: 返回工具调用请求
+  A->>A: 执行工具并回灌结果
+  A-->>U: 输出补丁与说明
 ```
 
 1. 开发者提交任务，主循环接手。
@@ -778,18 +778,18 @@ console.log('第 4 节断言全部通过');
 
 ```mermaid
 sequenceDiagram
-  participant H as "Agent 宿主"
-  participant C as "MCP 客户端"
-  participant S as "MCP 服务器"
-  participant D as "内部数据源"
-  H->>C: "读取服务器配置 mcpServers"
-  C->>S: "启动子进程并握手"
-  S-->>C: "上报可用工具清单"
-  C-->>H: "合并进工具注册表"
-  H->>S: "调用工具 查询组件文档"
-  S->>D: "读取内部文档目录"
-  D-->>S: "返回匹配片段"
-  S-->>H: "返回结果文本"
+  participant H as Agent 宿主
+  participant C as MCP 客户端
+  participant S as MCP 服务器
+  participant D as 内部数据源
+  H->>C: 读取服务器配置 mcpServers
+  C->>S: 启动子进程并握手
+  S-->>C: 上报可用工具清单
+  C-->>H: 合并进工具注册表
+  H->>S: 调用工具 查询组件文档
+  S->>D: 读取内部文档目录
+  D-->>S: 返回匹配片段
+  S-->>H: 返回结果文本
 ```
 
 1. 宿主读取配置文件，拿到服务器列表。
@@ -1100,14 +1100,20 @@ console.log('第 6 节断言全部通过', ranked.map((r) => r.name));
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "盘点现有配置"
-  "盘点现有配置" --> "导出可复用项"
-  "导出可复用项" --> "编写等价配置"
-  "编写等价配置" --> "小组灰度"
-  "小组灰度" --> "全量切换"
-  "小组灰度" --> "回退评估"
-  "回退评估" --> "编写等价配置"
-  "全量切换" --> [*]
+  state "盘点现有配置" as S0
+  state "导出可复用项" as S1
+  state "编写等价配置" as S2
+  state "小组灰度" as S3
+  state "全量切换" as S4
+  state "回退评估" as S5
+  [*] --> S0
+  S0 --> S1
+  S1 --> S2
+  S2 --> S3
+  S3 --> S4
+  S3 --> S5
+  S5 --> S2
+  S4 --> [*]
 ```
 
 1. 起点是盘点，列出模型、规则、常用指令三类配置。

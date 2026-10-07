@@ -932,15 +932,15 @@ console.log("chunks =", chunks.length, "sizes =", chunks.map(countTokens).join("
 
 ```mermaid
 sequenceDiagram
-  participant U as "用户提问"
-  participant R as "检索服务"
-  participant V as "向量库"
-  participant G as "答案生成"
-  U->>R: "提问 2024 版导出功能怎么用"
-  R->>V: "按 version 元数据过滤后做向量检索"
-  V-->>R: "返回前 k 个分块与来源字段"
-  R->>G: "拼接分块正文与来源"
-  G-->>U: "带出处的答案"
+  participant U as 用户提问
+  participant R as 检索服务
+  participant V as 向量库
+  participant G as 答案生成
+  U->>R: 提问 2024 版导出功能怎么用
+  R->>V: 按 version 元数据过滤后做向量检索
+  V-->>R: 返回前 k 个分块与来源字段
+  R->>G: 拼接分块正文与来源
+  G-->>U: 带出处的答案
 ```
 
 1. 用户提问里带着版本约束，这类约束不适合交给向量相似度处理。
@@ -1158,13 +1158,17 @@ console.log("tags =", merged.tags.join(","), "summarySource =", merged.summarySo
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "未入库"
-  "未入库" --> "已入库": "首次加载"
-  "已入库" --> "已入库": "文件修改时间未变"
-  "已入库" --> "重建中": "文件修改时间晚于入库时间"
-  "重建中" --> "已入库": "先删后加完成"
-  "已入库" --> "已删除": "收到删除请求"
-  "已删除" --> [*]
+  state "未入库" as S0
+  state "已入库" as S1
+  state "重建中" as S2
+  state "已删除" as S3
+  [*] --> S0
+  S0 --> S1: 首次加载
+  S1 --> S1: 文件修改时间未变
+  S1 --> S2: 文件修改时间晚于入库时间
+  S2 --> S1: 先删后加完成
+  S1 --> S3: 收到删除请求
+  S3 --> [*]
 ```
 
 1. 未入库的文档首次加载后进入已入库状态。

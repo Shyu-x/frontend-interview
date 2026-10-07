@@ -471,20 +471,20 @@ ToolRegistry 测试通过
 
 ```mermaid
 sequenceDiagram
-  participant U as "用户"
-  participant H as "Harness"
-  participant M as "模型"
-  participant T as "工具"
-  U->>H: "提交用户消息"
+  participant U as 用户
+  participant H as Harness
+  participant M as 模型
+  participant T as 工具
+  U->>H: 提交用户消息
   loop "Agent Loop 一轮"
-    H->>M: "发送完整消息历史"
-    M-->>H: "返回 final 或 tool_calls"
+    H->>M: 发送完整消息历史
+    M-->>H: 返回 final 或 tool_calls
     alt "有 tool_calls"
-      H->>T: "按 name 执行工具"
-      T-->>H: "返回工具结果"
-      H->>H: "追加 tool 消息"
+      H->>T: 按 name 执行工具
+      T-->>H: 返回工具结果
+      H->>H: 追加 tool 消息
     else "没有 tool_calls"
-      H-->>U: "返回最终回复"
+      H-->>U: 返回最终回复
     end
   end
 ```
@@ -673,15 +673,15 @@ Agent Loop 测试通过
 
 ```mermaid
 sequenceDiagram
-  participant L as "AgentLoop"
-  participant E as "EventEmitter"
-  participant O as "监听器"
-  L->>E: "emit round:start"
-  E->>O: "on round:start 回调"
-  L->>E: "emit model:end"
-  E->>O: "on model:end 回调"
-  L->>E: "emit tool:start"
-  E->>O: "on tool:start 回调"
+  participant L as AgentLoop
+  participant E as EventEmitter
+  participant O as 监听器
+  L->>E: emit round:start
+  E->>O: on round:start 回调
+  L->>E: emit model:end
+  E->>O: on model:end 回调
+  L->>E: emit tool:start
+  E->>O: on tool:start 回调
 ```
 
 1. `AgentLoop` 把一轮动作拆成四个事件：开始、模型返回、工具开始、工具结束。  
@@ -796,12 +796,17 @@ console.log('事件系统测试通过');
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "运行中"
-  "运行中" --> "已中止": "signal.aborted 为真"
-  "运行中" --> "工具调用": "model 返回 tool_calls"
-  "工具调用" --> "运行中": "工具结果已写回"
-  "运行中" --> "完成": "model 返回 final"
-  "运行中" --> "达到上限": "rounds 等于 maxRounds"
+  state "运行中" as S0
+  state "已中止" as S1
+  state "工具调用" as S2
+  state "完成" as S3
+  state "达到上限" as S4
+  [*] --> S0
+  S0 --> S1: signal.aborted 为真
+  S0 --> S2: model 返回 tool_calls
+  S2 --> S0: 工具结果已写回
+  S0 --> S3: model 返回 final
+  S0 --> S4: rounds 等于 maxRounds
 ```
 
 1. 初始状态是“运行中”。  

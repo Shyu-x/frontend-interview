@@ -150,16 +150,16 @@ console.log(`断言通过：长度=${view.length}，耗时=${(end - start).toFix
 
 ```mermaid
 sequenceDiagram
-  participant U as "用户操作"
-  participant R as "React"
-  participant P as "Profiler"
-  participant T as "浏览器"
-  U->>R "触发更新"
-  R->>P "记录开始时间"
-  R->>R "渲染各组件"
-  P->>P "累计每个组件耗时"
-  R->>T "提交 DOM"
-  R->>P "回调 onRender"
+  participant U as 用户操作
+  participant R as React
+  participant P as Profiler
+  participant T as 浏览器
+  U->>R: 触发更新
+  R->>P: 记录开始时间
+  R->>R: 渲染各组件
+  P->>P: 累计每个组件耗时
+  R->>T: 提交 DOM
+  R->>P: 回调 onRender
 ```
 
 1. 用户操作触发一次更新。
@@ -518,15 +518,15 @@ console.log('断言通过：下沉状态后 BigForm 不再进入重渲染列表'
 
 ```mermaid
 sequenceDiagram
-  participant P as "父组件"
-  participant M as "memo 组件"
-  participant R as "React"
-  P->>M "传入新 props"
-  M->>R "比较旧 props 与新 props"
+  participant P as 父组件
+  participant M as memo 组件
+  participant R as React
+  P->>M: 传入新 props
+  M->>R: 比较旧 props 与新 props
   alt "props 不一致"
-    R-->>M "执行渲染"
+    R-->>M: 执行渲染
   else "props 一致"
-    R-->>M "跳过渲染"
+    R-->>M: 跳过渲染
   end
 ```
 
@@ -738,17 +738,17 @@ console.log('断言通过：可见范围', range);
 
 ```mermaid
 sequenceDiagram
-  participant U as "用户"
-  participant A as "App"
-  participant L as "lazy 组件"
-  participant S as "Suspense"
-  participant N as "网络"
-  U->>A "进入页面"
-  A->>L "首次尝试渲染"
-  L->>N "动态 import 模块"
-  S-->>A "显示 fallback"
-  N->>L "模块到达"
-  L->>A "渲染组件内容"
+  participant U as 用户
+  participant A as App
+  participant L as lazy 组件
+  participant S as Suspense
+  participant N as 网络
+  U->>A: 进入页面
+  A->>L: 首次尝试渲染
+  L->>N: 动态 import 模块
+  S-->>A: 显示 fallback
+  N->>L: 模块到达
+  L->>A: 渲染组件内容
 ```
 
 1. 用户进入页面，App 尝试渲染 lazy 组件。

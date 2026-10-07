@@ -53,14 +53,14 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant U as "用户代理"
-  participant R as "权限规则引擎"
-  participant S as "沙箱执行器"
-  participant A as "审计日志"
-  U->>R as "请求执行命令"
-  R->>S as "输出 allow 或 deny"
-  S->>A as "记录参数与结果"
-  S->>U as "返回输出"
+  participant U as 用户代理
+  participant R as 权限规则引擎
+  participant S as 沙箱执行器
+  participant A as 审计日志
+  U->>R: 请求执行命令
+  R->>S: 输出 allow 或 deny
+  S->>A: 记录参数与结果
+  S->>U: 返回输出
 ```
 
 1. 用户代理只提出命令，不直接接触操作系统。  
@@ -357,14 +357,14 @@ console.log("4 个优先级断言通过");
 
 ```mermaid
 sequenceDiagram
-  participant T as "沙箱工具"
-  participant F as "文件系统"
-  T->>F as "读取工作目录路径"
-  F->>T as "返回带符号链接的路径"
-  T->>F as "执行 realpath 解析"
-  F->>T as "返回真实路径"
-  T->>T as "判断真实路径是否在白名单根目录内"
-  T->>T as "放行或拒绝"
+  participant T as 沙箱工具
+  participant F as 文件系统
+  T->>F: 读取工作目录路径
+  F->>T: 返回带符号链接的路径
+  T->>F: 执行 realpath 解析
+  F->>T: 返回真实路径
+  T->>T: 判断真实路径是否在白名单根目录内
+  T->>T: 放行或拒绝
 ```
 
 1. 沙箱工具不能直接用用户输入的路径做判断。  
@@ -516,14 +516,19 @@ console.log("2 个路径越界断言通过");
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "等待命令"
-  "等待命令" --> "白名单检查"
-  "白名单检查" --> "只读模式检查"
-  "只读模式检查" --> "允许执行"
-  "等待命令" --> "拒绝执行" : "不在白名单"
-  "只读模式检查" --> "拒绝执行" : "写命令被禁用"
-  "允许执行" --> [*]
-  "拒绝执行" --> [*]
+  state "等待命令" as S0
+  state "白名单检查" as S1
+  state "只读模式检查" as S2
+  state "允许执行" as S3
+  state "拒绝执行" as S4
+  [*] --> S0
+  S0 --> S1
+  S1 --> S2
+  S2 --> S3
+  S0 --> S4: 不在白名单
+  S2 --> S4: 写命令被禁用
+  S3 --> [*]
+  S4 --> [*]
 ```
 
 1. 先判断命令是否在白名单。  
@@ -688,18 +693,18 @@ console.log("5 个白名单/只读断言通过");
 
 ```mermaid
 sequenceDiagram
-  participant U as "用户代理"
-  participant R as "规则引擎"
-  participant Q as "审批队列"
-  participant H as "人工审批人"
-  participant A as "审计日志"
-  U->>R as "请求执行命令"
-  R->>Q as "决策为 ask"
-  Q->>H as "展示命令上下文"
-  H->>Q as "allow 或 deny"
-  Q->>R as "返回审批结果"
-  R->>A as "写入审批记录"
-  R->>U as "返回最终结果"
+  participant U as 用户代理
+  participant R as 规则引擎
+  participant Q as 审批队列
+  participant H as 人工审批人
+  participant A as 审计日志
+  U->>R: 请求执行命令
+  R->>Q: 决策为 ask
+  Q->>H: 展示命令上下文
+  H->>Q: allow 或 deny
+  Q->>R: 返回审批结果
+  R->>A: 写入审批记录
+  R->>U: 返回最终结果
 ```
 
 1. 规则引擎遇到 `ask`，不直接执行。  
@@ -1001,17 +1006,25 @@ console.log("5 个危险元字符断言通过");
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "输入命令"
-  "输入命令" --> "规则与路径检查"
-  "规则与路径检查" --> "deny 拒绝"
-  "规则与路径检查" --> "allow 执行"
-  "allow 执行" --> "运行 bash -c"
-  "运行 bash -c" --> "超时击杀"
-  "运行 bash -c" --> "读取 stdout 与 stderr"
-  "读取 stdout 与 stderr" --> "写审计日志"
-  "写审计日志" --> [*]
-  "超时击杀" --> [*]
-  "deny 拒绝" --> "写审计日志"
+  state "输入命令" as S0
+  state "规则与路径检查" as S1
+  state "deny 拒绝" as S2
+  state "allow 执行" as S3
+  state "运行 bash -c" as S4
+  state "超时击杀" as S5
+  state "读取 stdout 与 stderr" as S6
+  state "写审计日志" as S7
+  [*] --> S0
+  S0 --> S1
+  S1 --> S2
+  S1 --> S3
+  S3 --> S4
+  S4 --> S5
+  S4 --> S6
+  S6 --> S7
+  S7 --> [*]
+  S5 --> [*]
+  S2 --> S7
 ```
 
 1. 输入命令后，先进行规则、路径、元字符三层检查。  

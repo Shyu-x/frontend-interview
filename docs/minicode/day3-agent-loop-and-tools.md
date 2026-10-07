@@ -56,15 +56,15 @@ Agent loop 要解决的就是这段“谁把结果送回去”的链路。
 
 ```mermaid
 sequenceDiagram
-  participant U as "调用方"
-  participant M as "模型"
-  participant T as "工具执行器"
-  U->>M: "发送用户消息"
-  M-->>U: "返回一个工具调用"
-  U->>T: "执行工具"
-  T-->>U: "工具结果"
-  U->>M: "追加结果后再次请求"
-  M-->>U: "返回最终回答"
+  participant U as 调用方
+  participant M as 模型
+  participant T as 工具执行器
+  U->>M: 发送用户消息
+  M-->>U: 返回一个工具调用
+  U->>T: 执行工具
+  T-->>U: 工具结果
+  U->>M: 追加结果后再次请求
+  M-->>U: 返回最终回答
 ```
 
 解读：  
@@ -410,15 +410,21 @@ pi-agent-core 的 `convertToLlm` 消息流是 `AgentMessage[] → convertToLlm()
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "等待模型"
-  "等待模型" --> "有工具调用" : "模型返回 toolCall"
-  "有工具调用" --> "执行工具"
-  "执行工具" --> "回灌结果"
-  "回灌结果" --> "等待模型"
-  "等待模型" --> "无工具调用" : "返回文本"
-  "等待模型" --> "超出最大轮数" : "工具轮数达到上限"
-  "无工具调用" --> [*]
-  "超出最大轮数" --> [*]
+  state "等待模型" as S0
+  state "有工具调用" as S1
+  state "执行工具" as S2
+  state "回灌结果" as S3
+  state "无工具调用" as S4
+  state "超出最大轮数" as S5
+  [*] --> S0
+  S0 --> S1: 模型返回 toolCall
+  S1 --> S2
+  S2 --> S3
+  S3 --> S0
+  S0 --> S4: 返回文本
+  S0 --> S5: 工具轮数达到上限
+  S4 --> [*]
+  S5 --> [*]
 ```
 
 解读：  
@@ -585,15 +591,15 @@ read_file 遇到不存在的文件，程序如果直接抛异常，整个 agent 
 
 ```mermaid
 sequenceDiagram
-  participant M as "模型"
-  participant L as "主循环"
-  participant T as "read_file"
-  M->>L: "请求读取 bad.txt"
-  L->>T: "执行 read_file"
-  T-->>L: "抛出文件不存在错误"
-  L->>L: "捕获异常并包装成 toolResult"
-  L-->>M: "回灌错误工具结果"
-  M-->>L: "改调 glob 查找正确文件"
+  participant M as 模型
+  participant L as 主循环
+  participant T as read_file
+  M->>L: 请求读取 bad.txt
+  L->>T: 执行 read_file
+  T-->>L: 抛出文件不存在错误
+  L->>L: 捕获异常并包装成 toolResult
+  L-->>M: 回灌错误工具结果
+  M-->>L: 改调 glob 查找正确文件
 ```
 
 解读：  
@@ -1105,16 +1111,16 @@ beforeToolCall 可以阻断危险工具，afterToolCall 可以给结果加审计
 
 ```mermaid
 sequenceDiagram
-  participant M as "模型"
-  participant L as "主循环"
-  participant T1 as "read_file A"
-  participant T2 as "read_file B"
-  M->>L: "一次返回两个工具调用"
-  L->>T1: "执行 read_file A"
-  L->>T2: "执行 read_file B"
-  T1-->>L: "A 结果"
-  T2-->>L: "B 结果"
-  L-->>M: "按来源顺序回灌结果"
+  participant M as 模型
+  participant L as 主循环
+  participant T1 as read_file A
+  participant T2 as read_file B
+  M->>L: 一次返回两个工具调用
+  L->>T1: 执行 read_file A
+  L->>T2: 执行 read_file B
+  T1-->>L: A 结果
+  T2-->>L: B 结果
+  L-->>M: 按来源顺序回灌结果
 ```
 
 解读：  

@@ -63,19 +63,19 @@ flowchart TB
 
 ```mermaid
 sequenceDiagram
-    participant U as "用户"
-    participant A as "Agent 调度台"
-    participant R as "检索器与重排器"
-    participant T as "工具集"
-    participant S as "回答合成"
-    U->>A: "提交查询"
-    A->>A: "判定意图"
-    A->>R: "知识查询：检索 top_k 文档"
-    R-->>A: "返回候选文档与分数"
-    A->>T: "工具调用：执行指定工具"
-    T-->>A: "返回工具结果"
-    A->>S: "拼接检索内容、工具结果、历史上下文"
-    S-->>U: "返回带来源的回答"
+    participant U as 用户
+    participant A as Agent 调度台
+    participant R as 检索器与重排器
+    participant T as 工具集
+    participant S as 回答合成
+    U->>A: 提交查询
+    A->>A: 判定意图
+    A->>R: 知识查询：检索 top_k 文档
+    R-->>A: 返回候选文档与分数
+    A->>T: 工具调用：执行指定工具
+    T-->>A: 返回工具结果
+    A->>S: 拼接检索内容、工具结果、历史上下文
+    S-->>U: 返回带来源的回答
 ```
 
 逐条解读这张图：
@@ -308,16 +308,23 @@ console.log('全部断言通过');
 
 ```mermaid
 stateDiagram-v2
-    [*] --> "拉取来源清单"
-    "拉取来源清单" --> "计算每篇指纹"
-    "计算每篇指纹" --> "与库内指纹对比"
-    "与库内指纹对比" --> "新增文档入库"
-    "与库内指纹对比" --> "修改文档先删后插"
-    "与库内指纹对比" --> "缺失文档删除"
-    "新增文档入库" --> "打印更新统计"
-    "修改文档先删后插" --> "打印更新统计"
-    "缺失文档删除" --> "打印更新统计"
-    "打印更新统计" --> [*]
+  state "拉取来源清单" as S0
+  state "计算每篇指纹" as S1
+  state "与库内指纹对比" as S2
+  state "新增文档入库" as S3
+  state "修改文档先删后插" as S4
+  state "缺失文档删除" as S5
+  state "打印更新统计" as S6
+    [*] --> S0
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S2 --> S4
+    S2 --> S5
+    S3 --> S6
+    S4 --> S6
+    S5 --> S6
+    S6 --> [*]
 ```
 
 逐条解读：

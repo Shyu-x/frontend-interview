@@ -870,26 +870,26 @@ system-prompt ok
 
 ```mermaid
 sequenceDiagram
-  participant U as "调用方"
-  participant AG as "dsh-agent"
-  participant LOOP as "dsh-agent-loop"
-  participant SPR as "dsh-system-prompt"
-  participant TL as "dsh-tools"
-  participant SE as "dsh-session"
-  U->>AG: "handle.agent.followup"
-  AG->>LOOP: "唤醒驱动并投递入站消息"
-  LOOP->>SE: "append user/message 带 surfaceOp append"
-  LOOP->>AG: "agent/pre-step 决定拒绝或进入"
-  LOOP->>SPR: "assemble 与 renderPrompt"
-  SPR->>TL: "取该作用域可见的工具模式"
-  TL-->>SPR: "模式集合"
-  SPR-->>LOOP: "提示词文本与工具模式"
-  LOOP->>SE: "append system/message 与 request/header"
-  LOOP->>TL: "分派工具调用并走执行管道"
-  TL-->>LOOP: "冻结的最终结果"
-  LOOP->>SE: "append tool/result"
-  LOOP->>SE: "append assistant/message 或 assistant/attempt"
-  LOOP-->>U: "whenIdle 解析"
+  participant U as 调用方
+  participant AG as dsh-agent
+  participant AgLoop as dsh-agent-loop
+  participant SPR as dsh-system-prompt
+  participant TL as dsh-tools
+  participant SE as dsh-session
+  U->>AG: handle.agent.followup
+  AG->>AgLoop: 唤醒驱动并投递入站消息
+  AgLoop->>SE: append user/message 带 surfaceOp append
+  AgLoop->>AG: agent/pre-step 决定拒绝或进入
+  AgLoop->>SPR: assemble 与 renderPrompt
+  SPR->>TL: 取该作用域可见的工具模式
+  TL-->>SPR: 模式集合
+  SPR-->>AgLoop: 提示词文本与工具模式
+  AgLoop->>SE: append system/message 与 request/header
+  AgLoop->>TL: 分派工具调用并走执行管道
+  TL-->>AgLoop: 冻结的最终结果
+  AgLoop->>SE: append tool/result
+  AgLoop->>SE: append assistant/message 或 assistant/attempt
+  AgLoop-->>U: whenIdle 解析
 ```
 
 1. `followup` 把带身份的 user 角色消息送进 inbox，并唤醒驱动。

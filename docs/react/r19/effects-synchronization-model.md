@@ -64,16 +64,16 @@ Effect 是 React 专属概念，指出渲染本身引起的副作用；它运行
 
 ```mermaid
 sequenceDiagram
-  participant R as "React 渲染"
-  participant C as "组件函数"
-  participant D as "DOM 提交"
-  participant E as "useEffect"
-  participant V as "video 元素"
-  R->>C: "计算 isPlaying"
-  C->>D: "提交 video 到屏幕"
-  D->>E: "提交完成后运行 Effect"
-  E->>V: "isPlaying 为 true 则 play"
-  E->>V: "isPlaying 为 false 则 pause"
+  participant R as React 渲染
+  participant C as 组件函数
+  participant D as DOM 提交
+  participant E as useEffect
+  participant V as video 元素
+  R->>C: 计算 isPlaying
+  C->>D: 提交 video 到屏幕
+  D->>E: 提交完成后运行 Effect
+  E->>V: isPlaying 为 true 则 play
+  E->>V: isPlaying 为 false 则 pause
 ```
 
 解读：
@@ -237,11 +237,15 @@ React 怎么知道要断旧房间、连新房间？
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "空闲"
-  "空闲" --> "已连接到 general 房间": "roomId 为 general 时提交"
-  "已连接到 general 房间" --> "清理 general 房间连接": "roomId 变为 travel"
-  "清理 general 房间连接" --> "已连接到 travel 房间": "运行下一次 Effect"
-  "已连接到 travel 房间" --> [*]: "组件卸载时清理"
+  state "空闲" as S0
+  state "已连接到 general 房间" as S1
+  state "清理 general 房间连接" as S2
+  state "已连接到 travel 房间" as S3
+  [*] --> S0
+  S0 --> S1: roomId 为 general 时提交
+  S1 --> S2: roomId 变为 travel
+  S2 --> S3: 运行下一次 Effect
+  S3 --> [*]: 组件卸载时清理
 ```
 
 解读：
@@ -410,16 +414,16 @@ console.log(log.join('\n'));
 
 ```mermaid
 sequenceDiagram
-  participant R as "React"
-  participant E as "Effect"
-  participant S as "外部系统"
-  R->>E: "commit with roomId general"
-  E->>S: "connect general"
-  R->>E: "commit with roomId travel"
-  E->>S: "disconnect general"
-  E->>S: "connect travel"
-  R->>E: "unmount"
-  E->>S: "disconnect travel"
+  participant R as React
+  participant E as Effect
+  participant S as 外部系统
+  R->>E: commit with roomId general
+  E->>S: connect general
+  R->>E: commit with roomId travel
+  E->>S: disconnect general
+  E->>S: connect travel
+  R->>E: unmount
+  E->>S: disconnect travel
 ```
 
 解读：
@@ -584,12 +588,12 @@ console.log('实际输出：listeners.size =', listeners.size);
 
 ```mermaid
 sequenceDiagram
-  participant R as "React Dev Strict Mode"
-  participant E as "Effect"
-  R->>E: "mount setup"
-  R->>E: "cleanup"
-  R->>E: "setup"
-  R->>E: "unmount cleanup"
+  participant R as React Dev Strict Mode
+  participant E as Effect
+  R->>E: mount setup
+  R->>E: cleanup
+  R->>E: setup
+  R->>E: unmount cleanup
 ```
 
 解读：

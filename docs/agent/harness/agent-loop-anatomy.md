@@ -56,34 +56,34 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant UI as "调用方"
-  participant Loop as "Agent Loop"
-  participant Model as "模型"
-  participant Tools as "工具执行器"
-  UI->>Loop: "prompt 包含读取配置等四条指令"
-  Loop->>UI: "agent_start"
-  Loop->>UI: "turn_start"
-  Loop->>UI: "message_start 用户消息"
-  Loop->>UI: "message_end 用户消息"
-  Loop->>Model: "prepareRequest 后发起请求"
-  Model-->>Loop: "start 部分消息"
-  Loop->>UI: "message_start 助手消息"
-  Model-->>Loop: "text_delta"
-  Loop->>UI: "message_update"
-  Model-->>Loop: "done"
-  Loop->>UI: "message_end 助手消息"
-  Loop->>Tools: "tool_execution_start 四个工具"
-  Tools-->>UI: "tool_execution_update"
-  Tools-->>Loop: "tool_execution_end"
-  Loop->>UI: "message_start toolResult"
-  Loop->>UI: "message_end toolResult"
-  Loop->>UI: "turn_end"
-  Loop->>Model: "下一轮请求"
-  Model-->>Loop: "done 无工具调用"
-  Loop->>UI: "message_start 助手消息"
-  Loop->>UI: "message_end 助手消息"
-  Loop->>UI: "turn_end"
-  Loop->>UI: "agent_end"
+  participant UI as 调用方
+  participant AgentLoop as Agent Loop
+  participant Model as 模型
+  participant Tools as 工具执行器
+  UI->>AgentLoop: prompt 包含读取配置等四条指令
+  AgentLoop->>UI: agent_start
+  AgentLoop->>UI: turn_start
+  AgentLoop->>UI: message_start 用户消息
+  AgentLoop->>UI: message_end 用户消息
+  AgentLoop->>Model: prepareRequest 后发起请求
+  Model-->>AgentLoop: start 部分消息
+  AgentLoop->>UI: message_start 助手消息
+  Model-->>AgentLoop: text_delta
+  AgentLoop->>UI: message_update
+  Model-->>AgentLoop: done
+  AgentLoop->>UI: message_end 助手消息
+  AgentLoop->>Tools: tool_execution_start 四个工具
+  Tools-->>UI: tool_execution_update
+  Tools-->>AgentLoop: tool_execution_end
+  AgentLoop->>UI: message_start toolResult
+  AgentLoop->>UI: message_end toolResult
+  AgentLoop->>UI: turn_end
+  AgentLoop->>Model: 下一轮请求
+  Model-->>AgentLoop: done 无工具调用
+  AgentLoop->>UI: message_start 助手消息
+  AgentLoop->>UI: message_end 助手消息
+  AgentLoop->>UI: turn_end
+  AgentLoop->>UI: agent_end
 ```
 
 1. `prompt()` 把用户输入变为一条 user 消息，放入当前快照。  

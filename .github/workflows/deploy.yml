@@ -51,6 +51,9 @@ jobs:
           npm ci --prefix book
           node book/scripts/sync-fonts.mjs
 
+      - name: Parse every Mermaid diagram (real parser)
+        run: CHROME_PATH="$(which google-chrome)" node book/scripts/check-mermaid.mjs
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

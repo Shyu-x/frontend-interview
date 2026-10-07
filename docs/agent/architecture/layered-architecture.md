@@ -405,16 +405,24 @@ console.log("认知层断言全部通过");
 
 ```mermaid
 stateDiagram-v2
-    [*] --> "理解目标"
-    "理解目标" --> "拆分任务"
-    "拆分任务" --> "为当前任务打分"
-    "为当前任务打分" --> "选中动作"
-    "选中动作" --> "交给执行层"
-    "交给执行层" --> "观察结果"
-    "观察结果" --> "还有子任务" : "是"
-    "还有子任务" --> "为当前任务打分" : "继续"
-    "观察结果" --> "结束" : "否"
-    "结束" --> [*]
+  state "理解目标" as S0
+  state "拆分任务" as S1
+  state "为当前任务打分" as S2
+  state "选中动作" as S3
+  state "交给执行层" as S4
+  state "观察结果" as S5
+  state "还有子任务" as S6
+  state "结束" as S7
+    [*] --> S0
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6: 是
+    S6 --> S2: 继续
+    S5 --> S7: 否
+    S7 --> [*]
 ```
 
 1. 状态机从"理解目标"开始，这一步只确定目标类型。
@@ -770,17 +778,17 @@ console.log("执行层断言全部通过");
 
 ```mermaid
 sequenceDiagram
-    participant P as "感知层"
-    participant C as "认知层"
-    participant D as "决策层"
-    participant E as "执行层"
-    participant L as "日志存储"
-    P->>C: "message type=perception traceId=abc"
-    C->>D: "message type=context traceId=abc"
-    D->>E: "message type=tool_call traceId=abc"
-    E->>L: "span name=tool.query traceId=abc"
-    E->>D: "message type=tool_result traceId=abc"
-    D->>C: "message type=answer traceId=abc"
+    participant P as 感知层
+    participant C as 认知层
+    participant D as 决策层
+    participant E as 执行层
+    participant L as 日志存储
+    P->>C: message type=perception traceId=abc
+    C->>D: message type=context traceId=abc
+    D->>E: message type=tool_call traceId=abc
+    E->>L: span name=tool.query traceId=abc
+    E->>D: message type=tool_result traceId=abc
+    D->>C: message type=answer traceId=abc
 ```
 
 1. 感知层把归一化结果包成 message，traceId 随请求生成一次。

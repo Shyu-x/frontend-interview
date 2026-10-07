@@ -61,19 +61,19 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant APP as "应用代码"
-  participant R as "react"
-  participant REC as "react-reconciler"
-  participant DOM as "react-dom host config"
-  participant S as "scheduler"
-  APP->>R: "调用 createElement"
-  R-->>APP: "返回 React 元素"
-  APP->>DOM: "createRoot(container).render(element)"
-  DOM->>REC: "updateContainer(element, root)"
-  REC->>S: "请求调度更新"
-  S-->>REC: "分配工作切片"
-  REC->>DOM: "调用 HostConfig 创建或更新节点"
-  DOM-->>APP: "真实界面更新"
+  participant APP as 应用代码
+  participant R as react
+  participant REC as react-reconciler
+  participant DOM as react-dom host config
+  participant S as scheduler
+  APP->>R: 调用 createElement
+  R-->>APP: 返回 React 元素
+  APP->>DOM: createRoot(container).render(element)
+  DOM->>REC: updateContainer(element, root)
+  REC->>S: 请求调度更新
+  S-->>REC: 分配工作切片
+  REC->>DOM: 调用 HostConfig 创建或更新节点
+  DOM-->>APP: 真实界面更新
 ```
 
 - 第 1 步：`react` 只把 JSX 转成 React 元素，不产生界面。
@@ -350,11 +350,14 @@ react 包职责验证通过
 
 ```mermaid
 stateDiagram-v2
-  [*] --> "H 为 null"
-  "H 为 null" --> "H 已注入" : "渲染器进入渲染流程"
-  "H 已注入" --> "组件调用 useState" : "读取 dispatcher"
-  "组件调用 useState" --> "H 为 null" : "渲染结束或出错清理"
-  "H 为 null" --> [*]
+  state "H 为 null" as S0
+  state "H 已注入" as S1
+  state "组件调用 useState" as S2
+  [*] --> S0
+  S0 --> S1: 渲染器进入渲染流程
+  S1 --> S2: 读取 dispatcher
+  S2 --> S0: 渲染结束或出错清理
+  S0 --> [*]
 ```
 
 - 初始状态 `H` 是 `null`，此时调用 hooks 会失败。

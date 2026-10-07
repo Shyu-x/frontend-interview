@@ -50,11 +50,11 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant U as "你的应用"
-  participant S as "Claude Messages API"
-  U->>S: "POST /v1/messages 带 x-api-key 和 JSON 请求体"
-  S-->>U: "200 JSON 或 SSE 事件流"
-  U->>U: "解析 Content 数组为 text 或 tool_use 块"
+  participant U as 你的应用
+  participant S as Claude Messages API
+  U->>S: POST /v1/messages 带 x-api-key 和 JSON 请求体
+  S-->>U: 200 JSON 或 SSE 事件流
+  U->>U: 解析 Content 数组为 text 或 tool_use 块
 ```
 
 1. 你的应用构造请求体，包含 model 与 messages。
@@ -337,14 +337,14 @@ message shape ok
 
 ```mermaid
 sequenceDiagram
-  participant C as "Call 函数"
-  participant F as "frontCall"
-  participant H as "HTTP 服务"
-  C->>F: "传 model 与 messages"
-  F->>H: "POST /v1/messages JSON body"
-  H-->>F: "200 带 CallResponse JSON"
-  F-->>C: "返回 CallResponse"
-  C->>C: "遍历 Content 解析 type"
+  participant C as Call 函数
+  participant F as frontCall
+  participant H as HTTP 服务
+  C->>F: 传 model 与 messages
+  F->>H: POST /v1/messages JSON body
+  H-->>F: 200 带 CallResponse JSON
+  F-->>C: 返回 CallResponse
+  C->>C: 遍历 Content 解析 type
 ```
 
 1. Call 把参数交给 frontCall。
@@ -510,7 +510,7 @@ call parse ok
 **图解**：
 
 ```mermaid
-stateDiagram-v2
+flowchart TD
   S0["读取一行"] --> S1{"是否为 data 开头"}
   S1 -->|"否"| S0
   S1 -->|"是"| S2["解析 JSON 取 type"]

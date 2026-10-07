@@ -753,19 +753,19 @@ web 域选用: WebArena
 
 ```mermaid
 sequenceDiagram
-    participant U as "用户"
-    participant A as "Agent"
-    participant T as "追踪记录"
-    participant E as "评测器"
-    U->>A: "添加商品 123 到购物车"
-    A->>T: "记录第一步的工具调用"
-    U->>A: "使用标准配送进行结算"
-    A->>T: "记录第二步的工具调用"
-    U->>A: "确认支付"
-    A->>T: "记录第三步的工具调用"
-    T->>E: "整条链路的追踪数据"
-    E->>E: "计算完成率与各步指标"
-    E-->>U: "给出整链路得分"
+    participant U as 用户
+    participant A as Agent
+    participant T as 追踪记录
+    participant E as 评测器
+    U->>A: 添加商品 123 到购物车
+    A->>T: 记录第一步的工具调用
+    U->>A: 使用标准配送进行结算
+    A->>T: 记录第二步的工具调用
+    U->>A: 确认支付
+    A->>T: 记录第三步的工具调用
+    T->>E: 整条链路的追踪数据
+    E->>E: 计算完成率与各步指标
+    E-->>U: 给出整链路得分
 ```
 
 1. 用户走三步：加购、结算、确认支付。
@@ -988,17 +988,25 @@ console.log('完成率:', completionRate);
 
 ```mermaid
 stateDiagram-v2
-    [*] --> "生成初稿"
-    "生成初稿" --> "跑指标"
-    "跑指标" --> "全部达标"
-    "全部达标" --> [*]
-    "跑指标" --> "存在不达标项"
-    "存在不达标项" --> "生成纠正提示"
-    "生成纠正提示" --> "重跑任务"
-    "重跑任务" --> "跑指标"
-    "重跑任务" --> "达到最大次数"
-    "达到最大次数" --> "返回最后一次结果"
-    "返回最后一次结果" --> [*]
+  state "生成初稿" as S0
+  state "跑指标" as S1
+  state "全部达标" as S2
+  state "存在不达标项" as S3
+  state "生成纠正提示" as S4
+  state "重跑任务" as S5
+  state "达到最大次数" as S6
+  state "返回最后一次结果" as S7
+    [*] --> S0
+    S0 --> S1
+    S1 --> S2
+    S2 --> [*]
+    S1 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S1
+    S5 --> S6
+    S6 --> S7
+    S7 --> [*]
 ```
 
 1. 先让 Agent 生成初稿。

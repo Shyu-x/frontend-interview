@@ -295,18 +295,18 @@ Fabric 是 React Native 新架构下的渲染器，通过 `fabricUIManager` 与�
 
 ```mermaid
 sequenceDiagram
-    participant R as "React 协调器"
-    participant C as "ReactFiberConfigFabric"
-    participant N as "fabricUIManager"
-    participant S as "Shadow Tree"
-    R->>C: "提交一个 View 节点"
-    C->>N: "createNode"
-    N-->>C: "阴影节点"
-    R->>C: "提交一个 Text 节点"
-    C->>N: "createNode"
-    N-->>C: "文本阴影节点"
-    C->>N: "appendChild"
-    N->>S: "写入父子关系"
+    participant R as React 协调器
+    participant C as ReactFiberConfigFabric
+    participant N as fabricUIManager
+    participant S as Shadow Tree
+    R->>C: 提交一个 View 节点
+    C->>N: createNode
+    N-->>C: 阴影节点
+    R->>C: 提交一个 Text 节点
+    C->>N: createNode
+    N-->>C: 文本阴影节点
+    C->>N: appendChild
+    N->>S: 写入父子关系
 ```
 
 1. React 协调器先要求创建 View 节点。
@@ -476,15 +476,15 @@ console.log("验证通过：Fabric 阴影树按 createNode 与 appendChild 构�
 
 ```mermaid
 sequenceDiagram
-    participant N as "原生事件"
-    participant E as "dispatchEvent"
-    participant B as "batchedUpdates"
-    participant P as "extractPluginEvents"
-    participant R as "runEventsInBatch"
-    N->>E: "原生事件载荷"
-    E->>B: "批量上下文"
-    B->>P: "提取合成事件"
-    P->>R: "运行监听器批次"
+    participant N as 原生事件
+    participant E as dispatchEvent
+    participant B as batchedUpdates
+    participant P as extractPluginEvents
+    participant R as runEventsInBatch
+    N->>E: 原生事件载荷
+    E->>B: 批量上下文
+    B->>P: 提取合成事件
+    P->>R: 运行监听器批次
 ```
 
 1. 原生事件先到达 `dispatchEvent`。
@@ -871,12 +871,17 @@ Shadow Tree 是 Fabric 在 JS 侧表达的树形结构，用来描述视图层�
 
 ```mermaid
 stateDiagram-v2
-    [*] --> "构建阴影节点"
-    "构建阴影节点" --> "写入 childSet"
-    "写入 childSet" --> "属性 diff"
-    "属性 diff" --> "completeRoot 提交"
-    "completeRoot 提交" --> "原生视图同步"
-    "原生视图同步" --> [*]
+  state "构建阴影节点" as S0
+  state "写入 childSet" as S1
+  state "属性 diff" as S2
+  state "completeRoot 提交" as S3
+  state "原生视图同步" as S4
+    [*] --> S0
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> [*]
 ```
 
 1. 状态更新后，先构建或复用阴影节点。

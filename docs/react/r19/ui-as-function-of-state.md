@@ -51,14 +51,14 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant U["用户"]
-  participant H["提交处理函数"]
-  participant D["DOM"]
-  U->>H["点击提交"]
-  H->>D["禁用提交按钮"]
-  H->>D["显示加载中"]
-  H->>D["隐藏错误信息"]
-  H->>D["显示成功或错误信息"]
+  participant U as 用户
+  participant H as 提交处理函数
+  participant D as DOM
+  U->>H: 点击提交
+  H->>D: 禁用提交按钮
+  H->>D: 显示加载中
+  H->>D: 隐藏错误信息
+  H->>D: 显示成功或错误信息
 ```
 
 1. 用户点击提交，触发一个事件处理函数。
@@ -620,14 +620,14 @@ React 准备下一次渲染值： 5
 
 ```mermaid
 sequenceDiagram
-  participant C["组件渲染"]
-  participant H["onClick 处理函数"]
-  participant R["React 队列"]
-  C->>H["传入 number 等于 0 的快照"]
-  H->>R["setNumber(0+1) 第一次请求"]
-  H->>R["setNumber(0+1) 第二次请求"]
-  H->>R["setNumber(0+1) 第三次请求"]
-  R->>C["事件结束后用 number 等于 1 重新渲染"]
+  participant C as 组件渲染
+  participant H as onClick 处理函数
+  participant R as React 队列
+  C->>H: 传入 number 等于 0 的快照
+  H->>R: setNumber(0+1) 第一次请求
+  H->>R: setNumber(0+1) 第二次请求
+  H->>R: setNumber(0+1) 第三次请求
+  R->>C: 事件结束后用 number 等于 1 重新渲染
 ```
 
 1. 组件把本次渲染快照 `number = 0` 交给 onClick。

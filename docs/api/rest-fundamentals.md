@@ -541,16 +541,16 @@ URI 规则校验与生成通过
 
 ```mermaid
 sequenceDiagram
-    participant C as "Client"
-    participant S as "Server"
-    C->>S: "第一次 PUT /users/42"
-    S-->>C: "200 OK，年龄改为 30"
-    C->>S: "第二次 PUT /users/42"
-    S-->>C: "200 OK，年龄仍为 30"
-    C->>S: "POST /orders"
-    S-->>C: "201 Created 订单 1"
-    C->>S: "再次 POST /orders"
-    S-->>C: "201 Created 订单 2"
+    participant C as Client
+    participant S as Server
+    C->>S: 第一次 PUT /users/42
+    S-->>C: 200 OK，年龄改为 30
+    C->>S: 第二次 PUT /users/42
+    S-->>C: 200 OK，年龄仍为 30
+    C->>S: POST /orders
+    S-->>C: 201 Created 订单 1
+    C->>S: 再次 POST /orders
+    S-->>C: 201 Created 订单 2
 ```
 
 1. 两次 `PUT` 后状态一致，说明它是幂等方法。
@@ -710,15 +710,15 @@ console.log("安全、幂等、非幂等方法判断通过");
 ```mermaid
 stateDiagram-v2
     direction LR
-    state start as "收到请求"
-    state ok2 as "2xx 成功"
-    state redirect3 as "3xx 重定向"
-    state client4 as "4xx 客户端错误"
-    state server5 as "5xx 服务端错误"
-    start --> ok2: "请求成功"
-    start --> redirect3: "需要跳转"
-    start --> client4: "请求有误"
-    start --> server5: "服务器失败"
+    state "收到请求" as start
+    state "2xx 成功" as ok2
+    state "3xx 重定向" as redirect3
+    state "4xx 客户端错误" as client4
+    state "5xx 服务端错误" as server5
+    start --> ok2: 请求成功
+    start --> redirect3: 需要跳转
+    start --> client4: 请求有误
+    start --> server5: 服务器失败
 ```
 
 1. 服务器收到请求后先归入一个响应类别。
@@ -871,14 +871,14 @@ server.close();
 
 ```mermaid
 sequenceDiagram
-    participant C as "Client"
-    participant S as "Server"
-    C->>S: "GET /orders/42，Accept: application/json"
-    S-->>C: "200 OK，Content-Type: application/json，返回 JSON"
-    C->>S: "GET /orders/42，Accept: text/plain"
-    S-->>C: "200 OK，Content-Type: text/plain，返回文本"
-    C->>S: "GET /orders/42，Accept: application/xml"
-    S-->>C: "406 Not Acceptable"
+    participant C as Client
+    participant S as Server
+    C->>S: GET /orders/42，Accept: application/json
+    S-->>C: 200 OK，Content-Type: application/json，返回 JSON
+    C->>S: GET /orders/42，Accept: text/plain
+    S-->>C: 200 OK，Content-Type: text/plain，返回文本
+    C->>S: GET /orders/42，Accept: application/xml
+    S-->>C: 406 Not Acceptable
 ```
 
 1. 服务器先解析 `Accept` 头得到客户端可接受的格式列表。

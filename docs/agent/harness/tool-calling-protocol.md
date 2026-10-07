@@ -266,14 +266,14 @@ OK
 
 ```mermaid
 sequenceDiagram
-  participant Model as "模型"
-  participant Loop as "主循环"
-  Model->>Loop: "start 事件带 partial 消息"
-  Model->>Loop: "toolcall_start 事件"
-  Model->>Loop: "toolcall_delta 事件逐段给参数"
-  Model->>Loop: "done 事件给最终消息"
-  Loop->>Loop: "filter 出 type 为 toolCall 的元素"
-  Loop->>Loop: "按数组顺序执行并生成结果消息"
+  participant Model as 模型
+  participant AgentLoop as 主循环
+  Model->>AgentLoop: start 事件带 partial 消息
+  Model->>AgentLoop: toolcall_start 事件
+  Model->>AgentLoop: toolcall_delta 事件逐段给参数
+  Model->>AgentLoop: done 事件给最终消息
+  AgentLoop->>AgentLoop: filter 出 type 为 toolCall 的元素
+  AgentLoop->>AgentLoop: 按数组顺序执行并生成结果消息
 ```
 
 1. 模型流式输出时先发 `start`，带上一条不完整的 partial 消息。
@@ -702,18 +702,18 @@ OK
 
 ```mermaid
 sequenceDiagram
-  participant Loop as "主循环"
-  participant Pre as "预检阶段"
-  participant Slow as "slow_read 工具"
-  participant Fast as "fast_write 工具"
-  Loop->>Pre: "按源顺序逐个预检"
-  Pre->>Pre: "校验参数加 beforeToolCall"
-  Pre-->>Loop: "两个都返回可执行"
-  Loop->>Slow: "并发启动"
-  Loop->>Fast: "并发启动"
-  Fast-->>Loop: "tool_execution_end 先到"
-  Slow-->>Loop: "tool_execution_end 后到"
-  Loop->>Loop: "按源顺序生成 toolResult 消息"
+  participant AgentLoop as 主循环
+  participant Pre as 预检阶段
+  participant Slow as slow_read 工具
+  participant Fast as fast_write 工具
+  AgentLoop->>Pre: 按源顺序逐个预检
+  Pre->>Pre: 校验参数加 beforeToolCall
+  Pre-->>AgentLoop: 两个都返回可执行
+  AgentLoop->>Slow: 并发启动
+  AgentLoop->>Fast: 并发启动
+  Fast-->>AgentLoop: tool_execution_end 先到
+  Slow-->>AgentLoop: tool_execution_end 后到
+  AgentLoop->>AgentLoop: 按源顺序生成 toolResult 消息
 ```
 
 1. 主循环先按数组顺序对每个调用做预检，这一步是串行的。
@@ -1214,14 +1214,14 @@ OK
 
 ```mermaid
 sequenceDiagram
-  participant Loop as "主循环"
-  participant Tool as "工具 execute"
-  participant Model as "模型"
-  Loop->>Tool: "调用 execute 带已校验参数"
-  Tool-->>Loop: "throw Error 文件不存在"
-  Loop->>Loop: "捕获错误生成 isError 结果"
-  Loop->>Model: "下一轮请求带上这条 toolResult"
-  Model-->>Loop: "模型换路径重新发起 toolCall"
+  participant AgentLoop as 主循环
+  participant Tool as 工具 execute
+  participant Model as 模型
+  AgentLoop->>Tool: 调用 execute 带已校验参数
+  Tool-->>AgentLoop: throw Error 文件不存在
+  AgentLoop->>AgentLoop: 捕获错误生成 isError 结果
+  AgentLoop->>Model: 下一轮请求带上这条 toolResult
+  Model-->>AgentLoop: 模型换路径重新发起 toolCall
 ```
 
 1. 主循环调用 `execute`，参数已经过校验。
@@ -1494,12 +1494,12 @@ stateDiagram-v2
   state "错误结果" as s4
   state "成功结果" as s5
   [*] --> s1
-  s1 --> s2 : "参数通过且未中止"
-  s1 --> s4 : "参数报错 工具不存在 或已中止"
-  s2 --> s3 : "beforeToolCall 未拦截"
-  s2 --> s4 : "beforeToolCall 拦截"
-  s3 --> s5 : "execute 正常返回"
-  s3 --> s4 : "execute 抛错 或执行后已中止"
+  s1 --> s2: 参数通过且未中止
+  s1 --> s4: 参数报错 工具不存在 或已中止
+  s2 --> s3: beforeToolCall 未拦截
+  s2 --> s4: beforeToolCall 拦截
+  s3 --> s5: execute 正常返回
+  s3 --> s4: execute 抛错 或执行后已中止
   s4 --> [*]
   s5 --> [*]
 ```

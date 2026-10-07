@@ -56,15 +56,15 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant JS as "浏览器代码"
-  participant F as "fetch"
-  participant S as "服务器"
-  JS->>F: "调用 fetch 请求"
-  F->>S: "发送 HTTP 请求"
-  S-->>F: "返回状态行与响应头"
-  F-->>JS: "先 resolve Response"
-  JS->>JS: "读取 res.status 与 res.ok"
-  JS->>JS: "调用 res.json() 读响应体"
+  participant JS as 浏览器代码
+  participant F as fetch
+  participant S as 服务器
+  JS->>F: 调用 fetch 请求
+  F->>S: 发送 HTTP 请求
+  S-->>F: 返回状态行与响应头
+  F-->>JS: 先 resolve Response
+  JS->>JS: 读取 res.status 与 res.ok
+  JS->>JS: 调用 res.json() 读响应体
 ```
 
 1. 浏览器代码调用 `fetch`，请求被发往服务器。  
@@ -561,22 +561,22 @@ console.log('预期输出：请求拦截器 req2 先于 req1，响应拦截器 r
 
 ```mermaid
 sequenceDiagram
-  participant JS as "业务代码"
-  participant AC as "AbortController"
-  participant F as "fetch"
-  participant S as "服务器"
-  JS->>AC: "创建 controller"
-  JS->>F: "fetch(url, signal)"
-  JS->>JS: "启动 5000ms 定时器"
-  F->>S: "发送请求"
+  participant JS as 业务代码
+  participant AC as AbortController
+  participant F as fetch
+  participant S as 服务器
+  JS->>AC: 创建 controller
+  JS->>F: fetch(url, signal)
+  JS->>JS: 启动 5000ms 定时器
+  F->>S: 发送请求
   alt "超过 5000ms 未完成"
-    JS->>AC: "abort()"
-    AC-->>F: "signal 触发 abort"
-    F-->>JS: "reject AbortError"
+    JS->>AC: abort()
+    AC-->>F: signal 触发 abort
+    F-->>JS: reject AbortError
   else "正常完成"
-    S-->>F: "返回响应"
-    F-->>JS: "resolve Response"
-    JS->>JS: "清除定时器"
+    S-->>F: 返回响应
+    F-->>JS: resolve Response
+    JS->>JS: 清除定时器
   end
 ```
 
@@ -735,20 +735,20 @@ console.log('预期输出：验证通过；/slow 超时中止，/fast 在超时�
 ```mermaid
 stateDiagram-v2
   [*] --> Ready
-  Ready --> Send : "开始"
-  Send --> Success : "2xx"
-  Send --> Retryable : "5xx 或网络错误"
-  Retryable --> Wait : "重试次数未超限"
-  Wait --> Send : "退避结束"
-  Retryable --> FinalFail : "重试次数达上限"
+  Ready --> Send: 开始
+  Send --> Success: 2xx
+  Send --> Retryable: 5xx 或网络错误
+  Retryable --> Wait: 重试次数未超限
+  Wait --> Send: 退避结束
+  Retryable --> FinalFail: 重试次数达上限
   Success --> [*]
   FinalFail --> [*]
-  state Ready as "准备请求"
-  state Send as "发送请求"
-  state Success as "成功"
-  state Retryable as "可重试失败"
-  state Wait as "等待退避"
-  state FinalFail as "最终失败"
+  state "准备请求" as Ready
+  state "发送请求" as Send
+  state "成功" as Success
+  state "可重试失败" as Retryable
+  state "等待退避" as Wait
+  state "最终失败" as FinalFail
 ```
 
 1. 请求从“准备”进入“发送”。  

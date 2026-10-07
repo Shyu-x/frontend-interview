@@ -703,6 +703,7 @@ nav:
   - 组件与版式: design/components.md
   - 图标与图表工具箱: design/icons-and-diagrams.md
   - 书籍排版规范: design/print-spec.md
+  - 下载 PDF 分册: design/download.md
   - 教程写作规范: design/writing-standard.md
 hooks:
   - hooks/seo.py

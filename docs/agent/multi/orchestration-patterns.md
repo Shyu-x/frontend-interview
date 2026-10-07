@@ -216,16 +216,16 @@ console.log("工作流固定三步，Agent 动态步数，断言通过");
 
 ```mermaid
 sequenceDiagram
-    participant C as "调用方"
-    participant S1 as "阶段1 提取"
-    participant S2 as "阶段2 展开"
-    participant S3 as "阶段3 润色"
-    C->>S1: "原始输入"
-    S1-->>C: "关键词"
-    C->>S2: "关键词"
-    S2-->>C: "大纲"
-    C->>S3: "大纲"
-    S3-->>C: "终稿"
+    participant C as 调用方
+    participant S1 as 阶段1 提取
+    participant S2 as 阶段2 展开
+    participant S3 as 阶段3 润色
+    C->>S1: 原始输入
+    S1-->>C: 关键词
+    C->>S2: 关键词
+    S2-->>C: 大纲
+    C->>S3: 大纲
+    S3-->>C: 终稿
 ```
 
 1. 调用方把原始输入交给阶段 1，拿到阶段 1 输出。
@@ -685,18 +685,18 @@ console.log("并行扇出扇入通过，成功3路失败1路：", merged);
 
 ```mermaid
 sequenceDiagram
-    participant O as "编排者"
-    participant W1 as "工作者1 年报"
-    participant W2 as "工作者2 竞品"
-    participant W3 as "工作者3 供应链"
-    O->>O: "分析问题并制定计划"
-    O->>W1: "任务:读年报"
-    O->>W2: "任务:查竞品"
-    O->>W3: "任务:梳供应链"
-    W1-->>O: "年报摘要"
-    W2-->>O: "竞品对比"
-    W3-->>O: "供应链要点"
-    O->>O: "综合成报告"
+    participant O as 编排者
+    participant W1 as 工作者1 年报
+    participant W2 as 工作者2 竞品
+    participant W3 as 工作者3 供应链
+    O->>O: 分析问题并制定计划
+    O->>W1: 任务:读年报
+    O->>W2: 任务:查竞品
+    O->>W3: 任务:梳供应链
+    W1-->>O: 年报摘要
+    W2-->>O: 竞品对比
+    W3-->>O: 供应链要点
+    O->>O: 综合成报告
 ```
 
 1. 编排者先分析原始问题，产出一份子任务计划。
@@ -846,12 +846,16 @@ console.log("编排者-工作者动态规划并汇总通过：", report);
 
 ```mermaid
 stateDiagram-v2
-    [*] --> "生成草稿"
-    "生成草稿" --> "评估草稿": "提交"
-    "评估草稿" --> "通过": "分数达标"
-    "评估草稿" --> "修订草稿": "分数不达标"
-    "修订草稿" --> "评估草稿": "重新提交"
-    "通过" --> [*]
+  state "生成草稿" as S0
+  state "评估草稿" as S1
+  state "通过" as S2
+  state "修订草稿" as S3
+    [*] --> S0
+    S0 --> S1: 提交
+    S1 --> S2: 分数达标
+    S1 --> S3: 分数不达标
+    S3 --> S1: 重新提交
+    S2 --> [*]
 ```
 
 1. 入口是生成草稿，生成者只负责产出。
