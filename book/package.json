@@ -1,0 +1,24 @@
+{
+  "name": "frontend-interview-book",
+  "private": true,
+  "type": "module",
+  "description": "把站点内容排版为 PDF 书籍（Paged.js + Chromium）",
+  "scripts": {
+    "fonts": "node scripts/sync-fonts.mjs",
+    "build": "node build.mjs",
+    "sample": "node build.mjs --sample"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.2.0",
+    "@fontsource/jetbrains-mono": "^5.2.0",
+    "@fontsource/lxgw-wenkai": "^5.2.0",
+    "@fontsource/noto-sans-sc": "^5.2.0",
+    "@fontsource/noto-serif-sc": "^5.2.0",
+    "mermaid": "^11.0.0",
+    "pagedjs": "^0.4.3",
+    "puppeteer-core": "^24.0.0"
+  },
+  "devDependencies": {
+    "pdfjs-dist": "^6.4.299"
+  }
+}

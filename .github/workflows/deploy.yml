@@ -39,6 +39,18 @@ jobs:
         with:
           fetch-depth: 0   # 完整历史：sitemap 与结构化数据的 lastmod 依赖 git log
 
+      - name: Setup Node.js (fonts)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: book/package-lock.json
+
+      - name: Sync fonts (Noto Serif/Sans SC, Inter)
+        run: |
+          npm ci --prefix book
+          node book/scripts/sync-fonts.mjs
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

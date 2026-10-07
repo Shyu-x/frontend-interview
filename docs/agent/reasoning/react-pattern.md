@@ -316,12 +316,16 @@ LangChain 官方文档 Agents 章节列出 ReAct 风格代理。借鉴方式：�
 
 ```mermaid
 stateDiagram-v2
-    [*] --> "Thought"
-    "Thought" --> "Action": "决定调用工具"
-    "Action" --> "Observation": "执行并回填"
-    "Observation" --> "Thought": "未完成"
-    "Observation" --> "Final": "已完成"
-    "Final" --> [*]
+    state "Thought" as S0
+    state "Action" as S1
+    state "Observation" as S2
+    state "Final" as S3
+    [*] --> S0
+    S0 --> S1: 决定调用工具
+    S1 --> S2: 执行并回填
+    S2 --> S0: 未完成
+    S2 --> S3: 已完成
+    S3 --> [*]
 ```
 
 1. 初始状态进入 Thought。

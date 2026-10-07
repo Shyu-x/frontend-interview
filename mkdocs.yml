@@ -29,10 +29,7 @@ theme:
         icon: material/weather-night
         name: 切换到浅色模式
 
-  font:
-    text: "Inter"
-    code: "JetBrains Mono"
-    fallback: true
+  font: false
 
   icon:
     repo: fontawesome/brands/github
@@ -700,6 +697,13 @@ nav:
   - 社区与资讯: resources/community-and-news.md
   - 在线工具: resources/tools.md
 
+- 设计与写作规范:
+  - 概览: design/index.md
+  - 设计令牌与字体: design/tokens-and-typography.md
+  - 组件与版式: design/components.md
+  - 图标与图表工具箱: design/icons-and-diagrams.md
+  - 书籍排版规范: design/print-spec.md
+  - 教程写作规范: design/writing-standard.md
 hooks:
   - hooks/seo.py
 
@@ -707,5 +711,7 @@ extra:
   generator: false
 
 extra_css:
-  - https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap
+  - assets/fonts/fonts.css
+  - assets/fonts/maple-mono-cn.css
+  - stylesheets/tokens.css
   - stylesheets/extra.css

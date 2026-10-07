@@ -110,7 +110,18 @@ def on_nav(nav, config, files):
                 walk(it.children, trail + [it.title])
             elif it.is_page:
                 SITE["order"][it.file.src_uri] = (len(SITE["order"]), trail)
+
+    def tree(items):
+        out = []
+        for it in items:
+            if it.is_section:
+                out.append({"type": "section", "title": it.title, "children": tree(it.children)})
+            elif it.is_page:
+                out.append({"type": "page", "title": it.title, "src": it.file.src_uri, "url": it.file.dest_uri})
+        return out
+
     walk(nav.items, [])
+    SITE["tree"] = tree(nav.items)
     return nav
 
 
@@ -290,3 +301,9 @@ def on_post_build(config):
                 f"  <title>{escape(config['site_name'])}</title>\n  <link href=\"{base}feed.xml\" rel=\"self\"/>\n"
                 f"  <link href=\"{base}\"/>\n  <id>{base}</id>\n  <updated>{recent[0]['updated'] if recent else ''}</updated>\n"
                 + "\n".join(entries) + "\n</feed>\n")
+
+    # ---------- 书籍清单（供 PDF 流水线使用）----------
+    manifest = {"site": config["site_name"], "base": base, "tree": SITE.get("tree", []),
+                "updated": max((p["updated"] for p in pages), default="")}
+    with open(os.path.join(site_dir, "book-manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False)

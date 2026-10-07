@@ -6,8 +6,6 @@
    ========================================================================== */
 
 :root {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
 
   --ease-standard: cubic-bezier(0.445, 0.05, 0.55, 0.95);
   --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);

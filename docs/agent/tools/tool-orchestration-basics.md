@@ -65,7 +65,7 @@ flowchart TB
 flowchart LR
     input["任务描述"]
     planner["规划器：决定步骤与依赖"]
-    graph["依赖图：节点与边"]
+    depgraph["依赖图：节点与边"]
     scheduler["调度器：算出可并行的批次"]
     executor["执行器：调用工具并收集结果"]
     t1["工具 A"]
@@ -73,8 +73,8 @@ flowchart LR
     t3["工具 C"]
     result["聚合结果"]
     input --> planner
-    planner --> graph
-    graph --> scheduler
+    planner --> depgraph
+    depgraph --> scheduler
     scheduler --> executor
     executor --> t1
     executor --> t2
@@ -1337,13 +1337,13 @@ stateDiagram-v2
 
 ```mermaid
 flowchart LR
-    call["工具 id 加输入对象"]
+    callnode["工具 id 加输入对象"]
     key["键：工具 id 加输入哈希"]
     hit["命中：计数加一后返回"]
     miss["未命中：执行工具"]
     store["写入缓存"]
     full["超出容量：淘汰计数最低项"]
-    call --> key
+    callnode --> key
     key --> hit
     key --> miss
     miss --> store

@@ -28,3 +28,12 @@ Thumbs.db
 # Temporary
 tmp/
 temp/.cache/
+
+# 书籍流水线
+book/node_modules/
+book/dist/
+book/fonts/
+docs/assets/fonts/fonts.css
+docs/assets/fonts/noto-serif-sc/
+docs/assets/fonts/noto-sans-sc/
+docs/assets/fonts/inter/
