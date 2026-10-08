@@ -147,26 +147,6 @@ nav:
     - 工程化:
       - 工程化架构: css/css-architecture.md
       - 预处理与工具链: css/css-toolchain.md
-      - 底层原理手写:
-        - pnpm 与 Workspace Monorepo：幽灵依赖与依赖隔离: engineering/pnpm-workspace-monorepo.md
-        - Node 模块解析算法与依赖提升原理: engineering/node-resolution-hoisting.md
-        - Monorepo 任务编排：Turborepo、Nx 与缓存原理: engineering/monorepo-task-runner.md
-        - 手写迷你打包器：模块图、运行时、Tree Shaking: engineering/mini-bundler-handwritten.md
-        - Vite 底层：预构建、按需编译、HMR 与插件容器: engineering/vite-hmr-internals.md
-        - Babel/AST 底层与手写迷你编译器: engineering/babel-ast-handwritten.md
-        - Tapable 与 Webpack 插件体系手写: engineering/tapable-plugin-system.md
-        - Source Map 原理：VLQ 编码与手写解析器: engineering/sourcemap-vlq.md
-        - 微前端原理：沙箱、样式隔离与 Module Federation: engineering/micro-frontend-sandbox.md
-        - 依赖管理与供应链安全: engineering/supply-chain-lockfile-security.md
-        - 测试框架原理：手写 mini-jest 与 mock/快照/覆盖率: engineering/testing/test-runner-handwritten.md
-        - 渲染策略：CSR、SSR、SSG、ISR 与水合: engineering/ssr-ssg-isr-hydration.md
-      - 状态管理:
-        - Redux 与 Redux Toolkit 底层与手写: engineering/state-management/redux-internals.md
-        - 前端状态管理选型指南: engineering/state-management/selection-guide.md
-        - 服务端状态：TanStack Query、SWR 与缓存手写: engineering/state-management/server-state-query.md
-        - Signals 与细粒度响应式手写: engineering/state-management/signals-fine-grained.md
-        - 状态机与 XState：把流程建模为有限状态: engineering/state-management/state-machines-xstate.md
-        - Zustand、Jotai 与 useSyncExternalStore 手写: engineering/state-management/zustand-jotai-external-store.md
     - 题目索引: css/question-index.md
     - MDN 精读:
       - 动画、滚动驱动动画与 View Transitions：MDN 精读: css/deep-dive/animations-view-transitions.md
@@ -434,6 +414,26 @@ nav:
     - 开发体验与构建优化: engineering/dev-and-optimization.md
     - 包管理与交付: engineering/package-and-delivery.md
     - 微前端与代码质量: engineering/microfrontend-and-quality.md
+    - 底层原理手写:
+      - pnpm 与 Workspace Monorepo：幽灵依赖与依赖隔离: engineering/pnpm-workspace-monorepo.md
+      - Node 模块解析算法与依赖提升原理: engineering/node-resolution-hoisting.md
+      - Monorepo 任务编排：Turborepo、Nx 与缓存原理: engineering/monorepo-task-runner.md
+      - 手写迷你打包器：模块图、运行时、Tree Shaking: engineering/mini-bundler-handwritten.md
+      - Vite 底层：预构建、按需编译、HMR 与插件容器: engineering/vite-hmr-internals.md
+      - Babel/AST 底层与手写迷你编译器: engineering/babel-ast-handwritten.md
+      - Tapable 与 Webpack 插件体系手写: engineering/tapable-plugin-system.md
+      - Source Map 原理：VLQ 编码与手写解析器: engineering/sourcemap-vlq.md
+      - 微前端原理：沙箱、样式隔离与 Module Federation: engineering/micro-frontend-sandbox.md
+      - 依赖管理与供应链安全: engineering/supply-chain-lockfile-security.md
+      - 测试框架原理：手写 mini-jest 与 mock/快照/覆盖率: engineering/testing/test-runner-handwritten.md
+      - 渲染策略：CSR、SSR、SSG、ISR 与水合: engineering/ssr-ssg-isr-hydration.md
+    - 状态管理:
+      - Redux 与 Redux Toolkit 底层与手写: engineering/state-management/redux-internals.md
+      - 前端状态管理选型指南: engineering/state-management/selection-guide.md
+      - 服务端状态：TanStack Query、SWR 与缓存手写: engineering/state-management/server-state-query.md
+      - Signals 与细粒度响应式手写: engineering/state-management/signals-fine-grained.md
+      - 状态机与 XState：把流程建模为有限状态: engineering/state-management/state-machines-xstate.md
+      - Zustand、Jotai 与 useSyncExternalStore 手写: engineering/state-management/zustand-jotai-external-store.md
     - 测试与质量:
       - 单元与组件测试：Vitest、Jest 与 Testing Library: engineering/testing/unit-component-testing.md
       - 端到端与视觉回归：Playwright 与 Cypress: engineering/testing/e2e-visual-testing.md
