@@ -475,8 +475,9 @@ async function main() {
       }
       if (pages === null) throw new Error(`${v.slug} 连续 ${TRIES} 次失败`);
       console.log(`  → ${pdfOut}（${pages} 页，${((Date.now() - t0) / 1000).toFixed(0)}s）`);
+      built.push({ no: v.no, file: v.file, label: v.label, title: v.title, scope: v.scope, pages, chars: v.chars });
     }
-    if (built.length && !sample && !has("--volume")) {
+    if (built.length && !sample && (!has("--volume") || has("--notes"))) {
       writeFileSync(join(DIST, "volumes.json"), JSON.stringify(built, null, 1));
       const rows = built.map((b) => `| ${String(b.no).padStart(2, "0")} | ${b.title} | ${b.scope || "-"} | ${b.pages} |`).join("\n");
       writeFileSync(join(DIST, "RELEASE_NOTES.md"), `# 前端面试全家桶 · PDF 分册\n\n16 开（185×260mm），共 ${built.length} 册、${built.reduce((a, b) => a + b.pages, 0)} 页。文件名为英文（\`frontend-interview-序号-主题.pdf\`），下载页显示的是中文标签。\n\n| 册 | 主题 | 本册内容 | 页数 |\n|---|---|---|---|\n${rows}\n\n每册附封面、目录、页眉页脚与页码；代码字体 Maple Mono CN，正文 Noto Serif SC。在线版：https://shyu-x.github.io/frontend-interview/\n`);
