@@ -1,184 +1,50 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本仓库是一个中文前端教程站点（MkDocs Material），同时能生成 PDF 分册。内容全部在 `docs/`。
 
-## 项目概述
-
-**前端面试全家桶** - 多模块项目，包含文档站点和 Agent 系统。
-
-| 模块 | 说明 | 技术栈 |
-|------|------|--------|
-| `docs/` | MkDocs 文档站点 | MkDocs + Material |
-| `frontend/` | AI 对话前端 | React + Vite + TypeScript |
-| `backend/` | Agent 服务后端 | NestJS + LangChain |
-| `frontend-interview-master.md` | 完整面试文档 | Markdown |
-
----
-
-## 分支管理
-
-```
-main                  # 稳定版本
-  └── feature/agent-streaming  # Agent 开发分支
-```
-
-**分支规范**（详见 `CONTRIBUTING.md`）：
-- `feature/` - 新功能
-- `fix/` - Bug 修复
-- `docs/` - 文档更新
-- `refactor/` - 重构
-
-**Commit 规范**：`type(scope): subject`
-- `feat`: 新功能
-- `fix`: 修复
-- `docs`: 文档
-- `refactor`: 重构
-- `chore`: 构建/工具
-
-**⚠️ 重要：操作前必读 `GIT-RULES.md`，禁止绕过 Git 流程直接推送到 main**
-
----
-
-## 目录结构
-
-```
-someText/
-├── docs/                    # 文档源文件
-│   ├── index.md             # 首页
-│   ├── html/                # HTML 章节
-│   ├── css/                 # CSS 章节
-│   ├── js/                  # JavaScript 章节
-│   └── agent/               # Agent 文档
-│       ├── index.md
-│       ├── typescript-agent.md
-│       └── sse-streaming.md
-├── frontend/               # AI 对话前端
-│   ├── src/
-│   │   ├── components/      # UI 组件
-│   │   ├── hooks/           # React hooks
-│   │   │   └── useStreamChat.ts  # SSE 流式对话
-│   │   ├── types/           # TypeScript 类型
-│   │   ├── App.tsx          # 主应用
-│   │   └── index.css        # 样式
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/                # Agent 服务后端
-│   ├── src/
-│   │   ├── agents/
-│   │   │   └── typescript-agent.ts  # Claude Code 风格 Agent
-│   │   ├── controllers/
-│   │   │   └── chat.controller.ts
-│   │   ├── services/
-│   │   │   ├── agent.service.ts
-│   │   │   ├── chat.service.ts
-│   │   │   └── streaming.service.ts
-│   │   └── dto/
-│   │       └── chat.dto.ts
-│   └── package.json
-├── frontend-interview-master.md  # 完整面试文档
-├── mkdocs.yml               # 文档站点配置
-├── CONTRIBUTING.md          # 贡献指南
-├── MAINTENANCE.md           # 维护规划
-└── split_chapters.py        # 文档拆分脚本
-```
-
----
-
-## 常用命令
-
-> ⚠️ **环境要求**：所有 Python 命令必须使用 `uv run` 执行，禁止裸启动
-
-### 环境配置
-```bash
-# 安装 uv (如未安装)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 同步依赖
-uv sync
-
-# 添加依赖
-uv add mkdocs mkdocs-material
-```
-
-### 文档开发
-```bash
-make dev        # 启动开发服务器 (mkdocs serve --dev-addr 127.0.0.1:8000)
-make build      # 构建生产版本
-make clean      # 清理构建产物
-make lint       # 检查文档警告
-```
-
-### 前端开发
-```bash
-cd frontend
-npm install
-npm run dev      # http://localhost:3000
-npm run build   # 构建生产版本
-```
-
-### 后端开发
-```bash
-cd backend
-npm install
-npm run dev      # http://localhost:4000
-npm run build    # 构建
-```
-
-### Git 操作
-```bash
-git checkout -b feature/xxx    # 创建分支
-git add . && git commit -m "feat(scope): description"
-git push -u origin feature/xxx # 推送
-gh pr create                   # 创建 PR
-```
-
----
-
-## 技术要点
-
-### SSE 流式对话
-
-前端使用 `fetch` + `ReadableStream` 读取后端 SSE 数据：
-
-```typescript
-const response = await fetch('/api/chat/stream', { method: 'POST' });
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  const chunk = decoder.decode(value);
-  // 解析 SSE 数据...
-}
-```
-
-后端 NestJS 返回 `text/event-stream`，逐 token 推送。
-
-### TypeScript Agent (Claude Code 风格)
-
-核心架构：
-- `TypeScriptAgent` - Agent 主类
-- `LLMAdapter` - LLM 适配器接口
-- `AnthropicAdapter` - Anthropic API 实现
-- `AgentTool` - 工具定义与处理
-
----
-
-## 环境变量
+## 命令
 
 ```bash
-# backend/.env
-ANTHROPIC_API_KEY=your-api-key
-PORT=4000
+make install     # uv sync
+make dev         # 本地预览 http://127.0.0.1:8000
+make build       # 构建 site/
+make seo         # 构建并校验 SEO/GEO
+node book/scripts/check-mermaid.mjs      # 用真实解析器检查所有 Mermaid 图
+node book/build.mjs --plan               # 分册方案
+node book/build.mjs --volume N           # 构建第 N 册 PDF（需先 make build）
 ```
 
----
+Python 命令一律用 `uv run`，不要裸跑。构建一次约 1 到 10 分钟，别在循环里反复构建。
 
-## 参考资源
+## 写内容之前
 
-- [MkDocs 文档](https://www.mkdocs.org/)
-- [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
-- [NestJS 文档](https://docs.nestjs.com/)
-- [LangChain.js](https://js.langchain.com/)
-- [Anthropic API](https://docs.anthropic.com/)
+必读 `docs/design/writing-standard.md`：结构、五层递进、配图密度、禁用表述。几条硬规则：
+
+- 不写"性能更好""很容易出问题"这类无法验证的话，给数字、版本、规范条目或可运行代码。
+- 超过 15 行的代码要分段解释，注释写"为什么"。
+- 不用系统 emoji 装饰。
+- 图用 Mermaid；含中文的字符框图不要写（汉字宽度会让它错位），改用 Mermaid、表格或"纯 ASCII 框加框外图例"。
+
+Mermaid 常见坑：节点 id 不能是 `constructor` `name` `graph` `call` `end` 这类 JS 内建名或关键字；状态图用 `state "名称" as id`，转移里不要给状态名加引号；时序图的消息不要加引号，参与者不要叫 `Loop`。
+
+## 结构
+
+```text
+docs/               内容；design/ 是设计系统与写作规范
+docs/javascripts/   diagrams.js：图表渲染与配色，网页和 PDF 共用
+docs/stylesheets/   tokens.css 是网页与书籍共用的设计令牌
+book/               PDF：volumes.mjs 分册规则，build.mjs 构建，print.css 排版
+hooks/seo.py        构建钩子：sitemap、llms.txt、JSON-LD、book-manifest.json
+mkdocs.yml          站点配置；nav 同时决定 PDF 的分册与目录
+```
+
+## 发布
+
+- 推送到 `main` 自动部署 GitHub Pages（`deploy.yml`）。部署前会跑 Mermaid 解析、站点构建、SEO 校验。
+- PDF 由 `release-pdf.yml` 发布，手动触发或推送 `books-*` 标签，不随每次推送运行。
+
+## 约定
+
+- 提交信息 `type(scope): 说明`，不加署名行。
+- 不直接推 `main` 以外的长期分支；合并后删除分支。
+- 终止进程只终止自己启动的 PID，不用 `pkill -f` 之类的模糊匹配。

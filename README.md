@@ -1,153 +1,70 @@
 # 前端面试全家桶
 
-> 前端面试高频知识点配套代码示例与图解，助你系统复习、斩获 Offer。
+面向前端工程师的系统化教程：从 HTML、CSS、JavaScript 的语言底层，到浏览器、网络、框架、工程化，再到 AI Agent。每一篇都按"问题、模型、机制、手写实现、应用、易错点"展开，配图、代码、自测题齐全，可在线阅读，也可下载 PDF 分册离线读。
 
-[![Deploy to GitHub Pages](https://github.com/Shyu-x/frontend-interview/actions/workflows/deploy.yml/badge.svg)](https://github.com/Shyu-x/frontend-interview/actions)
-[![Website](https://img.shields.io/website?url=https%3A%2F%2Fshyu-x.github.io%2Ffrontend-interview)](https://shyu-x.github.io/frontend-interview)
-[![GitHub Stars](https://img.shields.io/github/stars/Shyu-x/frontend-interview?color=gold)](https://github.com/Shyu-x/frontend-interview)
+[![Deploy](https://github.com/Shyu-x/frontend-interview/actions/workflows/deploy.yml/badge.svg)](https://github.com/Shyu-x/frontend-interview/actions/workflows/deploy.yml)
 
-## 在线阅读
+**在线阅读：<https://shyu-x.github.io/frontend-interview/>**　支持深色模式、全文搜索、代码一键复制。
+**PDF 分册：** [Releases](https://github.com/Shyu-x/frontend-interview/releases)（16 开，按主题拆成多册）
 
-**🌐 https://shyu-x.github.io/frontend-interview**
+## 内容
 
-支持深色/浅色模式切换，代码一键复制，全文搜索。
+约 470 篇，按主题分为八个栏目：
 
-## 内容覆盖
+| 栏目 | 篇数 | 包含 |
+|---|---|---|
+| 前端基础 | 118 | HTML、CSS、JavaScript（语言底层、异步、模块、内存）、TypeScript |
+| 浏览器与网络 | 75 | 浏览器原理、网络协议、网络安全、API 设计与通信、浏览器 API |
+| 框架 | 59 | React 19、Vue 与框架生态 |
+| 工程化与性能 | 55 | 工程化、构建工具、包管理器与运行时、性能优化 |
+| 编程实战 | 22 | 手写代码、算法 |
+| AI 与开源 | 118 | AI Agent（Harness、记忆与 RAG、权限、多 Agent、会话存储）、七天 MiniCode、开源项目赏析 |
+| 教学资源 | 20 | 分门别类的权威学习资料，附学习路线与怎么学 |
+| 设计与写作规范 | 7 | 设计系统、书籍排版规范、教程写作规范 |
 
-| 模块 | 章节数 | 状态 |
-|------|--------|------|
-| HTML | 9 章节 | ✅ 完整 |
-| CSS | 10+ 章节 | ✅ 完整 |
-| JavaScript | 10+ 章节 | ✅ 完整 |
-| TypeScript | 10+ 章节 | ✅ 完整 |
-| 网络协议 | 20 章节 | ✅ 完整 |
-| 性能优化 | 10+ 章节 | ✅ 完整 |
-| 手写代码 | 30+ 题 | ✅ 完整 |
-| AI Agent | 25+ 文档 | ✅ 完整 |
-| **开源项目赏析** | **52 个项目** | ✅ **新增** |
+## 本地运行
 
----
-
-## 🏆 开源项目赏析
-
-> 高质量开源项目深度技术指南，52 个项目，17K+ 行内容
-
-[![AI Agent](https://img.shields.io/badge/AI_Agent-11%E4%B8%AA-blue?style=for-the-badge&logo=robot)](docs/open-source/ai-agents.md)
-[![前端框架](https://img.shields.io/badge/%E5%89%8D%E7%AB%AF%E6%A1%86%E6%9E%B6-8%E4%B8%AA-green?style=for-the-badge&logo=react)](docs/open-source/frontend-frameworks.md)
-[![构建工具](https://img.shields.io/badge/%E6%9E%84%E5%BB%BA%E5%B7%A5%E5%85%B7-11%E4%B8%AA-orange?style=for-the-badge&logo=gears)](docs/open-source/tooling.md)
-[![工程化](https://img.shields.io/badge/%E5%B7%A5%E7%A8%8B%E5%8C%96-10%E4%B8%AA-purple?style=for-the-badge&logo=npm)](docs/open-source/engineering.md)
-[![新兴趋势](https://img.shields.io/badge/%E6%96%B0%E5%8D%87%E8%B6%8A%E5%8A%BF-12%E4%B8%AA-red?style=for-the-badge&logo=rocket)](docs/open-source/trending.md)
-
-### 项目总览
-
-| 分类 | 文档 | 项目数 | 代表项目 |
-|------|------|--------|----------|
-| 🤖 AI Agent | [ai-agents.md](docs/open-source/ai-agents.md) | 11 | Claude Code, LangChain.js, MCP |
-| ⚛️ 前端框架 | [frontend-frameworks.md](docs/open-source/frontend-frameworks.md) | 8 | Next.js, Astro, Svelte 5 |
-| 🛠️ 工具链 | [tooling.md](docs/open-source/tooling.md) | 11 | Vite 6, esbuild, Turbopack |
-| 📦 工程化 | [engineering.md](docs/open-source/engineering.md) | 10 | tRPC, Prisma, Zustand |
-| 🚀 新兴趋势 | [trending.md](docs/open-source/trending.md) | 12 | HTMX, Bun, shadcn/ui |
-
-### 热门项目
-
-| 分类 | Top 3 项目 | Stars | 一句话描述 |
-|------|------------|-------|------------|
-| AI Agent | Claude Code | 124K | Anthropic 官方终端编码 Agent |
-| AI Agent | AutoGPT | 184K | 自动化 AI Agent 先驱 |
-| AI Agent | LangChain.js | 18K | 全功能 LLM 应用开发框架 |
-| 前端框架 | Next.js | 130K | React 全栈框架 |
-| 前端框架 | Astro | 45K | 岛屿架构，零 JS |
-| 前端框架 | Svelte | 78K | 编译型框架 |
-| 工具链 | Vite | 81K | 下一代构建工具 |
-| 工具链 | Bun | 91K | 一体化 JS 工具链 |
-| 工具链 | esbuild | 40K | Go 编写的极速打包器 |
-
-### 特色内容
-
-- 📊 **106 个 Mermaid 架构图** - 可视化核心原理
-- 🔄 **竞品对比表格** - 选型决策有依据
-- 📈 **性能基准数据** - benchmark 对比
-- 💻 **150+ 代码示例** - TypeScript/JavaScript
-- 🎯 **选型决策树** - 快速找到适合方案
-
-👉 [查看完整开源项目赏析](docs/open-source/index.md)
-
-## 快速开始
-
-### 本地开发
+需要 [uv](https://docs.astral.sh/uv/) 与 Node.js 22。
 
 ```bash
-# 安装依赖
-pip install mkdocs mkdocs-material
-
-# 启动开发服务器
-mkdocs serve --dev-addr 127.0.0.1:8000
-
-# 构建静态站点
-mkdocs build --clean
+make install    # 安装 Python 依赖
+make dev        # http://127.0.0.1:8000
+make build      # 构建站点到 site/
+make seo        # 构建并校验 sitemap、llms.txt、结构化数据
 ```
 
-### 目录结构
-
-```
-frontend-interview/
-├── docs/                    # 文档源文件 (Markdown)
-│   ├── index.md             # 首页
-│   ├── html/                # HTML 章节
-│   ├── css/                 # CSS 章节
-│   ├── js/                  # JavaScript 章节
-│   ├── typescript/          # TypeScript 章节
-│   ├── network/            # 网络协议章节
-│   ├── performance/         # 性能优化章节
-│   ├── coding/              # 手写代码题库
-│   └── stylesheets/         # 自定义样式
-├── mkdocs.yml               # MkDocs 配置
-├── CLAUDE.md                # Claude Code 开发指南
-├── split_chapters.py        # 文档拆分脚本
-└── .github/
-    └── workflows/
-        └── deploy.yml       # CI/CD 部署脚本
-```
-
-## 贡献指南
-
-### 添加新内容
-
-1. 在对应章节目录添加 `.md` 文件
-2. 更新 `mkdocs.yml` 中的 `nav` 配置
-3. 本地验证：`mkdocs build`
-4. 提交 PR
-
-### 更新主文档
-
-如果修改 `frontend-interview-master.md`，运行脚本拆分章节：
+## 生成 PDF
 
 ```bash
-python split_chapters.py
+npm ci --prefix book
+node book/scripts/sync-fonts.mjs
+python3 -m venv .venv-fonts && .venv-fonts/bin/pip install fonttools brotli
+.venv-fonts/bin/python book/scripts/merge-fonts.py
+make build
+node book/build.mjs --plan          # 查看分册方案
+node book/build.mjs --volume 13     # 构建单册
 ```
 
-### 主题定制
+发布由 `release-pdf` 工作流完成：手动触发，或推送 `books-*` 标签。详见站内《书籍排版规范》。
 
-- **样式修改**：`docs/stylesheets/extra.css`
-- **主题配置**：`mkdocs.yml` 中的 `theme` 和 `palette` 部分
-- **插件配置**：`mkdocs.yml` 中的 `plugins` 和 `markdown_extensions` 部分
+## 仓库结构
 
-## 技术栈
+```text
+docs/             文档源文件（Markdown）
+  design/         设计系统与写作规范
+  javascripts/    图表渲染器（网页与 PDF 共用）
+  stylesheets/    设计令牌 tokens.css 与站点样式
+book/             PDF 流水线：分册规则、排版样式、校验脚本
+hooks/seo.py      构建时生成 sitemap、llms.txt、JSON-LD、书籍目录清单
+overrides/        Material 主题模板覆盖
+scripts/          SEO 校验、Mermaid 校验
+mkdocs.yml        站点配置与导航
+```
 
-- **框架**：MkDocs
-- **主题**：Material for MkDocs
-- **字体**：Noto Sans SC / JetBrains Mono
-- **CI/CD**：GitHub Actions + GitHub Pages
+## 参与
 
-## 维护状态
+想改一篇内容或新增一篇，先读 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-| 指标 | 状态 |
-|------|------|
-| 部署状态 | ✅ 正常 |
-| 最近部署 | 2026-05-14 |
-| 构建频率 | push to main |
-| 覆盖率 | 核心章节 100% |
+## 许可
 
-## License
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+文档内容与代码示例采用 MIT 许可。站内与 PDF 使用的字体均为 SIL OFL 1.1 许可。
