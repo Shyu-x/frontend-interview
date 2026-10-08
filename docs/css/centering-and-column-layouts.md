@@ -14,18 +14,13 @@ tags:
 
 **行盒结构：**
 
-```
-+------------------------------------------+
-| line box（行盒）                          |
-| 行盒高度 = line-height                    |
-|                                          |
-|   +------------------------------------+ |
-|   | content area（内容区）              | |
-|   | content area 高度 = font-size       | |
-|   |                                    | |
-|   | 文字在 content area 中按 baseline 对齐 | |
-|   +------------------------------------+ |
-+------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph LB["line box（行盒）：高度 = line-height"]
+        subgraph CA["content area（内容区）：高度 = font-size"]
+            t["文字在 content area 中按 baseline 对齐"]
+        end
+    end
 ```
 
 **核心原理：** line-height（行高）上下 padding + content 共同撑起行盒高度。

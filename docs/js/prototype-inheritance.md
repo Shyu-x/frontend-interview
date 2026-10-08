@@ -27,20 +27,16 @@ console.log(Person.prototype.constructor === Person); // true
 
 ```mermaid
 flowchart LR
-    subgraph prototype["Person.prototype（原型对象）"]
-        direction TB
-        constructor["constructor → Person（回指）"]
-        sayHi["sayHi → function"]
+    subgraph protoObj["Person.prototype（原型对象）"]
+        ctorNode["constructor → Person（回指）"]
+        sayHiNode["sayHi → function"]
         proto1["__proto__ → Object.prototype"]
     end
-    
-    prototype -->|"__proto__"| instance
-    
-    subgraph instance["p（实例）"]
-        direction TB
-        name["name = \"张三\""]
+    subgraph inst["p（实例）"]
+        nameNode["name = \"张三\""]
         proto2["__proto__ → Person.prototype"]
     end
+    proto2 -->|"__proto__"| ctorNode
 ```
 
 ### 1.2 原型链

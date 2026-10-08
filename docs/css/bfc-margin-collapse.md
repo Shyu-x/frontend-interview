@@ -235,15 +235,16 @@ export function Card({ children, gap = 16 }: CardProps) {
 
 **BFC 示意：**
 
-```
-+---------------------------+
-| BFC 区域（独立渲染上下文）  |
-|                           |
-|   Box 1 (margin 折叠)      |
-|   Box 2                    |
-|                           |
-| BFC 外元素不受 BFC 内 margin 影响
-+---------------------------+
+```mermaid
+flowchart TB
+    subgraph BFCZone["BFC 区域（独立渲染上下文）"]
+        direction TB
+        b1["Box 1<br/>margin 折叠"]
+        b2["Box 2"]
+        b1 ~~~ b2
+    end
+    outside["BFC 外元素<br/>不受 BFC 内 margin 影响"]
+    BFCZone ~~~ outside
 ```
 
 ### 2.3 如何触发 BFC

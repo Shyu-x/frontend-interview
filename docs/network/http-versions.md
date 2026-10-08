@@ -307,23 +307,19 @@ HPACK 使用两个表压缩:
 
 ### 2.6 HTTP/3 与 QUIC
 
-```
-HTTP/3 协议栈:
-+-----------------------------+
-|         HTTP/3              |  应用层
-+-----------------------------+
-|          QUIC               |  (可靠的 UDP)
-|  +-----------------------+  |
-|  |  Stream 1             |  |  每个流独立
-|  |  Stream 2             |  |  流控，无队头阻塞
-|  |  Stream 3             |  |
-|  +-----------------------+  |
-|  |  Connection ID        |  |  连接迁移
-|  |  0-RTT / 1-RTT 握手   |  |
-|  +-----------------------+  |
-+-----------------------------+
-|          UDP                |  传输层
-+-----------------------------+
+```mermaid
+flowchart TD
+    subgraph H3["HTTP/3 协议栈"]
+        APP["HTTP/3<br/>应用层"]
+        subgraph QUIC["QUIC (可靠的 UDP)"]
+            STR["Stream 1<br/>Stream 2<br/>Stream 3<br/>每个流独立流控，无队头阻塞"]
+            CONN["Connection ID：连接迁移<br/>0-RTT / 1-RTT 握手"]
+        end
+        UDP["UDP<br/>传输层"]
+        APP --> STR
+        STR ~~~ CONN
+        QUIC --> UDP
+    end
 ```
 
 ## 3. HTTP 无状态与 keep-alive

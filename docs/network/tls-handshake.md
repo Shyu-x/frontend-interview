@@ -13,39 +13,45 @@ HTTPS 是 HTTP over TLS，在 HTTP 和 TCP 之间插入 TLS 层，提供加密�
 
 ### 1.2 TLS 1.2 vs TLS 1.3 握手对比
 
+**TLS 1.2 — 完整握手（2-RTT）：**
+
+```mermaid
+sequenceDiagram
+  participant C as 客户端
+  participant S as 服务器
+  C->>S: ClientHello（RTT 1：发送支持的加密套件 + 随机数）
+  S-->>C: ServerHello + 证书 + ...（RTT 1：返回证书 + 服务器随机数）
+  C->>S: ClientKeyExchange（发送 PreMasterSecret）
+  Note over C,S: 双方计算会话密钥
+  C->>S: ChangeCipherSpec
+  C->>S: Finished
+  S-->>C: ChangeCipherSpec
+  S-->>C: Finished
+  C->>S: HTTP 请求（加密）（RTT 2：实际请求（加密后））
 ```
-TLS 1.2 — 完整握手（2-RTT）:
-  客户端                          服务器
-    │                              │
-    │──── ClientHello ───────────>│  RTT 1: 发送支持的加密套件 + 随机数
-    │<─── ServerHello + 证书 + ...│  RTT 1: 返回证书 + 服务器随机数
-    │──── ClientKeyExchange ─────>│  发送 PreMasterSecret
-    │  [双方计算会话密钥]           │
-    │──── ChangeCipherSpec ─────>│
-    │──── Finished ─────────────>│
-    │<─── ChangeCipherSpec ──────│
-    │<─── Finished ─────────────│
-    │  HTTP 请求（加密）────────────>│  RTT 2: 实际请求（加密后）
 
-TLS 1.3 — 完整握手（1-RTT）:
-  客户端                          服务器
-    │                              │
-    │──── ClientHello              │  RTT 1: 发送支持的加密套件 + 随机数
-    │      + supported_versions    │         + (ClientHello 本身就是加密的!)
-    │      + key_share (ECDH 公钥) │
-    │<─── ServerHello              │
-    │      + key_share (ECDH 公钥) │  RTT 1: 返回 ServerHello + ECDH 公钥
-    │      + 证书 + 签名           │         + 证书 + 签名
-    │  [双方立即计算会话密钥]        │
-    │  HTTP 请求（加密）────────────>│  RTT 1: 握手完成，立即发送加密请求！
+**TLS 1.3 — 完整握手（1-RTT）：**
 
-TLS 1.3 — 0-RTT（Resumption）：
-  客户端                          服务器
-    │                              │
-    │──── ClientHello              │
-    │      + early_data (加密数据) │  使用上次的 PSK（预共享密钥）
-    │      + key_share            │  立即发送加密请求，0-RTT
-    │<─── ServerHello + ...        │  注意：重放攻击风险，不适合关键操作
+```mermaid
+sequenceDiagram
+  participant C as 客户端
+  participant S as 服务器
+  C->>S: ClientHello + supported_versions + key_share (ECDH 公钥)（RTT 1：发送支持的加密套件 + 随机数）
+  Note right of S: ClientHello 本身就是加密的！
+  S-->>C: ServerHello + key_share (ECDH 公钥) + 证书 + 签名（RTT 1：返回 ServerHello + ECDH 公钥 + 证书 + 签名）
+  Note over C,S: 双方立即计算会话密钥
+  C->>S: HTTP 请求（加密）（RTT 1：握手完成，立即发送加密请求！）
+```
+
+**TLS 1.3 — 0-RTT（Resumption）：**
+
+```mermaid
+sequenceDiagram
+  participant C as 客户端
+  participant S as 服务器
+  C->>S: ClientHello + early_data (加密数据) + key_share（使用上次的 PSK（预共享密钥），立即发送加密请求，0-RTT）
+  S-->>C: ServerHello + ...
+  Note over C,S: 注意：重放攻击风险，不适合关键操作
 ```
 
 ### 1.3 TLS 1.3 相比 TLS 1.2 的改进

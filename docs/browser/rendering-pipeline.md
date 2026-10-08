@@ -92,21 +92,15 @@ element.style.opacity = '0.5'                   // 合成属性
 
 ### 2.2 浏览器分层与合成层
 
-```
-页面分层（Layer Tree）:
-+------------------------+
-| Compositor Thread      |
-+------------------------+
-| Layer 1 (z-index: 3)   |  ← GPU 合成层，单独光栅化
-|   - 固定头部导航         |     transform: translateZ(0)
-|                         |     will-change: transform
-+------------------------+
-| Layer 2 (z-index: 2)   |  ← GPU 合成层
-|   - modal 弹窗          |
-+------------------------+
-| Main Layer             |  ← 主线程管理的默认层
-|   - 普通内容             |
-+------------------------+
+```mermaid
+flowchart TD
+    subgraph LT["页面分层（Layer Tree）"]
+        CT["Compositor Thread"]
+        L1["Layer 1 (z-index: 3)<br/>- 固定头部导航<br/>GPU 合成层，单独光栅化<br/>transform: translateZ(0)<br/>will-change: transform"]
+        L2["Layer 2 (z-index: 2)<br/>- modal 弹窗<br/>GPU 合成层"]
+        ML["Main Layer<br/>- 普通内容<br/>主线程管理的默认层"]
+        CT ~~~ L1 ~~~ L2 ~~~ ML
+    end
 ```
 
 ### 2.3 GPU 合成原理

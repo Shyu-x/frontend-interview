@@ -64,13 +64,6 @@
   --md-code-hl-special-color: #c2185b;
   --md-code-hl-generic-color: #4a4a4f;
   --md-code-hl-variable-color: #1d1d1f;
-
-  --mm-node-bg: #eef5ff;
-  --mm-node-border: #7ab2f2;
-  --mm-node-text: #0b2a4a;
-  --mm-edge: #86868b;
-  --mm-cluster-bg: #f5f5f7;
-  --mm-label-bg: #ffffff;
 }
 
 /* ---- Dark -------------------------------------------------------------- */
@@ -120,13 +113,6 @@
   --md-code-hl-special-color: #ff7eb6;
   --md-code-hl-generic-color: #c7c7cc;
   --md-code-hl-variable-color: #ececf0;
-
-  --mm-node-bg: #1b2736;
-  --mm-node-border: #2f6fb3;
-  --mm-node-text: #dcecff;
-  --mm-edge: #8e8e93;
-  --mm-cluster-bg: #18181c;
-  --mm-label-bg: #1c1c20;
 }
 
 /* ---- Base -------------------------------------------------------------- */
@@ -830,87 +816,29 @@ input,
   background: transparent;
 }
 
-/* ---- Mermaid ----------------------------------------------------------- */
-.md-typeset .mermaid {
+/* ---- 图表（渲染与配色见 javascripts/diagrams.js）--------------------------- */
+.md-typeset figure.diagram {
+  display: block;          /* 覆盖 Material 的 figure { display:flex; width:fit-content } */
+  width: auto;
   margin: 1.6rem 0;
-  padding: 1.4rem 1rem;
+  padding: 1.3rem 1rem;
   text-align: center;
   background: var(--panel-sunken);
   border-radius: var(--radius-md);
   box-shadow: inset 0 0 0 1px var(--hairline);
   overflow-x: auto;
 }
-
-.mermaid .node rect,
-.mermaid .node circle,
-.mermaid .node ellipse,
-.mermaid .node polygon,
-.mermaid .node path {
-  fill: var(--mm-node-bg) !important;
-  stroke: var(--mm-node-border) !important;
-  stroke-width: 1.2px !important;
+.md-typeset figure.diagram svg {
+  display: block;
+  margin: 0 auto;
+  width: 100%;
+  height: auto;
 }
-
-.mermaid .node .label,
-.mermaid .node span,
-.mermaid .node foreignObject,
-.mermaid .nodeLabel,
-.mermaid .cluster span,
-.mermaid .cluster-label span {
-  color: var(--mm-node-text) !important;
-  fill: var(--mm-node-text) !important;
-}
-
-.mermaid .edgePath .path,
-.mermaid .flowchart-link,
-.mermaid .messageLine0,
-.mermaid .messageLine1 {
-  stroke: var(--mm-edge) !important;
-  stroke-width: 1.4px !important;
-}
-
-.mermaid .arrowheadPath,
-.mermaid marker path {
-  fill: var(--mm-edge) !important;
-  stroke: var(--mm-edge) !important;
-}
-
-.mermaid .cluster rect {
-  fill: var(--mm-cluster-bg) !important;
-  stroke: var(--hairline-strong) !important;
-  rx: 10px;
-}
-
-.mermaid .edgeLabel,
-.mermaid .edgeLabel rect,
-.mermaid .edgeLabel span {
-  background-color: var(--mm-label-bg) !important;
-  fill: var(--mm-label-bg) !important;
-  color: var(--mm-node-text) !important;
-}
-
-.mermaid .actor {
-  fill: var(--mm-node-bg) !important;
-  stroke: var(--mm-node-border) !important;
-}
-
-.mermaid .actor-line {
-  stroke: var(--hairline-strong) !important;
-}
-
-.mermaid .note {
-  fill: var(--panel) !important;
-  stroke: var(--hairline-strong) !important;
-}
-
-.mermaid .noteText,
-.mermaid text.actor tspan {
-  fill: var(--mm-node-text) !important;
-}
-
-.mermaid .stateGroup rect {
-  fill: var(--mm-node-bg) !important;
-  stroke: var(--mm-node-border) !important;
+.md-typeset figure.diagram-failed {
+  color: var(--ink-500);
+  font-size: .8rem;
+  border: 1px dashed var(--hairline-strong);
+  background: transparent;
 }
 
 /* ---- Task lists & footnotes ------------------------------------------- */

@@ -446,21 +446,20 @@ try {
   const decoded = jwt.verify(token, 'secret-key');
   console.log(decoded);
 } catch (e) { console.error('Invalid token'); }
-
-// JWT vs Session:
-/*
-| 特性         | JWT                          | Session               |
-|-------------|-----------------------------|----------------------|
-| 存储位置      | 客户端（Token 本身）           | 服务器（Redis/DB）     |
-| 扩展性       | 好（无状态，多服务器无同步）    | 需 Session 共享/粘性    |
-| 撤销         | 困难（需黑名单/短期 Token）    | 简单（删除服务端 Session）|
-| 安全性       | 否（泄露 = 无法撤销） | 是（可立即撤销） |
-| JWT 不够安全的原因:                           |
-| 1. 无法主动撤销                              |
-| 2. 泄露风险（若非 HttpOnly Cookie 存储）      |
-| 3. 无加密（Payload 是 Base64 可读）           |
-*/
 ```
+
+| 特性 | JWT | Session |
+|---|---|---|
+| 存储位置 | 客户端（Token 本身） | 服务器（Redis / DB） |
+| 扩展性 | 好：无状态，多服务器无需同步 | 需要 Session 共享或粘性会话 |
+| 撤销 | 困难：需黑名单或短期 Token | 简单：删除服务端 Session |
+| 泄露后果 | 无法主动撤销，到期前一直有效 | 可立即撤销 |
+
+JWT 不够安全的原因：
+
+1. 无法主动撤销。
+2. 泄露风险：若不是存放在 HttpOnly Cookie 中，脚本可以读取。
+3. 默认无加密：Payload 只是 Base64 编码，任何人都能解码查看。
 
 ## 3. OAuth2 安全问题
 

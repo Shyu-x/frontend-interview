@@ -34,10 +34,13 @@ tags:
 - 浮动元素会扰乱 Line Box 的左右贴紧特性
 
 ```
-+------------------+  ← Line Box（行盒）
-| 行内元素1 | 行内元素2 |  ← 水平排列
-| 行内元素3 |        |
-+------------------+
++----------------------+  <- (1)
+| inline1  | inline2   |  <- (2)
+| inline3  |           |
++----------------------+
+
+(1) Line Box（行盒）
+(2) 水平排列；inline1~3 = 行内元素1~3
 
 ASCII 布局图：
 |←——————— container width ——————————→|
@@ -231,10 +234,13 @@ export function GridLayout() {
 
 ```
 +--------------------------------------------------+
-| 行盒（Line Box）                                  |
+| (1)                                              |
 |   [inline] [inline-block] [text] [img] [text]    |
-|   (默认 baseline 对齐)                             |
+|   (2)                                            |
 +--------------------------------------------------+
+
+(1) 行盒（Line Box）
+(2) 默认 baseline 对齐
 
 行盒高度 = max(line-height, img-height, 等)
 ```
@@ -260,13 +266,16 @@ export function GridLayout() {
 
 ```
 +---------------------------+
-| GFC（网格格式化上下文）    |
+| (1)                       |
 |                           |
-|   [grid-item] [grid-item] |  <- 行1
+|   [grid-item] [grid-item] |  <- row 1
 |                           |
-|   [grid-item] [grid-item] |  <- 行2
+|   [grid-item] [grid-item] |  <- row 2
 |                           |
 +---------------------------+
+
+(1) GFC（网格格式化上下文）
+row 1 / row 2 = 行1 / 行2
 ```
 
 **规则：**

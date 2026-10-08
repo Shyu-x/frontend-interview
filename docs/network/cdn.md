@@ -298,17 +298,19 @@ function measureCDNPerformance() {
 
 **CDN 架构图：**
 
-```
-用户 (浏览器) → CDN 全球边缘节点 (Edge Server / PoP)
-                ↓
-  ┌─────────────┼─────────────┐
-  ↓             ↓             ↓
-北京用户     成都用户      上海用户
-→ 北京边缘   → 成都边缘   → 上海边缘
-  ↓ (miss)    ↓ (miss)     ↓ (miss)
-  回源        回源         回源
-  ↓           ↓            ↓
-CDN 源站 (Origin Server)
+```mermaid
+flowchart TD
+  U["用户 (浏览器)"] --> E["CDN 全球边缘节点 (Edge Server / PoP)"]
+  E --> U1["北京用户"]
+  E --> U2["成都用户"]
+  E --> U3["上海用户"]
+  U1 --> E1["北京边缘"]
+  U2 --> E2["成都边缘"]
+  U3 --> E3["上海边缘"]
+  E1 -->|"miss"| B["回源"]
+  E2 -->|"miss"| B
+  E3 -->|"miss"| B
+  B --> O["CDN 源站 (Origin Server)"]
 ```
 
 **边缘节点分布：** 北京、成都、上海、深圳等全球节点

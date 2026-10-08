@@ -13,107 +13,29 @@ description: 从地址栏输入到首屏渲染的 14 个步骤、时序与耗时
 
 ### 1.2 完整时序流程图
 
-```
-用户输入 URL
-     │
-     ▼
-Step 1: URL 解析
-     - 地址栏判断是搜索词还是 URL
-     - 无协议前缀，自动补全 https://
-     - Chrome Omnibox 同时启动预搜索建议
-     │
-     ▼
-Step 2: HSTS 预加载列表检查
-     - 若命中 HSTS (HTTP Strict Transport Security) 列表
-     - HTTP 请求强制升级为 HTTPS
-     │
-     ▼
-Step 3: DNS 解析（详见 network/dns 页）
-     - 浏览器 DNS 缓存 → 系统 DNS 缓存 → hosts 文件
-     - → 本地 DNS 解析器 (ISP) → 根服务器 → TLD → 权威 DNS
-     │
-     ▼
-Step 4: TCP 连接（三次握手）
-     - SYN → SYN-ACK → ACK（往返 1 RTT）
-     - 若 HTTPS，追加 TLS 1.3 握手（1 RTT 或 0-RTT）
-     │
-     ▼
-Step 5: TLS 握手（HTTPS）
-     - 交换证书、验证身份、协商加密套件
-     - 完成后得到对称密钥，后续加密通信
-     │
-     ▼
-Step 6: 发送 HTTP 请求
-     GET /index.html HTTP/1.1
-     Host: www.example.com
-     Accept: text/html
-     Accept-Encoding: gzip, deflate, br
-     ...
-     │
-     ▼
-Step 7: 服务器处理，返回 HTTP 响应
-     │
-     ▼
-Step 8: 检查缓存（强缓存/协商缓存，详见 http-cache 页）
-     │
-     ▼
-Step 9: 准备渲染进程
-     - Site Isolation 规则分配/复用渲染进程
-     - process reuse：已存在相同站点进程时复用
-     │
-     ▼
-Step 9a: 解析 HTML → DOM Tree
-     - HTML Parser 边扫描边构建 Token → DOM 节点
-     - 遇到 <link> 触发 CSS 解析 → CSSOM
-     - 遇到 <script>（无 defer/async）阻塞 HTML 解析
-     - 预扫描器发现 <img>/<script src> 并通知网络线程
-     │
-     ▼
-Step 9b: 解析 CSS → CSSOM Tree
-     - CSS Parser 构建 CSS 规则树
-     - 计算每个 DOM 节点的最终样式（Style Calculation）
-     │
-     ▼
-Step 9c: 生成 Render Tree
-     - DOM Tree + CSSOM Tree → Render Tree
-     - 可见节点 + 样式信息，display:none 节点不进入
-     │
-     ▼
-Step 9d: Layout（布局/回流）
-     - 计算每个元素的几何信息（位置、大小）
-     - 涉及回流（reflow）——最昂贵的布局计算
-     │
-     ▼
-Step 9e: Paint（绘制）
-     - 将布局信息转换为绘制记录（Paint Records）
-     - 分层（Layer），每个合成层独立绘制
-     │
-     ▼
-Step 9f: 分层与合成（Composite）
-     - Compositor Thread 对各合成层进行光栅化
-     - 合成层按 z-index 叠加，生成最终帧
-     │
-     ▼
-Step 10: 首次内容绘制 (First Contentful Paint / FCP)
-     │
-     ▼
-Step 11: 执行 JavaScript
-     - Web Worker 并行执行，不阻塞主线程
-     - requestAnimationFrame 调度动画回调
-     - Intersection Observer 触发懒加载
-     │
-     ▼
-Step 12: 加载执行剩余资源
-     - 懒加载图片、Code Splitting 动态导入
-     - Intersection Observer 触发图片加载
-     │
-     ▼
-Step 13: 页面可交互 (Time to Interactive / TTI)
-     │
-     ▼
-Step 14: 后台标签静默期
-     - 预渲染（Back/Forward Cache / bfcache）
-     - 定期触发回流/重绘以保持活性
+```mermaid
+flowchart TD
+    S0["用户输入 URL"]
+    S0 --> S1["<b>Step 1: URL 解析</b><br/>地址栏判断是搜索词还是 URL<br/>无协议前缀，自动补全 https://<br/>Chrome Omnibox 同时启动预搜索建议"]
+    S1 --> S2["<b>Step 2: HSTS 预加载列表检查</b><br/>若命中 HSTS (HTTP Strict Transport Security) 列表<br/>HTTP 请求强制升级为 HTTPS"]
+    S2 --> S3["<b>Step 3: DNS 解析（详见 network/dns 页）</b><br/>浏览器 DNS 缓存 → 系统 DNS 缓存 → hosts 文件<br/>→ 本地 DNS 解析器 (ISP) → 根服务器 → TLD → 权威 DNS"]
+    S3 --> S4["<b>Step 4: TCP 连接（三次握手）</b><br/>SYN → SYN-ACK → ACK（往返 1 RTT）<br/>若 HTTPS，追加 TLS 1.3 握手（1 RTT 或 0-RTT）"]
+    S4 --> S5["<b>Step 5: TLS 握手（HTTPS）</b><br/>交换证书、验证身份、协商加密套件<br/>完成后得到对称密钥，后续加密通信"]
+    S5 --> S6["<b>Step 6: 发送 HTTP 请求</b><br/>GET /index.html HTTP/1.1<br/>Host: www.example.com<br/>Accept: text/html<br/>Accept-Encoding: gzip, deflate, br<br/>..."]
+    S6 --> S7["<b>Step 7: 服务器处理，返回 HTTP 响应</b>"]
+    S7 --> S8["<b>Step 8: 检查缓存（强缓存/协商缓存，详见 http-cache 页）</b>"]
+    S8 --> S9["<b>Step 9: 准备渲染进程</b><br/>Site Isolation 规则分配/复用渲染进程<br/>process reuse：已存在相同站点进程时复用"]
+    S9 --> S10["<b>Step 9a: 解析 HTML → DOM Tree</b><br/>HTML Parser 边扫描边构建 Token → DOM 节点<br/>遇到 &lt;link&gt; 触发 CSS 解析 → CSSOM<br/>遇到 &lt;script&gt;（无 defer/async）阻塞 HTML 解析<br/>预扫描器发现 &lt;img&gt;/&lt;script src&gt; 并通知网络线程"]
+    S10 --> S11["<b>Step 9b: 解析 CSS → CSSOM Tree</b><br/>CSS Parser 构建 CSS 规则树<br/>计算每个 DOM 节点的最终样式（Style Calculation）"]
+    S11 --> S12["<b>Step 9c: 生成 Render Tree</b><br/>DOM Tree + CSSOM Tree → Render Tree<br/>可见节点 + 样式信息，display:none 节点不进入"]
+    S12 --> S13["<b>Step 9d: Layout（布局/回流）</b><br/>计算每个元素的几何信息（位置、大小）<br/>涉及回流（reflow）——最昂贵的布局计算"]
+    S13 --> S14["<b>Step 9e: Paint（绘制）</b><br/>将布局信息转换为绘制记录（Paint Records）<br/>分层（Layer），每个合成层独立绘制"]
+    S14 --> S15["<b>Step 9f: 分层与合成（Composite）</b><br/>Compositor Thread 对各合成层进行光栅化<br/>合成层按 z-index 叠加，生成最终帧"]
+    S15 --> S16["<b>Step 10: 首次内容绘制 (First Contentful Paint / FCP)</b>"]
+    S16 --> S17["<b>Step 11: 执行 JavaScript</b><br/>Web Worker 并行执行，不阻塞主线程<br/>requestAnimationFrame 调度动画回调<br/>Intersection Observer 触发懒加载"]
+    S17 --> S18["<b>Step 12: 加载执行剩余资源</b><br/>懒加载图片、Code Splitting 动态导入<br/>Intersection Observer 触发图片加载"]
+    S18 --> S19["<b>Step 13: 页面可交互 (Time to Interactive / TTI)</b>"]
+    S19 --> S20["<b>Step 14: 后台标签静默期</b><br/>预渲染（Back/Forward Cache / bfcache）<br/>定期触发回流/重绘以保持活性"]
 ```
 
 ### 1.3 各阶段耗时分析代码

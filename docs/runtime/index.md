@@ -42,24 +42,35 @@ date: 2026-05-17
 
 ### 4.1 市场份额与生态对比
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    JavaScript 运行时生态                       │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│   Node.js          Bun              Deno                     │
-│   ═════════        ════            ════                      │
-│   npm (200k+)      内置兼容          deno.land (3k+)          │
-│   成熟稳定          性能卓越          安全沙箱                  │
-│   企业首选          新项目首选        边缘计算                  │
-│                                                              │
-│   ┌────────┐      ┌────────┐       ┌────────┐                │
-│   │ Express│      │ Hono   │       │ Fresh │                 │
-│   │ NestJS │      │ Elysia │       │ Aleph │                 │
-│   │ Next.js│      │ Bun API│       │ Deno KV│                │
-│   └────────┘      └────────┘       └────────┘                │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph eco["JavaScript 运行时生态"]
+        direction LR
+        subgraph nd["Node.js"]
+            direction TB
+            nd1["npm (200k+)<br/>成熟稳定<br/>企业首选"]
+            subgraph ndf["框架"]
+                nd2["Express<br/>NestJS<br/>Next.js"]
+            end
+            nd1 --- ndf
+        end
+        subgraph bn["Bun"]
+            direction TB
+            bn1["内置兼容<br/>性能卓越<br/>新项目首选"]
+            subgraph bnf["框架"]
+                bn2["Hono<br/>Elysia<br/>Bun API"]
+            end
+            bn1 --- bnf
+        end
+        subgraph dn["Deno"]
+            direction TB
+            dn1["deno.land (3k+)<br/>安全沙箱<br/>边缘计算"]
+            subgraph dnf["框架"]
+                dn2["Fresh<br/>Aleph<br/>Deno KV"]
+            end
+            dn1 --- dnf
+        end
+    end
 ```
 
 ---

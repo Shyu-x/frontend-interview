@@ -88,7 +88,7 @@ markdown_extensions:
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
-          class: mermaid
+          class: diagram
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
@@ -710,6 +710,10 @@ hooks:
 
 extra:
   generator: false
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js
+  - javascripts/diagrams.js
 
 extra_css:
   - assets/fonts/fonts.css

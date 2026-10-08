@@ -13,28 +13,16 @@ description: 强缓存与协商缓存、Cache-Control、ETag 与 Last-Modified�
 
 ### 1.2 完整缓存决策流程
 
-```
-HTTP 响应到达浏览器
-         │
-         ▼
-检查 Cache-Control: max-age / Expires (强缓存)
-         │
-    ┌────┴────┐
-    │  命中    │ 不命中
-    ▼         ▼
-直接使用缓存   检查 ETag / Last-Modified (协商缓存)
-(200 OK)          │
-             ┌────┴────┐
-             │  命中    │ 不命中
-             ▼         ▼
-         使用缓存    发送条件请求
-         (304)       (If-None-Match / If-Modified-Since)
-                         │
-                   ┌─────┴─────┐
-                   │ 服务端确认 │
-                   ▼           ▼
-              304 Not        200 返回
-              Modified       新资源 + 新 ETag/Last-Modified
+```mermaid
+flowchart TD
+    A["HTTP 响应到达浏览器"] --> B["检查 Cache-Control: max-age / Expires (强缓存)"]
+    B -->|"命中"| C["直接使用缓存<br/>(200 OK)"]
+    B -->|"不命中"| D["检查 ETag / Last-Modified (协商缓存)"]
+    D -->|"命中"| E["使用缓存<br/>(304)"]
+    D -->|"不命中"| F["发送条件请求<br/>(If-None-Match / If-Modified-Since)"]
+    F --> G{"服务端确认"}
+    G -->|"304 Not Modified"| E2["使用缓存"]
+    G -->|"200"| H["返回新资源 + 新 ETag/Last-Modified"]
 ```
 
 ### 1.3 强缓存详解

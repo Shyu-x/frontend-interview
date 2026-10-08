@@ -122,7 +122,7 @@ function assemble(vol, sample) {
     const score = (n) => {
       try {
         const h = readFileSync(join(SITE, n.url), "utf8");
-        return (h.match(/class="mermaid"/g) || []).length * 5 + (h.match(/class="highlight"/g) || []).length + (h.match(/<table/g) || []).length * 2;
+        return (h.match(/class="diagram"/g) || []).length * 5 + (h.match(/class="highlight"/g) || []).length + (h.match(/<table/g) || []).length * 2;
       } catch { return 0; }
     };
     const all = [];
@@ -300,35 +300,11 @@ async function toPdf(browser, htmlPath, pdfPath) {
   }, FONT_FACES);
   console.log(`  字体：注册 ${FONT_FACES.length} 条 @font-face（按需加载切片）`);
 
-  // 2) 渲染 Mermaid，与站点主题一致
+  // 2) 渲染图表：与网页共用 docs/javascripts/diagrams.js（同一套层级配色，印刷取值）
   await page.addScriptTag({ path: join(HERE, "node_modules/mermaid/dist/mermaid.min.js") });
-  const mermaidStats = await page.evaluate(async () => {
-    const nodes = [...document.querySelectorAll("pre.mermaid")];
-    const css = getComputedStyle(document.documentElement);
-    const v = (n) => css.getPropertyValue(n).trim();
-    window.mermaid.initialize({
-      startOnLoad: false, securityLevel: "loose", theme: "base",
-      themeVariables: {
-        fontFamily: v("--font-sans") || "sans-serif", fontSize: "19px",
-        primaryColor: v("--mm-node-bg"), primaryTextColor: v("--mm-node-text"),
-        primaryBorderColor: v("--mm-node-border"), lineColor: v("--mm-edge"),
-        secondaryColor: v("--mm-cluster-bg"), tertiaryColor: v("--mm-cluster-bg"),
-        noteBkgColor: "#fff8e1", noteTextColor: "#1d1d1f",
-      },
-      flowchart: { htmlLabels: true, curve: "basis" }, sequence: { useMaxWidth: true },
-    });
-    let ok = 0, bad = 0; const fails = [];
-    for (const n of nodes) {
-      try {
-        const { svg } = await window.mermaid.render("m" + Math.random().toString(36).slice(2), n.textContent);
-        const fig = document.createElement("figure");
-        fig.className = "diagram";
-        fig.innerHTML = svg;
-        n.replaceWith(fig); ok++;
-      } catch (e) { bad++; n.classList.add("mermaid-failed"); fails.push({ err: String(e.message || e).split("\n")[0].slice(0, 120), src: n.textContent.trim().split("\n").slice(0, 2).join(" | ").slice(0, 100), at: n.closest("section.chapter")?.id || "" }); }
-    }
-    return { ok, bad, fails };
-  });
+  await page.evaluate(() => { window.__FI_BOOK__ = true; });
+  await page.addScriptTag({ path: join(ROOT, "docs/javascripts/diagrams.js") });
+  const mermaidStats = await page.evaluate(() => window.FIDiagrams.renderAll(document, { mode: "print", eager: true, fontSize: "19px" }));
   console.log(`  mermaid: ${mermaidStats.ok} 个渲染成功，${mermaidStats.bad} 个失败`);
   for (const f of mermaidStats.fails) console.log(`    ✗ ${f.at} ${f.err}  «${f.src}»`);
 
@@ -434,7 +410,12 @@ async function main() {
   if (sample) vols = vols.filter((v) => v.no !== 0);
   const htmlOnly = has("--html-only");
   const profile = join(tmpdir(), `frontend-interview-book-${process.pid}`);
-  const browser = htmlOnly ? null : await puppeteer.launch({ executablePath: CHROME, headless: "new", protocolTimeout: 0, userDataDir: profile, args: ["--no-sandbox", "--allow-file-access-from-files", "--font-render-hinting=none"] });
+  const launch = () => puppeteer.launch({ executablePath: CHROME, headless: "new", protocolTimeout: 0, userDataDir: profile, args: ["--no-sandbox", "--allow-file-access-from-files", "--font-render-hinting=none"] });
+  // 只结束本次构建自己启动的浏览器进程
+  const shut = async (b) => { if (!b) return; await Promise.race([b.close().catch(() => {}), new Promise((r) => setTimeout(r, 5000))]); const proc = b.process(); if (proc && !proc.killed) proc.kill("SIGKILL"); };
+  const LIMIT = Number(process.env.BOOK_VOLUME_TIMEOUT_MIN || 12) * 60_000;
+  const TRIES = 3;
+  let browser = htmlOnly ? null : await launch();
   try {
     for (const v of vols) {
       const t0 = Date.now();
@@ -442,14 +423,25 @@ async function main() {
       const base = join(DIST, `${v.slug}${sample ? "-sample" : ""}`);
       writeFileSync(base + ".html", html);
       console.log(`[${v.slug}] ${v.title}：${count} 篇`);
-      if (!htmlOnly) {
-        const pages = await toPdf(browser, base + ".html", base + ".pdf");
-        console.log(`  → ${base}.pdf（${pages} 页，${((Date.now() - t0) / 1000).toFixed(0)}s）`);
+      if (htmlOnly) continue;
+      // 分页偶尔会卡死（本地无法复现、CI 上出现过）：每册设超时，超时后换一个新浏览器重试
+      let pages = null;
+      for (let attempt = 1; attempt <= TRIES && pages === null; attempt++) {
+        let timer;
+        const hung = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("timeout")), LIMIT); });
+        try {
+          pages = await Promise.race([toPdf(browser, base + ".html", base + ".pdf"), hung]);
+        } catch (e) {
+          console.log(`  第 ${attempt} 次失败：${String(e.message || e).slice(0, 120)}${attempt < TRIES ? "，换新浏览器重试" : ""}`);
+          await shut(browser); browser = await launch();
+        } finally { clearTimeout(timer); }
       }
+      if (pages === null) throw new Error(`${v.slug} 连续 ${TRIES} 次失败`);
+      console.log(`  → ${base}.pdf（${pages} 页，${((Date.now() - t0) / 1000).toFixed(0)}s）`);
     }
   } finally {
     // 无论成功、失败还是被中断，都要关掉浏览器并清掉临时 profile，避免遗留孤儿 Chrome
-    if (browser) { await browser.close().catch(() => {}); const proc = browser.process(); if (proc && !proc.killed) proc.kill("SIGKILL"); }
+    await shut(browser);
     rmSync(profile, { recursive: true, force: true });
   }
 }

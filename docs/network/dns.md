@@ -13,31 +13,20 @@ DNS（Domain Name System）是将人类可读域名（如 `www.example.com`）�
 
 ### 1.2 DNS 解析完整流程
 
-```
-浏览器 DNS 缓存 (Chrome: chrome://net-internals/#dns)
-     │ [命中则直接返回，跳过后续]
-     ▼ [不存在]
-系统 DNS 缓存 (Windows: ipconfig /displaydns, macOS: scutil --dns)
-     │ [命中则直接返回]
-     ▼ [不存在]
-本地 DNS 解析器 (/etc/resolv.conf，通常为 ISP DNS 或 8.8.8.8)
-     │
-     ▼ [递归查询模式]
-┌────────────────────────────────────────────────────────────┐
-│  本地 DNS 解析器开始递归查询                                  │
-│                                                            │
-│  Step 1: 查询根域名服务器 (.) —— 全球 13 组根服务器         │
-│       . → 返回 .com TLD 服务器地址                          │
-│                                                            │
-│  Step 2: 查询 .com TLD 顶级域名服务器                        │
-│       .com → 返回 example.com 权威服务器地址                │
-│                                                            │
-│  Step 3: 查询 example.com 权威域名服务器                    │
-│       example.com → 返回 A 记录: 93.184.216.34             │
-│                    → 返回 AAAA 记录: 2606:2800:...         │
-│                                                            │
-│  最终返回: IP 地址                                          │
-└────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["浏览器 DNS 缓存<br/>(Chrome: chrome://net-internals/#dns)"] -->|"命中则直接返回，跳过后续"| R(["返回"])
+    A -->|"不存在"| B["系统 DNS 缓存<br/>(Windows: ipconfig /displaydns, macOS: scutil --dns)"]
+    B -->|"命中则直接返回"| R
+    B -->|"不存在"| C["本地 DNS 解析器<br/>(/etc/resolv.conf，通常为 ISP DNS 或 8.8.8.8)"]
+    C -->|"递归查询模式"| Q
+    subgraph Q["本地 DNS 解析器开始递归查询"]
+        S1["Step 1: 查询根域名服务器 (.) —— 全球 13 组根服务器<br/>. → 返回 .com TLD 服务器地址"]
+        S2["Step 2: 查询 .com TLD 顶级域名服务器<br/>.com → 返回 example.com 权威服务器地址"]
+        S3["Step 3: 查询 example.com 权威域名服务器<br/>example.com → 返回 A 记录: 93.184.216.34<br/>→ 返回 AAAA 记录: 2606:2800:..."]
+        S4["最终返回: IP 地址"]
+        S1 --> S2 --> S3 --> S4
+    end
 ```
 
 ### 1.3 递归查询 vs 迭代查询

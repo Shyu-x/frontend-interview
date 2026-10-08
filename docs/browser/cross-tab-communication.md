@@ -13,13 +13,18 @@ description: BroadcastChannel、SharedWorker、postMessage、storage 事件等�
 
 ### 1.2 通信方式全景对比
 
-```
-Tab A                                           Tab B
-  │                                               │
-  │── BroadcastChannel (同源，推荐) ────────────>│  支持频道订阅，简单易用
-  │── localStorage + storage 事件 ─────────────>│  仅跨 Tab 通知，需轮询
-  │── SharedWorker ─────────────────────────────>│  共享状态，适合复杂场景
-  │── postMessage (需引用对方 window) ─────────>│  iframe/新窗口通信
+```mermaid
+flowchart LR
+  TA["Tab A"]
+  TB["Tab B"]
+  TA -->|"BroadcastChannel (同源，推荐)"| TB
+  TA -->|"localStorage + storage 事件"| TB
+  TA -->|"SharedWorker"| TB
+  TA -->|"postMessage (需引用对方 window)"| TB
+  N1["支持频道订阅，简单易用"] -.- TB
+  N2["仅跨 Tab 通知，需轮询"] -.- TB
+  N3["共享状态，适合复杂场景"] -.- TB
+  N4["iframe/新窗口通信"] -.- TB
 ```
 
 ### 1.3 BroadcastChannel（现代，推荐）

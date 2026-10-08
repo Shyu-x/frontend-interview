@@ -389,26 +389,12 @@ setTimeout
 
 **事件循环中的位置（简化版）：**
 
-```
-┌─────────────────────┐
-│  同步代码执行       │
-└─────────────────────┘
-            ↓
-┌─────────────────────┐
-│  微任务队列         │ ← Promise.then, queueMicrotask
-└─────────────────────┘
-            ↓
-┌─────────────────────┐
-│  宏任务队列         │ ← setTimeout, setInterval
-└─────────────────────┘
-            ↓
-┌─────────────────────┐
-│  渲染更新阶段       │ ← requestAnimationFrame
-└─────────────────────┘
-            ↓
-┌─────────────────────┐
-│  下一轮事件循环     │
-└─────────────────────┘
+```mermaid
+flowchart TD
+    A["同步代码执行"] --> B["微任务队列<br/>← Promise.then, queueMicrotask"]
+    B --> C["宏任务队列<br/>← setTimeout, setInterval"]
+    C --> D["渲染更新阶段<br/>← requestAnimationFrame"]
+    D --> E["下一轮事件循环"]
 ```
 
 **注意：** requestAnimationFrame 回调只在需要渲染时才会执行，在没有视觉更新的环境中（如 Node.js）行为可能不同。
@@ -486,22 +472,11 @@ setImmediate
 
 **Node.js 事件循环简化架构：**
 
-```
-┌─────────────────────┐
-│  主脚本（同步代码）  │
-└─────────────────────┘
-            ↓
-┌─────────────────────┐
-│  nextTick 队列      │ ← process.nextTick（最高优先级微任务）
-└─────────────────────┘
-            ↓
-┌─────────────────────┐
-│  微任务队列         │ ← Promise.then
-└─────────────────────┘
-            ↓
-┌─────────────────────┐
-│  宏任务队列         │ ← setTimeout, setImmediate, I/O
-└─────────────────────┘
+```mermaid
+flowchart TD
+    A["主脚本（同步代码）"] --> B["nextTick 队列<br/>← process.nextTick（最高优先级微任务）"]
+    B --> C["微任务队列<br/>← Promise.then"]
+    C --> D["宏任务队列<br/>← setTimeout, setImmediate, I/O"]
 ```
 
 **关键区别：**
@@ -566,21 +541,13 @@ setImmediate 在 I/O 后
 
 在 I/O 回调完成后，`setTimeout` 和 `setImmediate` 的执行顺序取决于**事件循环的当前阶段**：
 
-```
-事件循环阶段：
-┌────────────────────────┐
-│  timers                │ ← setTimeout(fn, 0)
-├────────────────────────┤
-│  pending callbacks     │
-├────────────────────────┤
-│  idle, prepare         │
-├────────────────────────┤
-│  poll                  │ ← I/O 操作在此阶段执行
-├────────────────────────┤
-│  check                 │ ← setImmediate 回调在此执行
-├────────────────────────┤
-│  close callbacks       │
-└────────────────────────┘
+```mermaid
+flowchart TD
+    A["timers<br/>← setTimeout(fn, 0)"] --> B["pending callbacks"]
+    B --> C["idle, prepare"]
+    C --> D["poll<br/>← I/O 操作在此阶段执行"]
+    D --> E["check<br/>← setImmediate 回调在此执行"]
+    E --> F["close callbacks"]
 ```
 
 **结论：**
