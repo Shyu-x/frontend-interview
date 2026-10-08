@@ -966,6 +966,7 @@ for (const step of steps) {
   }
 }
 ```
+
 **这段代码在做什么**
 
 - 指数退避第 attempt 次等待 delay 乘 2 的 attempt 减 1 次方。
@@ -1240,6 +1241,7 @@ async function handle(request, endpoint) {
   }
 }
 ```
+
 **这段代码在做什么**
 
 - 上下文对象以 request 起步，中间件逐步往里加字段。

@@ -289,6 +289,7 @@ function App() {
   );
 }
 ```
+
 **关键点：**
 
 - `startTransition(callback)` 内部的更新被标记为低优先级
@@ -430,6 +431,7 @@ function App() {
   );
 }
 ```
+
 **工作流程：**
 
 ```mermaid
@@ -703,6 +705,7 @@ function ItemWithDetails({ item }) {
   );
 }
 ```
+
 **与 SSR 的兼容性：**
 
 ```javascript

@@ -434,6 +434,7 @@ symlinkSync(outsideDir, fakeDir);
 
 assert.throws(() => checkCwd(fakeDir), /cwd 不允许/);
 ```
+
 **这段代码在做什么**
 
 1. 先创建一个真正的临时目录 `outsideDir`。  

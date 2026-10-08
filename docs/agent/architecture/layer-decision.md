@@ -222,6 +222,7 @@ assert.equal(ranked[0].id, "mid");       // 能力达标且成本低于 large
 console.log(ranked.map((r) => `${r.id}:${r.score.toFixed(3)}`).join(" "));
 // 预期输出：mid:0.770 large:0.400
 ```
+
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |

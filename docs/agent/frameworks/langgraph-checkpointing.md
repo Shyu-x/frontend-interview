@@ -944,6 +944,7 @@ await Promise.all([
 assert.equal(locked.get("d"), 2, "串行后两次更新都生效");
 console.log("线程隔离与串行化检查通过，串行结果 =", locked.get("d"));
 ```
+
 预期输出：
 
 ```text

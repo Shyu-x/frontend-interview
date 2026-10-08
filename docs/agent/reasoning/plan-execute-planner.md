@@ -91,6 +91,7 @@ interface ExecutionPlan {
   parallelBatches: TaskStep[][]; // 分批结果，同批内互不依赖
 }
 ```
+
 **这段代码在做什么**
 
 - `id` 是所有图算法的钥匙，拓扑排序与批次划分都只认它。
@@ -120,6 +121,7 @@ function computeLevels(steps) {
   return level;
 }
 ```
+
 **这段代码在做什么**
 
 - 无前置的步骤 `maxDep` 保持 -1，加一后层级为 0，也就是第一批。
@@ -285,6 +287,7 @@ function plannedCalls(stepCount) {
 console.log(reactCalls(6));         // 6
 console.log(plannedCalls(6));       // 1
 ```
+
 **这段代码在做什么**
 
 - `reactCalls` 把"每步都要重新决策"这件事写成了线性关系。
@@ -454,6 +457,7 @@ interface PlanDraft {
   dependencies: Dependency[]; // 边列表
 }
 ```
+
 **这段代码在做什么**
 
 - `type` 把依赖分成四类：显式声明的、模型推断的、数据流产生的、时间顺序要求的。
@@ -479,6 +483,7 @@ function validateRefs(draft) {
   return errors; // 返回数组而不是抛错，便于一次暴露全部问题
 }
 ```
+
 **这段代码在做什么**
 
 - 第一轮遍历步骤，用 Set 检测 id 重复，复杂度 O(步骤数)。
@@ -644,6 +649,7 @@ async function decompose(node, targetLevel, expand) {
   return node;
 }
 ```
+
 **这段代码在做什么**
 
 - 终止条件是抽象层级相等，而不是子节点数量，避免无限递归。
@@ -671,6 +677,7 @@ function matchTools(capabilities, tools) {
   return picked;
 }
 ```
+
 **这段代码在做什么**
 
 - 外层遍历能力，保证 LLM 给出的执行顺序不被打破。
@@ -834,6 +841,7 @@ class DependencyGraph {
   }
 }
 ```
+
 **这段代码在做什么**
 
 - 两张表加一张入度表看似冗余，实际是同一张图的三份视图，各自服务一种查询。
@@ -864,6 +872,7 @@ topologicalSort() {
   return result.length === this.adjacency.size ? result : null; // 排不完说明有环
 }
 ```
+
 **这段代码在做什么**
 
 - 初始队列由入度为 0 的节点组成，迭代顺序也就是步骤登记顺序。
@@ -1084,6 +1093,7 @@ function priorityScore(factors) {
   return Math.min(Math.max(score, 0), 1); // 归一化到 0 到 1
 }
 ```
+
 **这段代码在做什么**
 
 - 六个因子都要求调用方先归一到 0 到 1，函数本身不做量纲转换。
@@ -1115,6 +1125,7 @@ function adjust(base, runtime, event) {
   }
 }
 ```
+
 **这段代码在做什么**
 
 - `retry` 每次把优先级降 0.1，最低降到 0.1，防止失败步骤被永久雪藏。
@@ -1297,6 +1308,7 @@ function validatePlan(plan) {
   return { valid: errors.length === 0, errors, warnings }; // valid 是 errors 的纯函数
 }
 ```
+
 **这段代码在做什么**
 
 - 目标覆盖用集合求差，把每步声明的 `achievesGoals` 扁平化后装进 Set 做 O(1) 查找。
@@ -1321,6 +1333,7 @@ function decideReplan(step, result, plan) {
   return 'rollback-then-replan';              // 不可重试，先回退到检查点再重排
 }
 ```
+
 **这段代码在做什么**
 
 - 成功分支也要判断，因为产出结构变了会让后续步骤的输入假设失效。

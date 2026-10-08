@@ -445,6 +445,7 @@ function markWatermark(db, path) {
 db.prepare(`INSERT OR IGNORE INTO backfill_state (id, status, last_watermark)
             VALUES (1, 'pending', NULL)`).run();
 ```
+
 **这段代码在做什么**
 
 - `INSERT OR IGNORE` 保证 `id=1` 行存在。
@@ -1184,6 +1185,7 @@ function testBase() {
 }
 testBase();
 ```
+
 **这段代码在做什么**
 
 - `appendLine` 写入两条完整行，再追加半行。
@@ -1330,6 +1332,7 @@ function testFullMatrix() {
 }
 testFullMatrix();
 ```
+
 **这段代码在做什么**
 
 - 用例 1-5 验证正常写入与文件存在性。

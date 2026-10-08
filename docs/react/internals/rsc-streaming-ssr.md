@@ -870,6 +870,7 @@ const server = http.createServer((req, res) => {
   // 后续片在数据就绪后继续写入
 });
 ```
+
 **这段代码在做什么**
 
 - `writeHead` 只声明内容类型，长度交给 Node 决定。

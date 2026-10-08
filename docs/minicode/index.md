@@ -1166,6 +1166,7 @@ faq-debug-paths-check passed
 
 ??? question "1. 请说出七天路线图每一天的主题，以及 Day3 的前置依赖是什么。"
     答案要点：
+
     - Day1 模型 SDK 与流式，Day2 程序入口与单次 Agent。
     - Day3 工具与 Agent Loop，依赖 Day2。
     - Day4 会话与上下文压缩，Day5 权限与沙箱，Day6 记忆与技能与待办，Day7 子 Agent 与多任务。
@@ -1173,36 +1174,42 @@ faq-debug-paths-check passed
 
 ??? question "2. 原项目 Day2 的 DirectRun 在什么条件下会 panic？"
     答案要点：
+
     - `Message` 为空字符串时 panic。
     - panic 文本是 `message不能为空`。
     - 这是入口层的参数校验，位于调用 Agent 之前。
 
 ??? question "3. 环境变量 `NCC_LLM_APIKEY` 对应 viper 的哪个配置键？"
     答案要点：
+
     - 对应 `llm.apikey`。
     - 因为 `SetEnvPrefix("ncc")` 后，viper 会把点号转成下划线并加前缀。
     - 完整规则是 `$NCC_LLM_APIKEY`。
 
 ??? question "4. 为什么 Day2 不能执行工具？Day3 如何补上？"
     答案要点：
+
     - Day2 的回调只识别 `ToolUseBlock` 并打印 `[tool_use]`。
     - Day2 没有工具实现执行和结果回传。
     - Day3 用 `runLoop` 拿到工具名后从注册表取 handler，执行并把结果 push 回 messages。
 
 ??? question "5. 原项目 SessionManager 中的 parentID 链起什么作用？"
     答案要点：
+
     - parentID 把每个 entry 接成一条历史路径。
     - `BuildSessionContext` 从 `nowEntryID` 沿 parentID 回溯，再反转得到时间正序消息。
     - 这允许从一个会话节点叉开新路径。
 
 ??? question "6. 本站原创验证脚本要求什么运行时版本？为什么？"
     答案要点：
+
     - 要求 Node 20+。
     - 因为脚本使用 `node:assert/strict` 和 ESM 语法。
     - Node 18 可能不满足某些运行时行为，所以统一 Node 20+。
 
 ??? question "7. 用一句话解释 Agent Loop 的四个状态。"
     答案要点：
+
     - Idle 等待用户消息。
     - Calling 请求模型。
     - Executing 执行工具。
@@ -1210,6 +1217,7 @@ faq-debug-paths-check passed
 
 ??? question "8. 如果你的商业项目要复用 nano-claude-code 的 Go 代码，MIT License 要求你保留什么？"
     答案要点：
+
     - 保留原版权声明 `Copyright 2026 dlut-tic`。
     - 保留 MIT License 文本。
     - 在分发源码或二进制时随附许可。

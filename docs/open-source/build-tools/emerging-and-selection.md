@@ -155,6 +155,7 @@ export default defineConfig({
   },
 })
 ```
+
 ### 1.6 性能基准
 
 | 工具 | Dev Server | Build | HMR |
@@ -358,6 +359,7 @@ export default defineConfig({
   },
 })
 ```
+
 ### 2.6 性能基准
 
 Farm 官方声称：
@@ -588,6 +590,7 @@ const server = Bun.serve({
 // 环境变量注入）时日志依旧与实际监听端口一致，避免"日志撒谎"。
 console.log(`Server running at http://localhost:${server.port}`)
 ```
+
 ### 3.6 性能基准
 
 - 启动速度：比 Node.js 快约 4 倍

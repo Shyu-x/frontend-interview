@@ -87,6 +87,7 @@ function withAuthentication(WrappedComponent) {
   };
 }
 ```
+
 ### 1.3 链式调用
 
 多个 HOC 可链式组合，形成功能管道。
@@ -418,6 +419,7 @@ function FileInput() {
   );
 }
 ```
+
 ### 4.3 ref 的使用
 
 `useRef` 用于访问 DOM 元素或存储可变的跨渲染持久值。
@@ -550,6 +552,7 @@ function App() {
   );
 }
 ```
+
 ### 5.4 预加载策略
 
 ```javascript
@@ -868,6 +871,7 @@ function useDataFetching(url) {
   return { data, loading, error };
 }
 ```
+
 ### 8.3 Hooks 规则
 
 ```javascript

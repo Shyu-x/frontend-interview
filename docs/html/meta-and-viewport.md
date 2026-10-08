@@ -99,6 +99,7 @@ Open Graph Protocol 由 Facebook 2010 年发布，已被微信、Twitter、Linke
 <meta name="twitter:description" content="最全面的前端面试题库">
 <meta name="twitter:image" content="https://example.com/twitter-image.jpg">
 ```
+
 > Twitter 在 2024 年后对未声明 `twitter:card` 的页面默认降级为 `summary`（小图），建议显式声明。
 
 ### 1.6 其他常用 meta
@@ -177,6 +178,7 @@ Open Graph Protocol 由 Facebook 2010 年发布，已被微信、Twitter、Linke
 
 **Q1：如果把 `<meta charset>` 放在 `<title>` 之后，会发生什么？**
 > 浏览器在解析 HTML 时，遇到 `<meta charset>` 之前的部分会**先用默认编码（通常是 Latin-1/ISO-8859-1）解析一遍**，发现 charset 后才回退并用正确编码重新解析。这会导致：
+>
 > 1. **两次解析**（性能浪费）
 > 2. 在某些浏览器中，如果 `<title>` 中包含非 ASCII 字符（如中文），在第一次 Latin-1 解析时会变成乱码，即使最终正确解析也无法消除已产生的 BOM 问题
 > 3. 极少数情况下，如果 `<meta charset>` 不在文档前 1024 字节内，浏览器直接使用默认编码，整个页面乱码
@@ -186,6 +188,7 @@ Open Graph Protocol 由 Facebook 2010 年发布，已被微信、Twitter、Linke
 > **现状**：IE 已于 2022 年正式退役（微软 2023 停止支持），此 meta 标签在 2026 年已是**冗余无害但无意义**的存在，建议从模板中移除。
 
 > 参考：
+>
 > - [MDN — meta charset](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta#attr-charset)
 > - [Open Graph Protocol](https://ogp.me/)
 > - [Google — Robots meta tag](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag)

@@ -53,6 +53,7 @@ flowchart TD
   E --> F["进入 render 阶段"]
   F --> G["进入 commit 阶段"]
 ```
+
 1. 初始挂载来自 `createRoot` 与首次 `render` 调用。  
 2. 自身 `setState` 直接把一次更新排入队列。  
 3. 父组件因状态更新重新渲染时，其子树组件也会被遍历。  
@@ -215,6 +216,7 @@ flowchart TD
   E --> F["产出 effect list 或 flags 标记"]
   F --> G["commit 阶段使用"]
 ```
+
 1. render 阶段从根 Fiber 进入工作循环。  
 2. 函数组件在这里被调用，得到新 JSX。  
 3. React 把新结果与旧 Fiber 比较，生成变更标记。  
@@ -357,6 +359,7 @@ flowchart TD
   E --> F["稍后回到断点继续"]
   F --> G["commit 时交换 current 与 workInProgress"]
 ```
+
 1. 当前展示的树叫 `current`。  
 2. 每次更新创建或复用 `workInProgress` 树作为副本。  
 3. 计算都发生在 `workInProgress` 上，旧树保持不变。  
@@ -515,6 +518,7 @@ sequenceDiagram
   C->>P: "异步调度 useEffect"
   P-->>D: "绘制后执行"
 ```
+
 1. render 阶段完成计算，把变更标记传入 commit。  
 2. commit 先同步改真实 DOM。  
 3. DOM 修改后同步触发 `useLayoutEffect`。  
@@ -653,6 +657,7 @@ flowchart TD
   B --> H["shouldYield 为真则暂停"]
   H --> I["保存 nextUnitOfWork 供恢复"]
 ```
+
 1. 工作循环从 `nextUnitOfWork` 开始。  
 2. 每次调用 `performUnitOfWork` 处理一个 Fiber。  
 3. 节点有子节点时深度优先进入子节点。  
@@ -806,6 +811,7 @@ flowchart TD
   D --> E["提交结果仍只有一次"]
   E --> F["开发中第二次调用日志可见"]
 ```
+
 1. Strict Mode 只影响开发构建。  
 2. 它让 render 阶段的组件函数调用两次。  
 3. 第二次调用用于暴露非法副作用。  
@@ -958,6 +964,7 @@ sequenceDiagram
   R->>C: "完成计算，提交变更"
   C->>D: "修改 DOM 后浏览器绘制"
 ```
+
 1. 浏览器把 click 事件交给 React 合成事件系统。  
 2. 事件处理器中执行 `setState`，只是排队更新。  
 3. 事件结束后 React 安排一次同步或并发渲染。  
@@ -1109,6 +1116,7 @@ flowchart TD
   E --> G["优化后再次测量帧率与交互延迟"]
   F --> G
 ```
+
 1. 性能排查先记录一次更新。  
 2. render 高通常需要减少计算或跳过子树。  
 3. commit 高通常要减少 DOM 节点或避免同步 layout 抖动。  

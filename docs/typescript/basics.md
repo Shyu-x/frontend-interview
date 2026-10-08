@@ -183,6 +183,7 @@ type B = IsString<123>;    // false
 // 总结：
 
 ```mermaid
+
 flowchart TB
     subgraph any["any 类型"]
         a1["任意类型"]

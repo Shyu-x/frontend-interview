@@ -1587,48 +1587,56 @@ React 文档提供 `onShellReady` 与 `abort` 两个钩子，让外壳先发出�
 
 ??? question "1. `push()` 返回 `false` 后继续不断 `push`，会发生什么？"
     答案要点：
+
     1. 数据会不断进入内部缓冲，超出 `highWaterMark` 后不报错。
     2. 缓冲涨到几十 MB 甚至 GB，内存只增不减。
     3. 正确做法：返回 `false` 就停止 `push`，等 `_read` 或 `readable` 事件后再继续。
 
 ??? question "2. `data` 事件与 `readable` + `read()` 两种模式分别适合什么场景？"
     答案要点：
+
     1. `data` 模式是 flowing，数据自动推送，适合管道式逐块处理。
     2. `readable` + `read()` 是 paused，按需取数，适合精确控制读取节奏。
     3. 一个流同时只用一种，两种混用会让某些事件不触发。
 
 ??? question "3. `write()` 返回 `false` 后不等 `drain` 会有什么后果？`drain` 何时触发？"
     答案要点：
+
     1. 后续数据全部堆在内部缓冲，内存持续上涨。
     2. `drain` 在内部缓冲被清空时触发，表示可以继续写。
     3. 修复方式：遇到 `false` 就停止 write，通过 `once('drain', 继续)` 恢复。
 
 ??? question "4. `highWaterMark` 在 Buffer 模式和对象模式下分别按什么计数？默认值各是多少？"
     答案要点：
+
     1. Buffer 模式按字节数计数，可读流和可写流默认都是 64KB（65536 字节）。
     2. 对象模式按对象个数计数，默认 16 个。
     3. 调整时 Buffer 模式传字节数，对象模式传对象个数。
 
 ??? question "5. `pipe` 与 `pipeline` 在错误传播和资源清理上有什么差异？"
     答案要点：
+
     1. `pipe` 只搬数据，不转发源错误到目标，出错时需要每个流手动处理。
     2. `pipeline` 在任一流出错时自动销毁所有参与流，并只回调一次。
     3. 多个流串联时优先用 `pipeline`，裸 `pipe` 多用于简单两流场景。
 
 ??? question "6. Transform 的 `_transform` 里为什么必须调用 `callback()`？不调用会怎样？"
     答案要点：
+
     1. `callback()` 是告知 Node 当前块处理完成，缓冲计数才会减少。
     2. 不调用时该 chunk 永远处于"处理中"，后续数据无法流入，流被卡死。
     3. 即使不 `push` 任何输出，也必须 `callback()`。
 
 ??? question "7. 写一个带背压的 Readable，`_read`、`push`、`readable` 三个环节如何分工？"
     答案要点：
+
     1. `_read` 是 Node 在缓冲有空间时调用的生产入口。
     2. `push()` 把数据放入内部缓冲，返回 `false` 表示已到水位。
     3. `readable` 在缓冲有数据或数据被消费后触发，生产者借此恢复。
 
 ??? question "8. 如何把 Node Readable 交给浏览器 fetch 消费？背压如何跨转换联动？"
     答案要点：
+
     1. 用 `Readable.toWeb(nodeReadable)` 得到 Web `ReadableStream`。
     2. 把该 `ReadableStream` 作为 fetch 的 `body` 传入。
     3. 转换层会衔接两侧背压：Node 侧遵守 `push` 返回值，Web 侧遵守 `desiredSize`。

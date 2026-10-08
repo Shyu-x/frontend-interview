@@ -170,6 +170,7 @@ class EventEmitter {
   }
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -279,6 +280,7 @@ class EventEmitter {
   }
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -361,6 +363,7 @@ class PriorityEventEmitter {
   }
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -452,6 +455,7 @@ class EventBus {
 // 后续任何地方 new EventBus() 也都拿到同一实例，保证跨模块监听/派发共享同一份事件表。
 export const eventBus = new EventBus();
 ```
+
 ---
 
 ## 2. Proxy 代理模式
@@ -575,6 +579,7 @@ function effect(fn) {
   activeEffect = null;
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -699,6 +704,7 @@ function deepReadonly(obj) {
   return readonly(obj, Infinity);
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -811,6 +817,7 @@ Function.prototype.myBind = function(context, ...bindArgs) {
   };
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -899,6 +906,7 @@ function createValidatedProxy(target, validationRules) {
   });
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -949,6 +957,7 @@ function mix(target, ...sources) {
   return target;
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -1035,6 +1044,7 @@ class AsyncEventEmitter {
   }
 }
 ```
+
 **测试**：
 
 ```javascript
@@ -1126,6 +1136,7 @@ class Observable {
   }
 }
 ```
+
 ---
 
 ## 5. 总结

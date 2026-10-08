@@ -540,6 +540,7 @@ async function director(plan) {
 // 两个板块，各 2 个和 1 个单元
 console.log(await director({ front: ['a', 'b'], back: ['c'] }));
 ```
+
 **这段代码在做什么**
 
 - `Object.entries` 把板块配置转成可遍历的键值对。

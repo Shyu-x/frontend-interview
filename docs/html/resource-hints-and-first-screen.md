@@ -138,6 +138,7 @@ description: preload、prefetch、preconnect、dns-prefetch 的区别，以及 f
 > `modulepreload` 会：① 预解析模块文件；② 预解析依赖图（import 的子模块）；③ 预建立 CORS 连接。而 `preload as="script"` 仅下载主模块，不处理依赖图。大型 ESM 应用（Next.js/Nuxt）中 `modulepreload` 可显著减少首屏模块解析时间。
 
 > 参考：
+>
 > - [web.dev — Preload, prefetch and priorities](https://web.dev/articles/preload-prefetch-and-priorities)
 > - [MDN — Link prefetching FAQ](https://developer.mozilla.org/en-US/docs/Web/HTML/Link_types/prefetch)
 > - [MDN — modulepreload](https://developer.mozilla.org/en-US/docs/Web/HTML/Link_types/modulepreload)

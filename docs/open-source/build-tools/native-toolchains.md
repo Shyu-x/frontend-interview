@@ -615,6 +615,7 @@ async function buildAll() {
   )
 }
 ```
+
 #### 2.7.2 代码分割
 
 ```javascript
@@ -920,6 +921,7 @@ module.exports = {
   },
 }
 ```
+
 **Jest 集成**：
 
 ```javascript
@@ -1287,6 +1289,7 @@ module.exports = {
   },
 }
 ```
+
 ### 4.7 支持的功能矩阵
 
 | 功能 | 状态 | 说明 |

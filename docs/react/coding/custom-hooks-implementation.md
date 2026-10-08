@@ -201,6 +201,7 @@ function App() {
   );
 }
 ```
+
 ### 1.4 设计原理图
 
 ```mermaid
@@ -435,6 +436,7 @@ function useThrottle(value, interval) {
   return throttledValue;
 }
 ```
+
 ### 3.3 使用示例
 
 ```javascript
@@ -679,6 +681,7 @@ function UserPreferences() {
   );
 }
 ```
+
 ---
 
 ## 5. 实现 usePrevious
@@ -911,6 +914,7 @@ function useInterval(callback, delay) {
   }, [delay]);
 }
 ```
+
 ### 6.3 带暂停/恢复功能
 
 ```javascript
@@ -1023,6 +1027,7 @@ function useIntervalControl(callback, delay) {
   return { start, stop };
 }
 ```
+
 ### 6.4 使用示例
 
 ```javascript
@@ -1103,6 +1108,7 @@ function useAnimationFrame(callback) {
   }, [callback]);
 }
 ```
+
 ---
 
 ## 7. 实现 useOnClickOutside
@@ -1327,6 +1333,7 @@ function Popover({ content, children }) {
   );
 }
 ```
+
 ---
 
 ## 8. 实现 useEventListener
@@ -1478,6 +1485,7 @@ function useEventListener(event, handler, options = {}) {
   }, [event, target, enabled, capture, once, passive]);
 }
 ```
+
 ### 8.3 自定义事件版本
 
 ```javascript

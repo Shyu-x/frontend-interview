@@ -133,6 +133,7 @@ splitChunks: {
   }
 }
 ```
+
 ### 3.2 tree shaking + terser
 
 ```javascript
@@ -163,6 +164,7 @@ optimization: {
   ]
 }
 ```
+
 ### 3.3 babel-loader 优化
 
 ```javascript

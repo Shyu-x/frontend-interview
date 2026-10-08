@@ -331,6 +331,7 @@ export default function PostPage() {
   )
 }
 ```
+
 **参考链接**:
 
 - [Remix 官网](https://remix.run)
@@ -826,6 +827,7 @@ export class Post {
   comments: Comment[]
 }
 ```
+
 **查询示例**:
 
 ```typescript
@@ -1064,6 +1066,7 @@ export const posts = pgTable('posts', {
 // 若存在「按作者查文章」这类高频查询，需要额外声明 index('posts_author_id_idx').on(posts.authorId)，
 // 否则删除用户时的外键校验会退化为全表扫描（O(n)）。
 ```
+
 **查询示例**:
 
 ```typescript

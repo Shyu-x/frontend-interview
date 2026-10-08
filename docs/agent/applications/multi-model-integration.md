@@ -2006,6 +2006,7 @@ fallback.setFallbackChain('claude-3-5-sonnet-20241022', [
   'gpt-4o-mini',
 ]);
 ```
+
 **这段代码在做什么**
 
 - 三家适配器一起注册进工厂，业务层用模型名取用。
@@ -2053,6 +2054,7 @@ return { ...(await adapter.complete({ ...params, model })), servedBy: model };
 const degraded = result.servedBy !== params.model;
 if (degraded) logger.warn('degraded to ' + result.servedBy);
 ```
+
 **这段代码在做什么**
 
 - `servedBy` 记录真正执行这次调用的模型名。

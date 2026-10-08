@@ -137,6 +137,7 @@ const server = Bun.serve({
 // 比直接复用配置字面量更可靠。
 console.log(`Bun server listening on http://${server.hostname}:${server.port}`);
 ```
+
 ### 3.2 使用 Express 风格框架
 
 ```typescript

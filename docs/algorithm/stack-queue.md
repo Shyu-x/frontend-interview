@@ -53,6 +53,7 @@ function isValid(s) {
   return stack.length === 0;
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n)
@@ -97,6 +98,7 @@ function dailyTemperatures(temperatures) {
   return result;
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n) - 每个元素最多入栈出栈各一次
@@ -160,6 +162,7 @@ class MinStack {
   }
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(1) - 所有操作
@@ -223,6 +226,7 @@ class MyQueue {
   }
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: 均摊 O(1)
@@ -274,6 +278,7 @@ function nextGreaterElement(nums1, nums2) {
   return nums1.map(num => map.get(num));
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n + m)
@@ -336,6 +341,7 @@ function evalRPN(tokens) {
   return stack[0];
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n)

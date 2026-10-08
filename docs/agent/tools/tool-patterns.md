@@ -633,6 +633,7 @@ await assert.rejects(() => readFileTool({ path: "relative.txt" }), /绝对路径
 console.log(part);
 console.log("全部断言通过");
 ```
+
 预期输出：
 
 ```text

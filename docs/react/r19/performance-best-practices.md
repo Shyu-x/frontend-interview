@@ -1182,36 +1182,42 @@ console.log('断言通过：仅纯函数且无不稳定依赖的手写缓存可�
 
 ??? question "React 性能优化应该从哪一步开始？"
     答案要点：
+
     1. 先度量建立基线。
     2. 用 Profiler 或性能轨道定位热点。
     3. 只改热点，再对比验证。
 
 ??? question "Profiler 的 actualDuration 和 baseDuration 代表什么？"
     答案要点：
+
     1. actualDuration 是本次更新该子树实际渲染耗时。
     2. baseDuration 是估算无优化时整棵子树重渲染耗时。
     3. 两者对比可判断 memo 是否命中。
 
 ??? question "为什么单个总是新的 props 会破坏 memo？"
     答案要点：
+
     1. memo 默认用 Object.is 逐项比较 props。
     2. 每次渲染新建的对象或函数引用不同。
     3. 所有接收该值的 memo 组件都会进入渲染。
 
 ??? question "状态下沉为什么能减少不必要渲染？"
     答案要点：
+
     1. React 默认父组件更新会递归渲染子组件。
     2. 状态放在顶层会让整棵子树参与更新。
     3. 下沉到使用它的组件可缩小影响范围。
 
 ??? question "children 透传与 memo 的区别是什么？"
     答案要点：
+
     1. children 透传利用 JSX 结构让 React 知道子节点不需要重渲染。
     2. memo 比较 props 决定子组件是否重新渲染。
     3. children 透传是结构手段，memo 是组件级缓存手段。
 
 ??? question "虚拟列表如何保持 DOM 数量恒定？"
     答案要点：
+
     1. 用滚动偏移和行高算可见范围。
     2. 只渲染范围内的数据。
     3. 用总占位高度模拟滚动长度。
@@ -1219,12 +1225,14 @@ console.log('断言通过：仅纯函数且无不稳定依赖的手写缓存可�
 
 ??? question "lazy 组件在什么情况下会 suspend？"
     答案要点：
+
     1. 首次尝试渲染时，模块还没加载完成会 suspend。
     2. Promise 被拒绝时扔给最近的错误边界。
     3. Suspense 在加载期间显示 fallback。
 
 ??? question "开启 React Compiler 后手写 memo 可以全删吗？"
     答案要点：
+
     1. 不能无条件全删。
     2. 纯渲染、无不稳定依赖的手写缓存可删。
     3. 删除后要跑测试、Profiler 和基线复核。

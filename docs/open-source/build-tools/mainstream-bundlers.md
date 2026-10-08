@@ -344,6 +344,7 @@ export default defineConfig({
   },
 })
 ```
+
 **TypeScript 类型检查**（与 Vite 解耦，需单独运行）：
 
 ```bash
@@ -1235,6 +1236,7 @@ module.exports = (env, argv) => {
   }
 }
 ```
+
 **Module Federation 配置（微前端）**：
 
 ```javascript

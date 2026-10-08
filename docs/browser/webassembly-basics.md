@@ -126,6 +126,7 @@ console.log(`耗时 ${(end - start).toFixed(1)} ms，结果 ${sum}`);
 ```bash
 node sum_js.js
 ```
+
 输出示例（你的机器数字可能不同）：
 ```text
 耗时 4.2 ms，结果 7999998000000

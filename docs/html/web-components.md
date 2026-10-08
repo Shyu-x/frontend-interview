@@ -189,6 +189,7 @@ slot.addEventListener('slotchange', (e) => {
 
 **Q2：Shadow DOM 的样式隔离是 100% 安全的吗？有什么方式可以穿透？**
 > 不是 100%。穿透方式：
+>
 > 1. **CSS 变量（Custom Properties）**：`--color: red` 可穿过 Shadow Boundary
 > 2. **`:host-context()`**：根据祖先元素匹配 Shadow Root
 > 3. **JavaScript**：在 open 模式下可通过 `element.shadowRoot` 直接操作
@@ -196,6 +197,7 @@ slot.addEventListener('slotchange', (e) => {
 > 如果需要完全隔离（如第三方组件），需用 `mode: 'closed'`（但仍有 `querySelector` 绕过方式）。
 
 > 参考：
+>
 > - [MDN — Web Components](https://developer.mozilla.org/en-US/docs/Web/Web_Components)
 > - [MDN — Using custom elements](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements)
 > - [MDN — Using shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM)

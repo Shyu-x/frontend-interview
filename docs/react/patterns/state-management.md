@@ -164,6 +164,7 @@ function ThemeProvider({ children }) {
   );
 }
 ```
+
 ### 3.4 选择性订阅模式
 
 使用 `useContext` 时配合选择器，只订阅需要的数据片段：
@@ -244,6 +245,7 @@ const create = (createState) => {
   return { setState, getState, subscribe, destroy };
 };
 ```
+
 ### 4.2 状态流图
 
 ```mermaid
@@ -504,6 +506,7 @@ const counterSlice = createSlice({
 export const { increment, decrement, setValue } = counterSlice.actions;
 export default counterSlice.reducer;
 ```
+
 ### 7.2 createAsyncThunk
 
 ```tsx
@@ -564,6 +567,7 @@ const usersSlice = createSlice({
   },
 });
 ```
+
 ### 7.3 RTK Query
 
 RTK Query 是专为数据获取和缓存设计的 API：
@@ -627,6 +631,7 @@ export const {
   useCreateUserMutation,
 } = api;
 ```
+
 ---
 
 ## 8. 状态管理选择决策树

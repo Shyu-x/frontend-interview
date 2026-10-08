@@ -665,6 +665,7 @@ class HttpService {
   }
 }
 ```
+
 ### 2.8 与其他异步方案对比
 
 | 特性 | RxJS | Promise | async/await |
@@ -755,6 +756,7 @@ function createStore(initialState) {
   };
 }
 ```
+
 ### 3.3 技术栈
 
 - **语言**: TypeScript (97.9%)
@@ -1576,6 +1578,7 @@ export const usePersistStore = defineStore('persist', () => {
   return { token, user, login, logout };
 });
 ```
+
 ### 5.8 与 Vuex 4 对比
 
 | 特性 | Pinia | Vuex 4 |

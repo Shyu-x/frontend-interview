@@ -879,6 +879,7 @@ assert.equal(validateMcpServers({}).length, 1);
 
 console.log('第 5 节断言全部通过');
 ```
+
 预期输出：
 
 ```text

@@ -151,6 +151,7 @@ setTimeout(() => {
 // 微任务优先于宏任务，注册位置只决定同一类型队列内部的先后。
 console.log('end');
 ```
+
 **输出：**
 ```
 start
@@ -452,6 +453,7 @@ setImmediate(() => {
 // 边界条件：只有当代码位于 I/O 回调内部时，setImmediate 与 setTimeout(0) 的先后才可能翻转。
 console.log('2'); // 输出：2（第 2 位）
 ```
+
 **输出（Node.js）：**
 ```
 1
@@ -524,6 +526,7 @@ fs.readFile('./package.json', () => {
   // 另外本例省略了 readFile 的 error 参数，真实项目里文件缺失会导致回调抛出未捕获异常。
 });
 ```
+
 **输出（可能）：**
 ```
 I/O 回调
@@ -613,6 +616,7 @@ console.log('script end'); // 同步代码的最后一行；此后进入事件�
 // 边界：若把它跑到支持 await 优化的引擎（Node 12+ / 现代浏览器），await 只花 1 个微任务 tick，'async1 end' 才排在 then1 之后；
 //       老引擎里 await 会拆成多个 tick，顺序会变，这正是本题最容易踩的版本坑。
 ```
+
 **输出：**
 ```
 script start

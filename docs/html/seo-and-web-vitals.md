@@ -319,6 +319,7 @@ LCP 波动通常由以下原因导致：
 ---
 
 > 参考：
+>
 > - https://developer.chrome.com/docs/crux（Chrome UX Report）
 > - https://nextjs.org/docs/app/building-your-application/optimizing/metadata（Next.js Metadata API）
 > - https://schema.org/docs/schemas.html（Schema.org 类型参考）

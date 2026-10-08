@@ -146,6 +146,7 @@ class MyPromise {
   }
 }
 ```
+
 ### 1.4 Promise.then 返回值规则
 
 | then 回调返回值 | 下一个 Promise 的状态 |

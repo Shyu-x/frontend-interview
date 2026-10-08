@@ -1049,6 +1049,7 @@ assert.throws(() => topologicalLayers([
 console.log('依赖图断言全部通过', JSON.stringify(layers));
 // 预期输出：依赖图断言全部通过 [["A"],["B"],["C","D"],["E"]]
 ```
+
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
@@ -1464,6 +1465,7 @@ assert.equal(none, 0);
 console.log('回调断言全部通过', mgr.logs.length);
 // 预期输出：回调断言全部通过 1
 ```
+
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |

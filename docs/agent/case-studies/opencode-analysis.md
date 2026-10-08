@@ -377,6 +377,7 @@ console.log("注册表：", registry.names().join("、"));
 // 收到：你好
 // 注册表： view、bash
 ```
+
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |

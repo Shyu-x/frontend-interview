@@ -611,6 +611,7 @@ assert.equal(out.ctx.audit_skipped, true);
 assert.equal(out.results.merge.ok, true);
 console.log("断言全部通过");
 ```
+
 预期输出：
 
 ```text

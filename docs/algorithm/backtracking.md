@@ -139,6 +139,7 @@ function subsetsIterative(nums: number[]): number[][] {
   return result;
 }
 ```
+
 **复杂度**：时间 O(n * 2^n)，空间 O(n)。
 
 ---
@@ -338,6 +339,7 @@ function existWithTrie(board: string[][], words: string[]): string[] {
   return found;
 }
 ```
+
 **复杂度**：时间 O(m * n * 4^L)，空间 O(L)，L 为单词长度。
 
 ---
@@ -396,6 +398,7 @@ function letterCombinations(digits: string): string[] {
   return result;
 }
 ```
+
 **复杂度**：时间 O(4^n)，空间 O(n)。
 
 ## 应用与行业实践

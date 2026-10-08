@@ -157,6 +157,7 @@ const resources = [
 const groups = groupByCategory(resources);
 console.log(Object.keys(groups).length); // 期望输出 5
 ```
+
 **这段代码在做什么**
 
 - `reduce` 一次遍历完成分组，时间复杂度是资源条数。
@@ -239,6 +240,7 @@ const tooling = resources.filter((r) => ["protocol", "vendor"].includes(r.catego
 
 console.log(chineseEntry.length, tooling.length); // 期望输出 4 2
 ```
+
 **这段代码在做什么**
 
 - 第一个 `filter` 用类别筛出社区资源，得到中文入口。
@@ -1592,6 +1594,7 @@ function planOrder(docs) {
 const order = planOrder(docs).map((d) => d.file);
 console.log(order.slice(0, 3).join(" "));
 ```
+
 **这段代码在做什么**
 
 - 用 `[...docs]` 复制数组，避免排序改动原数据。

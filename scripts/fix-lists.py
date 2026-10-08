@@ -7,6 +7,52 @@ import glob
 import re
 import sys
 
+
+INDENTED = re.compile(r"^( {4,})([-*+]|\d{1,3}[.)])\s+\S")
+
+
+def fix_after_fence(lines):
+    """顶层代码围栏闭合后紧跟非空行：补空行，否则后面的列表会被吞进同一个段落。"""
+    out, fence, n = [], None, 0
+    for i, line in enumerate(lines):
+        m = re.match(r"^(`{3,}|~{3,})", line)
+        out.append(line)
+        if not m:
+            continue
+        tok = m.group(1)[0] * 3
+        if fence is None:
+            fence = tok
+        elif line.strip().startswith(fence):
+            fence = None
+            if i + 1 < len(lines) and lines[i + 1].strip() and not lines[i + 1].startswith(("```", "~~~")):
+                out.append("")
+                n += 1
+    return out, n
+
+
+def fix_indented(lines):
+    """提示块 / 折叠块（!!! ???）里缩进 4 格的列表：上一行是同缩进的普通文字时补一个空行。"""
+    out, fence, n = [], None, 0
+    for line in lines:
+        m = re.match(r"^\s*(`{3,}|~{3,})", line)
+        if m:
+            tok = m.group(1)[0] * 3
+            if fence is None:
+                fence = tok
+            elif line.strip().startswith(fence):
+                fence = None
+            out.append(line)
+            continue
+        im = INDENTED.match(line)
+        if fence is None and im and out:
+            prev = out[-1]
+            pm = re.match(r"^( {4,})(\S.*)$", prev)
+            if pm and len(pm.group(1)) == len(im.group(1)) and not INDENTED.match(prev) and not pm.group(2).startswith(("`", "|", "<", "#", "!!!", "???", ">")):
+                out.append("")
+                n += 1
+        out.append(line)
+    return out, n
+
 FIX = "--fix" in sys.argv
 LIST = re.compile(r"^(\s{0,3})([-*+]|\d{1,3}[.)])\s+\S")
 total, files = 0, 0
@@ -41,6 +87,9 @@ for path in sorted(glob.glob("docs/**/*.md", recursive=True)):
                 out.append("")
                 n += 1
         out.append(line)
+    lines2, n2 = fix_indented(out)
+    lines3, n3 = fix_after_fence(lines2)
+    out, n = lines3, n + n2 + n3
     if n:
         total += n
         files += 1

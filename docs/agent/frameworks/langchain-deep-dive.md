@@ -131,6 +131,7 @@ const chain = prompt.pipe(model);
 const result = await chain.invoke({ concept: "闭包" });
 console.log(result); // 闭包是指函数记住其定义时作用域的能力。
 ```
+
 **这段代码在做什么**
 
 - `invoke` 接收一个普通对象，键名与模板变量一致。
@@ -1133,6 +1134,7 @@ const finalAnswer = `根据片段「${retrieved}」的回答`;
 console.log(answerPrompt);
 console.log(finalAnswer);
 ```
+
 **这段代码在做什么**
 
 - 把检索得到的文本作为上下文注入提示。
@@ -1370,6 +1372,7 @@ await chain.invoke(
   { callbacks: [monitor] }
 );
 ```
+
 **这段代码在做什么**
 
 - `invoke` 第二个参数中传入 callbacks 数组。

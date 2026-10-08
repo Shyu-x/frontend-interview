@@ -121,6 +121,7 @@ function isValidBSTInorder(root: TreeNode | null): boolean {
   return inorder(root);
 }
 ```
+
 **复杂度**：时间 O(n)，空间 O(h)。
 
 ---
@@ -178,6 +179,7 @@ function levelOrder(root: TreeNode | null): number[][] {
   return result;
 }
 ```
+
 **复杂度**：时间 O(n)，空间 O(w)，w 为最大层宽度（最坏情况 O(n)）。
 
 ---
@@ -250,6 +252,7 @@ function maxDepthBFS(root: TreeNode | null): number {
   return depth;
 }
 ```
+
 **复杂度**：时间 O(n)，空间 O(h)。
 
 ---

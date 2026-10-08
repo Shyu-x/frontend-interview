@@ -87,6 +87,7 @@ function reactive(obj) {
   })
 }
 ```
+
 ### 1.2 TypeScript支持
 
 - Vue2: 通过 `vue-property-decorator` 等装饰器库模拟类型支持，不够原生

@@ -138,6 +138,7 @@ const html = render(template, {
 // 直接交给 console.log 便于在命令行逐行核验占位符替换与循环展开是否符合预期。
 console.log(html);
 ```
+
 #### 1.4.3 数据库操作
 
 ```typescript
@@ -282,6 +283,7 @@ const server = new Server({
 // 第 4 段：启动确认——Server 构造函数是同步返回的，此时端口已开始监听；若端口被占用会在实例化时抛错。
 console.log('WebSocket server running');
 ```
+
 #### 1.4.6 测试框架
 
 ```typescript
@@ -481,6 +483,7 @@ const server = Bun.serve({
 // 读 server.port 而不是写死 3000：若端口改成 0 由系统随机分配，这里打印的才是真实端口。
 console.log(`Listening on localhost:${server.port}`);
 ```
+
 **运行时 - TypeScript 版本：**
 
 ```typescript
@@ -524,6 +527,7 @@ const server = serve({
 // 回读可保证日志始终反映真实监听端口。
 console.log(`Server running on port ${server.port}`);
 ```
+
 **数据库操作：**
 
 ```typescript

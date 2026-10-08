@@ -329,6 +329,7 @@ function SearchComponent() {
   );
 }
 ```
+
 ## 6. 常见陷阱与最佳实践
 
 | 陷阱 | 说明 | 解决方案 |

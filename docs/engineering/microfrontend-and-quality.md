@@ -212,6 +212,7 @@ module.exports = {
   }
 }
 ```
+
 ESLint 使用 visitor 模式遍历 AST，规则对象中声明的每个 key 对应一种 AST 节点类型，遍历到该类型节点时调用对应函数。
 
 ## 4. husky / lint-staged

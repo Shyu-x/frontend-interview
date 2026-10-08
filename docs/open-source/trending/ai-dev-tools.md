@@ -537,6 +537,7 @@ const response = await client.messages.stream({
   ]
 })
 ```
+
 ## 5. MCP 协议与 Agent 框架
 
 ### 5.1 Model Context Protocol (MCP)

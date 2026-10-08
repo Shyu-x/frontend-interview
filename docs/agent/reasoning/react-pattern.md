@@ -172,6 +172,7 @@ const observation = tools[decision.action](decision.actionArgs);
 state.history.push(makeStep(1, decision.thought, decision.action, decision.actionArgs, observation));
 console.log(state.history[0]);
 ```
+
 **这段代码在做什么**
 
 - `fakeModel` 用历史判断是否已有信息。

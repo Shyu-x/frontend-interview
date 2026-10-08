@@ -1357,6 +1357,7 @@ console.log("rows =", kb.store.rows.size, "docs =", kb.tracker.docs.size);
 // 预期输出：all assertions passed
 // rows = 3 docs = 1
 ```
+
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |

@@ -26,6 +26,7 @@ type UserType = {
 // 两者都能描述对象结构，区别如下：
 
 ```mermaid
+
 flowchart LR
     subgraph interface["interface"]
         i1["声明合并（支持）"]

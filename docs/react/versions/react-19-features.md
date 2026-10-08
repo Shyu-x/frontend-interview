@@ -194,6 +194,7 @@ function TodoList() {
   );
 }
 ```
+
 ### 2.2 乐观更新的生命周期
 
 ```mermaid
@@ -611,6 +612,7 @@ class RecoverableErrorBoundary extends Component {
   }
 }
 ```
+
 ### 6.3 错误边界架构
 
 ### 6.4 错误边界架构
@@ -749,6 +751,7 @@ function ProductList({ products, filter }) {
   );
 }
 ```
+
 ### 7.3 编译器安全规则
 
 ```javascript
@@ -932,6 +935,7 @@ const features = {
 // 风险：三个数组都是可变引用，任何一处 features.stable.push(...) 都会污染全局矩阵；
 // 若要作为配置分发，建议在导出前 Object.freeze 递归冻结，或只对外暴露拷贝。
 ```
+
 ---
 
 ## 11. 参考资源

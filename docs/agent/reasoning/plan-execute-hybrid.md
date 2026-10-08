@@ -461,6 +461,7 @@ assert.ok(Number.isFinite(a5.failureRate));
 
 console.log('运行结果:', [a1, a2, a3, a4, a5].map((a) => decide(a).action).join(' | '));
 ```
+
 预期输出：
 
 ```text

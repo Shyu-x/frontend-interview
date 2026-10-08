@@ -62,6 +62,7 @@ flowchart TD
   E --> H["手动扩缩容"]
   F --> I["自动扩缩与自愈"]
 ```
+
 1. 先判断流量是否突发且整体低流量，若为是，Serverless 更贴合。
 2. 如果流量持续中高，再判断是否需要容器编排。
 3. 单机可承载时选 Docker；需要多副本调度时选 Kubernetes。
@@ -196,6 +197,7 @@ sequenceDiagram
   L-->>G: "SSE 帧"
   G-->>C: "逐字渲染"
 ```
+
 1. 客户端把完整历史放进 POST 体。
 2. API Gateway 把请求转发给 Lambda。
 3. Lambda 调用模型并获取流式句柄。
@@ -382,6 +384,7 @@ flowchart LR
   E --> F["健康检查"]
   F --> G["监听 4000"]
 ```
+
 1. 源码进入 builder 阶段安装生产依赖。
 2. builder 把 `node_modules` 复制到 runtime 阶段。
 3. runtime 创建非 root 用户并部署源码。
@@ -562,6 +565,7 @@ flowchart TD
   G --> I["内存指标"]
   G --> J["QPS 指标"]
 ```
+
 1. Deployment 声明 3 个副本。
 2. ReplicaSet 维持三个 Pod 的实际数量。
 3. Service 根据 `readinessProbe` 决定哪些 Pod 接入流量。
@@ -825,6 +829,7 @@ flowchart TB
   E --> H
   F --> H
 ```
+
 1. 流量入口可以同步处理，也可以先入队。
 2. 同步处理路径用水平扩展接住更多请求。
 3. 队列路径由多个消费者按容量拉取任务。
@@ -977,6 +982,7 @@ sequenceDiagram
   T-->>A: "结果"
   A-->>C: "完整响应"
 ```
+
 1. 客户端进入一次请求。
 2. Agent API 调用模型并产生 Span。
 3. 模型返回后再调用工具。
@@ -1144,6 +1150,7 @@ flowchart TD
   F --> G["访问模型 API"]
   G --> H["Secrets Manager 获取密钥"]
 ```
+
 1. 进程启动时先读环境变量。
 2. zod 校验不通过就快速退出。
 3. 通过后进入请求限流。
@@ -1313,6 +1320,7 @@ stateDiagram-v2
   正常 --> 维护: "主动驱逐"
   维护 --> 正常: "PDB 保留 2 副本"
 ```
+
 1. 指标超阈值触发扩容。
 2. 指标回落后必须经过稳定窗口才能缩容。
 3. 缩容不能低于 `minReplicas`。
@@ -1477,6 +1485,7 @@ flowchart TD
   F --> G
   G --> H["修复并写回配置"]
 ```
+
 1. 告警后先检查 Pod 实际状态。
 2. 状态正常时查指标和日志。
 3. 状态异常时查事件和探针。
@@ -1645,6 +1654,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 1 题：API Gateway 同步代理的函数，为什么 `timeout: 30` 与 `timeout: 60` 都可能用不满？"
     答案要点：  
+
     - 同步 REST API 超时硬上限为 29 秒。  
     - 函数内部 30 秒只对内部调用有意义。  
     - 60 秒需要 Function URL、WebSocket 或响应流式传输模式才能真正跑满。  
@@ -1652,6 +1662,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 2 题：`livenessProbe` 和 `readinessProbe` 失败分别发生什么？"
     答案要点：  
+
     - 存活失败会重启容器，`restartCount` 增长。  
     - 就绪失败只把 Pod 从 Service 摘掉，不重启。  
     - 存活探针用于防止死锁进程占用副本。  
@@ -1660,6 +1671,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 3 题：为什么 Dockerfile 要用多阶段构建和非 root 用户？"
     答案要点：  
+
     - builder 阶段可以保留编译器和开发依赖。  
     - runtime 阶段只复制生产依赖，缩小体积。  
     - 非 root 用户减少容器被攻破后的权限。  
@@ -1667,6 +1679,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 4 题：HPA 用多指标时，为什么说它是短板原则？"
     答案要点：  
+
     - HPA 对每个指标单独算期望副本数。  
     - 最终期望取所有结果的最大值。  
     - 任一指标吃紧就扩容。  
@@ -1675,6 +1688,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 5 题：为什么分布式限流要用 Redis，而不是进程内计数？"
     答案要点：  
+
     - 多副本部署时请求可能落在不同进程。  
     - 进程内计数无法共享。  
     - Redis 有序集合可以按窗口删除过期记录。  
@@ -1683,6 +1697,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 6 题：为什么流式响应必须设置 `Cache-Control: no-cache` 和 `Connection: keep-alive`？"
     答案要点：  
+
     - `no-cache` 防止中间层缓存增量帧。  
     - `keep-alive` 防止代理在 token 间隔期断开长连接。  
     - 缺少任一头部会导致前端不能连续接收。  
@@ -1690,6 +1705,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 7 题：为什么 OpenTelemetry 的 `sdk.start()` 必须早于业务模块加载？"
     答案要点：  
+
     - 它注册全局 TracerProvider 和 ContextManager。  
     - 早于业务模块执行才能让自动插桩产生记录。  
     - 晚于业务模块会拿到 no-op tracer。  
@@ -1698,6 +1714,7 @@ console.log('缺失配置检查断言通过');
 
 ??? question "第 8 题：什么是 PDB，它与存活探针的区别是什么？"
     答案要点：  
+
     - PDB 是 PodDisruptionBudget，约束主动驱逐的可用副本数。  
     - 存活探针处理单容器异常，由 kubelet 执行。  
     - PDB 不处理硬宕机。  

@@ -170,6 +170,7 @@ function cleanup() {
 > `toDataURL()` 返回 Base64 编码字符串（体积大 33%），`toBlob()` 返回 `Blob` 对象（体积小，可流式上传）。生产环境应优先用 `canvas.toBlob(callback, 'image/png', 0.9)`。
 
 > 参考：
+>
 > - [MDN — Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
 > - [MDN — SVG](https://developer.mozilla.org/en-US/docs/Web/SVG)
 > - [Google Web Fundamentals — Canvas vs SVG](https://developers.google.com/web/fundamentals/design-and-ux/graphics/choosing-effective-m格式)

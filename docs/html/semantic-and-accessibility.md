@@ -188,6 +188,7 @@ a { color: -webkit-link; text-decoration: underline; }
 </body>
 </html>
 ```
+
 ### 1.5 `<section>` vs `<article>` vs `<div>` 区别
 
 | 维度 | `<section>` | `<article>` | `<div>` |
@@ -213,6 +214,7 @@ a { color: -webkit-link; text-decoration: underline; }
 
 **Q3：屏幕阅读器读取 SPA 时，JavaScript 动态注入的内容能被感知吗？**
 > 默认情况下**不能感知**。解决方案：
+>
 > 1. **ARIA Live Regions**：动态内容区域设置 `aria-live="polite"`（不打断）或 `"assertive"`（打断）
 > 2. **MutationObserver**：监听 DOM 变化，向 live region 写入内容
 > 3. **路由切换时焦点管理**：SPA 路由跳转后，用 `focus()` 将焦点移到新页面的 `<main>` 或 `<h1>`
@@ -223,6 +225,7 @@ a { color: -webkit-link; text-decoration: underline; }
 > **原则**：能用原生 HTML 实现的功能，坚决不用 ARIA。
 
 > 参考：
+>
 > - [MDN — HTML Semantic Elements](https://developer.mozilla.org/en-US/docs/Web/HTML/Element)
 > - [MDN — ARIA Roles](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles)
 > - [W3C WAI — WCAG 2.1](https://www.w3.org/WAI/standards-guidelines/wcag/)
@@ -412,6 +415,7 @@ dialog:not([open]) { display: none; }
 
 **Q2：SPA 路由切换时，屏幕阅读器用户如何感知页面变化？**
 > 默认情况下**无法感知**。解决方案：
+>
 > 1. 在每个页面 `<main>` 或 `<h1>` 上设置 `aria-live="polite"`
 > 2. 路由切换时，向 live region 写入"已导航至 XX 页面"
 > 3. 路由切换完成后，`focus()` 到新页面 `<h1>` 或 `<main>`
@@ -419,6 +423,7 @@ dialog:not([open]) { display: none; }
 
 **Q3：Lighthouse Accessibility 得分 100 分，是否等同于 WCAG 2.1 AA 合规？**
 > **不等于**。Lighthouse 只能检测**静态可验证**的问题（约覆盖 WCAG 约 30-40% 的规则）。以下问题无法被自动检测：
+>
 > - 键盘焦点的实际顺序（需要手动 Tab 测试）
 > - 颜色对比度的精确值（自动化只能检测 CSS 中的声明值）
 > - 动态内容（AJAX/React/Vue 条件渲染）的无障碍性
@@ -426,6 +431,7 @@ dialog:not([open]) { display: none; }
 > - 认知障碍用户的可用性
 
 > 参考：
+>
 > - [W3C WAI — WCAG 2.1](https://www.w3.org/WAI/standards-guidelines/wcag/)
 > - [MDN — ARIA](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA)
 > - [MDN — ARIA Roles](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles)

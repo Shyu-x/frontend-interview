@@ -157,6 +157,7 @@ function styled(tag) {
   };
 }
 ```
+
 ### 2.3 TailwindCSS 原理与原子化 CSS
 
 TailwindCSS 是原子化（utility-first）CSS 框架，通过组合小的工具类实现样式：
@@ -272,6 +273,7 @@ Modifier   → 状态/变体（用 -- 连接）
   </footer>
 </article>
 ```
+
 **BEM 优点：**
 
 - 类名自解释（命名即文档）

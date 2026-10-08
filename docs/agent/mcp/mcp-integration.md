@@ -696,6 +696,7 @@ child.stdout.on("data", async (chunk) => {
   }
 });
 ```
+
 **这段代码在做什么**
 
 - 写入时补 `"\n"`，这是 stdio 传输约定的消息终止符。
@@ -1072,6 +1073,7 @@ server.setRequestHandler("prompts/get", async (request) => {
   throw new Error(`未知提示 ${name}`); // 未知名字显式报错，避免客户端拿到非法结构
 });
 ```
+
 **这段代码在做什么**
 
 - `arguments` 是语言保留字，解构时重命名为 `args` 才能使用。

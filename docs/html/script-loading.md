@@ -141,6 +141,7 @@ gantt
 | 能否省略结束标签 | 替换型空元素可以（如 `<img />`） | link 等也为空元素 |
 
 > 参考：
+>
 > - https://blog.csdn.net/Bianca427/article/details/125421327
 > - https://www.cnblogs.com/gavinzzh-firstday/p/5735010.html
 > - https://blog.csdn.net/weixin_42420703/article/details/83213799
@@ -553,6 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
 | 渲染阻塞 | 严重 | 中等 | 最小 |
 
 > 参考：
+>
 > - https://segmentfault.com/a/1190000045432965
 > - https://juejin.cn/post/6844904197423382535
 > - https://blog.csdn.net/canjava/article/details/140057832

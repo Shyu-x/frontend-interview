@@ -163,6 +163,7 @@ assert.equal(counter.calls, 2);
 assert.deepEqual(r2, { id: 2, done: true });
 console.log("验证通过：子 agent 被独立调用两次");
 ```
+
 预期输出：
 
 ```text
@@ -314,6 +315,7 @@ const auditCodeAgent = makeBudgetedSubAgent("代码审计", async (task) => {
 const out = await auditCodeAgent({ task: { file: "index.js" } });
 console.log(checkResultSize(out));
 ```
+
 **这段代码在做什么**
 
 - 用字符长度粗略估算 token 数：每 4 个字符约 1 token。
@@ -1073,6 +1075,7 @@ const handle = mgr.submit(async () => {
 });
 console.log(await waitForTask(mgr, handle));
 ```
+
 **这段代码在做什么**
 
 - 循环调用 poll，间隔 100ms。

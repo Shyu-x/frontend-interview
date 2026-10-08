@@ -165,6 +165,7 @@ while (collection.length > 0) {
 ---
 
 > 参考：
+>
 > - https://developer.mozilla.org/en-US/docs/Web/API/HTMLCollection
 > - https://developer.mozilla.org/en-US/docs/Web/API/NodeList
 > - https://blog.csdn.net/weixin_43807979/article/details/123851813
@@ -320,6 +321,7 @@ document.close(); // 结束写入
 ---
 
 > 参考：
+>
 > - https://developer.mozilla.org/en-US/docs/Web/API/Document/write
 > - https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
 > - https://blog.csdn.net/weixin_45517869/article/details/123851813

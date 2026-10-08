@@ -125,6 +125,7 @@ while (true) {
   }
 }
 ```
+
 **这段代码在做什么**
 
 - res.body 是 ReadableStream，getReader() 给出按片读取的接口。
@@ -528,6 +529,7 @@ assert.equal(chunks[1].data, '[DONE]');
 assert.ok(!JSON.stringify(chunks).includes('\uFFFD'), '不应出现替换字符');
 console.log('chunk 数量:', chunks.length, '首个内容:', chunks[0].data);
 ```
+
 预期输出：
 
 ```
@@ -1371,6 +1373,7 @@ assert.equal(events.length, 3);
 assert.equal(events[0].content, '你');
 assert.equal(events[2].type, 'complete');
 ```
+
 **这段代码在做什么**
 
 - 复用同一个解码器，保证跨片汉字不被截断。

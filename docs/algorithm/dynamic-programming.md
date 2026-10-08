@@ -131,6 +131,7 @@ function maxSubArrayDP(nums: number[]): number {
   return max;
 }
 ```
+
 **复杂度**：时间 O(n)，空间 O(1)。
 
 ---
@@ -265,6 +266,7 @@ function coinChangeBFS(coins: number[], amount: number): number {
   return -1;
 }
 ```
+
 **复杂度**：时间 O(n * amount)，空间 O(amount)。
 
 ---
@@ -355,6 +357,7 @@ function wordBreakWithTrie(s: string, wordDict: string[]): boolean {
   return dp[n];
 }
 ```
+
 **复杂度**：时间 O(n * m)，空间 O(n)，其中 m 为字典单词平均长度。
 
 ---

@@ -278,6 +278,7 @@ function App() {
   );
 }
 ```
+
 ### 3.3 fallback 设计模式
 
 #### 模式一：骨架屏
@@ -344,6 +345,7 @@ function BlogPost() {
   );
 }
 ```
+
 ### 3.4 Suspense 并发状态图
 
 ```mermaid
@@ -498,6 +500,7 @@ function DataFetcher() {
   return <div>{data ? data.content : 'Loading...'}</div>;
 }
 ```
+
 ### 5.3 依赖检测增强
 
 React 18 能更准确地检测依赖数组遗漏：
@@ -600,6 +603,7 @@ async function handler(request) {
   // 否则中文等非 ASCII 内容在部分浏览器上会乱码。
 }
 ```
+
 ### 6.2 Progressive Hydration 渐进式水合
 
 ```mermaid
@@ -749,6 +753,7 @@ function NavLink({ to, children }) {
 // 遗留问题：preloadRoute 定义后未被任何地方调用，NavLink 的悬停路径也没复用它，
 // 所以当前实现只是骨架，实际收益取决于把 preloadRoute(to) 接到 preload 为 true 的分支上。
 ```
+
 ### 7.3 API 参考
 
 | 属性 | 类型 | 说明 |

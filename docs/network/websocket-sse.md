@@ -472,6 +472,7 @@ class WebSocketClient {
   }
 }
 ```
+
 ## 3. SSE vs WebSocket vs 长轮询
 
 ### 3.1 定义/背景（一句话说清）
@@ -964,6 +965,7 @@ app.get('/stream/:userId', async (req, res) => {
 
 **Q1：AI 大模型的流式输出为什么用 SSE 而不是 WebSocket？**
 > SSE 与 SSE 在 LLM 流式输出中的差异：
+>
 > 1. **语义匹配**：`fetch()` 返回的 `ReadableStream` 可直接通过 `TextDecoderStream` 转为 SSE 格式，前端只需 `EventSource` 或 fetch 流式消费
 > 2. **天然单向**：LLM 推理只有服务端输出，无需客户端推送，SSE 语义完全吻合
 > 3. **标准 HTTP 兼容**：SSE 是标准 HTTP，长连接穿越代理和 CDN 比 WebSocket 更容易
@@ -972,6 +974,7 @@ app.get('/stream/:userId', async (req, res) => {
 
 **Q2：SSE 能否实现浏览器向服务器发送数据？**
 > 原生 `EventSource` **只支持 GET**，但有几种 workaround：
+>
 > 1. **同域下额外建立 WebSocket 连接** 用于客户端→服务端（常见方案）
 > 2. **用 `fetch('POST')` 发送指令**，SSE 专门接收服务器推送
 > 3. **EventSource 支持自定义 URL，服务器根据 URL 参数路由不同频道**
@@ -998,6 +1001,7 @@ if (new WebSocket) {
 ```
 
 > 参考：
+>
 > - [MDN - Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
 > - [SSE 技术详解](https://cloud.tencent.com/developer/article/1194063)
 > - [实时技术对比: SSE vs WebSocket vs Long Polling](https://cloud.tencent.com/developer/article/2521124)

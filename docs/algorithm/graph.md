@@ -273,6 +273,7 @@ function numIslandsUnionFind(grid: string[][]): number {
   return uf.count;
 }
 ```
+
 **复杂度**：时间 O(m * n)，空间 O(m * n)（DFS/BFS 递归栈或队列）。
 
 ---
@@ -375,6 +376,7 @@ function cloneGraphBFS(node: Node | null): Node | null {
   return cloneNode;
 }
 ```
+
 **复杂度**：时间 O(V + E)，空间 O(V)。
 
 ---
@@ -466,6 +468,7 @@ function pacificAtlantic(heights: number[][]): number[][] {
   return result;
 }
 ```
+
 **复杂度**：时间 O(m * n)，空间 O(m * n)。
 
 ---
@@ -565,6 +568,7 @@ function findCircleNumUnion(isConnected: number[][]): number {
   return uf.count;                       // count 已由并查集维护为剩余集合数
 }
 ```
+
 **复杂度**：DFS 时间 O(n^2)，空间 O(n)；并查集时间 O(n^2 alpha(n))，空间 O(n)。
 
 ## 应用与行业实践

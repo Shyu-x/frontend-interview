@@ -490,6 +490,7 @@ server.start();
 
 const client = new chat.Chat('127.0.0.1:0', grpc.credentials.createInsecure());
 ```
+
 （此脚本是四模式集合的外壳，完整运行需要继续网络端口的复用，建议在本地项目中按方法拆分调用；gRPC 的真实连接与关闭顺序以官方 Node 示例为准。）
 
 **常见坑**

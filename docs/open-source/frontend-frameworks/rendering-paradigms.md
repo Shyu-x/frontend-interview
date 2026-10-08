@@ -1277,6 +1277,7 @@ function StatusBadge() {
   );
 }
 ```
+
 #### 3.4.4 状态管理
 
 ```typescript
@@ -1393,6 +1394,7 @@ export function useStore() {
   return context;
 }
 ```
+
 #### 3.4.5 路由系统
 
 ```tsx
@@ -1465,6 +1467,7 @@ function App() {
   );
 }
 ```
+
 ### 3.5 SolidStart SSR
 
 ```tsx

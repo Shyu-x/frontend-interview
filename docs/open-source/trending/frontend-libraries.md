@@ -102,6 +102,7 @@ function BearCounter() {
 // → 只有 selector 结果发生变化的组件才重渲染。整条链路无 Provider、无 reducer、无 action 常量，
 // 代价是状态逻辑与组件同处一个模块，规模变大后建议按领域拆分成多个 store 文件。
 ```
+
 **中间件示例**:
 
 ```typescript
@@ -140,6 +141,7 @@ const useStore = create(
 // 高频更新场景应加节流或改用 onRehydrateStorage/skipHydration 控制水合时机——localStorage 读取是同步的，
 // 但 persist 的水合发生在 store 创建之后，首屏可能先渲染初始值再被持久化值覆盖（React 中表现为一次额外渲染）。
 ```
+
 **npm 下载统计**:
 
 - 22K+ GitHub stars
@@ -213,6 +215,7 @@ function Profile() {
   )
 }
 ```
+
 **高级用法**:
 
 ```typescript
@@ -332,6 +335,7 @@ function App() {
   )
 }
 ```
+
 **竞品对比**:
 
 | 维度 | React Hook Form | Formik | React Form | RHF + Zod |
@@ -756,6 +760,7 @@ module.exports = {
   ]
 }
 ```
+
 **运行时使用**:
 
 ```tsx
@@ -975,6 +980,7 @@ function ExampleDialog() {
   )
 }
 ```
+
 **参考链接**:
 
 - [shadcn/ui 官网](https://ui.shadcn.com)

@@ -299,6 +299,7 @@ function App() {
   );
 }
 ```
+
 ### 4.2 组件级分割
 
 对于大型组件中的次要功能，按需加载。
@@ -474,6 +475,7 @@ function SearchInput() {
   );
 }
 ```
+
 ---
 
 ## 6. useMemo 与 useCallback 策略
@@ -640,6 +642,7 @@ function SearchPage() {
   );
 }
 ```
+
 ### 7.3 useSyncExternalStore 稳定订阅
 
 在并发模式下安全地订阅外部数据源。

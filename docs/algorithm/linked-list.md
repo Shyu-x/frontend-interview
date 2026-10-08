@@ -74,6 +74,7 @@ function reverseListRecursive(head: ListNode | null): ListNode | null {
   // 始终返回最深层的尾节点作为新头，保证各层返回一致。
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n)
@@ -163,6 +164,7 @@ function hasCycle(head: ListNode | null): boolean {
   return false;
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n)
@@ -220,6 +222,7 @@ function removeNthFromEnd(head: ListNode | null, n: number): ListNode | null {
   return dummy.next;
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n)
@@ -266,6 +269,7 @@ function getIntersectionNode(headA: ListNode | null, headB: ListNode | null): Li
   return pA;
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n + m)
@@ -330,6 +334,7 @@ function mergeKLists(lists: Array<ListNode | null>): ListNode | null {
   return dummy.next;
 }
 ```
+
 **复杂度分析**:
 
 - 时间复杂度: O(n log k) - k 为链表数量

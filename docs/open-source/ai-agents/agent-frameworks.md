@@ -1363,6 +1363,7 @@ async function runResearchWorkflow() {
 
 runResearchWorkflow(); // 顶层直接调用且未 await/catch，失败会变成 unhandled rejection；教学演示中可接受，服务端代码里应显式处理
 ```
+
 ### 5.7 Human-in-the-Loop 示例
 
 ```typescript

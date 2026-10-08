@@ -97,6 +97,7 @@ const flagConfig = {
   salt: 'checkout_page_v2',
 };
 ```
+
 **这段代码在做什么**
 
 - key 是开关的唯一标识，日志与配置平台都靠它定位。
@@ -120,6 +121,7 @@ function isEnabled(config, userId) {
   return bucketOf(userId, config.salt) < config.rollout;
 }
 ```
+
 **这段代码在做什么**
 
 - 第 2 行是短路判断，总闸关闭时不再计算哈希。
@@ -184,10 +186,12 @@ for (let i = 0; i < 100; i += 1) {
 
 console.log('section 1 passed', { hit });
 ```
+
 运行结果形如：
 ```text
 section 1 passed { hit: 103 }
 ```
+
 hit 的具体数值由 SHA-256 决定，断言要求它落在 60 到 140 之间。
 
 **常见坑**
@@ -250,6 +254,7 @@ const digest = createHash('sha256').update(raw).digest();
 assert.equal(digest.length, 32);
 console.log('digest bytes', digest.length);
 ```
+
 **这段代码在做什么**
 
 - raw 把盐值放在前面，换盐值等于换一套分组。
@@ -274,6 +279,7 @@ const num = digest.readUInt32BE(0);
 assert.ok(num >= 0 && num <= 4294967295);
 console.log('num ok', Number.isInteger(num));
 ```
+
 **这段代码在做什么**
 
 - readUInt32BE(0) 从第 0 字节开始读 4 个字节。
@@ -306,6 +312,7 @@ const b = bucketOf('user_42', 'checkout_exp');
 assert.ok(b >= 0 && b < 100);
 console.log('bucket in range', true);
 ```
+
 **这段代码在做什么**
 
 - 函数接收用户标识与盐值两个参数。
@@ -350,10 +357,12 @@ assert.equal(bucketOf('user_7', 'exp_2024'), bucketOf('user_7', 'exp_2024'));
 
 console.log('section 2 passed', { maxDeviation });
 ```
+
 运行结果形如：
 ```text
 section 2 passed { maxDeviation: 28 }
 ```
+
 28 是最大桶偏差的示例值，由哈希决定，断言要求它不超过 50。
 
 **常见坑**
@@ -419,6 +428,7 @@ export function makeBucketCache(bucketFn) {
   };
 }
 ```
+
 **这段代码在做什么**
 
 - 闭包让 cache 在多次调用之间保持存活。
@@ -439,6 +449,7 @@ function isEnabled(config, userId, options) {
   return bucketOf(userId, config.salt) < config.rollout;
 }
 ```
+
 **这段代码在做什么**
 
 - version 用来标记配置的修订号。
@@ -456,6 +467,7 @@ function stableId(user) {
   return `a:${user.anonymousId}`;
 }
 ```
+
 **这段代码在做什么**
 
 - 已登录用户以用户 ID 为身份，跨设备保持一致。
@@ -497,10 +509,12 @@ for (let i = 0; i < 10; i += 1) {
 
 console.log('section 3 passed', { consistent: true, first });
 ```
+
 运行结果形如：
 ```text
 section 3 passed { consistent: true, first: 37 }
 ```
+
 37 是示例桶号，由哈希决定，断言保证 1000 次调用结果一致。
 
 **常见坑**
@@ -567,6 +581,7 @@ const experiment = {
   xB: 630,
 };
 ```
+
 **这段代码在做什么**
 
 - nA 与 nB 是两组各自进入实验的用户数。
@@ -588,6 +603,7 @@ function twoProportionZ(xA, nA, xB, nB) {
   return (pA - pB) / se;
 }
 ```
+
 **这段代码在做什么**
 
 - pA 与 pB 是两组观测转化率。
@@ -611,6 +627,7 @@ function requiredSampleSize(p, delta) {
   return Math.ceil((16 * p * (1 - p)) / (delta * delta));
 }
 ```
+
 **这段代码在做什么**
 
 - 双侧检验关心两个方向的差异，所以取绝对值。
@@ -655,6 +672,7 @@ assert.equal(n, 57600);
 
 console.log('section 4 passed', { zSmall, zLarge, n });
 ```
+
 运行结果：
 ```text
 section 4 passed { zSmall: -0.9029..., zLarge: -2.8553..., n: 57600 }
@@ -729,6 +747,7 @@ const flags = [
   },
 ];
 ```
+
 **这段代码在做什么**
 
 - owner 是团队名，便于清理时找到决策人。
@@ -749,6 +768,7 @@ function findExpiredFlags(list, now) {
   });
 }
 ```
+
 **这段代码在做什么**
 
 - filter 保留满足条件的开关。
@@ -768,6 +788,7 @@ function cleanupAction(flag) {
   return 'drive_decision';
 }
 ```
+
 **这段代码在做什么**
 
 - full_on 的开关要删除旧分支，保留新分支。
@@ -817,6 +838,7 @@ assert.deepEqual(findExpiredFlags(afterClean, now), []);
 
 console.log('section 5 passed', { expiredKeys: expired.map((f) => f.key) });
 ```
+
 运行结果：
 ```text
 section 5 passed { expiredKeys: [ 'a' ] }
@@ -895,6 +917,7 @@ const flags = {
   },
 };
 ```
+
 **这段代码在做什么**
 
 - 两个开关使用不同的盐值，分组互相独立。
@@ -929,6 +952,7 @@ export class FlagClient {
   }
 }
 ```
+
 **这段代码在做什么**
 
 - bucketOf 是前面实现的哈希分桶函数。
@@ -958,6 +982,7 @@ export class FlagClient {
     }
   }
 ```
+
 **这段代码在做什么**
 
 - isEnabled 依次检查配置存在、总闸、白名单、分桶。
@@ -1036,10 +1061,12 @@ assert.equal(client.isEnabled('checkout_page_v2', 'user_999'), true);
 
 console.log('section 6 passed', { cacheSize: client.cache.size });
 ```
+
 运行结果：
 ```text
 section 6 passed { cacheSize: 3 }
 ```
+
 三个缓存键分别是 checkout_exp:user_42、button_exp:user_42、checkout_exp:user_999。
 
 **常见坑**

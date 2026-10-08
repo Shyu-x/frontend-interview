@@ -254,6 +254,7 @@ request.onsuccess = (e) => {
   store.put({ id: 2, name: 'Bob', age: 30 });
 };
 ```
+
 ## 6. WebSocket 全双工通信
 
 ### 6.1 定义与核心原理
@@ -520,6 +521,7 @@ HTTP 头对比：HTTP 请求头 ~500 字节 vs WebSocket 帧头 2 字节
 | 支持代理 | 是 | 是 | 部分 | 部分（可能降级为 HTTP） |
 
 > **选型建议：**
+>
 > - **只需服务端推送**（如通知、实时数据、股票行情）→ SSE（实现简单，自动重连，原生 HTTP）
 > - **需要双向通信**（聊天、游戏、实时协作）→ WebSocket
 > - **低频轮询**（每隔几十秒查一次）→ 短轮询（最简单的方案）
@@ -555,6 +557,7 @@ location /ws {
 
 **Q1：WebSocket 断线后如何保证消息可靠性？**
 > 采用应用层 ACK + 重发队列机制：
+>
 > 1. 每条消息带唯一 `id`
 > 2. 发送后等待服务端 `ack`（N 秒内未收到则重发）
 > 3. 服务端维护去重集合（Set），收到重复 `id` 直接返回 `ack` 不重复处理
@@ -576,6 +579,7 @@ location /ws {
 > RFC 6455 原生提供 Ping/Pong 帧（opcode 0x9/0xA），但浏览器的 WebSocket API **不暴露**这些帧，需自行用 JSON 消息模拟。
 
 > 参考：
+>
 > - [RFC 6455 - The WebSocket Protocol](https://datatracker.ietf.org/doc/html/rfc6455)
 > - [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
 > - [实时技术对比: SSE vs WebSocket vs Long Polling](https://cloud.tencent.com/developer/article/2521124)

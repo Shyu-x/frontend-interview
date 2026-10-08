@@ -649,6 +649,7 @@ export function ErrorBoundary() {
   );
 }
 ```
+
 #### 2.4.2 嵌套路由与 outlet
 
 Remix 的嵌套路由允许组件在父布局中渲染子路由。
@@ -880,6 +881,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 ```
+
 ### 2.7 优缺点分析
 
 #### 2.7.1 优势
@@ -1025,6 +1027,7 @@ export default function ContactPage() {
   );
 }
 ```
+
 **JavaScript 版本：**
 
 ```javascript

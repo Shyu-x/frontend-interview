@@ -923,6 +923,7 @@ console.log('链路输出:', trace.join(' -> '));
 console.log('购物车件数:', agent.state().cartCount);
 console.log('完成率:', completionRate);
 ```
+
 预期输出：
 
 ```

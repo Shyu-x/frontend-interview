@@ -1030,6 +1030,7 @@ assert.equal(out.messages[1].content, '文件内容:a.txt');
 await assert.rejects(() => runAgent('再试一次'), /超过最大步数/); // 脚本已耗尽
 console.log('最终回答:', out.content);
 ```
+
 运行结果：
 
 ```

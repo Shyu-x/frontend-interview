@@ -318,6 +318,7 @@ function beginWork(current, workInProgressLane, renderLanes) {
   }
 }
 ```
+
 ### 4.3 completeWork 阶段
 
 `completeWork` 是向上回溯的入口，处理当前 Fiber 的副作用和 DOM 更新：

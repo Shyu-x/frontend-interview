@@ -179,6 +179,7 @@ flowchart TB
         A["Missing end"]
     end
 ```
+
 **正确做法**: 确保每个 `subgraph` 有对应的 `end`
 
 ### 7.2 节点 ID 重复
@@ -187,6 +188,7 @@ flowchart LR
     node1["First"]
     node1["Second - ERROR!"]
 ```
+
 **正确做法**: 每个节点使用唯一的 ID
 
 ### 7.3 中文引号问题
@@ -194,6 +196,7 @@ flowchart LR
 flowchart LR
     A["中文引号「」"]
 ```
+
 **说明**: Mermaid 11.x 支持中文标点，建议使用 `[]` 包裹节点文本
 
 ## 8. CI 检查集成
