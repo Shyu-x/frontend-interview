@@ -1815,6 +1815,7 @@ grid.addEventListener('keydown', (e) => {
 **怎么度量收益**：用 Playwright 断言"同一时刻只有一个格子 tabindex=0"。用 axe-core 记录改前改后的 violation 条数。用 Chrome DevTools Performance 面板录制滚动，数 Long Task 条数。用 DevTools 的 Accessibility 面板核对屏幕外行是否真的不在树里。
 
 **什么时候不该用**：
+
 - 表格总行数少到一次渲染不产生长任务，引入虚拟滚动只增加维护成本。
 - 用户需要 Ctrl+F 在整表内查找时，虚拟滚动会让未渲染的行搜不到，必须另做搜索入口。
 
@@ -1858,6 +1859,7 @@ socket.addEventListener('message', (e) => {
 **怎么度量收益**：用 Playwright 监听 DOM 变化，统计单位时间内的 live region 写入次数。用屏幕阅读器手动跑一遍协作流程，记录需要重新探索画布的次数。用 axe-core 检查 live region 是否存在且非空。
 
 **什么时候不该用**：
+
 - 画布内容全量播报会把有用信息埋掉，应另外提供结构化的大纲视图。
 - 纯装饰性的动效和他人光标轨迹不要进 live region，那会持续占用朗读通道。
 
@@ -1891,6 +1893,7 @@ await expect(page.getByRole('button', { name: '筛选' })).toBeVisible();
 **怎么度量收益**：用 Playwright 的 aria snapshot 行数做回归指标。用 Lighthouse 的 Accessibility 分类看审计项结果。用 Chrome DevTools Performance 的 Long Tasks 和脚本求值时长看渲染成本。用 axe-core 的 violation 条数看语义错误。
 
 **什么时候不该用**：
+
 - 为了压节点数把交互元素设成 `aria-hidden="true"`，用户会彻底操作不到它。
 - 把需要被读到的说明文字用 `display:none` 藏起来，屏幕阅读器同样读不到。
 
@@ -1930,6 +1933,7 @@ axe-core 提供可在测试中调用的规则集，能在流水线里对渲染�
 **目标**：把一个订单列表改造成键盘可用、可被 DOM 断言验证的组件，覆盖表格导航、Modal 详情、实时状态播报三块。
 
 **步骤**：
+
 1. 建立基线：用 Playwright 的 aria snapshot 记录改造前的可访问性树，用 axe-core 记录 violation 条数。
 2. 明确结构：确定表格用原生 `<table>` 还是 `role="grid"`，为每列写出可访问名称并从表头取得。
 3. 实现导航：用 roving tabindex 让方向键在单元格间移动，Home/End 跳到行首行尾。
@@ -1939,6 +1943,7 @@ axe-core 提供可在测试中调用的规则集，能在流水线里对渲染�
 7. 提交测试：把上述断言并入测试套件，并逐个验证断言确实会失败。
 
 **验收标准**：
+
 - 全程只用键盘能从筛选框走到任意一行、打开详情、关闭并回到原按钮，焦点落点可预测。
 - 每条断言在人为破坏实现后都会失败，破坏点写在测试注释里。
 - 文字与背景的对比度达到 WCAG AA 门槛，触控目标不小于 24×24 CSS 像素。

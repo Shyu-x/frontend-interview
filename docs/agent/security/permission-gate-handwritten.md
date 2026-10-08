@@ -1026,6 +1026,7 @@ console.log('audit replay verified');
 目标：写一个只有 3 条规则的团队代码助手权限闸门，覆盖 Bash 删除、强制推送和 curl 外发。
 
 步骤：
+
 1. 新建 `minimal-gate.mjs`，实现 `evaluate(request, rules)` 固定 deny 先于 ask 先于 allow。
 2. 规则一：项目范围 deny `Bash(rm -rf *)`。
 3. 规则二：项目范围 deny `Bash(git push --force *)`。
@@ -1033,6 +1034,7 @@ console.log('audit replay verified');
 5. 用 `node:assert` 验证请求 `Bash(rm -rf /tmp)` 被 deny，`Bash(curl http://localhost)` 被 ask，`Bash(ls -la)` 被 allow。
 
 验收标准：
+
 - 脚本能在 Node 20 运行通过。
 - 至少 4 条断言通过。
 - 打印输出显示每个请求的效果和命中规则。

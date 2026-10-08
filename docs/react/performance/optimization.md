@@ -907,6 +907,7 @@ function VirtualTable({ rows, rowHeight = 36, viewport = 480 }) {
 **怎么度量收益**：用 React DevTools Profiler 录制一次筛选输入，看 commit 耗时和 "rendered components" 数量。用 Chrome DevTools Performance 录制 3 秒滚动，看 Frames 轨道是否掉帧、有没有超过 50ms 的长任务。用 web-vitals 库采集 INP，观察交互响应分位。
 
 **什么时候不该用**：
+
 - 行数在 200 以内，虚拟化的换算和缓冲逻辑带来的维护成本超过收益。
 - 表格需要浏览器原生 Ctrl+F 查全表，或者需要一次性打印、导出全部行，未挂载的行搜不到也导不出。
 
@@ -950,6 +951,7 @@ useEffect(() => {
 **怎么度量收益**：用 Lighthouse 移动端预设（含 CPU 降速）看 FCP、LCP、TBT、TTI。用 Chrome DevTools Network 面板确认首屏路由实际下载的 JS 字节数。用 web-vitals 采集线上 LCP 和 INP 的 P75 分位。
 
 **什么时候不该用**：
+
 - 应用只有一个页面且整包体积在预算内，拆包只会多一次网络往返。
 - 内网系统带宽充足且用户长期停留在同一页，骨架屏闪烁造成的等待感比下载时间更明显。
 
@@ -992,6 +994,7 @@ function CursorLayer() {
 **怎么度量收益**：用 Chrome DevTools Performance 录制拖动过程，看 Frames 轨道和长任务。用 React DevTools Profiler 看 commit 次数和每次提交的组件数。在 store 的通知函数里打点，统计每秒通知次数与每秒渲染次数。
 
 **什么时候不该用**：
+
 - 协作频率低（例如评论批注每十几秒同步一次），外置 store 增加的心智成本没有对应收益。
 - 团队依赖 React DevTools 直接检查 state，状态移出 React 后在面板里看不到，排障成本上升。
 
@@ -1024,6 +1027,7 @@ web.dev 定义了 LCP、INP、CLS 三个指标及阈值，web-vitals 库负责�
 **目标**：把一份 5000 行的订单表格从不做优化的版本改到可流畅输入筛选，并给出前后两组可复现的测量数据。
 
 **步骤**：
+
 1. 用 Vite 创建 React 项目，写一个脚本生成 5000 条订单假数据，字段包含 id、金额、状态。
 2. 先写全量渲染版本，不做任何优化，作为对照。
 3. 用 React DevTools Profiler 录制一次筛选输入，记录 commit 耗时与渲染组件数。
@@ -1033,6 +1037,7 @@ web.dev 定义了 LCP、INP、CLS 三个指标及阈值，web-vitals 库负责�
 7. 重复第 3 步，把前后两次的记录整理成一张表。
 
 **验收标准**：
+
 - Elements 面板里同时挂载的表格行数不超过 20。
 - 输入筛选关键词时，Profiler 记录的 commit 耗时低于 50ms。
 - Performance 面板录制 3 秒操作，没有超过 50ms 的长任务。

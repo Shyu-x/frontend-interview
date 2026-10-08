@@ -8,11 +8,13 @@ description: Custom Elements、Shadow DOM、Template 与 Slot 的原理与用法
 ## 1. 定义与核心原理
 
 **Web Component** 是一套原生 Web 平台技术栈，包含三个核心规范：
+
 - **Custom Elements**：创建自定义 HTML 标签（`class MyElement extends HTMLElement`）
 - **Shadow DOM**：样式和 DOM 结构的隔离封装
 - **HTML Templates**（`<template>` + `<slot>`）：可复用的组件结构模板
 
 **核心价值：**
+
 - 跨框架复用（Angular / React / Vue / 原生均可使用）
 - 原生支持，无需构建工具
 - 样式天然隔离，不会污染全局
@@ -142,6 +144,7 @@ class MyLayout extends HTMLElement {
 ```
 
 **插槽内容分发规则：**
+
 - 有 `slot="X"` 属性的节点 → 进入 `name="X"` 的具名插槽
 - 无 `slot` 属性的节点 → 进入默认 `<slot>`（无名插槽）
 - 多个节点指定同一 `slot` → 按文档顺序依次填入

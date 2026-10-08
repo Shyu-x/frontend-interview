@@ -40,6 +40,7 @@ HTML5 新增了大量语义化标签，使页面结构更清晰、可读性更�
 ```
 
 **语义化标签的浏览器默认样式：**
+
 - `display: block`（大部分）
 - `display: inline`（`mark`, `time`, `span`类似元素）
 
@@ -70,6 +71,7 @@ HTML5 新增了大量语义化标签，使页面结构更清晰、可读性更�
 ```
 
 **video/audio 常用属性：**
+
 - `controls`：显示播放控件
 - `autoplay`：自动播放（现代浏览器需配合 muted）
 - `loop`：循环播放
@@ -259,6 +261,7 @@ request.onsuccess = (e) => {
 **WebSocket** 是一种在单个 TCP 连接上提供**全双工（full-duplex）通信**的协议，由 HTML5 标准引入（RFC 6455）。与 HTTP 的"请求→响应"模式不同，WebSocket 建立连接后，服务器和客户端可**随时互相发送数据**，无需每次重新建立连接。
 
 **核心原理：**
+
 - 通过 HTTP handshake（握手）建立连接，随后协议从 HTTP"升级"为 WebSocket
 - 连接建立后是持久的 TCP 连接，双方可随时发送帧（frame）
 - 头部开销极小（每帧仅 2-14 字节），适合高频数据交换
@@ -274,6 +277,7 @@ request.onsuccess = (e) => {
 | 双向通信模拟（ Comet） | 综合轮询+流式传输 | 实现复杂，HTTP 头开销巨大（每个消息带完整 HTTP 头） |
 
 **WebSocket 的诞生：**
+
 - 2011 年，RFC 6455 正式标准化
 - 一次 HTTP 握手 → 升级为 WebSocket → 持久 TCP 连接
 - 消除 HTTP 头开销，支持任意时刻双向推送
@@ -618,6 +622,7 @@ document.addEventListener('click', (e) => {
 ```
 
 **pushState/replaceState 区别：**
+
 - `pushState`：创建新历史记录（可后退）
 - `replaceState`：替换当前历史记录（不可后退）
 

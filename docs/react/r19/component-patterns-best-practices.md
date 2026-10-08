@@ -97,6 +97,7 @@ function BaseModal({ type, children, onClose }) {
 ```
 
 **这段代码在做什么**
+
 - `type` 是字符串开关，父组件知道所有用途。
 - 每加一种用途，`title` 分支和按钮分支都要改。
 - `children` 只承担一部分内容，外壳仍在替调用方做决定。
@@ -131,6 +132,7 @@ function ConfirmModal({ onOk }) {
 ```
 
 **这段代码在做什么**
+
 - `BaseModal` 不再知道 confirm、form、preview 这些词。
 - `ConfirmModal` 通过嵌套把标题、正文、按钮放进 `children`。
 - 新增表单弹窗时只写新内容组件，不改 `BaseModal`。
@@ -216,6 +218,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 怎么借鉴到你的项目：先列出现有组件的所有 `type` 或 `variant` 分支，把纯内容分支改成 children。
 
 **小结**
+
 - 外壳管行为，children 管内容。
 - 继承把变化压到父类，组合把变化放到调用方。
 - 每加一种用途只新增文件、不改外壳，是组合是否到位的检验标准。
@@ -274,6 +277,7 @@ function List({ type, data }) {
 ```
 
 **这段代码在做什么**
+
 - `type` 把行结构写进列表组件。
 - 新增业务类型要改列表组件。
 - 列表组件同时承担排列与行内容两个职责。
@@ -303,6 +307,7 @@ function UserList({ users }) {
 ```
 
 **这段代码在做什么**
+
 - `renderItem` 是函数 prop，列表在 map 中调用它。
 - `empty` 是元素 prop，列表在空数据时返回它。
 - 新增业务类型只写新的调用方组件。
@@ -380,6 +385,7 @@ console.log('预期输出：render prop 断言通过：0:Ann | 1:Ben');
 怎么借鉴到你的项目：找出列表、表格、下拉框中按类型分支的代码，把分支改成 render prop。
 
 **小结**
+
 - render prop 把“怎么渲染”交给调用方。
 - 组件保留“何时渲染、传什么参数”的控制权。
 - 内联函数要关注引用稳定性，必要时用 useCallback。
@@ -437,6 +443,7 @@ function Tabs({ value, onChange, tabs, panels }) {
 ```
 
 **这段代码在做什么**
+
 - `tabs` 与 `panels` 是数组，结构被父组件写死。
 - 调用方无法在 Tab 之间插入自定义元素。
 - 新增一个带图标的 Tab 要改 `tabs` 数据格式。
@@ -471,6 +478,7 @@ function TabPanel({ id, children }) {
 ```
 
 **这段代码在做什么**
+
 - `Tabs` 不再知道 Tab 数量与标签内容。
 - `Tab` 通过 Context 读取 `value` 与 `onChange`。
 - `TabPanel` 通过 Context 判断自己是否显示。
@@ -558,6 +566,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 怎么借鉴到你的项目：先找一组总是一起出现的组件，把共享状态收进父组件 Context。
 
 **小结**
+
 - 复合组件把“结构摆放”交给调用方。
 - Context 适合共享同一家族内的隐式状态。
 - Context 值要拆小，避免无关子组件重渲染。
@@ -606,6 +615,7 @@ function NameInput({ value, onChange }) {
 ```
 
 **这段代码在做什么**
+
 - `value` 由外部提供，组件自己不保存状态。
 - 外部不传 `value` 时输入框显示为空且无法输入。
 - 简单页面必须写 `useState` 才能使用。
@@ -634,6 +644,7 @@ function NameInput({ value, defaultValue = '', onChange }) {
 ```
 
 **这段代码在做什么**
+
 - `controlled` 用 `value !== undefined` 判断模式。
 - `current` 在受控时用外部值，非受控时用内部值。
 - `handleChange` 在非受控时先更新内部状态。
@@ -723,6 +734,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 怎么借鉴到你的项目：先统计组件在表单库与普通页面中的用法，决定是否同时支持两种模式。
 
 **小结**
+
 - 受控由外部驱动，非受控由内部状态驱动。
 - 同时支持两种模式时，用 `value !== undefined` 判断。
 - 模式切换要避免，否则会出现警告与状态丢失。
@@ -777,6 +789,7 @@ function Dropdown({ items }) {
 ```
 
 **这段代码在做什么**
+
 - 展开状态与 DOM 结构写在同一个组件。
 - 样式写死在组件内部，使用方无法替换。
 - 没有键盘导航与 ARIA 角色。
@@ -813,6 +826,7 @@ function Menu({ items, renderTrigger }) {
 ```
 
 **这段代码在做什么**
+
 - `useDisclosure` 只返回状态与操作函数。
 - `Menu` 提供 `role="menu"` 与 `role="menuitem"`。
 - `renderTrigger` 让使用方决定按钮外观。
@@ -903,6 +917,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 怎么借鉴到你的项目：先分辨“逻辑复用”与“界面复用”，逻辑抽 Hook，结构加 ARIA 用无头组件。
 
 **小结**
+
 - 无头组件负责结构、状态与可访问性，不负责样式。
 - 自定义 Hook 负责状态与行为，不负责结构。
 - 可访问性是选择无头组件的主要理由。
@@ -960,6 +975,7 @@ function Button({ type, handleClick, rest }: ButtonProps) {
 ```
 
 **这段代码在做什么**
+
 - `type` 与原生 button 的 `type` 属性冲突。
 - `handleClick` 用 any，编辑器无法提示参数。
 - `rest` 作为一个 prop 传递，无法展开原生属性。
@@ -989,6 +1005,7 @@ function Input({ className, ...rest }: ComponentProps<'input'>) {
 ```
 
 **这段代码在做什么**
+
 - `ComponentProps<'button'>` 带来自 `onClick`、`disabled`、`type` 等原生属性。
 - `variant` 是联合类型，传错值会有类型错误。
 - `...rest` 把剩余属性交给原生 button。
@@ -1066,6 +1083,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 怎么借鉴到你的项目：先统一事件命名，再用 `ComponentProps` 替换手写 props 类型。
 
 **小结**
+
 - 命名一致、事件签名统一、类型可推导是 API 的三条底线。
 - `ComponentProps` 让组件继承原生属性并保留类型提示。
 - React 19 的 ref 用法需核对官方升级文档。
@@ -1121,6 +1139,7 @@ function SearchList({ data, loading }) {
 ```
 
 **这段代码在做什么**
+
 - 只有加载与空两个分支。
 - 请求失败时 `data` 可能仍是空数组，显示“暂无数据”。
 - 没有向辅助技术播报状态变化。
@@ -1159,6 +1178,7 @@ function SearchList({ status, onRetry }: { status: Status; onRetry: () => void }
 ```
 
 **这段代码在做什么**
+
 - `Status` 是判别联合，每个分支携带自己的数据。
 - 加载与空状态用 `role="status"` 播报。
 - 错误状态用 `role="alert"` 并附带重试按钮。
@@ -1234,6 +1254,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 怎么借鉴到你的项目：把所有异步区域的状态从布尔值改成判别联合，并补上对应 role。
 
 **小结**
+
 - 三态要用显式状态机表达，避免用长度推断。
 - 可访问性需要语义化 HTML 与 ARIA 属性配合。
 - 错误状态必须提供可恢复操作，例如重试。
@@ -1292,6 +1313,7 @@ src/
 ```
 
 **这段代码在做什么**
+
 - 一个购物车功能分散在三个目录。
 - 改购物车要同时打开组件、Hook、类型目录。
 - 删除购物车功能需要跨目录清理。
@@ -1328,6 +1350,7 @@ export type { CartItem } from './types';
 ```
 
 **这段代码在做什么**
+
 - 购物车相关文件放在 `features/cart`。
 - `index.ts` 控制公开边界，外部只从入口导入。
 - `shared` 存放跨功能组件，依赖方向清晰。
@@ -1406,6 +1429,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 怎么借鉴到你的项目：先把一个高频改动的功能移入独立目录，并补上 index 入口。
 
 **小结**
+
 - 按功能共置，修改集中在一个目录。
 - 公开入口控制依赖方向，避免循环依赖。
 - 共享层只放跨功能复用的内容。
@@ -1428,6 +1452,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 目标：把一个 `type` 分支驱动的列表组件重构成组合优先的组件，并补齐三态与可访问性。
 
 步骤：
+
 1. 找一个现有列表组件，记录它支持的所有 `type` 或 `variant` 分支。
 2. 新建 `features/demo` 目录，放入 `List.tsx`、`useList.ts`、`types.ts`、`index.ts`。
 3. 把行内容改成 `renderItem`，把空状态改成 `empty` 元素 prop，把错误状态改成 `error` 元素 prop。
@@ -1436,6 +1461,7 @@ console.log('预期输出：两行断言信息，退出码 0');
 6. 写一个 Node 脚本，用 `node:assert` 检查四种状态渲染结果与公开入口导出。
 
 验收标准：
+
 - 新增一种行类型时只新增调用方文件，不改 `List.tsx`。
 - `Status` 联合类型在 TypeScript 中能提示未覆盖分支。
 - 加载中不会被显示为“暂无数据”。

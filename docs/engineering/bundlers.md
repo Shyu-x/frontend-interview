@@ -173,6 +173,7 @@ Benchmarks（官方）：
 ```
 
 **ESBuild 的限制**：
+
 - 不支持类型检查（需要 tsc --noEmit 配合）
 - 不支持装饰器旧语法（需 babel）
 - 不支持自定义 AST 转换（babel 的灵活性无法替代）

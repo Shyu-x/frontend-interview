@@ -19,6 +19,7 @@ CSS 输入 → PostCSS 解析器 → AST（抽象语法树） → 插件链 → 
 ```
 
 **常见插件：**
+
 - `autoprefixer`：自动添加浏览器前缀
 - `postcss-preset-env`：将现代 CSS 转换为兼容性更好的版本
 - `cssnano`：压缩优化 CSS
@@ -194,6 +195,7 @@ registerPaint('my-pattern', class {
 ```
 
 **Houdini 主要 API：**
+
 - **Paint API**：自定义背景、边框等绘制逻辑
 - **Layout API**：自定义布局算法（如 masonry）
 - **Animation Worklet**：与主线程分离的高性能动画

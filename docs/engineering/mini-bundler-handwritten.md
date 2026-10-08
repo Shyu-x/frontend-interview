@@ -828,6 +828,7 @@ document.querySelector('#open-table').addEventListener('click', async () => {
 **怎么度量收益**：用 webpack-bundle-analyzer 看入口 chunk 的 parsed size；用 Chrome DevTools 的 Network 面板数首屏请求数与传输字节；用 PerformanceObserver 采集 `largest-contentful-paint`，取改动前后各十次的中位数。
 
 **什么时候不该用**：
+
 - 表格是页面唯一内容，用户进来必然展开，动态 import 只多一次请求往返。
 - 内网带宽充足且设备为桌面机，首屏指标不敏感，改动前后测不出差异。
 - 表格数据要参与服务端渲染，延迟加载会让水合内容与 DOM 不一致。
@@ -859,6 +860,7 @@ console.log(formatDate(Date.now()))
 **怎么度量收益**：用 webpack 的 stats.json 看 `usedExports` 标记结果；用 Chrome DevTools 的 Coverage 面板看脚本未使用字节占比；在固定机型上看 Performance 面板的 `scripting` 与 `total blocking time`，重复十次取中位数。
 
 **什么时候不该用**：
+
 - 库在加载时注册全局 polyfill 或注入样式，删掉未引用模块会直接改变运行行为。
 - 代码大量使用 `require` 加变量拼路径，静态分析拿不到引用集合，开启后产物不变。
 - 以 CJS 为发布产物且下游用 `require` 消费，标记出的未使用导出仍会留在文件里。
@@ -896,6 +898,7 @@ function loadChunk(id) {
 **怎么度量收益**：用 webpack-bundle-analyzer 看各 chunk 的 parsed size 与共享依赖；用 Network 面板按 chunk 名筛选，确认重复点击不重复下载；用 `performance.getEntriesByType('resource')` 统计 chunk 请求耗时分布。
 
 **什么时候不该用**：
+
 - 回放数据在页面加载后立刻用于渲染缩略图，拆出去只多一次请求。
 - 协同引擎与画布互相调用频繁，跨 chunk 调用开销超过拆分省下的下载量。
 - 用户网络无法稳定完成第二次请求，多 chunk 会放大失败面，不如单包一次到位。
@@ -924,6 +927,7 @@ Node.js 条件导出 `exports` 字段（出处：Node.js 官方文档）。该�
 **目标**：写一个能解析 ESM 静态导入、标记未使用导出、输出带 source map 产物的小打包器，并用它构建一个四文件页面。
 
 **步骤**：
+
 1. 准备入口与三个模块：入口引用两个导出，第三个导出无人引用，其中一个模块含顶层 `console.log`。
 2. 从入口递归解析 import 语句，产出模块图，节点记录文件路径、源码与静态依赖列表。
 3. 从入口遍历模块图，收集被引用的导出名，写入每个模块的 usedExports 集合。
@@ -933,6 +937,7 @@ Node.js 条件导出 `exports` 字段（出处：Node.js 官方文档）。该�
 7. 在 DevTools 的 Sources 面板打断点，确认能定位回原文件。
 
 **验收标准**：
+
 - 产物在浏览器控制台打印出入口引用的两个导出值，未引用导出的符号名在产物里搜不到。
 - 含顶层 `console.log` 的模块被标记为有副作用，函数体保留在产物中。
 - 同一构建里重复要求同一个模块 id，工厂函数只执行一次。

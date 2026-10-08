@@ -30,6 +30,7 @@ function MyComponent() {
 | Hook 3 | effect: fn |
 
 **为什么不能用条件语句包裹 Hook：**
+
 - 第一次渲染：Hooks 按顺序串联成链表
 - 第二次渲染：Hooks 按相同顺序被读取，顺序被打乱会导致 state 错位
 
@@ -197,6 +198,7 @@ function App() {
 | 6 | 按 capturing → target → bubbling 顺序执行 |
 
 **为什么用合成事件：**
+
 1. 跨浏览器兼容（IE/Firefox/Chrome 行为一致）
 2. 事件委托（减少绑定数量）
 3. 对象池复用（减少 GC 压力）
@@ -412,6 +414,7 @@ function Screen({ userId }) {
 目标是做一个万行筛选列表的小页面，把输入回显和列表渲染分开，并用 Profiler 量化前后差异。
 
 步骤：
+
 1. 用确定性随机种子生成 10000 行假数据，字段包含 id、name、status。
 2. 写第一版：受控 input 加每次输入直接 filter，记录一次交互的提交情况。
 3. 用 React DevTools Profiler 录制"输入 5 个字符"的交互，存下 commit 次数与最长 commit 耗时。
@@ -421,6 +424,7 @@ function Screen({ userId }) {
 7. 在 README 里写清复现命令、两份记录的数值和结论。
 
 验收标准：
+
 - 列表重算期间输入框仍能逐字符回显，不丢字符。
 - 同机同浏览器同数据下，第二版的最长 commit 耗时低于第一版。
 - DOM 中的行数不超过可视行数加 overscan 上限。

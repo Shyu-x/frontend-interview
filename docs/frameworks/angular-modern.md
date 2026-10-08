@@ -115,6 +115,7 @@ export class CounterComponent {
 ```
 
 **这段代码在做什么**
+
 - `standalone: true` 告诉编译器：这个组件自己去解析模板依赖，不查 NgModule。
 - `imports: [LikeButton]` 是给模板用的清单，与文件顶部的 TypeScript import 语句是两件事。
 - `selector` 是模板里出现的标签名，也是别的组件 import 它之后的引用方式。
@@ -135,6 +136,7 @@ bootstrapApplication(CounterComponent, {
 ```
 
 **这段代码在做什么**
+
 - `bootstrapApplication` 的第一个参数是根组件类，不需要先建 NgModule。
 - 第二个参数是 `ApplicationConfig`，它的 `providers` 数组承担原来 `AppModule.providers` 的角色。
 - `provideRouter` 返回一组路由相关的提供者，路由表作为参数传进去。
@@ -155,6 +157,7 @@ export const appRoutes = [
 ```
 
 **这段代码在做什么**
+
 - `loadComponent` 接收一个返回 Promise 的函数，Promise 解析出组件类。
 - `import()` 是动态导入，打包器会把它切成独立的 chunk。
 - 独立组件不需要 `loadChildren` 那种"先加载模块再加载组件"的两级结构。
@@ -241,6 +244,7 @@ Counter 模板用到的标签: [ 'app-like', 'span' ]
 | 启动时提示找不到 `bootstrapApplication` | 导入路径写错 | 从 `@angular/platform-browser` 导入；需核对官方文档：当前主版本该函数的导出包名 |
 
 **小结**
+
 - 独立组件把模板依赖放在组件自己的 `imports`，删掉了 NgModule 这一层声明。
 - 应用级依赖落到 `bootstrapApplication` 的 `providers`，路由级惰性用 `loadComponent`。
 - 漏写 `imports` 是编译期或启动期错误，不会静默降级成空标签。
@@ -300,6 +304,7 @@ export class CartService {
 ```
 
 **这段代码在做什么**
+
 - `providedIn: 'root'` 让这行代码同时完成"定义类"和"登记提供者"两件事。
 - 没有 `providedIn` 的类不能被 `inject`，除非有人在某个 `providers` 里登记。
 - `CartService` 在根层只有一个实例，任何组件拿到的都是同一个对象。
@@ -323,6 +328,7 @@ export class DraftCartComponent {
 ```
 
 **这段代码在做什么**
+
 - `providers: [CartService]` 把 `CartService` 登记在组件的 ElementInjector 上。
 - 这个组件以及它模板里的子组件，`inject(CartService)` 都命中这一层。
 - 组件销毁时，这一层登记的实例一起释放。
@@ -343,6 +349,7 @@ export class OrderApi {
 ```
 
 **这段代码在做什么**
+
 - `InjectionToken` 的泛型决定取出值的类型，构造参数只是一段描述文本。
 - 令牌是查找键，接口地址、数字开关这类没有类身份的值都要靠它。
 - 登记时写成 `{ provide: API_BASE, useValue: '/api' }`，放在哪个注入器就作用到哪一层。
@@ -416,6 +423,7 @@ skipSelf 拿到 Logger: root-logger
 | 在 `setTimeout` 回调里调 `inject` 报错 | 调用时已经离开注入上下文 | 把 `inject` 移回字段初始化器或构造函数体 |
 
 **小结**
+
 - 查找路径是"本层注入器到根"，第一个命中者胜出，组件级 `providers` 覆盖根级。
 - 没有类身份的值要包成 `InjectionToken`，令牌就是查找键。
 - `optional` 决定找不到时返回 `undefined` 还是抛错，不要用它掩盖拼错的令牌。
@@ -477,6 +485,7 @@ export class ZoneDemoComponent {
 ```
 
 **这段代码在做什么**
+
 - 普通字段 `count` 没有版本信息，Angular 只能靠整轮检查发现它变了。
 - `setTimeout` 被 Zone.js 打了补丁，回调结束时通知 Angular 跑一轮检查。
 - 界面会更新，代价是这一轮要把可达组件树的绑定读一遍。
@@ -502,6 +511,7 @@ export class SignalDemoComponent {
 ```
 
 **这段代码在做什么**
+
 - `changeDetection: OnPush` 让这个组件默认被跳过，除非它被标记。
 - 模板里 `count()` 读取信号时，Angular 把这个视图登记成信号的消费者。
 - `count.set(5)` 把该视图标记为脏，下一轮检查才会走到它。
@@ -520,6 +530,7 @@ bootstrapApplication(AppComponent, {
 ```
 
 **这段代码在做什么**
+
 - 无 Zone 模式靠信号、`markForCheck` 与模板事件来触发检查。
 - 这个提供者替换掉 Zone.js 的补丁层，`polyfills` 里也不再需要 `zone.js`。
 - 名字带 `Experimental` 的 API 会随版本改名，升级前需核对官方文档：当前主版本无 Zone 提供者的准确函数名。
@@ -606,6 +617,7 @@ counter 读了 2 次，header 读了 1 次
 | `inject` 写进 `setTimeout` 回调报错 | 调用时已经离开注入上下文 | 把 `inject` 移回字段初始化器或构造函数体 |
 
 **小结**
+
 - 变更检测是"读绑定、比值、写 DOM"，触发源决定这一轮走多少节点。
 - 信号把触发源精确到某个视图，`OnPush` 让没被标记的分支整段跳过。
 - 无 Zone 模式不是自动生效的开关，旧代码里的普通字段要一起迁移。
@@ -665,6 +677,7 @@ console.log(qty());              // 3
 ```
 
 **这段代码在做什么**
+
 - `signal(initial)` 返回一个可调用对象，调用即读值。
 - `set(next)` 用新值整体替换旧值。
 - `update(fn)` 接收一个函数，参数是当前值，返回值是新值。
@@ -696,6 +709,7 @@ console.log(total(), runs);        // 再读时才重算
 ```
 
 **这段代码在做什么**
+
 - `computed` 的函数体只描述"怎么算"，什么时候算由读取决定。
 - 第一次读取执行函数体，结果写入缓存。
 - 依赖没变时后续读取直接返回缓存，`runs` 不增加。
@@ -727,6 +741,7 @@ count.set(1);      // 依赖变化，effect 再跑一次，旧定时器被清掉
 ```
 
 **这段代码在做什么**
+
 - `effect` 的函数体在创建后立刻执行一次，用来建立依赖。
 - 函数体里读到的信号成为它的依赖，`count` 变化时它被重新调度。
 - `onCleanup` 注册的函数在下次执行前与销毁时各调用一次。
@@ -839,6 +854,7 @@ effect 观察到的值: [ 60, 90 ]
 | effect 反复触发停不下来 | 在 `effect` 里写了它自己依赖的信号 | 把写信号的动作放到事件处理函数里 |
 
 **小结**
+
 - `signal` 是唯一写入口，`computed` 只读且缓存，`effect` 做动作。
 - `computed` 的重算由读取驱动，不是由 `set` 驱动。
 - `effect` 的清理函数在重跑前调用一次，定时器与订阅都要在这里回收。
@@ -896,6 +912,7 @@ sequenceDiagram
 ```
 
 **这段代码在做什么**
+
 - `@if` 里的表达式每轮变更检测都会读一次，读信号时自动登记依赖。
 - `@else if` 可以连写多个，最后一个 `@else` 兜底。
 - 旧写法 `*ngIf` 需要同时引入 `NgIf` 指令，新语法不引入任何指令。
@@ -912,6 +929,7 @@ sequenceDiagram
 ```
 
 **这段代码在做什么**
+
 - `track row.id` 让每行的键等于该行数据的 `id`。
 - 键相同的旧视图被复用，只重新计算绑定值。
 - `@empty` 块在数组长度为 0 时渲染，替代旧写法里额外的 `*ngIf`。
@@ -939,6 +957,7 @@ sequenceDiagram
 ```
 
 **这段代码在做什么**
+
 - `@switch` 按值做全等比较，走第一个匹配的 `@case`。
 - `@default` 是可选的兜底分支。
 - `@defer` 把块内代码切成分包，`on viewport` 表示进入视口后才下载与渲染。
@@ -1012,6 +1031,7 @@ console.log('按下标 track 后，键 0 的视图记录的还是 id:', indexRes
 | 首次渲染报 `Cannot read properties of undefined` | 表达式在数据到达前就访问了字段 | 先用 `@if` 包住，或把信号初值写成空数组 |
 
 **小结**
+
 - `@if`、`@for`、`@switch` 不需要引入指令，写法和普通语句接近。
 - `track` 决定复用粒度，选主键而不是位置，能保住滚动位置与组件内部状态。
 - `@empty` 与 `@defer` 分别处理空列表与延迟渲染，这两个块都要写上占位内容。
@@ -1080,6 +1100,7 @@ export class OrdersComponent {
 ```
 
 **这段代码在做什么**
+
 - `inject(HttpClient)` 从注入器取客户端，前提是应用里提供了 `provideHttpClient`。
 - `toSignal` 必须在有注入上下文的位置调用，字段初始化器满足条件。
 - `initialValue: []` 让信号在读到时立刻是数组，模板里不用判空。
@@ -1113,6 +1134,7 @@ export class SearchComponent {
 ```
 
 **这段代码在做什么**
+
 - `toObservable(this.term)` 把信号变化转成流，同样需要在注入上下文里创建。
 - `debounceTime(300)` 是时间轴上的合并规则，属于 RxJS 的职责。
 - `switchMap` 在新值到来时取消上一个内层订阅，这是信号给不了的语义。
@@ -1139,6 +1161,7 @@ export class TickerComponent {
 ```
 
 **这段代码在做什么**
+
 - `DestroyRef` 由注入器提供，代表当前组件或指令的销毁点。
 - `takeUntilDestroyed(this.destroyRef)` 在销毁信号发出时取消上游订阅。
 - 与 `toSignal` 相比，这条路径多了一处手动订阅，取消时机仍然自动。
@@ -1237,6 +1260,7 @@ console.log('被取消的在途请求数:', canceled);
 | `toSignal` 报注入上下文错误 | 在组件构造之外调用 | 移到字段初始化器或构造函数体内 |
 
 **小结**
+
 - 模板层优先用信号，时间轴上的合并、去抖、取消留在 RxJS。
 - 两个方向的转换各只做一次：`toObservable` 进入流，`toSignal` 回到模板。
 - 不得不手写订阅时，用 `takeUntilDestroyed` 或 `DestroyRef` 把取消时机钉死。

@@ -75,6 +75,7 @@ async function runEval(agent, task) {
 ```
 
 **这段代码在做什么**
+
 - `tasks` 是固定任务集，每条任务带一个预期工具名。
 - `runEval` 调用 Agent，保留整条轨迹 `trace`。
 - `scoreTask` 是计分函数，返回一个数字或布尔值。
@@ -189,6 +190,7 @@ function sampleTasks(logs, sizePerLayer) {
 ```
 
 **这段代码在做什么**
+
 - `byTool` 把日志按 `toolType` 分组。
 - `sizePerLayer` 控制每层抽取数量。
 - 使用 `slice` 做简单抽样，生产环境可换成随机抽样。
@@ -314,6 +316,7 @@ function runDeterministic(task, trace) {
 ```
 
 **这段代码在做什么**
+
 - `assertTools` 把工具调用列表转成 Set，检查每个预期工具是否被调用。
 - `assertEntities` 检查答案文本中是否包含每个关键实体。
 - `runDeterministic` 返回每个检查项的独立通过状态。
@@ -436,6 +439,7 @@ function parseJudgeOutput(raw) {
 ```
 
 **这段代码在做什么**
+
 - `buildJudgePrompt` 生成评分 prompt，维度固定为三个，要求输出 JSON。
 - 三个维度借鉴了 Anthropic 在实际评测中使用的维度（来源：Anthropic 研究系统文章，以原文为准）。
 - `parseJudgeOutput` 对每个维度做 0-1 范围检查。
@@ -554,6 +558,7 @@ function assertTrajectory(trace, expected) {
 ```
 
 **这段代码在做什么**
+
 - `extractMetrics` 只取工具调用步，统计步数和 token 总数。
 - `toolSequence` 输出工具名序列，便于与预期比较。
 - `assertTrajectory` 中工具序列用精确匹配，适合固定流程任务。
@@ -669,6 +674,7 @@ function isNotRegression(newMetrics, baseline, tolerance = 0.05) {
 ```
 
 **这段代码在做什么**
+
 - `tolerance` 控制容忍度，避免小波动触发误报。
 - 分数允许下降 5% 以内，步数和成本允许上升 5% 以内。
 - 三个指标独立判断，方便定位是哪个指标回退。
@@ -778,6 +784,7 @@ async function runWithFlakyCheck(runTask, maxRetry = 3) {
 ```
 
 **这段代码在做什么**
+
 - 第一次运行失败后进入重试循环。
 - 任意一次重试成功，整体判定为 flaky。
 - 重试全部失败才判定为 fail。
@@ -888,6 +895,7 @@ function createReplayModel(trace) {
 ```
 
 **这段代码在做什么**
+
 - `createReplayModel` 接收一条预存轨迹。
 - 内部用 `index` 记录播放位置。
 - 每次调用返回下一个步骤，直到轨迹播完。
@@ -910,6 +918,7 @@ async function replayRegression(trace, expected) {
 ```
 
 **这段代码在做什么**
+
 - 循环调用回放器直到 `null`，收集所有步骤。
 - 统计工具调用数量，与预期数量比较。
 - 这种测试不产生 API 费用，可以放进 CI 快速运行。

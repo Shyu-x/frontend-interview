@@ -86,6 +86,7 @@ console.log(buildPromptWithTopK('为什么 token 会过期', docs));
 ```
 
 **这段代码在做什么**
+
 - `slice(0, 3)` 写死了返回数量，模型不能要求“只要 token refresh”。
 - 查询文本就是用户原问题，没有根据检索反馈改写。
 - 结果直接进入提示词，模型无法决定是否需要这些内容。
@@ -115,6 +116,7 @@ console.log(searchCode('不存在的查询'));   // 返回空数组
 ```
 
 **这段代码在做什么**
+
 - 模型可以指定查询词，例如 `token 过期 刷新`。
 - 返回空数组是一种反馈，不是报错，模型可以改写查询重试。
 - 工具没有固定执行次数，调用次数由外部循环决定。
@@ -215,6 +217,7 @@ console.log(listFiles('./src', 'auth.*\\.ts$'));
 ```
 
 **这段代码在做什么**
+
 - `pattern` 是模型生成的路径规则。
 - 只扫描一层目录，真实 glob 会递归子目录。
 - 运行结果取决于工作目录文件，可以为空数组或文件名列表。
@@ -238,6 +241,7 @@ console.log(grepFile('./src/auth.ts', 'ENOENT'));
 ```
 
 **这段代码在做什么**
+
 - `-n` 输出行号，方便后续读文件跳到该行。
 - 捕获子进程非零退出，空结果表示没有匹配。
 - 工具返回字符串数组，每个元素带行号与内容。
@@ -259,6 +263,7 @@ console.log(readLines('./src/auth.ts', 12));
 ```
 
 **这段代码在做什么**
+
 - `startLine` 来自 grep 的行号。
 - `context` 控制向上向下多读几行。
 - 返回原文件行，给模型准确上下文。
@@ -289,6 +294,7 @@ console.log(hits);
 ```
 
 **这段代码在做什么**
+
 - 用临时目录创建可控文件，断言 grep 精确命中第 2 行。
 - 使用 Node 内置 `node:child_process`，单文件可运行。
 - 运行结果：
@@ -383,6 +389,7 @@ console.log(searchSchema.name, searchSchema.inputSchema.required.join(','));
 ```
 
 **这段代码在做什么**
+
 - 描述明确说明“精确文本搜索”，引导模型不要传自然语言长句。
 - schema 只允许一个字符串参数 `query`。
 - `required` 防止调用时缺少必要参数。
@@ -408,6 +415,7 @@ console.log(executeSearch(index, { query: 'refresh' }));
 ```
 
 **这段代码在做什么**
+
 - `source` 数组保存每个命中的文件路径与行号。
 - 返回 `matched` 数量，模型可直接判断命中范围。
 - 没有命中时返回空数组与 `matched: 0`，不是抛异常。
@@ -430,6 +438,7 @@ console.log(validateInput({ query: /refresh/ })); // 传正则会被拒绝
 ```
 
 **这段代码在做什么**
+
 - 只检查 `query` 类型，不检查业务内容。
 - 错误信息是完整句子，便于模型修正下一次调用。
 - 运行结果：
@@ -458,6 +467,7 @@ console.log(result.source.join(','));
 ```
 
 **这段代码在做什么**
+
 - 断言校验错误能被识别，证明工具契约生效。
 - 断言来源包含文件路径与行号，证明输出可追溯。
 - 运行结果：
@@ -542,6 +552,7 @@ console.log(startState.steps, startState.answer);
 ```
 
 **这段代码在做什么**
+
 - `steps` 记录已调用工具次数。
 - `results` 保存每次检索得到的来源，后续回答要引用。
 - `answer` 为空表示还未得到结论。
@@ -565,6 +576,7 @@ console.log(next);                        // 继续查
 ```
 
 **这段代码在做什么**
+
 - 达到上限必须停止，这是硬性约束。
 - 结果非空就回答，这是本节的简化停止条件。
 - 真实系统会由模型判断“结果是否足够”，这里简化为确定规则。
@@ -595,6 +607,7 @@ console.log(runLoop(search, 'token 刷新'));
 ```
 
 **这段代码在做什么**
+
 - 每次循环增加 `steps`，上限为 `maxSteps`。
 - 每次搜索结果追加到 `results`，保留所有来源。
 - 停止条件是“有结果或达到上限”，真实循环还可加入“查询重复则改写”。
@@ -624,6 +637,7 @@ console.log('steps=', state.steps, 'results=', JSON.stringify(state.results));
 ```
 
 **这段代码在做什么**
+
 - 用断言确认循环在第 1 次检索后停止。
 - 用 `deepEqual` 确认结果带着 file 与 line。
 - 运行结果：
@@ -710,6 +724,7 @@ console.log(classify([], null));
 ```
 
 **这段代码在做什么**
+
 - 工具报错和空结果分开处理。
 - 空结果提示“改写查询”，工具报错提示“检查参数”。
 - 模型可依据 `hint` 选择下一步动作。
@@ -729,6 +744,7 @@ console.log(rewriteQuery('tokenRefresher'));
 ```
 
 **这段代码在做什么**
+
 - 只改变查询文本，不改动工具行为。
 - 这是确定的小改写，模型可以在此基础上加入同义词。
 - 运行结果：
@@ -755,6 +771,7 @@ console.log(searchWithRetry(search, 'tokenRefresher'));
 ```
 
 **这段代码在做什么**
+
 - `attempt` 上限是 3，避免无限改写。
 - 命中后立即返回命中数与尝试次数。
 - 空结果由 `rewriteQuery` 生成下一轮查询。
@@ -785,6 +802,7 @@ console.log('attempts=', result.attempts, 'hits=', result.hits.join(','));
 ```
 
 **这段代码在做什么**
+
 - 断言第一次未命中、第二次命中。
 - 证明改写能把驼峰查询转成能命中的文本。
 - 运行结果：
@@ -867,6 +885,7 @@ console.log(result);
 ```
 
 **这段代码在做什么**
+
 - `source` 是可直接核对的文件与行号。
 - `snippet` 是原文片段，模型可引用但不可改写。
 - 运行结果：
@@ -885,6 +904,7 @@ console.log(renderAnswer('配置在 auth.ts', ['src/auth.ts:9']));
 ```
 
 **这段代码在做什么**
+
 - 引用部分与正文分开，方便程序抽取。
 - 来源用 `[1]` 编号，回答正文中可对应标注。
 - 运行结果：
@@ -908,6 +928,7 @@ console.log(validateCitations(['src/loaders.ts:1'], ['src/auth.ts:9'])); // 返�
 ```
 
 **这段代码在做什么**
+
 - 用 `Set` 做存在性检查，来源数量少时足够。
 - 校验输出“哪些来源不被支持”，而不是直接给布尔值。
 - 运行结果：
@@ -933,6 +954,7 @@ console.log('有效引用校验通过，伪造引用=', fake.join(','));
 ```
 
 **这段代码在做什么**
+
 - 断言合法引用不会被误杀。
 - 断言不存在于检索结果的引用被识别出来。
 - 运行结果：
@@ -1020,6 +1042,7 @@ console.log(docs.map((d) => ({ id: d.id, score: cos(d.vec, query) })));
 ```
 
 **这段代码在做什么**
+
 - 计算查询与每个文档向量的余弦相似度。
 - 向量维度为演示固定为 3 维，生产使用 1024 或 1536 维。
 - 运行结果按得分排序可判断最近者是 `login`。
@@ -1041,6 +1064,7 @@ console.log(filterByCat(annCandidates, 'auth'));
 ```
 
 **这段代码在做什么**
+
 - 先模拟近似索引召回固定候选，再按 `cat` 过滤。
 - 过滤在候选之后执行，可能让结果少于预期。
 - 这就是 pgvector README 中 ANN 后过滤的召回陷阱。
@@ -1062,6 +1086,7 @@ console.log(chooseRoute({ hasSymbol: true, size: 5000, changeRate: 'high', query
 ```
 
 **这段代码在做什么**
+
 - `hasSymbol` 为真且不是自然语言查询，优先 grep。
 - 向量库规模用“约百万级”作为 pgvector 常见适用范围，来源是 pgvector README 与 Supabase 文档，以原文为准。
 - 变更频繁时外部索引容易失步，这是 Claude Code 转向 agentic search 的理由之一。
@@ -1090,6 +1115,7 @@ console.log(ranked.map((r) => `${r.id}:${r.score.toFixed(2)}`).join(' '));
 ```
 
 **这段代码在做什么**
+
 - 断言语义上更接近 `login` 的向量排第一。
 - 这是向量检索的最小可运行版本，生产需换 pgvector 或专用索引。
 - 运行结果：
@@ -1153,6 +1179,7 @@ login:0.99 mail:0.11
 目标：为本地 Markdown 知识库写一个最小 agentic 检索 CLI。
 
 步骤：
+
 1. 准备一个含 5 篇 Markdown 小文档的目录，每篇不超过 50 行。
 2. 实现三个工具：`list_markdown` 负责扫描目录，`grep_markdown` 在文件中按文本查找，`read_markdown` 读取指定行范围。
 3. 每个工具返回文件路径、匹配行号与原文片段。
@@ -1160,6 +1187,7 @@ login:0.99 mail:0.11
 5. 回答时打印引用来源，并用校验器确认引用存在于检索结果。
 
 验收标准：
+
 - 传入一个自然语言查询，程序能在不超过 5 步内找到对应 Markdown 并输出来源。
 - 来源路径与行号可用编辑器直接打开核对。
 - 检索空结果时程序会自动改写一次查询，而不是直接结束。

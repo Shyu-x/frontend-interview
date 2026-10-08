@@ -1524,6 +1524,7 @@ def pick_cut(msgs, keep_budget):  # 返回切点下标，右侧内容保留在�
 **怎么度量收益**：用 OpenTelemetry 的 `gen_ai.usage.input_tokens` 记录每轮输入 token 数，看压缩后该类会话的 p50 与 p95。再用 Prometheus 计数 `compress_triggered_total`，观察触发比例是否随对话长度线性上升。任务侧用固定工单用例集跑离线评测，统计"订单号是否被正确复述"的通过率。
 
 **什么时候不该用**：
+
 - 会话总长度稳定在窗口的三成以内，压缩只会增加一次摘要调用和一次信息损失。
 - 用户明确要求逐字回溯历史对话内容，摘要会破坏原文，此时应做落盘检索而不是压缩。
 
@@ -1555,6 +1556,7 @@ def shrink_tool_result(call_id, text, spill_dir):
 **怎么度量收益**：看单次排障任务的输入 token 总量与 tool call 轮次，指标名可用 `agent_tokens_in_total` 与 `agent_tool_calls_total`。同时统计"回读次数"，回读过多说明头尾保留长度不够。
 
 **什么时候不该用**：
+
 - 日志总量小于 `MAX_INLINE`，落盘只增加一次磁盘写和一次路径拼接。
 - 任务要求逐行核对日志，截断后模型看不到中间行，此时应把过滤交给 ripgrep，而不是交给摘要。
 
@@ -1587,6 +1589,7 @@ def rebuild(system, summary, recent_msgs):
 **怎么度量收益**：统计"跨分支串味"次数，做法是抽检回答里引用的决策是否属于当前分支，人工标注一批样本算比例。再看每次切分支后的首 token 延迟与输入 token 数，指标用 `gen_ai.usage.input_tokens`。
 
 **什么时候不该用**：
+
 - 分支之间共享全部前置信息，独立摘要只会让每个分支都缺上下文。
 - 会话轮次很少，直接重建整段历史比维护三份摘要开销低。
 
@@ -1622,6 +1625,7 @@ CLI 里提供手动触发压缩的命令，让用户在任务切换点主动清�
 **目标**：为一组模拟消息实现"估算 + 触发 + 切点 + 摘要重建"的完整链路，并用测试证明 tool call 与 tool result 始终落在同一侧。
 
 **步骤**：
+
 1. 定义消息结构，至少包含 `role`、`content`，工具消息额外带 `tool_call_id`。
 2. 实现 `estimate_tokens`，用中文、英文、中英混合三段文本写出断言。
 3. 实现 `should_compress`，用可控的 `window` 与 `reserve` 构造触发与不触发两组用例。
@@ -1631,6 +1635,7 @@ CLI 里提供手动触发压缩的命令，让用户在任务切换点主动清�
 7. 给三个函数写单元测试并接入 CI。
 
 **验收标准**：
+
 - `estimate_tokens` 对三段测试文本的返回值与手算结果一致。
 - `should_compress` 在边界值前后给出相反结果，`used + reserve == window` 时的行为有明确断言。
 - `pick_cut` 返回的下标右侧，不存在"只有 tool result 没有 tool call"的消息。

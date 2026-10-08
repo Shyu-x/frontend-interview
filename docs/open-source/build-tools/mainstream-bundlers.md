@@ -72,6 +72,7 @@ graph TB
 Vite（法语"快速"，发音 `/viːt/`）是新一代前端构建工具，由 Vue 作者尤雨溪发起，现已成为生态最活跃的前端工具之一。Vite 6.x 正式将 Rolldown 作为生产构建引擎，标志着全面 Rust 化时代的到来。
 
 **核心特性**：
+
 - 开发环境基于原生 ES Modules，热更新极快（HMR < 100ms）
 - 生产构建使用 Rolldown，输出高度优化的静态资源
 - 提供开箱即用的默认配置，支持插件扩展
@@ -190,6 +191,7 @@ flowchart TD
 ```
 
 **预构建的文件**：
+
 - `node_modules` 中的 ESM 依赖
 - 有大量内部模块的包
 - 使用不同导出格式的包（CJS/ESM 混合）
@@ -510,6 +512,7 @@ cd new-app && npm install
 Rollup 是 JavaScript 模块打包器，专注于 ES 模块优化和 Tree-shaking。它是现代打包器的重要灵感来源，Vite 和 WMR 都采纳了其插件 API。
 
 **核心特性**：
+
 - 基于深度执行路径分析的 Tree-shaking
 - 代码分割（通过动态 import）
 - 强大的插件系统（被 Vite 继承）
@@ -908,6 +911,7 @@ esbuild.build({
 Webpack 是最成熟的 JavaScript 模块打包器，v4+ 无需配置文件即可工作。它是业界事实标准，拥有庞大的插件生态。
 
 **核心特性**：
+
 - 静态模块打包器，从入口构建依赖图
 - 代码分割和延迟加载
 - 强大的 Loader 系统（预处理任何文件类型）
@@ -1359,6 +1363,7 @@ cp -r my-cra-app/src my-app/
 Parcel 是零配置打包工具，"Works out of the box"是其核心理念。它使用 Rust 编写的编译器，实现 10-100 倍于传统工具的性能。
 
 **核心特性**：
+
 - 零配置：开箱即用，支持 HTML、CSS、JavaScript、TypeScript、图片、Sass、SVG、Vue
 - 内置开发服务器（HTTPS 支持、API 代理）
 - 热更新保留应用状态（React Fast Refresh、Vue Hot Reloading）

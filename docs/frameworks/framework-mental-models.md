@@ -93,6 +93,7 @@ const vnode1 = { type: "div", props: { id: "app" }, children: [
 ```
 
 **这段代码在做什么**
+
 - vnode0 与 vnode1 分别表示点击前后的两份界面描述。
 - 字符串 "计数：0" 与 "计数：1" 是两个纯文本子节点。
 - 整棵树只有文本节点不同，button 与 div 完全一致。
@@ -121,6 +122,7 @@ console.log(diff(vnode0, vnode1)); // 只输出一个setText补丁
 ```
 
 **这段代码在做什么**
+
 - 递归函数 diff 接收新旧两个节点，返回补丁数组。
 - 遇到字符串节点时，只比较文本内容，不同才生成 setText 补丁。
 - 比较 div 和 button 时，它们的 type 相同，继续深入比较 children。
@@ -162,6 +164,7 @@ console.log("断言通过：只更新一个文本节点");
 ```
 
 **这段代码在做什么**
+
 - 定义点击前后的两棵虚拟 DOM 树。
 - 用 diff 函数递归比较，收集最小补丁。
 - assert.deepStrictEqual 验证补丁内容与手写预期一致。
@@ -183,6 +186,7 @@ console.log("断言通过：只更新一个文本节点");
 | 大列表首屏渲染慢 | 初始构建虚拟 DOM 树与 diff 有双重开销 | 使用分页或 IntersectionObserver 懒加载 |
 
 **小结**
+
 - React 是虚拟 DOM 代表，JS 先算出补丁再交浏览器。
 - 虚拟 DOM 省的是"直接操作 DOM 的成本"，但多出"生成树与 diff"的成本。
 - Svelte 与 Solid 走了不同路线，下面几节逐一对比。
@@ -237,6 +241,7 @@ function track(target, key) { // 记录依赖
 ```
 
 **这段代码在做什么**
+
 - activeEffect 表示当前运行的读取函数。
 - targetMap 按"目标对象"再按"属性 key"组织依赖。
 - deps 用 Set 存储依赖函数，同一个函数不会重复添加。
@@ -263,6 +268,7 @@ function reactive(obj) { // 返回Proxy包装后的对象
 ```
 
 **这段代码在做什么**
+
 - 包装原始对象，返回 Proxy 代理。
 - get 先调用 track 收集当前 activeEffect。
 - set 修改原始值后，从 targetMap 取出依赖并逐个执行。
@@ -313,6 +319,7 @@ console.log("断言通过：依赖count的函数执行3次，依赖name的函数
 ```
 
 **这段代码在做什么**
+
 - state 是被 Proxy 包装的响应式对象。
 - 两个 activeEffect 分别读取 count 与 name，各自被收集为依赖。
 - 修改 count 两次，只有读 count 的函数被重新执行。
@@ -337,6 +344,7 @@ console.log("断言通过：依赖count的函数执行3次，依赖name的函数
 | React 里直接改 state 对象不更新 | 没有调用 setState 触发重新渲染 | 用不可变更新方式并调用 setState |
 
 **小结**
+
 - React 是调度式状态，更新必须走 setState 或 useState。
 - Vue 依赖 Proxy 自动收集精确的组件依赖。
 - Solid 直接暴露信号，状态与视图绑定更细，下一节展开。
@@ -393,6 +401,7 @@ flowchart TB
 ```
 
 **这段代码在做什么**
+
 - Vue 用 `v-for` 指令描述循环，模板保持类似 HTML 的结构。
 - React 用 JS 的 map 方法描述循环，JSX 嵌入在 JS 表达式里。
 - 两者都要求给每个列表项提供唯一 key。
@@ -418,6 +427,7 @@ console.log(JSON.stringify(vtree, null, 2));
 ```
 
 **这段代码在做什么**
+
 - 用正则匹配模板里的每个 li 标签与文本内容。
 - 每个 li 转成一个对象节点，children 是文本数组。
 - 返回一个 ul 的对象节点，结构可供 dif f 使用。
@@ -466,6 +476,7 @@ console.log("断言通过：模板解析结构与手写结构一致");
 ```
 
 **这段代码在做什么**
+
 - parseTemplate 解析两个 li 标签。
 - expected 是手写虚拟 DOM 结构。
 - assert.deepStrictEqual 验证结构等价。
@@ -494,6 +505,7 @@ console.log("断言通过：模板解析结构与手写结构一致");
 | 模板与 JSX 里注释规律不同 | 两者语法规则独立 | 分别查各自语法规则 |
 
 **小结**
+
 - 模板语法允许编译器做静态分析，能产出更优更新策略。
 - JSX 与 JS 融合紧，学习成本单一但静态分析困难。
 - Svelte 模板把静态分析推向极致，下一节展开。
@@ -557,6 +569,7 @@ function checkChanges() { // 从根开始遍历所有绑定
 ```
 
 **这段代码在做什么**
+
 - bindings 数组模拟组件树内所有绑定表达式。
 - registerBinding 记录组件、取值函数与当前值。
 - checkChanges 遍历所有绑定，逐个求值并比较。
@@ -578,6 +591,7 @@ console.log("修改后检测：", checkChanges()); // 脏检查发现变化
 ```
 
 **这段代码在做什么**
+
 - Counter 类有一个 count 属性与 label 取值函数。
 - registerBinding 把 label 注册为绑定表达式。
 - 直接修改 count，没有显式通知。
@@ -635,6 +649,7 @@ console.log("断言通过：全树遍历后发现一个组件变化");
 ```
 
 **这段代码在做什么**
+
 - 注册 Counter 与 Header 两个组件的绑定。
 - 初始检测时无变化，返回空数组。
 - 直接修改 c.count，没有触发任何通知。
@@ -656,6 +671,7 @@ console.log("断言通过：全树遍历后发现一个组件变化");
 | 变化检测没有触发 | 事件发生在 Zone 之外 | 换用框架提供的 API 或手动触发检测 |
 
 **小结**
+
 - Angular 默认策略是全树遍历脏检查，事件由 Zone 触发。
 - React 与 Solid 是从状态出发定位组件，检测范围更小。
 - Angular 提供 OnPush 与信号等剪枝手段，缩小检测范围。
@@ -705,6 +721,7 @@ flowchart LR
 ```
 
 **这段代码在做什么**
+
 - `let count = 0` 声明可写状态。
 - `$: doubled = count * 2` 声明派生值，依赖 count。
 - 点击按钮时 count 加一，编译器提前生成的代码会更新 DOM。
@@ -728,6 +745,7 @@ function Counter() {
 ```
 
 **这段代码在做什么**
+
 - createSignal 返回一个 getter 与一个 setter。
 - doubled 是一个函数，每次调用才重算。
 - 模板里 count() 与 doubled() 被调用，Solid 收集依赖。
@@ -778,6 +796,7 @@ console.log("断言通过：只重新执行依赖count的effect");
 ```
 
 **这段代码在做什么**
+
 - createSignal 实现 getter 与 setter，订阅用 Set 存储。
 - createEffect 设置 activeEffect，让 getter 能收集依赖。
 - setCount(1) 只通知订阅过 count 的 effect。
@@ -801,6 +820,7 @@ effect读到count 1
 | 编译阶段报变量未声明 | 模板引用的变量在 script 里没声明 | 检查变量是否在组件作用域内 |
 
 **小结**
+
 - Svelte 在编译期生成精确更新代码，运行时更精简。
 - Solid 在运行时收集精确依赖，更新粒度同样是节点级。
 - React 选择通用 diff 在运行时求差异，三种策略各有取舍。
@@ -854,6 +874,7 @@ function Counter() {
 ```
 
 **这段代码在做什么**
+
 - useState(0) 声明了可触发渲染的状态。
 - setCount 更新状态，React 会重新渲染组件。
 - JSX 直接嵌入 count，重新渲染时替换新值。
@@ -876,6 +897,7 @@ const count = ref(0); // 响应式引用
 ```
 
 **这段代码在做什么**
+
 - ref(0) 创建一个响应式引用。
 - `count++` 是赋值操作，Proxy 拦截并通知。
 - 模板里 `{{ count }}` 自动读取值，建立依赖关系。
@@ -895,6 +917,7 @@ const count = ref(0); // 响应式引用
 ```
 
 **这段代码在做什么**
+
 - count 是普通变量，没有特殊包装。
 - 点击时执行 count 加一，编译器生成赋值后的 DOM 更新代码。
 - 模板里 `{count}` 被编译成精确的节点操作。
@@ -917,6 +940,7 @@ function Counter() {
 ```
 
 **这段代码在做什么**
+
 - createSignal 返回 getter 与 setter 两个函数。
 - `count()` 是读取，`setCount` 是写入。
 - 模板里 `count()` 调用建立了节点级依赖。
@@ -943,6 +967,7 @@ export class CounterComponent {
 ```
 
 **这段代码在做什么**
+
 - 组件用 Component 装饰器声明模板。
 - signal(0) 创建 Angular 的信号状态。
 - 模板里 `{{ count() }}` 调用 signal 读取值。
@@ -994,6 +1019,7 @@ console.log("断言通过：五种链路都得到计数：1");
 ```
 
 **这段代码在做什么**
+
 - target 代表页面上的文本节点。
 - 五个数组元素分别用最小实现表示五种更新策略。
 - 每次重置 target 后运行一种策略。
@@ -1020,6 +1046,7 @@ Angular脏检查更新后： 计数：1
 | Angular 信号模板不更新 | 版本或模块导入不对 | 检查 Angular 版本是否支持 signal，是否已导入 |
 
 **小结**
+
 - 五个框架的计数器代码都短，但更新路径完全不同。
 - React 与 Angular 更偏向框架调度，Svelte 与 Solid 更直接。
 - 理解这五段代码，你就掌握了五个框架的第一层心智模型。

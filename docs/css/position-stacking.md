@@ -48,6 +48,7 @@ position: sticky
 **z-index 生效条件**：`z-index` 只对**定位元素**（position 不为 static）有效。
 
 **Stacking Context 创建条件（满足任一）**：
+
 - 根元素 `<html>`
 - `position: relative/absolute` + `z-index` 不为 auto
 - `position: fixed / sticky`
@@ -296,6 +297,7 @@ body {
 | 继续滚动 | 当 sticky 随内容离开容器时，恢复文档流（不再固定） |
 
 **sticky 注意事项：**
+
 - 必须指定 `top/left/right/bottom` 中的一个
 - 父容器必须有明确的高度（不能是 `overflow: hidden` 裁剪了子元素）
 - 父容器不能是 `overflow: hidden/auto`，否则 sticky 无法超出

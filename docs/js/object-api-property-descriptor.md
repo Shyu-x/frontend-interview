@@ -956,6 +956,7 @@ const appConfig = shallowRef(config); // shallowRef 只跟踪 .value 替换，�
 **怎么度量收益**：用 Lighthouse 移动端配置看 Total Blocking Time 与 First Contentful Paint；用 Chrome DevTools Performance 录 5 秒启动，看 Scripting 时长与 Long Task 数量；用 performance.mark 与 performance.measure 包住启动，取 20 次的中位数。
 
 **什么时候不该用**：
+
 - 运行期设置页要改写配置项时，冻结后的写入在严格模式抛 TypeError。
 - 配置带 setter 且 setter 有副作用时，freeze 拦不住它执行。
 - 配置对象要交给会就地写入的第三方库时，先做可写副本。
@@ -990,6 +991,7 @@ function createBoard(initial, onCommit) {
 **怎么度量收益**：用 React DevTools Profiler 看 commit 时长与渲染组件数；用 Yjs 的 update 事件统计每次广播字节数；用 Chrome DevTools Performance 看 Long Task 计数与 INP 指标。
 
 **什么时候不该用**：
+
 - 需要审计"谁改了哪个字段"时，Proxy 的 set 只给新值，旧值要自己存。
 - 对象有几千个键时，每次写入都展开复制，开销随键数增长。
 - 状态本身是数字或字符串时，套 Proxy 拿不到额外信息。
@@ -1026,6 +1028,7 @@ Object.freeze(columns);
 **怎么度量收益**：用 Chrome DevTools Performance 的 Bottom-Up 视图按 Self Time 找 Object.keys 调用；用 React DevTools Profiler 看 commit 时长；看翻页交互的 INP 与 Long Task 数量。
 
 **什么时候不该用**：
+
 - 数据来自 JSON.parse 且键就是整数 ID 时，顺序由规范固定，改键名的改动面大于收益。
 - 列顺序由用户拖拽决定时，顺序属于业务数据，应存数组而不是靠对象键序。
 - 列数量只有个位数时，缓存带来的收益低于维护成本。
@@ -1062,6 +1065,7 @@ produce 用 Proxy 记录被写入的路径，只复制路径上的对象，其�
 **目标**：实现一个 todoStore，做到写入被拦截、未改动分支引用不变、非法重定义被拒绝。
 
 **步骤**：
+
 1. 用 Object.defineProperty 定义 store 的版本号属性，configurable 设 true，enumerable 设 false，打印 Reflect.ownKeys 看它出现在哪里。
 2. 用 Proxy 的 set 拦截写入，写入前用 Object.is 比较旧值，相同就跳过提交。
 3. 用写时复制生成新快照，把新快照交给订阅者回调。
@@ -1071,6 +1075,7 @@ produce 用 Proxy 记录被写入的路径，只复制路径上的对象，其�
 7. 写单测覆盖以上每一步，并在 CI 里跑。
 
 **验收标准**：
+
 - 对未改动分支做 `===` 比较返回 true。
 - 在冻结快照上写入，严格模式下抛 TypeError。
 - 同一 tick 内重复提交相同值，订阅者只被调用一次。

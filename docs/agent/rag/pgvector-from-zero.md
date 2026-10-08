@@ -1227,6 +1227,7 @@ await client.end();
 目标：构建一个最小可运行的语义搜索服务，包含建表、写入、查询和验证。
 
 步骤：
+
 1. 本地启动 PostgreSQL，创建一个新数据库 `semantic_demo`。
 2. 在新数据库执行 `CREATE EXTENSION vector;` 并核对版本。
 3. 用 Node 脚本建表 `docs`，列包含 `id`、`content`、`embedding vector(3)`。
@@ -1236,6 +1237,7 @@ await client.end();
 7. 故意写入一条 2 维向量，捕获并打印错误信息。
 
 验收标准：
+
 - 脚本能一次性运行完成，输出版本号、写入行数、精确检索结果、HNSW 检索结果。
 - 精确检索和 HNSW 检索的前 2 条结果一致。
 - 维度错误被捕获且错误信息包含 `expected` 字样。

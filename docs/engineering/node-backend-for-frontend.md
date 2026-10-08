@@ -1808,6 +1808,7 @@ app.post('/exports', async (req, res) => {
 **怎么度量收益**：用 k6 压 `POST /exports`，看 p95 与 p99 响应时间；用 BullMQ 的等待任务数与任务完成时长观察积压；用 OpenTelemetry 把入队和 worker 各打一个 span，看两段耗时占比。
 
 **什么时候不该用**：
+
 - 导出结果必须锁定请求时刻的数据版本，队列重试会读到新写入的行。
 - 团队没有 worker 部署环境，也没有死信队列监控，失败任务会静默消失。
 
@@ -1844,6 +1845,7 @@ async function getFeed(userId) {                     // 读路径统一入口
 **怎么度量收益**：前端用 Lighthouse 看 LCP 与 TTFB，用 Performance 面板看接口耗时；服务端用 Redis `INFO stats` 里的 `keyspace_hits` 与 `keyspace_misses` 算命中率；用 OpenTelemetry 的 span 时长区分缓存耗时与数据库耗时。
 
 **什么时候不该用**：
+
 - 数据要求强一致，例如余额与库存扣减结果，过期窗口会返回旧值。
 - 用户维度的键数量远超内存容量，且每个键只被访问一次，缓存只多一次网络往返。
 
@@ -1883,6 +1885,7 @@ queue.process('board-op', 200, async (jobs) => {   // 一次取 200 条任务
 **怎么度量收益**：用 `pg_stat_statements` 看 update 的 `calls` 与 `mean_exec_time`；用 `EXPLAIN ANALYZE` 检查是否走主键索引；用队列积压数看消费是否跟得上生产。
 
 **什么时候不该用**：
+
 - 单房间并发低于几十次每秒且连接池有余量时，批处理只增加端到端延迟。
 - 事件需要毫秒级可查，例如审计留痕要立刻可见，队列会引入等待。
 
@@ -1913,6 +1916,7 @@ Cache-Aside 模式（出处：Microsoft Azure 架构中心 Cloud Design Patterns
 **目标**：做一个带缓存与异步导出的订单查询服务，用 Node 20 内置模块起服务，数据存关系型数据库，缓存用 Redis。
 
 **步骤**：
+
 1. 建 `orders` 表，插入 10 万行测试数据，字段含 `tenant_id`、`status`、`created_at`。
 2. 建复合索引 `(tenant_id, status, created_at)`，用 `EXPLAIN` 记录带最左列和不带最左列的执行计划。
 3. 用 `node:http` 实现 `GET /orders`，解析路径与查询参数，按租户和状态分页。
@@ -1922,6 +1926,7 @@ Cache-Aside 模式（出处：Microsoft Azure 架构中心 Cloud Design Patterns
 7. 用 k6 打这两个接口，保存报告与 Redis `INFO stats` 输出。
 
 **验收标准**：
+
 - `EXPLAIN` 输出显示带最左列的查询命中复合索引，不带的走全表扫描。
 - 缓存命中时单条详情接口不产生数据库查询，可从数据库日志确认。
 - `POST /exports` 在 10 万行数据下 p99 低于网关超时阈值。

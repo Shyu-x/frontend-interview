@@ -307,6 +307,7 @@ render('table-skeleton');
 **怎么度量收益**：用 Chrome DevTools Performance 面板取 LCP、FCP、TBT；用 Coverage 面板看主包 JS 的未使用比例；用 webpack-bundle-analyzer 对比拆分前后的 chunk 体积；Lighthouse 桌面与移动预设各跑一轮。
 
 **什么时候不该用**：
+
 - 该页首屏唯一内容就是表格，用户进来只看表，拆出去的模块必然立刻加载，白白多一次请求。
 - 首屏就要同步调用导出 API（脚本化批量任务），异步模块拿不到同步返回值。
 - 内网环境带宽充裕且包体本来就小，拆包带来的请求开销会盖过收益。
@@ -339,6 +340,7 @@ if (navigator.connection?.effectiveType !== '2g') prefetchProfile();
 **怎么度量收益**：Lighthouse 移动预设取的 FCP、LCP、TBT；用 web-vitals 库把 LCP、CLS、INP 上报到自有端点；用 performance.getEntriesByType('navigation') 取 responseEnd 到 domContentLoaded 的差值做自定义打点。
 
 **什么时候不该用**：
+
 - 页面本身就是单屏、只有一处交互，拆出来的 chunk 都要加载，等于多一次往返。
 - 离线首屏是硬需求（Service Worker 预缓存全部资源），拆包与全量预缓存的目标冲突，要先定策略。
 - 首屏文案随语言变化且不能闪，此时按 locale 切包会引入二次渲染，应先内联默认语言文案。
@@ -374,6 +376,7 @@ window.exportBoard = () => import('./exporter').then((m) => m.run(board));
 **怎么度量收益**：用 performance.mark 与 performance.measure 打点"进入路由到画布可绘制"；Performance 面板统计长任务条数与总阻塞时间；在房间内用 performance.now() 差值测量一次本地操作到远端可见的往返时长。
 
 **什么时候不该用**：
+
 - 业务要求进房间立刻恢复上一位用户留下的识别结果，识别模块属于关键路径，不能拆。
 - 验收流程固定为"先导出再编辑"，导出变成第一步，异步加载会让流程变成两段等待。
 - 白板是离线可用的单机工具，没有 socket 事件可挂，得换用可见性或空闲回调触发。
@@ -414,6 +417,7 @@ webpackPrefetch 让浏览器在空闲时下载，webpackPreload 与父 chunk 并
 **目标**：给一个已有的单页应用（或教程示例仓库）完成首屏分割，并用自己测出的数据说明改动效果。
 
 **步骤**：
+
 1. 用 webpack-bundle-analyzer 或构建产物体积报告，记录当前主包与首屏路由 chunk 的体积。
 2. 打开 Performance 面板，用 Slow 4G 加 4 倍 CPU 降速录制首屏，导出 LCP、FCP、TBT 三个指标。
 3. 把首屏之外的路由改成动态 import()，给每个 chunk 写可读命名（webpackChunkName 或构建工具等价写法）。
@@ -423,6 +427,7 @@ webpackPrefetch 让浏览器在空闲时下载，webpackPreload 与父 chunk 并
 7. 写一份 README，说明拆分边界、触发时机、测量方法与结论。
 
 **验收标准**：
+
 - 产物报告能列出每个 chunk 的体积与触发时机，主包与首屏 chunk 有前后对比。
 - 性能录制在相同降速与网络条件下各做三次，记录表含原始数值。
 - 代码里每个动态 import 都有一行中文注释写明触发条件。

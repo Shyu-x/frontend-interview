@@ -68,6 +68,7 @@ sequenceDiagram
 ```
 
 解读：  
+
 1. 调用方把用户消息和系统提示发给模型。  
 2. 模型没有直接给最终答案，而是返回一个工具调用。  
 3. 调用方识别工具调用，并交给工具执行器。  
@@ -105,6 +106,7 @@ console.log(fakeAssistant.toolCalls.length);
 ```
 
 **这段代码在做什么**  
+
 - 定义 ToolCall，给每个工具调用一个 id、name 和参数对象。  
 - 定义 AssistantMessage，让模型既能返回文字，也能携带工具调用。  
 - fakeAssistant 的 content 是空字符串，代表模型没有最终答案。  
@@ -134,6 +136,7 @@ console.log(messages.length);
 ```
 
 **这段代码在做什么**  
+
 - 设置 hasToolCalls，表示当前是否还需要继续执行工具。  
 - 进入 while 后，把模型消息加入历史。  
 - 用工具调用数量决定是否继续。  
@@ -163,6 +166,7 @@ console.log("single-call-ok");
 ```
 
 **这段代码在做什么**  
+
 - 用 node:assert 检查假助手消息没有最终文字。  
 - 检查工具调用名称是 read_file。  
 - 断言通过则打印 single-call-ok。  
@@ -205,6 +209,7 @@ pi-agent-core 的 Agent 类把 `message_end` 作为屏障，必须先处理完�
 怎么借鉴到你的项目：真实异步系统里要保证“助手消息已经落盘”再执行工具，避免后续 hook 读到旧状态。
 
 **小结**  
+
 1. 单次调用只到模型输出工具调用为止，不会自动执行。  
 2. agent loop 的核心是把执行结果送回消息历史。  
 3. 只靠 while 和工具调用数量还不够，必须补停止条件。
@@ -238,6 +243,7 @@ flowchart TD
 ```
 
 解读：  
+
 1. 每轮都从当前消息历史出发。  
 2. 请求模型后得到助手消息。  
 3. 检查助手消息中的工具调用数量。  
@@ -268,6 +274,7 @@ console.log(toolCallCount > 0);
 ```
 
 **这段代码在做什么**  
+
 - 定义 ToolResultMessage，它以后会用来回灌工具执行结果。  
 - runLoopOnce 暂时只返回本轮假助手消息的工具调用数量。  
 - 打印 toolCallCount 是否大于 0，结果是 true。  
@@ -300,6 +307,7 @@ console.log(history.at(-1)?.role);
 ```
 
 **这段代码在做什么**  
+
 - 用 history 模拟一次用户请求后得到的对话历史。  
 - 创建一条 toolResult 消息，内容来自 glob 工具的假设输出。  
 - 用 push 把它追加到历史末尾。  
@@ -346,6 +354,7 @@ console.log("append-tool-result-ok");
 ```
 
 **这段代码在做什么**  
+
 - 创建用户起点消息。  
 - 创建工具结果，toolCallId 与假 glob 调用对应。  
 - 追加后断言消息长度是 2。  
@@ -388,6 +397,7 @@ pi-agent-core 的 `convertToLlm` 消息流是 `AgentMessage[] → convertToLlm()
 怎么借鉴到你的项目：历史里可以有 UI 专用消息，但发给模型前要过滤。
 
 **小结**  
+
 1. 循环继续条件是“当前助手消息里有工具调用”。  
 2. 工具结果必须带 toolCallId，并回灌到对话历史末尾。  
 3. 模型请求必须包含 user、assistant、toolResult 三类消息。
@@ -428,6 +438,7 @@ stateDiagram-v2
 ```
 
 解读：  
+
 1. 状态从等待模型开始。  
 2. 模型返回工具调用，进入执行工具状态。  
 3. 执行完成后回灌结果，再回到等待模型。  
@@ -451,6 +462,7 @@ for (const call of [{ name: "glob" }, { name: "read" }, { name: "grep" }]) {
 ```
 
 **这段代码在做什么**  
+
 - LoopOptions 里放入 maxToolRounds，作为本轮会话的上限。  
 - executedToolRounds 从 0 开始，每执行一个工具调用就加 1。  
 - 用 for 模拟三轮工具调用。  
@@ -484,6 +496,7 @@ console.log(rounds);
 ```
 
 **这段代码在做什么**  
+
 - hasToolCalls 由循环内逻辑更新，这里用假值模拟。  
 - while 条件同时检查 hasToolCalls 和 rounds 上限。  
 - rounds 每轮加 1，防止无界执行。  
@@ -526,6 +539,7 @@ console.log("max-rounds-ok");
 ```
 
 **这段代码在做什么**  
+
 - 循环内永远把 hasToolCalls 设为 true，模拟不肯停的模型。  
 - while 条件中的 rounds 上限拦下第 5 轮。  
 - 超限后抛错，包含具体最大轮数。  
@@ -569,6 +583,7 @@ pi-agent-core 的 finishTurn 可返回 `{ action: "end" }` 立即结束 run。
 怎么借鉴到你的项目：如果有业务侧终止信号，应挂在 finishTurn 而不是只依赖工具轮数。
 
 **小结**  
+
 1. 最大轮数保护要放进 while 条件，而不是只放在事后判断。  
 2. 超限后的错误信息要包含实际轮数。  
 3. 模型输出被 token 截断时，应停止执行不完整的工具调用。
@@ -603,6 +618,7 @@ sequenceDiagram
 ```
 
 解读：  
+
 1. 模型请求读取 bad.txt。  
 2. 主循环把请求交给 read_file。  
 3. read_file 抛出文件不存在错误。  
@@ -629,6 +645,7 @@ readFileUnsafe("bad.txt").catch((error) => {
 ```
 
 **这段代码在做什么**  
+
 - 定义 readFileUnsafe，bad.txt 时直接抛错误。  
 - 正常路径返回固定内容。  
 - 调用 bad.txt 并用 catch 捕获。  
@@ -666,6 +683,7 @@ console.log(result.content.includes("ENOENT"));
 ```
 
 **这段代码在做什么**  
+
 - executeReadFile 调用 readFileUnsafe。  
 - 成功时返回 isError false。  
 - 失败时捕获 error，把 message 放入 content。  
@@ -711,6 +729,7 @@ console.log("error-as-result-ok");
 ```
 
 **这段代码在做什么**  
+
 - readFileUnsafe 在 bad.txt 时抛错。  
 - executeReadFile 包裹 try/catch 并返回结构化结果。  
 - 断言 isError 为 true，内容包含 ENOENT。  
@@ -754,6 +773,7 @@ pi-agent-core 在 stopReason 为 length 时，也会用错误结果回灌，提�
 怎么借鉴到你的项目：把“未执行”也作为错误结果，模型就能自然重试。
 
 **小结**  
+
 1. 工具执行失败不应让主循环崩溃。  
 2. 错误结果要包含 isError 与原始信息。  
 3. 外层统一捕获异常，工具函数内部只负责抛错。
@@ -791,6 +811,7 @@ flowchart TD
 ```
 
 解读：  
+
 1. 所有工具先注册到 tools 数组。  
 2. 模型只拿这些工具的 name 和说明。  
 3. 每次工具调用从 tools 数组里按 name 匹配执行函数。  
@@ -821,6 +842,7 @@ console.log(tools.length);
 ```
 
 **这段代码在做什么**  
+
 - Tool 接口把每个工具的名字、说明和实际执行函数绑在一起。  
 - tools 是注册表。  
 - registerTool 用来向注册表添加工具。  
@@ -857,6 +879,7 @@ registerTool({
 ```
 
 **这段代码在做什么**  
+
 - 使用 node:fs/promises 的异步文件 API。  
 - read_file 直接把指定路径按 UTF-8 读出。  
 - write_file 把内容写到指定路径。  
@@ -887,6 +910,7 @@ registerTool({
 ```
 
 **这段代码在做什么**  
+
 - 读取原始文件内容并检查 oldText 是否存在。  
 - 如果 oldText 不存在，抛出可回灌的错误。  
 - 替换第一次出现的 oldText。  
@@ -918,6 +942,7 @@ registerTool({
 ```
 
 **这段代码在做什么**  
+
 - 使用 child_process.execFile 执行 bash 命令。  
 - 设置 timeout 为 10 秒，避免命令挂死。  
 - stdout 与 stderr 都返回给模型。  
@@ -960,6 +985,7 @@ registerTool({
 ```
 
 **这段代码在做什么**  
+
 - glob 使用 node:fs/promises.readdir 列出目录中的文件。  
 - ext 过滤按扩展名匹配。  
 - grep 遍历目录下每个文件。  
@@ -1038,6 +1064,7 @@ console.log("six-tools-smoke-ok");
 ```
 
 **这段代码在做什么**  
+
 - 用 mkdtemp 创建隔离目录。  
 - 写入 a.md 作为测试文件。  
 - 注册 glob 和 grep 两个工具。  
@@ -1089,6 +1116,7 @@ beforeToolCall 可以阻断危险工具，afterToolCall 可以给结果加审计
 怎么借鉴到你的项目：在 bash 工具前加 beforeToolCall，按 allowlist 拦截命令。
 
 **小结**  
+
 1. 六个工具覆盖本地代理最常用的读、写、改、搜、命令执行。  
 2. 每个工具必须返回字符串结果，失败则抛错。  
 3. 注册表用 name 匹配工具，保持模型调用与执行函数解耦。
@@ -1124,6 +1152,7 @@ sequenceDiagram
 ```
 
 解读：  
+
 1. 模型一次返回两个工具调用。  
 2. 主循环同时发出两个 read_file 请求。  
 3. A 和 B 可以并行运行。  
@@ -1161,6 +1190,7 @@ console.log(resolveMode({
 ```
 
 **这段代码在做什么**  
+
 - ToolExecutionMode 只有 parallel 与 sequential 两种。  
 - resolveMode 检查整批工具调用。  
 - 如果有一个工具标为 sequential，整批必须串行。  
@@ -1203,6 +1233,7 @@ async function executeParallel(
 ```
 
 **这段代码在做什么**  
+
 - executeSequential 逐个 await，执行顺序完全确定。  
 - executeParallel 用 Promise.all 同时开始所有调用。  
 - 两个函数都返回字符串数组。  
@@ -1261,6 +1292,7 @@ console.log("parallel-sequential-ok");
 ```
 
 **这段代码在做什么**  
+
 - 每个 executeOne 延迟 40ms。  
 - 串行两次总计约 80ms，并行约 40ms。  
 - 用断言证明 seqMs 大于 parMs。  
@@ -1309,6 +1341,7 @@ pi-agent-core 在并行模式下，工具完成事件按完成顺序发出，但
 怎么借鉴到你的项目：UI 更新可以按完成顺序，发给模型的上下文必须按来源顺序。
 
 **小结**  
+
 1. 并行工具可以缩短总耗时，但只适合相互独立的工具。  
 2. 串行工具保证执行顺序，用于有依赖或有副作用的操作。  
 3. 结果回灌模型时要保持来源顺序，避免上下文错位。
@@ -1331,6 +1364,7 @@ pi-agent-core 在并行模式下，工具完成事件按完成顺序发出，但
 目标：写一个 Node 20 单文件 Mini Code Agent，用假模型完成一次端到端工具链。  
 
 步骤：  
+
 1. 新建 `mini-agent.ts`，把第 5 节和第 6 节的工具执行与循环代码合并。  
 2. 假模型按脚本返回 4 个工具调用：glob 与 grep 并行，read_file 与 bash 串行。  
 3. 把工具结果回灌，然后让假模型返回最终文本。  
@@ -1338,6 +1372,7 @@ pi-agent-core 在并行模式下，工具完成事件按完成顺序发出，但
 5. 用 `npx tsx mini-agent.ts` 运行。  
 
 验收标准：  
+
 - 脚本退出前打印 `e2e-4-tools-ok`。  
 - 假模型返回的 4 个工具调用全部被执行。  
 - 串行工具中 bash 在 read_file 之后执行。  

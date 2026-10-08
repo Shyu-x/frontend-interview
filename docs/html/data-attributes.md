@@ -212,6 +212,7 @@ el.dataset.ID; // '1' — 同名！
 ### 8.1 Q1: `dataset.id` 和 `getAttribute('data-id')` 有什么区别？
 
 **答案：**
+
 - `dataset.id`：返回 DOMStringMap，自动处理命名转换（data-id → id，data-user-id → userId）
 - `getAttribute('data-id')`：返回原始字符串，不做转换
 
@@ -242,6 +243,7 @@ el.getAttribute('data-user-id'); // 直接访问原始属性
 ### 8.3 Q3: data-* 属性在 SSR 场景下有什么注意事项？
 
 **答案：**
+
 1. **Hydration 不匹配**：SSR 和客户端 dataset 访问方式相同，但注意 data-* 必须是字符串
 2. **序列化**：SSR 时，`data-config` 必须是 JSON 字符串（`JSON.stringify`），而非对象
 3. **安全性**：data-* 内容会出现在 HTML 中，**不要存放敏感信息**（token、密码）

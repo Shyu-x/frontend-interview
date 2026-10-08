@@ -18,6 +18,7 @@ date: 2026-05-17
 Rsbuild 是基于 Rspack 的高性能构建工具，由字节跳动 Web Infra 团队开发。它提供开箱即用的构建能力，同时保持与 webpack 生态的兼容性。
 
 **核心特性**：
+
 - 零配置启动，提供合理的默认设置
 - 语义化配置 API，降低 Rspack 学习曲线
 - 高性能 Rust 工具链（Rspack + SWC + Lightning CSS）
@@ -199,6 +200,7 @@ export default defineConfig({
 Farm 是用 Rust 编写的高性能构建工具，与 Vite 完全兼容。它声称比 webpack 快 20 倍，比 Vite 快 10 倍。
 
 **核心特性**：
+
 - Vite 插件兼容（直接使用 Vite 插件）
 - HMR 更新时间 < 20ms
 - 持久化磁盘缓存（模块级）
@@ -359,6 +361,7 @@ export default defineConfig({
 ### 2.6 性能基准
 
 Farm 官方声称：
+
 - 比 webpack 快 20x
 - 比 Vite 快 10x
 - HMR < 20ms
@@ -385,6 +388,7 @@ Farm 官方声称：
 Bun 是 all-in-one 的 JavaScript/TypeScript 工具链，包含运行时、包管理器、测试运行器和打包器。它使用 Zig 编写，性能远超 Node.js。
 
 **核心特性**：
+
 - 运行时：Node.js 替代品，启动速度 4x
 - 包管理器：npm 替代，install 速度快 30x
 - 测试运行器：Jest 兼容，TypeScript 优先

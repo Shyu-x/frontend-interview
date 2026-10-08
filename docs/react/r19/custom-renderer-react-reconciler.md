@@ -877,6 +877,7 @@ console.log('打印验证通过');
 **目标**：写一个 Node 20+ 单文件渲染器，将一棵 `div > span` 组件树打印成缩进文本。
 
 **步骤**：
+
 1. 安装 React 与对应的 `react-reconciler`，锁定版本。
 2. 实现第一章的 Host Config 骨架。
 3. 实现 `createInstance`、`createTextInstance`、`appendChild`、`appendChildToContainer`、`resetAfterCommit`。
@@ -884,6 +885,7 @@ console.log('打印验证通过');
 5. 用 `React.createElement` 创建一棵包含 `div` 和多个 `span` 的树。
 
 **验收标准**：
+
 - 运行脚本后，控制台输出 `div` 及至少两个缩进的 `span` 文本。
 - 使用 `node:assert` 断言输出文本包含预期节点名。
 - 脚本不依赖浏览器环境，且运行退出码为 0。

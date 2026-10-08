@@ -64,6 +64,7 @@ description: HTML 语义化的原理与模板，以及微格式、ARIA、WCAG �
 | WAI-ARIA 1.2（2023） | 自定义组件语义补充 | 针对复杂 SPA 组件 |
 
 **语义化解决了 5 个核心问题：**
+
 1. **`<div>` 地狱**：机器无法区分 `div class="nav"` 和 `div class="sidebar"`
 2. **SEO 瓶颈**：早期爬虫靠 title/meta/关键词密度，无法理解页面结构层次
 3. **无障碍鸿沟**：视障用户依赖屏幕阅读器，`div` 对阅读器毫无含义
@@ -331,6 +332,7 @@ a { color: -webkit-link; text-decoration: underline; }
 | **R — Robust（健壮）** | 兼容各类辅助技术 | 符合 HTML 规范、ARIA 正确使用 |
 
 **WCAG 2.1 AA 合规 checklist（前端必须检查项）：**
+
 - [ ] 所有图片有 `alt` 属性（装饰性图片用 `alt=""` + `aria-hidden="true"`）
 - [ ] 表单有显式 `<label>` 关联（不能用 placeholder 替代 label）
 - [ ] 颜色对比度 ≥ 4.5:1（文字）/ 3:1（大文字 ≥ 18pt）

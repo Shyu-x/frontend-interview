@@ -668,6 +668,7 @@ server {
 **怎么度量收益**：看 `$ssl_session_reused` 为 r 的比例、`curl -w '%{time_appconnect}'` 的耗时、边缘节点 CPU。统计用 nginx 日志聚合，验证单次用 `openssl s_client -tls1_3 -brief`。
 
 **什么时候不该用**：
+
 - 白板的落笔属于写操作，走 0-RTT 会被重放，画布上会重复出现同一笔。
 - 合规要求端到端加密时，不能在边缘终止 TLS 再解密，会话恢复也就不适用。
 
@@ -696,6 +697,7 @@ curl -o /dev/null -s -w '%{time_appconnect}\n' https://example.com/
 **怎么度量收益**：指标是 `time_appconnect`、首屏 FCP、握手字节数。测量用 curl、DevTools Performance 面板、Wireshark 过滤 `tls.handshake` 的包长。
 
 **什么时候不该用**：
+
 - 服务端要兼容只支持 RSA 的旧客户端时，不能只部署 ECDSA 证书。
 - 客户端不可控时，不能把服务端配成只允许 TLS 1.3，老机型会直接连不上。
 
@@ -728,6 +730,7 @@ for page in range(1, 6):
 **怎么度量收益**：指标是连接条数、`time_appconnect` 与 `time_total`、服务端 `$ssl_session_reused` 为 r 的比例。测量用 Network 面板、`curl -w`、nginx 访问日志。
 
 **什么时候不该用**：
+
 - 并发数远超连接池上限时，继续加并发只增加排队，不减少握手次数。
 - 内网服务已在可信机房直连时，再叠 0-RTT 只增加配置复杂度，收益有限。
 
@@ -760,6 +763,7 @@ for page in range(1, 6):
 **目标**：在一台可控主机上量出 TLS 1.2 与 1.3 握手的差别，并验证会话恢复是否命中。
 
 **步骤**：
+
 1. 用 nginx 或 Caddy 起一个只开 TLS 1.2 的站点，配一张自签证书。
 2. 用 `openssl s_client -connect host:443 -tls1_2 -brief </dev/null` 记录协议版本与套件。
 3. 用 `curl -o /dev/null -s -w '%{time_appconnect}\n'` 重复 20 次，把输出写进文件。
@@ -768,6 +772,7 @@ for page in range(1, 6):
 6. 用 Wireshark 过滤 `tls.handshake.type == 1`，对比两次抓包的握手往返次数。
 
 **验收标准**：
+
 - 能给出 TLS 1.2 与 1.3 各自的握手往返次数，并有抓包文件为证。
 - 20 次请求的 `time_appconnect` 有原始记录，别人可以重算中位数。
 - 日志里能看到至少一次 `$ssl_session_reused` 为 r 的记录。

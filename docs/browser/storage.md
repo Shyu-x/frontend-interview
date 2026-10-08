@@ -268,6 +268,7 @@ function loadView() {
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录一次“打开列表到可交互”，读 FCP 与主线程 Long Task 列表。再用 Application 面板配合代码计数，统计一次操作里对 localStorage 的读写次数。配置命中率用自建埋点算：读键成功次数除以打开次数。
 
 **什么时候不该用**：
+
 - 配置里要存几万行已勾选的订单 id：单个键会超过 5MB 量级上限，应改成服务端保存勾选集合。
 - 同一台机器上多人轮换登录同一个账号：localStorage 按 origin 共享，A 的列配置会出现在 B 的界面上，需按用户 id 分键或存服务端。
 
@@ -304,6 +305,7 @@ req.onsuccess = (e) => {
 **怎么度量收益**：Chrome DevTools 的 Performance 面板录首屏，读 FCP、LCP、Total Blocking Time 三项。同一设备、同一网络（Network 面板选 Slow 4G）、同一 CPU 节流倍数重复 3 次取中位数。再看主线程长任务列表里是否还有 parse 相关的长条。
 
 **什么时候不该用**：
+
 - 首屏必须显示上次登录的用户名，且这个值只有 localStorage 有：挪进异步通道会让首屏先闪一次未登录状态。
 - 数据只有几十条时，localStorage 一次读写的耗时低于 IndexedDB 打开连接加起事务的开销，多出的异步分支不划算。
 
@@ -341,6 +343,7 @@ function enqueue(op) {
 **怎么度量收益**：看断网重连后的丢失条数，等于本地队列条数减去服务端确认条数。用 DevTools Performance 面板录连续 200 次 enqueue，看长任务分布。存储用量在 Application 面板的 Storage 区读，或在页面里调 navigator.storage.estimate() 打印。
 
 **什么时候不该用**：
+
 - 只存“当前白板 id”和“上次缩放比例”：localStorage 一个键就够，加 IndexedDB 会把初始化变成异步。
 - 操作里带有时效令牌：离线重放时令牌已过期，必须改成重放前重新取令牌，否则整批失败。
 
@@ -376,6 +379,7 @@ storage 事件只在其它同源标签页触发，BroadcastChannel 可以传结�
 **目标**：做一个离线可用的待办清单，把 localStorage 与 IndexedDB 的分工写清楚，并能解释每一处选择。
 
 **步骤**：
+
 1. 建一个页面：一个输入框加一个列表，刷新后数据不丢。
 2. 把待办正文与完成状态存进 IndexedDB 的 todos store，keyPath 设为 id。
 3. 把界面偏好（主题、排序方式、上次筛选）存进 localStorage，键名带版本前缀。
@@ -385,6 +389,7 @@ storage 事件只在其它同源标签页触发，BroadcastChannel 可以传结�
 7. 在 DevTools 的 Network 面板选 Offline，加三条待办，再恢复网络并刷新，检查数据仍在。
 
 **验收标准**：
+
 - 刷新后待办条数与完成状态不变，Application 面板的 IndexedDB 区能看到 todos store 与对应记录。
 - 隐私模式下打开页面不抛异常，偏好读不到时用默认值渲染，页面顶部有提示条说明偏好不会被记住。
 - 两个同源标签页中任一个改主题，另一个在 1 秒内跟随变化。

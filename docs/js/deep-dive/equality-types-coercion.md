@@ -909,6 +909,7 @@ function sumSelected(rows) {
 **怎么度量收益**：用 Chrome DevTools Performance 面板看筛选操作触发的 `Long Tasks` 条数和 `Scripting` 时间；用 React DevTools Profiler 记录表格组件的 render 次数；用 `performance.mark` 与 `performance.measure` 量出「点筛选」到「重渲染完成」的时长。
 
 **什么时候不该用**：
+
 - 若选中项要按用户点击顺序展示，`Set` 删除后重新加入会排到末尾，顺序与点击顺序不一致，此时用数组加索引表。
 - 若列表固定只有几十行且不做跨分页保留，直接遍历数组判断就够了，多一层 `Set` 只是增加同步成本。
 
@@ -950,6 +951,7 @@ console.log(totalCents([{ amount: "0.1" }, { amount: "0.2" }])); // 输出 30，
 **怎么度量收益**：用 Chrome DevTools Performance 的 `Scripting` 时间与 Lighthouse 的 `Total Blocking Time` 看首屏脚本开销；用 `performance.mark('sum-start')` 与 `performance.mark('sum-end')` 量累加耗时；用对账脚本输出的差异条数验证精度。
 
 **什么时候不该用**：
+
 - 若接口已经返回整数分，前端不要再乘 100，多一次 `Math.round` 会掩盖字段单位写错的问题。
 - 若业务需要 16 位以上有效数字，双精度不够用，应改用十进制字符串或 `BigInt`，不要靠 `Number.EPSILON` 兜底。
 - `a - b < Number.EPSILON` 只在两数都接近 1 时成立，数量级相差大时会把不等的两数判成相等。
@@ -991,6 +993,7 @@ console.log(Object.is(-0, 0)); // 输出 false
 **怎么度量收益**：用 React DevTools Profiler 看画布组件的 render 次数是否随远端消息线性增长；用 Chrome DevTools Performance 看每秒帧数与掉帧时长；在控制台打印 `index.size` 与图元总数的比值，观察索引是否重复膨胀。
 
 **什么时候不该用**：
+
 - 若画布坐标固定为整数像素且不会产生负零，`-0` 相关的分支是多余的，删掉可以少一次判断。
 - 若合并逻辑由服务端的 OT 或 CRDT 负责，前端再做版本相等判断会形成第二套真相来源，两边结论不一致时难定位。
 - 若版本号本身是字符串，`Object.is` 与 `===` 结论一致，引入 `Object.is` 不会带来行为差别。
@@ -1035,6 +1038,7 @@ React 判断 state 是否需要重渲染、以及对比依赖数组时使用 `Ob
 **目标**：写一个比较实验项目，把四种相等算法在 `NaN`、`+0`、`-0`、数字字符串、对象上的结果跑成一张表，并把结论落成项目内的比较工具函数。
 
 **步骤**
+
 1. 建目录并选定测试运行器，用 Node 内置的 `node:test` 或 Vitest。
 2. 写 `compare.js`，导出四个函数：`loose` 用 `==`、`strict` 用 `===`、`sameValue` 用 `Object.is`、`sameValueZero` 手写实现。
 3. 列出输入集合：`NaN`、`+0`、`-0`、`1`、`"1"`、`null`、`undefined`、`""`、`[]`、`[1]`、`{}`、`1n`。
@@ -1044,6 +1048,7 @@ React 判断 state 是否需要重渲染、以及对比依赖数组时使用 `Ob
 7. 写一份 README，列出本项目里每种算法应该用在哪里，并附上对照表。
 
 **验收标准**
+
 - `npm test` 全部通过，断言条数不少于 30 条，`NaN`、`+0`、`-0` 三类各覆盖至少 2 条。
 - 表格中 `NaN` 一列显示：`==` 与 `===` 返回 `false`，`Object.is` 返回 `true`。
 - 表格中 `-0` 与 `+0` 一列显示：`===` 返回 `true`，`Object.is` 返回 `false`。

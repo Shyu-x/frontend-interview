@@ -88,6 +88,7 @@ import { executeToolCalls } from './tool-calls.ts'
 ```
 
 **这段代码在做什么**
+
 - `ReactLoopInbox` 是收件箱的实现类，驱动器只在 `agent.ts` 里实例化它一次。
 - `RuntimeContextProjection` 与 `SystemPromptProjection` 同在一个文件，负责两类隐藏信息。
 - `AssistantStreamAttempt` 每次模型尝试创建一个，负责把流式分片折叠成四类帧。
@@ -116,6 +117,7 @@ constructor(
 ```
 
 **这段代码在做什么**
+
 - `inbox` 拿到 `sessionProjections`，证明收件箱状态不是一个普通数组，而是从会话日志投影出来的。
 - `lastTurn` 从 `turnBoundary` 投影读取，冷启动即使没有 Agent 实例也能读到上次轮次号。
 - `scope` 是 agent 作用域边界，生命周期拥有者在驱动器退出后负责解绑。
@@ -170,6 +172,7 @@ console.log('模块图断言通过')
 | 事件分发器在热路径重复创建 | 每次 `agentEvents` 都构造新对象 | 构造函数里建一次并复用 `dispatch` |
 
 **小结**
+
 1. agent.ts 指向另外四个模块，是唯一知道全局装配关系的文件。
 2. 四个工位都不互相直接调用，它们通过 agent.ts 串联、通过 session 日志交换可见效果。
 3. 五个文件里只有 constants.ts 不产生会话事件，它只提供 `DEFAULT_MAX_PARALLEL_TOOL_CALLS = 10`。
@@ -230,6 +233,7 @@ type Phase =
 ```
 
 **这段代码在做什么**
+
 - `idle` 不持有取消控制器，因为它没有活动可取消。
 - `maintenance` 与 `running` 都持有独立的 `AbortController`。
 - `wakeRequested` 是锁存位，回答「相位切换期间有没有人喊过醒来」。
@@ -250,6 +254,7 @@ private setPhase(next: Phase): void {
 ```
 
 **这段代码在做什么**
+
 - `status` 是派生值：`idle` 与 `maintenance` 都对外报 `'idle'`，只有 `running` 报 `'running'`。
 - 从 `maintenance` 切回 `idle`，对外状态没变，不发 `agent/status`。
 - 从 `idle` 切到 `running` 会发一次 `agent/status { status: 'running' }`。
@@ -282,6 +287,7 @@ private wakeDriver(wakeAfterAbort = false): void {
 ```
 
 **这段代码在做什么**
+
 - 参数 `wakeAfterAbort` 来自 `send` 的分类，它在插入收件箱之前被捕获，防止重入取消改判。
 - 活着的 `running` 驱动器会自己领取队列，所以普通唤醒不锁存。
 - `maintenance` 期间任何 `wakeDriver` 都锁存，因为维护任务结束后要补跑。
@@ -344,6 +350,7 @@ statusLog: running -> idle
 | `agent/status` 事件乱发 | 没有比较前后状态 | 只在 `previousStatus !== status` 时 `emit` |
 
 **小结**
+
 1. 三种相位里只有两个对外状态：`idle` 与 `running`。
 2. `wakeDriver` 非空闲时只锁存，空闲时才真正开驱动器。
 3. `wakeAfterAbort` 与 `disposed` 是锁存判断的两个关键例外。
@@ -411,6 +418,7 @@ private async turn(): Promise<boolean> {
 ```
 
 **这段代码在做什么**
+
 - 不在 `running` 相位就抛错，防止没有驱动器预约的裸调用。
 - `signal.throwIfAborted()` 在开轮次前先检查取消信号。
 - `turn/start` 落盘失败会走 `throwError`，不静默吞掉。
@@ -459,6 +467,7 @@ while (true) {
 ```
 
 **这段代码在做什么**
+
 - `preStep` 返回 `reject` 时没有步骤可开，轮次结束原因是 `blocked`。
 - 每一步都先写 `step/start`，再执行，最后在 `finally` 里写 `step/end`。
 - `ToolCallRecovery` 观察本会话事件，步骤失败时能算出未答复的 `tool/call`。
@@ -491,6 +500,7 @@ while (true) {
 ```
 
 **这段代码在做什么**
+
 - `abortedCancelCause` 只复制 `kind` 与 `reason`，把调用方原始对象留在信号上，避免 Node fetch 加上的 `stack` 进日志。
 - 取消走 `aborted`，普通失败走 `error`，两条路径都要先 `throw error` 再交给 `finally`。
 - `LlmError` 保留原始失败事实，其他错误平整成 `{ message, code: 'UNKNOWN' }`。
@@ -552,6 +562,7 @@ turn 与 step 断言通过
 | 步骤结束原因在 `max-tokens` 后被降级 | 每次都用最新 `stepEnd` 覆盖 | `max-tokens` 粘性判断，不覆盖已有 `max-tokens` |
 
 **小结**
+
 1. 首步目标 `next-turn`，后续改 `next-step`，空首批只开边界不花模型调用。
 2. `step/start` 与 `step/end` 是步骤括号，失败与取消也会写 `step/end`。
 3. `turn/end` 原因有 `blocked`、`completed`、`max-tokens`、`aborted`、`error` 五类（资料按 TurnEndReason 列举，完整枚举需核对官方文档）。
@@ -624,6 +635,7 @@ apply(state: InboxState, event) {
 ```
 
 **这段代码在做什么**
+
 - 折叠只处理 `agent/inbox/spliced` 一种事件，其他事件直接返回原状态。
 - `start` 与 `removedCount` 必须是安全整数且在边界内，非法历史会整体拒绝。
 - 使用 `toSpliced` 返回新数组，不修改旧状态对象。
@@ -642,6 +654,7 @@ claim(target: InboxTarget, turn: number): UserMessage[] {
 ```
 
 **这段代码在做什么**
+
 - 先取空 `next-step` 全部消息，再按需要从 `next-turn` 取一条。
 - 两次 `mutate` 的最后一个参数都是 `false`，表示不 `discardRemoved`。
 - 纯删除不产生 `outcome: 'canceled'`，只产生 `agent/inbox/claimed` 通知。
@@ -688,6 +701,7 @@ private mutate(target, start, deleteCount, inserted, discardRemoved): UserMessag
 ```
 
 **这段代码在做什么**
+
 - `start` 支持负索引，`-1` 从队尾数起，超界会收敛到合法范围。
 - 删除量会按剩余长度截断，避免越界删除报错。
 - 事件体只写有效字段：没有删除就不写 `removedCount`，没有 outcome 就不写 `outcome`。
@@ -743,6 +757,7 @@ console.log('收件箱投影断言通过，当前 next-turn 有', state['next-tu
 | 冷启动投影因一个坏事件整体失败 | 越界 splice 被静默容忍 | `apply` 里拒绝非法边界并带 `event.seq` 报错 |
 
 **小结**
+
 1. 收件箱状态不是普通内存数组，而是 `agent/inbox/spliced` 事件折叠出的投影。
 2. `claim` 是纯删除，普通删除带 `outcome: 'canceled'`，两者事件区分明确。
 3. `mutate` 的归一化把负数起点、浮点删除量收敛到合法区间，再落一个规范化事件。
@@ -813,6 +828,7 @@ push(chunk: StreamChunk): void {
 ```
 
 **这段代码在做什么**
+
 - `attemptId` 由 `LlmAttemptId(sessionId + ':' + attempt)` 组成，只在 Agent 生命周期内唯一。
 - `revision` 来自外部传入的 `nextRevision`，每次取都会自增。
 - `accumulator` 保存带时间戳的紧凑流，供落盘事件引用。
@@ -853,6 +869,7 @@ abandon(): void {
 ```
 
 **这段代码在做什么**
+
 - `settle` 的回调 `append()` 是同步的，失败就转 `abandon` 再抛错。
 - `committed` 结局带 `eventType` 与 `seq`，`abandoned` 结局没有这两项。
 - 两种结局都置 `terminal = true`，保证一次尝试只发一次 `end`。
@@ -875,6 +892,7 @@ interruptedBlocks(): ContentBlock[] {
 ```
 
 **这段代码在做什么**
+
 - `stream` getter 展开 `accumulator.snapshot()`，避免返回可变引用。
 - `blocks()` 用于成功路径的 `assistant/message`。
 - `interruptedBlocks()` 用于取消路径，只保留可安全展示的前缀。
@@ -925,6 +943,7 @@ console.log('流帧断言通过')
 | 取消后丢了用户已看到的半句 | 直接把错误往上抛 | 取消分支用 `interruptedBlocks()` 写 `interrupted: true` 锚点 |
 
 **小结**
+
 1. 一次尝试固定三帧：一个 `start`、零或多个 `chunk`、一个 `end`。
 2. `chunk` 的 `revision` 每次自增，`index` 只在推送分片时自增。
 3. `settle` 是「先落盘、后发终态」，`abandon` 是落盘失败时的保底终态。
@@ -997,6 +1016,7 @@ return { concluded }
 ```
 
 **这段代码在做什么**
+
 - `parseArguments` 解析失败时保留原始文本、空字符串映射为 `{}`。
 - 并行组的初值是「当前到结尾的整段」，然后在组内遇到模式变化再停。
 - 排他组只含一个调用，保证屏障成立。
@@ -1022,6 +1042,7 @@ const fillPool = async (): Promise<void> => {
 ```
 
 **这段代码在做什么**
+
 - `inFlight.size < maxParallelToolCalls` 是并行池的上界，`maxParallelToolCalls` 每次从配置采样。
 - `nextToStart > 0` 时若下一个调用模式不再是并行，就中断补池，形成新屏障。
 - 每次 `startCall` 后立刻 `commitReady`，保证有序提交不被新开调用拖住。
@@ -1045,6 +1066,7 @@ function appendSkippedToolCall(session, turn, step, block: ToolCallBlock): void 
 ```
 
 **这段代码在做什么**
+
 - 每条被取消跳过的调用都会补一对 `tool/call` 与 `tool/result`。
 - 错误码固定是 `TOOL_ABORTED_BEFORE_DISPATCH`，文本固定不变。
 - 这样回放被取消步骤时，模型看到的是成对工具历史，不会尝试自动重试。
@@ -1112,6 +1134,7 @@ dispatch:查天气A -> dispatch:查天气B -> result:查天气A -> result:查天
 | 取消后模型看到孤立 `tool/call` | 没补结果对 | 对未开始的调用补 `ABORTED_BEFORE_DISPATCH` 结果 |
 
 **小结**
+
 1. 分组策略由第一个调用的 `executionMode` 决定，并行组内再遇排他就会截断成新屏障。
 2. 补池上限 `maxParallelToolCalls` 每次从配置采样，设为 1 就是全串行。
 3. 取消时用固定错误码补账，保证回放历史里每对工具调用都有结果。
@@ -1172,6 +1195,7 @@ project(rendered: string, input: SystemPromptDecisionInput): SystemPromptCommit[
 ```
 
 **这段代码在做什么**
+
 - `inHistory` 由 `preparedCall.systemPromptUpdate === 'in-history'` 决定，只有 capable 路由为真。
 - `startsSeries` 由 pre-step 声明、表层代际变化或路由缺 `toolUpdate` 时工具变化三者合并而来。
 - 走替换路径时，先逐个清空后续非空节点，最后才按需改写头节点。
@@ -1206,6 +1230,7 @@ constructor(ctx: Context, session: Session) {
 ```
 
 **这段代码在做什么**
+
 - 恢复阶段从最新事件往回扫，碰到第一个存在于 `surface.nodes` 的 `user/message` 就停。
 - `this.retained ??= null` 区分「从没有过快照」和「有但现在不保留」。
 - 事件监听只关注 `subject === session`，忽略其他会话。
@@ -1229,6 +1254,7 @@ project(current: string, sections: readonly ContextSnapshotSection[]): UserMessa
 ```
 
 **这段代码在做什么**
+
 - 三个提前返回里两个是 `return` 不产生消息：从无到空、值相同。
 - `CLEARED` 是固定文本，告诉模型旧快照不再适用。
 - 有内容时 `source` 带 `form: 'snapshot'` 与 `sections`，可归属各贡献来源。
@@ -1293,6 +1319,7 @@ append:你是助手 -> append:你是助手V2 -> replace:1:你是助手V3
 | 清除后的旧快照又回到模型 | 清除标记没有被正确跟踪 | 被替换事件命中 retained 序号就置 `null` |
 
 **小结**
+
 1. 系统提示词只有「追加头节点、追加新节点、清空加改写」三种落盘方式。
 2. `inHistory`、`startsSeries`、渲染文本是否为空共同决定选哪条路径。
 3. 运行时上下文快照在三个条件下保持不写：从无到空、值相同、旧值被替换后置空。

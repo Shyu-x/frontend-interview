@@ -307,6 +307,7 @@ function bindRows(rows, openEditor) {
 **怎么度量收益**：在 Chrome DevTools 的 Performance 面板录一段滚动加点击的操作，看主线程长任务数量与 JS Heap 曲线；用 Performance 面板的 Bottom-Up 视图确认点击回调耗时；用 Memory 面板拍两次堆快照，比较 `EventListener` 相关对象数量。
 
 **什么时候不该用**：
+
 - 表格已经用事件委托，逐行绑定与清理函数都是多余开销。
 - 行数据由框架的 keyed diff 管理，手写闭包会和框架的重用逻辑冲突，索引可能对不上行。
 
@@ -347,6 +348,7 @@ function createBrush(initial) {
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录制双人同时绘制的 10 秒片段，看每帧的脚本耗时；用 Memory 面板比较绘制前后快照里画笔对象与 canvas 相关对象的数量；用 `PerformanceObserver` 订阅 `longtask` 统计卡顿次数。
 
 **什么时候不该用**：
+
 - 状态需要被序列化后同步到服务端时，闭包里的变量读不到，应改为显式的状态对象。
 - 需要把画笔状态交给撤销栈或时间旅行调试时，隐藏状态会挡住回放。
 
@@ -378,6 +380,7 @@ function mountPanel(root, createChart) {
 **怎么度量收益**：Chrome DevTools 的 Memory 面板拍堆快照，对比"切换 20 次后"与"首次进入后"两次结果，看 Detached 节点与图表构造函数实例数；Performance 面板看 JS Heap 曲线是否随切换次数阶梯上升；Lighthouse 复测 TBT 与主线程长任务。
 
 **什么时候不该用**：
+
 - 图表所在路由本来就不会卸载（单页常驻），额外返回卸载函数属于无效代码路径。
 - 图表库自带 `dispose` 且在元素移除时自动触发，重复手动清理可能报错。
 
@@ -410,6 +413,7 @@ CommonJS 的模块包装函数（出处：Node.js 官方文档，Modules: Common
 **目标**：写一个可挂载、可卸载的计数器卡片模块，用它验证闭包捕获、块级作用域与清理函数的配合。
 
 **步骤**：
+
 1. 建 `index.html` 与 `app.js`，用 `<script type="module">` 引入，确认代码处在模块作用域而不是全局。
 2. 实现 `createCounter(initial)`，内部用 `let` 保存 `count`，返回 `increment`、`decrement`、`getCount` 三个方法。
 3. 实现 `mountCounter(root, counter)`，用 `const` 保存 DOM 引用，绑定点击监听，并启动一个 `setInterval` 每秒刷新运行时长文本。
@@ -419,6 +423,7 @@ CommonJS 的模块包装函数（出处：Node.js 官方文档，Modules: Common
 7. 用 `no-var`、`prefer-const`、`no-loop-func` 三条规则跑一遍代码。
 
 **验收标准**：
+
 - 卸载后调用 `getCount()` 仍返回卸载前的值，说明闭包保住了状态。
 - 卸载后控制台不再出现该卡片的运行时长刷新，说明定时器被清除。
 - 连续挂载卸载 20 次后，堆快照里该模块的自定义对象数量不随次数增长。

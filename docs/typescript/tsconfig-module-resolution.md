@@ -1014,6 +1014,7 @@ npx tsc -b --verbose
 **怎么度量收益**：指标是发包后的解析错误数和新项目首次接入的报错数。测量方法：CI 里跑 `npx @arethetypeswrong/cli --pack .` 统计报错条目；再用 `tsc --traceResolution` 搜包名，确认解析结果落在 `dist/index.d.ts`。
 
 **什么时候不该用**：
+
 - 只给单一打包器消费、不打算让 Node 直接 `import` 的内部包：条件映射多一层维护面，收益为零。
 - 消费方仍以 CJS 为主且不打算升级 Node：直接在 `main` 与 `types` 上各写一个字段，别引入条件表。
 
@@ -1046,6 +1047,7 @@ npx tsc -b --verbose
 **怎么度量收益**：指标是 `Check time`、`Files`、`Types` 三个字段和编辑器单文件报错数。测量方法：改配置前后各跑三次 `tsc --noEmit --extendedDiagnostics` 取中位数；再用 `tsc --generateTrace trace` 配合 Perfetto 看检查阶段占比。
 
 **什么时候不该用**：
+
 - 这个包要发布到 npm 并被 Node 直接加载：`bundler` 不检查扩展名，产物在 Node 下会解析失败。
 - 团队要求同一份 tsconfig 同时描述运行时与类型检查：改用 `node16` 或 `nodenext`，把判定权交给运行时。
 
@@ -1079,6 +1081,7 @@ npx tsc -b --verbose
 **怎么度量收益**：指标是 `tsc -b` 的墙钟时间和跳过项目数。测量方法：用 `tsc -b --verbose` 数 `up to date` 行数；用 `tsc --extendedDiagnostics` 看单包 `Check time`；改动只落在叶子包时对比前后时间。
 
 **什么时候不该用**：
+
 - 仓库只有一个包：加 `references` 只多一层构建顺序，收益为负。
 - 包之间靠打包产物互相引用、类型不跨包流动：引用链会指不到 d.ts，报错集中在找不到声明。
 
@@ -1118,6 +1121,7 @@ publint 检查 `main`、`module`、`exports`、`types` 指向的文件是否存�
 **目标**：在一个包含两个包的小仓库里，让"打包器消费"和"Node 直接 import"两条路径都能拿到正确类型。
 
 **步骤**：
+
 1. 新建 pnpm workspace，包含 `packages/lib` 与 `apps/node-consumer`。
 2. 给 `packages/lib` 写 `package.json`，设置 `type` 与 `exports`，把 `types` 写在同层第一位。
 3. 给该包配置 `module: "node16"`、`moduleResolution: "node16"`、`declaration: true`，相对导入一律写 `.js` 扩展名。
@@ -1127,6 +1131,7 @@ publint 检查 `main`、`module`、`exports`、`types` 指向的文件是否存�
 7. 把 lib 的 `moduleResolution` 改成 `bundler` 重跑，记录报错差异。
 
 **验收标准**：
+
 - 仓库根 `tsc -b` 零错误，第二次运行只打印 `up to date`。
 - `tsc --traceResolution` 日志中 lib 的解析结果落在 `dist/index.d.ts`。
 - `attw --pack packages/lib` 不报"伪装 ESM"类别的问题。

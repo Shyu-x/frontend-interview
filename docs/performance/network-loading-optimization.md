@@ -104,6 +104,7 @@ console.log({ dns, connect, ttfb });
 ```
 
 **这段代码在做什么**
+
 - `getEntriesByType("navigation")` 拿到当前页面的导航计时条目。
 - `domainLookupEnd` 减 `domainLookupStart` 得到 DNS 查询耗时。
 - `connectEnd` 减 `connectStart` 覆盖 TCP 与 TLS 两段握手。
@@ -130,6 +131,7 @@ console.log("FCP", fcp ? fcp.startTime.toFixed(0) : "无");
 ```
 
 **这段代码在做什么**
+
 - `getEntriesByType("paint")` 返回 first-paint 与 first-contentful-paint 两条记录。
 - `find` 按 name 挑出 FCP 记录。
 - `PerformanceObserver` 在 LCP 元素出现时回调，`buffered: true` 能拿到订阅前的记录。
@@ -169,6 +171,7 @@ console.log(splitTiming(fake));
 ```
 
 **这段代码在做什么**
+
 - `splitTiming` 把导航计时差值集中到一个函数，便于复用。
 - `redirect` 覆盖从导航开始到重定向结束。
 - `wait` 是 `responseStart` 减 `requestStart`，也就是服务器处理加排队。
@@ -226,6 +229,7 @@ console.log("账本校验通过", t);
 | LCP 只报 0 | 元素在 iframe 内，或页面已隐藏 | 在真实标签页测，并确认元素类型 |
 
 **小结**
+
 - 首屏耗时是一本账，先拿到 TTFB、FCP、LCP 三个数字。
 - 阶段拆分的价值在于定位，不在于好看。
 - 线上数据与本地数据可能差一个数量级，结论以线上为准。
@@ -303,6 +307,7 @@ console.log("端口", port);
 ```
 
 **这段代码在做什么**
+
 - `http.createServer` 起一个只回 ok 的本地服务。
 - `server.listen(0, "127.0.0.1")` 里的 0 表示让系统选空闲端口。
 - `http.Agent` 的 `keepAlive: true` 会让 socket 在请求结束后保留。
@@ -332,6 +337,7 @@ server.close();
 ```
 
 **这段代码在做什么**
+
 - `get` 返回一个 Promise，在响应体读完时 resolve。
 - `res.resume()` 消费响应流，不消费则 end 事件不触发。
 - 两次 `await get()` 用同一个 agent，也就是同一个连接池。
@@ -397,6 +403,7 @@ console.log("连接复用校验通过，总连接数", connections);
 | HTTP/2 下连接数仍是多个 | 入口分散在多个主机 | 合并入口域名，让同源请求共用一条连接 |
 
 **小结**
+
 - DNS、TCP、TLS 是每次新连接的固定成本，复用能直接省掉。
 - 度量方法是在客户端统计新建连接次数，而不是凭感觉。
 - 域名拆分省下的并行度，常被新增握手成本抵消，要用数字决策。
@@ -459,6 +466,7 @@ flowchart TD
 ```
 
 **这段代码在做什么**
+
 - `dns-prefetch` 只做域名解析，成本低，作为降级方案。
 - `preconnect` 多做 TCP 与 TLS 两段，收益取决于连接建立耗时。
 - `crossorigin` 是字体预加载的必要属性，缺失会导致重复下载。
@@ -483,6 +491,7 @@ console.log(tags.map(hasAs));
 ```
 
 **这段代码在做什么**
+
 - `matchAll` 返回所有匹配项，展开成字符串数组。
 - 正则里的 `\b` 避免匹配到 `data-rel="preload"` 这类误命中。
 - `hasAs` 只检查是否存在带值的 `as` 属性。
@@ -539,6 +548,7 @@ console.log("提示检查通过，缺少 as 的标签数", missingAs.length);
 | prefetch 抢了首屏带宽 | prefetch 与关键请求同时进行 | 依赖空闲调度，或延后到 load 之后 |
 
 **小结**
+
 - 三种提示对应三档确定性：当前必用、下一跳会用、不确定。
 - preload 的 `as` 与 `crossorigin` 决定它是否真的生效。
 - 每条提示都要能说出它省掉了哪一段耗时。
@@ -598,6 +608,7 @@ sequenceDiagram
 ```
 
 **这段代码在做什么**
+
 - 第一行用 `fetchpriority="high"` 把主图提到该批次请求的前面。
 - `width` 与 `height` 同时给出，用于计算占位面积并减少布局偏移。
 - 第二行把页脚图片标为 low，减少它对首屏的竞争。
@@ -624,6 +635,7 @@ server.listen(0, "127.0.0.1", () => {
 ```
 
 **这段代码在做什么**
+
 - `res.writeEarlyHints` 发送 103 临时响应，参数是 Link 头的内容。
 - 一个 103 可以带多条用逗号分隔的 Link，减少往返次数。
 - 之后 `writeHead(200)` 发正式响应，两个响应用同一个连接。
@@ -651,6 +663,7 @@ server.close();
 ```
 
 **这段代码在做什么**
+
 - `net.connect` 建立 TCP 连接，不使用 HTTP 客户端，避免 103 被丢弃。
 - 请求头里带 `Connection: close`，让服务器响应后关闭，方便拿到 end 事件。
 - 把收到的数据拼成字符串，等待连接结束。
@@ -708,6 +721,7 @@ console.log("103 顺序校验通过");
 | 103 的 Link 指向次屏资源 | 提示资源过多，抢占首屏带宽 | 只列首屏关键 CSS 与字体 |
 
 **小结**
+
 - fetchpriority 改的是同批次请求的相对顺序，不改体积。
 - 103 让资源在 HTML 到达前就被发现，缩短发现到开始的间隔。
 - 两个手段都要用 LCP 与资源开始时间验证，而不是只看配置。
@@ -775,6 +789,7 @@ console.log({ raw: raw.length, gzip: gz.length, brotli: br.length });
 ```
 
 **这段代码在做什么**
+
 - `repeat(2000)` 生成重复度高的输入，便于观察压缩比。
 - `gzipSync` 用默认等级压缩，得到 gzip 字节数。
 - `BROTLI_PARAM_QUALITY` 取值 0 到 11，11 是最高等级。
@@ -798,6 +813,7 @@ console.log(back1 === text, back2 === text);
 ```
 
 **这段代码在做什么**
+
 - `gunzipSync` 与 `brotliDecompressSync` 是各自压缩函数的逆操作。
 - `toString()` 默认按 UTF-8 解码，与构造输入时一致。
 - 两次比较都为 true 才说明压缩是无损的。
@@ -824,6 +840,7 @@ console.log(pickEncoding("gzip, deflate"));
 ```
 
 **这段代码在做什么**
+
 - `pickEncoding` 只做字符串匹配，真实实现要解析 q 值权重。
 - 返回 `identity` 表示不压缩，直接发原始字节。
 - `store` 保存预压缩结果，请求时查表，省掉现场压缩的 CPU。
@@ -881,6 +898,7 @@ console.log("压缩校验通过", { raw: raw.length, gzip: gz.length, brotli: br
 | Content-Length 与响应体不符 | 压缩后长度写成了原始长度 | 用压缩后的字节长度，或改用分块传输 |
 
 **小结**
+
 - 压缩的收益来源是减少传输字节，代价是服务端 CPU。
 - 文本资源受益，图片与视频不受益。
 - 预压缩加上内容编码协商，可以同时拿到省字节与低延迟。
@@ -951,6 +969,7 @@ flowchart TD
 ```
 
 **这段代码在做什么**
+
 - 浏览器按 source 的顺序挑选第一个支持的类型。
 - `srcset` 里的 `w` 描述符声明每个候选的实际像素宽度。
 - `sizes` 的 `100vw` 表示小屏时图片占满视口宽度。
@@ -977,6 +996,7 @@ function pick(candidates, need) {
 ```
 
 **这段代码在做什么**
+
 - `parseSrcset` 用逗号切分候选，再用空格切出描述符。
 - `desc.replace("w", "")` 只处理宽度描述符，像素密度描述符要另写分支。
 - `pick` 先按宽度升序排序，保证挑选结果稳定。
@@ -996,6 +1016,7 @@ console.log("桌面", pick(candidates, 1200 * 1));
 ```
 
 **这段代码在做什么**
+
 - 手机算出的需求宽度是 1125，候选里 1200 是第一个够用的。
 - 桌面算出的需求宽度是 1200，正好命中最大候选。
 - 挑选逻辑只用宽度，格式协商由 picture 完成。
@@ -1049,6 +1070,7 @@ console.log("srcset 挑选校验通过");
 | 收益无法度量 | 只看图片目录总大小 | 用 PerformanceResourceTiming 看 transferSize |
 
 **小结**
+
 - 图片优化的收益来源是减少传输字节与解码工作量。
 - 响应式图片把选图权交给浏览器，你负责候选与规则。
 - 度量要看每张图的 transferSize 与 LCP 元素的具体 URL。
@@ -1121,6 +1143,7 @@ body { font-family: "BrandSans", system-ui, sans-serif; }
 ```
 
 **这段代码在做什么**
+
 - `@font-face` 定义字体名与文件地址，`format("woff2")` 帮助浏览器判断是否需要下载。
 - `font-display: swap` 让文字立刻以后备字体显示。
 - `unicode-range` 限定生效字符范围，范围外的字符不触发下载。
@@ -1140,6 +1163,7 @@ body { font-family: "BrandSans", system-ui, sans-serif; }
 ```
 
 **这段代码在做什么**
+
 - `as="font"` 让预加载按字体规则参与缓存与优先级。
 - `crossorigin` 必须与 CSS 请求字体时的身份属性一致，否则会重复下载。
 - 只预加载首屏用到的字重，多个字重会互相竞争带宽。
@@ -1159,6 +1183,7 @@ console.log(displays(cssText));
 ```
 
 **这段代码在做什么**
+
 - 正则匹配每个 `@font-face` 块的完整文本。
 - 块内再匹配 `font-display` 的取值，缺失时记作 `auto`。
 - 输出数组里出现 `auto`，表示该字体没有显式策略。
@@ -1213,6 +1238,7 @@ console.log("字体策略校验通过", found);
 | 子集未生效 | unicode-range 写错范围 | 用构建工具按实际用字生成子集 |
 
 **小结**
+
 - 字体加载的核心决策是等待期显示什么。
 - 收益来源是减少首屏不可见文本的时间，代价是可能重排。
 - 度量看首屏文字出现时间与字体文件的实际字节数。
@@ -1279,6 +1305,7 @@ flowchart TD
 ```
 
 **这段代码在做什么**
+
 - 内联 `<style>` 里的规则随 HTML 一起到达，不增加请求。
 - `rel="preload" as="style"` 让非关键样式以低优先级下载。
 - `onload` 在下载完成后把 rel 改成 stylesheet，此时才会应用样式。
@@ -1301,6 +1328,7 @@ console.log(inlineCritical(html, css));
 ```
 
 **这段代码在做什么**
+
 - `replace` 的第二个参数用函数形式，避免 `$` 在样式里被当成替换模式。
 - 占位注释放在 `<style>` 里，替换后就是合法的内联样式。
 - 真实构建工具会先计算首屏用到的规则，再输出这段文本。
@@ -1323,6 +1351,7 @@ console.log("首次绘制", paint.startTime.toFixed(0));
 ```
 
 **这段代码在做什么**
+
 - `navigation` 条目给出 HTML 响应结束的时间。
 - `paint` 条目的第一条是 first-paint，表示首次绘制像素的时间。
 - 两个时间差值包含解析、样式与布局，不全是样式表造成。
@@ -1375,6 +1404,7 @@ console.log("关键 CSS 内联校验通过");
 | 改动后指标没有变化 | 阻塞的不是样式表而是同步脚本 | 用性能面板确认阻塞来源再改 |
 
 **小结**
+
 - 渲染阻塞的收益来源是缩短首屏必经的等待链条。
 - 关键 CSS 内联把一次往返变成零次，代价是 HTML 变大。
 - 度量看首次绘制时间与 HTML 传输字节的平衡。
@@ -1439,6 +1469,7 @@ requestIdleCallback(() => { import("./editor.js"); });
 ```
 
 **这段代码在做什么**
+
 - `addEventListener` 里用 `async` 回调，便于等待模块加载。
 - `await import("./editor.js")` 在运行时下载并执行模块。
 - 解构拿到模块导出的 `mountEditor` 函数再调用。
@@ -1461,6 +1492,7 @@ console.log("加载后", globalThis.__loaded, mod.v);
 ```
 
 **这段代码在做什么**
+
 - 临时模块在被导入时执行顶层语句，把标记改为 true。
 - 第一个输出证明模块体在 `import()` 之前没有执行。
 - `await import()` 完成后模块体执行，标记变为 true。
@@ -1487,6 +1519,7 @@ window.addEventListener("load", () => {
 ```
 
 **这段代码在做什么**
+
 - `getEntriesByType("resource")` 返回本页所有资源计时条目。
 - `initiatorType === "script"` 过滤出由脚本发起的请求。
 - `transferSize` 是压缩后的网络字节，缓存命中时可能为 0。
@@ -1540,6 +1573,7 @@ console.log("代码拆分校验通过，模块执行次数", globalThis.__hits);
 | 重复下载同一模块 | 多个路径解析到不同 URL | 统一模块说明符与打包配置 |
 
 **小结**
+
 - 代码拆分的收益来源是减少首屏必须下载与执行的字节。
 - 拆分边界按首屏是否一定执行来划。
 - 度量看首屏脚本字节与交互后的可响应时间。

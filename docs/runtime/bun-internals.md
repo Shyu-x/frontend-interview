@@ -88,6 +88,7 @@ flowchart TD
 ```
 
 **这段代码在做什么**
+
 1. 这只是核对清单，不是可执行代码。
 2. 把模糊印象拆成三条彼此独立的断言。
 3. 每条断言都要有出处，否则不能写进结论。
@@ -103,6 +104,7 @@ console.log(typeof versions.node);          // Node 20 下是 string
 ```
 
 **这段代码在做什么**
+
 1. `process.versions` 由标准运行时环境提供，键名不固定。
 2. `Object.keys` 取出全部键名，排序后方便对比两次输出。
 3. `typeof versions.node` 在 Node 20 下返回 `"string"`。
@@ -120,6 +122,7 @@ console.log(typeof globalThis); // 两边都是 object
 ```
 
 **这段代码在做什么**
+
 1. `typeof` 遇到未声明的名字返回字符串，不会触发引用错误。
 2. Node 下 `typeof Bun` 输出 `undefined`。
 3. Bun 下 `Bun` 是可访问的命名空间，具体成员需核对官方文档。
@@ -245,6 +248,7 @@ function findNodeModules(start) {
 ```
 
 **这段代码在做什么**
+
 1. 用 `existsSync` 判断某一层有没有 `node_modules` 目录。
 2. 命中就返回该层路径，调用方据此选择解析模式。
 3. 每轮循环用字符串切分上移一层，直到根目录。
@@ -266,6 +270,7 @@ function pickVersion({ importVersion, lockVersion, pkgVersion }) {
 ```
 
 **这段代码在做什么**
+
 1. 参数顺序对应资料的决策顺序，`import` 里写死的版本排在最前。
 2. `bun.lock` 存在时优先级高于 `package.json`。
 3. `package.json` 里可以是精确版本，也可以是范围。
@@ -288,6 +293,7 @@ function decideFetch({ hasCompatibleCache, latestCachedAt, now }) {
 ```
 
 **这段代码在做什么**
+
 1. 兼容版本命中缓存时直接返回，不发起网络请求。
 2. 解析目标是 `latest` 时，检查上次下载时间是否在 24 小时内。
 3. 两条都不满足才返回 `download`。
@@ -305,6 +311,7 @@ import { z as zRange } from "zod@^3.20.0"; // semver 范围
 ```
 
 **这段代码在做什么**
+
 1. `@3.0.0` 是精确版本，解析时不需要查 lockfile。
 2. `@next` 是 npm 标签，走注册表标签解析。
 3. `@^3.20.0` 是 semver 范围，命中范围内任一兼容版本。
@@ -430,6 +437,7 @@ console.log(BUILTIN.length); // 打印条目数量
 ```
 
 **这段代码在做什么**
+
 1. 数组内容逐项照抄官方文档的 loader 列表，一个不漏。
 2. `ts` 与 `tsx` 是两个独立条目，JSX 语法走 `tsx`。
 3. `toml`、`wasm`、`napi` 表示这些格式可以直接导入。
@@ -452,6 +460,7 @@ function pickLoader(fileName, overrides = {}) {
 ```
 
 **这段代码在做什么**
+
 1. 没有扩展名的文件返回空字符串，落进兜底分支。
 2. 覆盖表命中时直接返回，不会再看内置表。
 3. 覆盖表里没有的扩展名才查内置列表。
@@ -470,6 +479,7 @@ function pickLoader(fileName, overrides = {}) {
 ```
 
 **这段代码在做什么**
+
 1. `[loader]` 是顶层字段，键是带点的扩展名。
 2. 值必须是内置 loader 名称之一。
 3. 官方示例注释写明：用它加载 Bun 原生不支持的文件类型。
@@ -489,6 +499,7 @@ function pickLoader(fileName, overrides = {}) {
 ```
 
 **这段代码在做什么**
+
 1. 官方 API 表列出了 `Bun.Transpiler` 这个名称。
 2. 资料未覆盖它的构造参数与方法签名。
 3. 清单里的三项在动手前必须去官方文档确认。
@@ -610,6 +621,7 @@ console.log(file instanceof Blob);       // 继承自 Blob，断言成立
 ```
 
 **这段代码在做什么**
+
 1. `Bun.file` 接收路径，返回 BunFile 实例。
 2. 官方文档写明它是磁盘上文件的懒加载表示。
 3. 因为继承自 Blob，它可以直接参与 Blob 相关的 API。
@@ -629,6 +641,7 @@ const blob = new Blob([await readFile("./data.bin")]); // 转成 Blob
 ```
 
 **这段代码在做什么**
+
 1. `text` 适合读配置、模板、文本数据。
 2. `bytes` 返回 `Uint8Array`，适合二进制处理。
 3. `blob` 返回 Blob，可以直接交给需要 Blob 的接口。
@@ -647,6 +660,7 @@ await writeFile("out.bin", new Uint8Array([1, 2, 3])); // 写字节
 ```
 
 **这段代码在做什么**
+
 1. 第一个参数是目标路径，第二个参数是内容。
 2. 内容可以是字符串，也可以是字节视图。
 3. 官方归档示例用 `Bun.write` 把归档对象写到磁盘。
@@ -667,6 +681,7 @@ console.log(dv.getUint8(2));      // 读取第 2 字节
 ```
 
 **这段代码在做什么**
+
 1. `ArrayBuffer` 只能查看大小和切片，不能直接读写值。
 2. `DataView` 是按字节偏移读写的视图，适合二进制协议。
 3. 513 等于 `2 * 256 + 1`，按大端序落到第 1、2 字节。
@@ -786,6 +801,7 @@ Bun.serve({
 ```
 
 **这段代码在做什么**
+
 1. `Bun.serve` 接收一个配置对象。
 2. 配置里的 `fetch` 字段是请求处理函数。
 3. 函数返回值必须是 Response，可以带响应体和响应头。
@@ -803,6 +819,7 @@ port = 3000 # 未设置时的默认端口
 ```
 
 **这段代码在做什么**
+
 1. `[serve] port` 的默认值是 3000。
 2. 官方还写明可以用 `BUN_PORT` 或 `PORT` 环境变量设置。
 3. 命令行 `--port` 参数也可以设置端口。
@@ -821,6 +838,7 @@ ws.onmessage = (e) => console.log(e.data);       // 收到消息时打印
 ```
 
 **这段代码在做什么**
+
 1. 客户端用标准 `WebSocket` 构造器，不需要第三方库。
 2. 服务端一侧按官方 API 表由 `Bun.serve` 承载。
 3. 服务端具体配置字段资料未覆盖，需核对官方文档：`Bun.serve` 的 websocket 相关字段。
@@ -838,6 +856,7 @@ UDP（User Datagram Protocol，用户数据报协议）：Bun.udpSocket
 ```
 
 **这段代码在做什么**
+
 1. TCP 与 UDP 各有独立的起步函数，不经过 HTTP 层。
 2. 子进程有两个入口：异步的 `Bun.spawn` 与阻塞式的 `Bun.spawnSync`。
 3. `$` 提供 Shell 能力，官方 API 表把它单列一行。
@@ -951,6 +970,7 @@ pathIgnorePatterns = ["dist/**"] # 按 glob 排除文件与目录
 ```
 
 **这段代码在做什么**
+
 1. `root` 决定从哪个目录开始发现测试文件，默认是 `.`。
 2. `test.preload` 与顶层 `preload` 同名但作用范围不同。
 3. `pathIgnorePatterns` 用 glob（通配模式）排除文件，官方说明会剪掉匹配到的目录。
@@ -970,6 +990,7 @@ pathIgnorePatterns = ["dist/**"] # 按 glob 排除文件与目录
 ```
 
 **这段代码在做什么**
+
 1. 官方 API 表只给出名称 `Bun.build` 与文档路径。
 2. 资料未覆盖参数列表，因此不写猜测的调用代码。
 3. 清单里的三项是接项目时最先要确认的。
@@ -990,6 +1011,7 @@ file = false        # 关闭默认的 .env 加载
 ```
 
 **这段代码在做什么**
+
 1. `smol` 是官方明确写出取舍的开关：省内存，付出性能。
 2. `logLevel` 有三个取值，官方逐个列出。
 3. `telemetry` 默认开启，官方目前只用它收集匿名崩溃报告。
@@ -1012,6 +1034,7 @@ depth = 3 # console.log 的对象展开深度，默认 2
 ```
 
 **这段代码在做什么**
+
 1. `preload` 是数组，适合注册插件或做全局初始化。
 2. `define` 把全局标识符替换成常量表达式，值按 JSON（JavaScript Object Notation，JavaScript 对象表示法）解析。
 3. 官方提醒 `define` 的值解析规则可能在未来版本改成纯 TOML，属于历史遗留。
@@ -1120,6 +1143,7 @@ console.log(hasNodeModules ? "Node 风格解析" : "Bun 风格解析");
 ```
 
 **这段代码在做什么**
+
 1. `existsSync` 检查当前目录是否存在该目录。
 2. 官方原文是"工作目录或更高层"，所以真实实现要向上查找。
 3. 命中时保持 Node.js 风格的模块解析。
@@ -1138,6 +1162,7 @@ foo();
 ```
 
 **这段代码在做什么**
+
 1. 这一模式下不触发自动安装。
 2. 版本由 `package.json` 里声明的 semver 范围决定。
 3. 官方说明这条路径保证向后兼容，迁移成本低。
@@ -1154,6 +1179,7 @@ foo();
 ```
 
 **这段代码在做什么**
+
 1. 首次运行时代码在这里触发自动安装。
 2. 安装目标目录是全局模块缓存，不是项目里的 `node_modules`。
 3. 官方说明 `bun install` 与运行时共用同一个缓存。
@@ -1171,6 +1197,7 @@ foo();
 ```
 
 **这段代码在做什么**
+
 1. 第一条来自官方 Limitations，原因是类型声明文件在 `node_modules` 里。
 2. 第二条同样是官方 Limitations 原文。
 3. 第三条来自官方 FAQ 与 Deno 的对比段。
@@ -1283,6 +1310,7 @@ console.log(metric.name, metric.summary);
 ```
 
 **这段代码在做什么**
+
 1. 指标要有名字，避免事后换口径。
 2. 预热次数单独列出，是因为前几次会包含初始化开销。
 3. 计入统计的次数要写死，方便别人复现同样的样本量。
@@ -1304,6 +1332,7 @@ console.log(env.platform, env.arch);
 ```
 
 **这段代码在做什么**
+
 1. `process.versions.node` 给出运行时版本。
 2. `process.platform` 给出操作系统标识。
 3. `process.arch` 给出 CPU 架构。
@@ -1324,6 +1353,7 @@ console.log(t1 - t0);         // 单次耗时，单位毫秒
 ```
 
 **这段代码在做什么**
+
 1. `performance.now()` 返回高精度时间戳，单位毫秒。
 2. 计时范围只包含被测的那一行代码。
 3. 单次结果波动大，必须多次测量后取汇总值。
@@ -1340,6 +1370,7 @@ smol = true # 降低内存占用，官方说明代价是性能
 ```
 
 **这段代码在做什么**
+
 1. 官方原文说明该模式降低内存占用，代价是性能。
 2. 因此内存与吞吐这两类指标不能同时声称都变好。
 3. 做基准时要把这个开关的状态写进环境快照。

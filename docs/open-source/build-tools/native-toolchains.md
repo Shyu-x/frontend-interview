@@ -18,6 +18,7 @@ date: 2026-05-17
 Rolldown 是用 Rust 编写的 JavaScript/TypeScript 打包器，目标是为 Vite 提供高性能的生产构建能力，最终取代 Rollup + esbuild 的组合。
 
 **核心特性**：
+
 - Rollup 兼容的 API 和插件接口
 - 性能接近 esbuild，远超传统 JavaScript 打包器
 - 使用 oxc 项目进行解析和源码映射
@@ -297,6 +298,7 @@ export default defineConfig({
 esbuild 是一个极速的 JavaScript 打包/压缩工具，使用 Go 语言编写。它重新定义了"快速"的基准——比传统工具快 10-100 倍，而无需任何缓存。
 
 **核心特性**：
+
 - 极端速度，无需缓存即可实现
 - 内置支持 JavaScript、TypeScript、JSX、JSON、CSS
 - 提供 CLI、Go API、JavaScript API 三种使用方式
@@ -675,6 +677,7 @@ esbuild.build({
 SWC（Speedy Web Compiler）是高性能的 JavaScript/TypeScript 编译器，使用 Rust 编写。作为 Babel 的替代方案，SWC 提供 20-70 倍的转译速度提升。
 
 **核心特性**：
+
 - 完整的 Babel 兼容层（CLI 选项一致）
 - 支持 JSX、TypeScript、Flow 转译
 - Jest 集成（swc-node）
@@ -1014,6 +1017,7 @@ SWC 比 Babel 快 20-70 倍，具体取决于项目复杂度：
 Turbopack 是 Vercel 开发的增量打包器，使用 Rust 编写，专为 Next.js 优化。它是 Next.js 15+ 的默认打包器，目标是让大型应用也能拥有极速的开发体验。
 
 **核心特性**：
+
 - 增量计算：缓存精确到函数级别，重复构建几乎零开销
 - 懒编译：只打包浏览器实际请求的代码
 - 统一图：处理 Next.js 的客户端/服务端/边缘多种输出环境
@@ -1543,6 +1547,7 @@ Rolldown 的公开目标之一是兼容 Rollup 的插件接口与配置形态，
 目标：把一个已有 TypeScript 工具包的转译从 `tsc` 换成 esbuild 或 SWC，在同一套测试下对比耗时与体积。
 
 步骤：
+
 1. 挑一个你手上的 TS 包，记录当前构建命令，用 `time npm run build` 连跑 5 次并记下耗时。
 2. 记录当前产物的 gzip 体积：`gzip -c dist/index.js | wc -c`。
 3. 新写一份构建脚本输出到 `dist-next`，让两套产物并存，不改动原命令。
@@ -1552,6 +1557,7 @@ Rolldown 的公开目标之一是兼容 Rollup 的插件接口与配置形态，
 7. 写一份记录：5 次耗时的中位数、gzip 体积变化、测试结果、差异来源模块。
 
 验收标准：
+
 - 两套产物的导出符号排序后逐项相同，脚本输出可直接贴进记录。
 - 同一套单元测试在两套产物上全部通过。
 - 记录里有 5 次构建耗时，并注明机器与命令。

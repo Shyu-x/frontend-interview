@@ -217,6 +217,7 @@ runAgent();
 ```
 
 LCEL (LangChain Expression Language) 使用 pipe 操作符串联各组件：
+
 - `prompt.pipe(llm)` - 组合提示模板和模型
 - `.pipe(outputParser)` - 添加输出解析器
 - 支持 `.bind()` 绑定参数，`.withConfig()` 配置运行时

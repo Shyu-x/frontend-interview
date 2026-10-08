@@ -287,6 +287,7 @@ function add(a, b) { return a + b; }
 ```
 
 **TurboFan 优化：**
+
 - 生成优化机器码，使用 SSA（静态单赋值）
 - 类型专门化：若 a,b 始终是整数，优化为快速整数加法
 

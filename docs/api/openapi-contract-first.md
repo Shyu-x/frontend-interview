@@ -1334,6 +1334,7 @@ function checkListQuery(req) { // 校验 /orders 的 query 参数
 **怎么度量收益**：用 k6 对 `/orders` 跑固定场景，看 `http_req_failed` 与 `http_req_duration`。服务端统计返回 400 且 errors 非空的请求占比，这个占比上升说明非法输入被拦在业务逻辑之外。
 
 **什么时候不该用**：
+
 - 该接口只被一个内部批处理任务调用，参数由同一份代码生成，不存在人工拼串。
 - 查询条件不参与权限与计费判断，非法值最多返回空列表，在数据访问层拦截即可。
 
@@ -1373,6 +1374,7 @@ components:
 **怎么度量收益**：在服务入口记录校验失败次数与失败字段名，用日志查询按字段聚合。客户端埋点统计“操作同步失败”事件数，本地用 20 个客户端并发提交，观察错误列表的字段分布。
 
 **什么时候不该用**：
+
 - 操作体是图片或音频分片这类二进制，JSON Schema 描述不了内部结构，只能校验头部元数据。
 - 操作频率达到每秒百次以上又要逐条校验时，把结构校验放在设备端，服务端只做抽样与签名校验。
 
@@ -1406,6 +1408,7 @@ jobs:
 **怎么度量收益**：统计 CI 中契约任务的失败次数与失败规则名。统计 openapi-typescript 生成文件的 git diff 行数，用它衡量每次契约变更的影响面。第三方 issue 打上“字段与文档不一致”标签后按周统计数量。
 
 **什么时候不该用**：
+
 - 消费方只有 1 个内部调用者，且双方在同一仓库同时改代码，类型可以直接从代码导出。
 - 接口处于探索期、字段按天调整，此时冻结契约会拖慢迭代。
 
@@ -1429,6 +1432,7 @@ jobs:
 **目标**：为任务清单服务的两个接口写契约，让请求校验、mock、类型生成在同一条流水线上跑通。
 
 **步骤**：
+
 1. 建仓库目录，写 openapi.json，info 里填 title 与 version。
 2. 写 GET /tasks：query 含 page、pageSize、status，status 用 enum 列出取值，定义放 components.schemas。
 3. 写 POST /tasks：requestBody 用 `$ref` 指向 components.schemas.Task，required 标出必填字段。
@@ -1438,6 +1442,7 @@ jobs:
 7. 写 CI 步骤：跑 Redocly lint、跑校验脚本自测用例、跑生成命令后检查 git diff。
 
 **验收标准**：
+
 - 请求 `/tasks?pageSize=abc` 返回 400，errors 里出现 pageSize。
 - mock 对 `GET /tasks?pageSize=20` 返回的 JSON 通过契约校验。
 - 改动 schema 后不重跑类型生成，CI 任务退出码非零。

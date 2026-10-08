@@ -22,6 +22,7 @@ description: "弱引用语义、FinalizationRegistry 与泄漏模式"
 GC Roots 包含但不限于：全局对象、当前活跃执行栈上的局部变量与寄存器、引擎内部的活跃表（如正在被 FinalizationRegistry 处理的 BeingFinalized 列表）、活跃的原生句柄（v8::Global、DOM 包装器等）。弱引用（weak edge）不进根集，也不参与传播的主循环，这是弱语义的全部基础。
 
 V8 的主回收器 Mark-Compact 使用三色标记：
+
 - white：尚未被访问，标记结束时仍为 white 的即垃圾。
 - grey：已被发现、但其出边尚未扫描。
 - black：已扫描完毕。
@@ -877,6 +878,7 @@ function getRowNode(row) {
 **怎么度量收益**：Chrome DevTools 的 Memory 面板抓三次快照，分别是"进入页面""翻页 20 次后""强制回收后"，对比行元素的实例数。Performance 面板录制翻页动作，看 Scripting 时间与 JS Heap 曲线的形状。
 
 **什么时候不该用**：
+
 - 行数据是字符串或数字：WeakMap 拒绝原始值作为键。
 - 需要按行号遍历缓存做统计：WeakMap 不可枚举，拿不到键列表。
 - 需要跨页面刷新复用渲染结果：页面卸载后 WeakMap 随 realm 一起消失。
@@ -912,6 +914,7 @@ function getBitmap(url) {
 **怎么度量收益**：用真机加 Chrome 远程调试连上 Memory 面板，清空缓存冷启动 5 次，记录 JS Heap 峰值分布。用 PerformanceObserver 观察 largest-contentful-paint，对比开启与关闭缓存的分布。
 
 **什么时候不该用**：
+
 - 资源需要确定性释放，例如 WebGL 纹理、ImageBitmap、文件句柄：改成显式 dispose 加引用计数。
 - 目标对象频繁被 GC 回收导致 deref 经常落空：改成 Map 加 TTL，让缓存寿命可预期。
 - 首屏关键图片要求立即可用：用强引用常驻，靠容量上界控制总量。
@@ -948,6 +951,7 @@ function hideCursor(session) {
 **怎么度量收益**：Memory 面板抓快照，重复 20 次"加入用户再离开"，观察光标元素与会话对象的实例数是否随次数增长。用 Allocation instrumentation on timeline 观察退出动作期间的分配能否被回收。
 
 **什么时候不该用**：
+
 - 需要枚举在线用户或按 id 查会话：用 Map 加显式 delete。
 - 需要跨 iframe 或 Worker 共享这张映射：WeakMap 限于单个 realm。
 
@@ -994,6 +998,7 @@ MDN 的 WeakMap 页面给出把私有属性与实例关联的示例，实例失�
 **目标**：做一个能在本地复现、定位并修掉一条强引用路径的最小工程。
 
 **步骤**：
+
 1. 建一个页面，生成 500 个行对象，每个对象对应一个 DOM 节点，另放"挂载"与"卸载"两个按钮。
 2. 不做缓存，反复挂载卸载 20 次，用 Memory 面板抓快照作为基线。
 3. 加一个模块级 Map 缓存行对象到节点，重复 20 次，抓快照并记录 detached 节点数。
@@ -1003,6 +1008,7 @@ MDN 的 WeakMap 页面给出把私有属性与实例关联的示例，实例失�
 7. 整理一页排查记录：触发条件、指标、路径、修复方式、回归门禁。
 
 **验收标准**：
+
 - 三次快照的行节点实例数都有记录，WeakMap 版本在强制回收后回到基线水平。
 - 能写出修复前那条强引用路径的变量名与所在文件。
 - Node 脚本在 20 轮加强制回收后，heapUsed 增量低于本项目实测基线。

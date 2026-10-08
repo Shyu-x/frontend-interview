@@ -1452,6 +1452,7 @@ add_header Alt-Svc 'h3=":443"; ma=600' always;  # 缓存 600 秒
 **怎么度量收益**：用 Chrome DevTools Network 面板看 `Load` 与 `Finish`，在 `tc qdisc add dev eth0 root netem loss 1% delay 50ms` 下重复 20 次取中位数。对比同一表格页在 `h2` 与 `h3` 下的 `Load` 时间。
 
 **什么时候不该用**：
+
 - 内网丢包率长期为 0，且浏览器到网关延迟低于 5ms。
 - 表格必须在首屏一次渲染完整 1 万行，无法分页或虚拟滚动。
 
@@ -1488,6 +1489,7 @@ console.log('导航协议', nav?.nextHopProtocol); // 第二次访问应为 h3
 **怎么度量收益**：Chrome DevTools Performance 面板看 `First Contentful Paint` 与 `Largest Contentful Paint`；Chrome Remote Debugging 连接低端安卓机。用 `chrome://net-export` 导出网络日志，筛选 `QUIC_SESSION`。
 
 **什么时候不该用**：
+
 - 目标安卓机的系统 WebView 不支持 UDP 443，或企业 Wi-Fi 封锁 UDP 443。
 - 首屏 GET 会写数据库或扣库存，不能承受 0-RTT 重放。
 
@@ -1527,6 +1529,7 @@ for {
 **怎么度量收益**：服务端开启 qlog，用 qvis 查看 `PATH_CHALLENGE` 与 `PATH_RESPONSE`；客户端用 `chrome://net-export` 记录 `QUIC_SESSION`。指标：迁移后首个白板消息的往返时间。
 
 **什么时候不该用**：
+
 - 白板只固定在工位有线网使用，没有网络切换。
 - 服务端已经用短连接和 IP 绑定会话，迁移后仍会重建状态。
 
@@ -1554,6 +1557,7 @@ qlog 与 qvis 分析（出处：qlog 开源项目 / IETF qlog 草案）。做法
 目标：搭一个静态站点，同时提供 HTTP/2 与 HTTP/3，并验证 Alt-Svc 升级、0-RTT 恢复与连接迁移。
 
 步骤：
+
 1. 用 nginx 配置 `listen 443 ssl`、`http2 on`、`listen 443 quic reuseport` 与 `Alt-Svc` 头。
 2. 准备一个含 30 个图片资源的页面，确保每个资源可单独缓存。
 3. 用 `curl --http2` 与 `curl --http3` 分别请求页面，记录 `time_total`。
@@ -1563,6 +1567,7 @@ qlog 与 qvis 分析（出处：qlog 开源项目 / IETF qlog 草案）。做法
 7. 在手机上切换 Wi-Fi 与蜂窝网络，观察白板或长连接是否断开。
 
 验收标准：
+
 - `curl --http3` 与 `curl --http2` 都能返回 200，且响应头含 `Alt-Svc`。
 - 弱网 1% 丢包下重复 20 次，HTTP/3 的 `Load` 时间中位数不高于 HTTP/2。
 - `PerformanceObserver` 在第二次访问时打印出 `h3`。

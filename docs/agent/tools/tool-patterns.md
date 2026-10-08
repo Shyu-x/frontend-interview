@@ -97,6 +97,7 @@ const readFileSchema: JSONSchema = {
 ```
 
 **这段代码在做什么**
+
 - name 是注册表的键，同名注册会互相覆盖，旧页的实现里就是直接覆盖且不报错。
 - description 不是文档而是提示词，写的是能力边界，决定这个工具被选中的概率。
 - inputSchema 顶层必须是 object，旧页的注册表在写入前会强制检查这一条。
@@ -137,6 +138,7 @@ function validate(input: Record<string, unknown>, schema: JSONSchema) {
 ```
 
 **这段代码在做什么**
+
 - 填充函数先浅拷贝再写入，调用方手里的原对象保持不变。
 - 判断条件是 undefined，不是 falsy，所以空字符串和 0 会被当成有效值。
 - 校验函数收集错误而不抛异常，调用方一次能拿到全部问题。
@@ -320,6 +322,7 @@ class ToolRegistry {
 ```
 
 **这段代码在做什么**
+
 - 用两个 Map 分开存元数据与可执行函数，同一个 name 把两边对齐。
 - 注册时先查 has，重复注册抛错，避免旧实现里静默覆盖的问题。
 - get 返回 undefined 而不是抛错，把是否存在交给调用方判断。
@@ -362,6 +365,7 @@ class ToolExecutor {
 ```
 
 **这段代码在做什么**
+
 - 六个阶段顺序固定，查定义在最前，因为后面每一步都依赖它。
 - 校验失败必须发生在执行之前，参数不合法的调用不会真正产生副作用。
 - 错误分支统一走 errorHandler，调用方只需判断 success 字段。
@@ -518,6 +522,7 @@ async function readFileTool(input: { path: string; encoding?: string; lineStart?
 ```
 
 **这段代码在做什么**
+
 - normalize 会把路径里的 `.` 与重复分隔符消掉，`..` 则保留下来，因此可以据此判断。
 - isAbsolute 先拦掉相对路径，因为相对路径的解释依赖进程当前目录。
 - stat 的结果用来判断是文件还是目录，以及文件大小是否超限。
@@ -557,6 +562,7 @@ function normalizeOptions(input: { command: string; workingDirectory?: string; t
 ```
 
 **这段代码在做什么**
+
 - 黑名单用字符串包含匹配，能挡住最典型的写法，但绕不过变形写法，它只是第一层。
 - 白名单是真正的授权决策，只取首个 token 判断，管道与串联命令需要更细的解析。
 - 默认拒绝意味着新增命令必须显式加进集合，这是安全优先的取舍。
@@ -732,6 +738,7 @@ function shouldRetry(code: ToolErrorCode, retryCount = 0): boolean {
 ```
 
 **这段代码在做什么**
+
 - 策略表用 Record 加联合类型做穷尽映射，漏配一个错误码会在编译期报错。
 - 权限错误不把底层 message 透传，避免泄漏服务器上的真实路径。
 - 限流给了 backoffMs 基准值，供上层实现指数退避，这里只声明不实现。
@@ -768,6 +775,7 @@ function sanitize(value: unknown, seen = new WeakSet<object>()): unknown {
 ```
 
 **这段代码在做什么**
+
 - 先处理字符串截断再判断对象，字符串是最后会进入模型上下文的主要载荷。
 - WeakSet 记录已经访问过的对象，遇到环引用时返回占位字符串而不是抛错。
 - 数组只取前 1000 项，避免一次搜索的原始结果撑爆上下文。
@@ -925,6 +933,7 @@ function assertWithinLimit(requests: ToolCallRequest[]) {
 ```
 
 **这段代码在做什么**
+
 - 分批加批内并发，把并发数钳在 limit 上，两批之间天然串行。
 - 结果按输入顺序 push，调用方不需要再排序。
 - assertWithinLimit 在真正执行前拦掉超大请求，报错信息里带上两个数字便于定位。
@@ -958,6 +967,7 @@ async function executeAll(
 ```
 
 **这段代码在做什么**
+
 - 外层按组循环，组与组之间严格串行，这是依赖关系的落点。
 - 组内结果先收齐再做失败判断，避免丢失同组其它调用的结果。
 - stopOnError 为真时返回停止标记与触发停止的调用 id，便于上层定位。
@@ -1127,6 +1137,7 @@ function runInSandbox(input: RunInput) {
 ```
 
 **这段代码在做什么**
+
 - spawn 不带 shell 参数，命令与参数分开传，避免 shell 解释特殊字符。
 - timeout 与 killSignal 由 Node 负责到点发信号，不用自己写定时器。
 - env 显式裁剪成一个只有 PATH 的对象，父进程的敏感变量不会进子进程。
@@ -1160,6 +1171,7 @@ function shapeResult(raw: { code: number | null; stdout: string; stderr: string;
 ```
 
 **这段代码在做什么**
+
 - 上限判断放在拼接之前，已经到顶就完全不解析新数据。
 - 按剩余空间切片，最后一次拼接只会补上还能放下的部分。
 - 超时与非零退出码映射成不同的错误码，上层据此决定是否重试。
@@ -1319,6 +1331,7 @@ function gate(toolName: string, metadata: ToolMetadata | undefined, approved: bo
 ```
 
 **这段代码在做什么**
+
 - 元数据里两个字段共同决定是否需要确认，显式声明优先于分类推断。
 - gate 返回三种状态里的两种：等确认或执行，调用方据此决定是否继续。
 - 等待确认返回的是状态而不是异常，方便上层渲染确认对话框。
@@ -1348,6 +1361,7 @@ async function guardedExecute(call: { name: string; input: any }, deps: {
 ```
 
 **这段代码在做什么**
+
 - 四层按顺序排，前一层不通过就不会进入下一层，检查成本逐层递增。
 - 授权检查读的是工具元数据，与参数内容无关，所以它挡的是操作类型而不是某次输入。
 - 沙箱调用统一走 sandboxRun，超时默认值与 Schema 保持一致。

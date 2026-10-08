@@ -141,10 +141,12 @@ const useStore = create(
 // 但 persist 的水合发生在 store 创建之后，首屏可能先渲染初始值再被持久化值覆盖（React 中表现为一次额外渲染）。
 ```
 **npm 下载统计**:
+
 - 22K+ GitHub stars
 - 15M+ 周下载量
 
 **参考链接**:
+
 - [Zustand 官网](https://zustand-demo.pmnd.rs)
 - [Zustand GitHub](https://github.com/pmndrs/zustand)
 
@@ -239,10 +241,12 @@ const { data } = useSWR(userId ? `/api/user/${userId}` : null, fetcher)
 ```
 
 **npm 下载统计**:
+
 - 25K+ GitHub stars
 - 10M+ 周下载量
 
 **参考链接**:
+
 - [SWR 官网](https://swr.vercel.app)
 - [SWR GitHub](https://github.com/vercel/swr)
 
@@ -338,10 +342,12 @@ function App() {
 | API | 优秀 | 良好 | 良好 | 优秀 |
 
 **npm 下载统计**:
+
 - 39K+ GitHub stars
 - 20M+ 周下载量
 
 **参考链接**:
+
 - [React Hook Form 官网](https://react-hook-form.com)
 - [React Hook Form GitHub](https://github.com/react-hook-form/react-hook-form)
 
@@ -455,10 +461,12 @@ function TodoList() {
 ```
 
 **npm 下载统计**:
+
 - 22K+ GitHub stars
 - 15M+ 周下载量
 
 **参考链接**:
+
 - [Framer Motion 官网](https://www.framer.com/motion/)
 - [Framer Motion GitHub](https://github.com/framer/motion)
 
@@ -527,10 +535,12 @@ axios.interceptors.response.use(
 ```
 
 **npm 下载统计**:
+
 - 104K+ GitHub stars
 - 60M+ 周下载量
 
 **参考链接**:
+
 - [Axios 官网](https://axios-http.com)
 - [Axios GitHub](https://github.com/axios/axios)
 
@@ -588,10 +598,12 @@ const data = await api.get('users').json()
 | 取消请求 | CancelToken | AbortSignal | AbortSignal | AbortSignal |
 
 **npm 下载统计**:
+
 - 10K+ GitHub stars
 - 2M+ 周下载量
 
 **参考链接**:
+
 - [Ky GitHub](https://github.com/sindresorhus/ky)
 
 ---
@@ -630,10 +642,12 @@ try {
 ```
 
 **npm 下载统计**:
+
 - Nuxt 生态核心依赖
 - 百万级使用
 
 **参考链接**:
+
 - [ofetch GitHub](https://github.com/unjs/ofetch)
 
 ## 4. 微前端架构
@@ -763,6 +777,7 @@ const RemoteButton = React.lazy(() => import('remoteApp/Button'))
 ```
 
 **参考链接**:
+
 - [Module Federation 官网](https://module-federation.io)
 - [Webpack MF 文档](https://webpack.js.org/concepts/module-federation/)
 
@@ -961,6 +976,7 @@ function ExampleDialog() {
 }
 ```
 **参考链接**:
+
 - [shadcn/ui 官网](https://ui.shadcn.com)
 - [shadcn/ui GitHub](https://github.com/shadcn-ui/ui)
 
@@ -1037,6 +1053,7 @@ const pick = UserSchema.pick({ name: true, email: true })
 ```
 
 **参考链接**:
+
 - [Zod 官网](https://zod.dev)
 - [Zod GitHub](https://github.com/colinhacks/zod)
 
@@ -1137,6 +1154,7 @@ supabase link --project-ref your-project-id
 **周下载量**: 1570 万 | **GitHub**: 72K stars
 
 **参考链接**:
+
 - [Supabase 官网](https://supabase.com)
 - [Supabase 文档](https://supabase.com/docs)
 - [GitHub](https://github.com/supabase/supabase-js)
@@ -1174,6 +1192,7 @@ firebase deploy
 **周下载量**: 756 万
 
 **参考链接**:
+
 - [Firebase 文档](https://firebase.google.com/docs)
 - [GitHub](https://github.com/firebase/firebase-js-sdk)
 
@@ -1204,6 +1223,7 @@ unzip pb.zip
 **GitHub**: 34K stars
 
 **参考链接**:
+
 - [PocketBase 官网](https://pocketbase.io)
 - [GitHub](https://github.com/pocketbase/pocketbase)
 

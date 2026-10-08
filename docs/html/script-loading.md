@@ -10,6 +10,7 @@ description: src 与 href 的渲染阻塞差异，以及 script 的 async / defe
 ### 1.1 img src — 图片资源的加载行为
 
 **行为**：
+
 - 下载与 HTML 解析并行
 - 渲染树（Render Tree）构建时，`img` 需要图片数据才能绘制 → **渲染被阻塞**
 - 图片下载完成后触发重绘（repaint）
@@ -509,6 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
 3. **破坏需要 early execution 的逻辑**：如需要尽早读取 `window.pluginAPI` 的第三方集成代码
 
 最佳做法是分析依赖关系，按需分层：
+
 - **关键路径（阻塞首屏交互）**：内联少量同步脚本
 - **框架/核心逻辑**：defer
 - **统计/监控**：async（不需要等 DOM）
@@ -529,6 +531,7 @@ document.addEventListener('DOMContentLoaded', () => {
 ```
 
 区别在于：`type="module"` 会：
+
 - 默认请求 CORS（需要 `crossorigin` 属性配合）
 - 在 `window.module` 中暴露为模块（而非普通脚本）
 - 有独立的模块级作用域（不污染全局）

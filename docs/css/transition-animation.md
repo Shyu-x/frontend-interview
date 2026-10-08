@@ -86,11 +86,13 @@ transition-timing-function:
 ### 1.4 性能优化与 GPU 加速
 
 **触发 GPU 加速的属性（推荐用于动画）**：
+
 - `transform: translate() / scale() / rotate()`
 - `opacity`
 - `filter: blur()`
 
 **不推荐动画的属性（会触发重排/重绘）**：
+
 - `width` / `height`（重排）
 - `margin` / `padding`（重排）
 - `left` / `top` / `right` / `bottom`（重排）
@@ -296,6 +298,7 @@ function useWillChange(enabled: boolean) {
 ### 2.2 CSS 动画性能差的原因
 
 **性能差的 CSS 属性（触发布局/重绘）：**
+
 - `width`, `height`
 - `margin`, `padding`
 - `top`, `left`, `right`, `bottom`
@@ -310,6 +313,7 @@ function useWillChange(enabled: boolean) {
 ```
 
 **动画性能好的 CSS 属性：**
+
 - `transform`（translate, scale, rotate）
 - `opacity`
 

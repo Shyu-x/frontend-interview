@@ -253,6 +253,7 @@ flowchart TB
 ```
 
 **圣杯 vs 双飞翼 区别：**
+
 - 圣杯：`main` 无专属容器，用 `padding` + `relative` 调整
 - 双飞翼：`main` 有专属包裹容器，用 `margin` 调整，避免 `relative`
 - 双飞翼更简洁，避免了圣杯中 `relative` 定位的问题（如 overflow 裁剪）

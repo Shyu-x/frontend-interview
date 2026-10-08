@@ -1543,6 +1543,7 @@ http.createServer((req, res) => {
 **怎么度量收益**：Chrome DevTools 的 Network 面板看单次请求的 transferSize 与 TTFB。服务端用 Prometheus 采集 `http_request_duration_seconds` 的 p95。数据库侧用 `EXPLAIN ANALYZE` 确认分页查询走了索引扫描。
 
 **什么时候不该用**：
+
 - 数据是进程内的数组且行数固定在几百行以内，一次返回比分页少一次往返。
 - 需要对账全量导出时，逐页拉会漏掉并发写入的行，要改用快照游标或一次导出任务资源。
 
@@ -1578,6 +1579,7 @@ res.end(JSON.stringify(article));
 **怎么度量收益**：Chrome DevTools 的 Network 面板看 Size 列是否显示 304。服务端统计 304 响应数占总响应数的比例。用 Lighthouse 的 mobile 预设跑 LCP 与 total byte weight。
 
 **什么时候不该用**：
+
 - 响应体解压后只有几 KB 且每次内容都不同，配 ETag 只会多一次往返。
 - 客户端每次都带 `Cache-Control: no-store` 时，协商逻辑不会被触发。
 - 文章内容按用户身份做字段裁剪时，ETag 要把用户维度算进版本号，否则会串数据。
@@ -1619,6 +1621,7 @@ async function putOp(req, res, boardId, opId) {      // 单例资源：一笔操
 **怎么度量收益**：用 k6 的 constant-vus 场景重放同一 opId，脚本断言第二次响应体与第一次一致。服务端计数 412 响应数除以总写入数，得到冲突率。用 autocannon 压同一白板，观察版本冲突随并发上升的曲线。
 
 **什么时候不该用**：
+
 - 只读的展示型页面不存在并发写入，加 If-Match 只是多一次版本比对。
 - 需要服务端做字符级合并的协作文档，HTTP 条件请求解决不了，要换 CRDT 或 OT 库，例如 Yjs、Automerge。
 - 操作本身就是幂等的绝对值覆盖（例如拖拽结束后的坐标），不需要单独的 opId 资源。
@@ -1659,6 +1662,7 @@ async function putOp(req, res, boardId, opId) {      // 单例资源：一笔操
 **目标**：用 `node:http` 写一个任务清单服务，覆盖集合资源、单例资源、内容协商与 HATEOAS 链接，并用 curl 验证。
 
 **步骤**：
+
 1. 建模：`/tasks` 是集合资源，`/tasks/:id` 是单例资源，`/tasks/:id/status` 用 PUT 覆盖状态。
 2. 实现 GET /tasks，支持 limit 与 cursor 查询参数，服务端把 limit 收敛到 50。
 3. 实现 GET /tasks/:id，响应带 ETag、`_links.self` 与 `_links.status`。
@@ -1668,6 +1672,7 @@ async function putOp(req, res, boardId, opId) {      // 单例资源：一笔操
 7. 写一个 verify.sh，用 curl 跑完下面全部断言。
 
 **验收标准**：
+
 - `curl -i 'localhost:3000/tasks?limit=500'` 返回条数不超过 50，响应头含 Link。
 - 对同一任务连续两次 `curl -X PUT .../status -H 'If-Match: "1"'`，第二次返回 412。
 - 带同一 Idempotency-Key 连续两次 POST /tasks，返回的 id 相同，服务端任务总数只加 1。

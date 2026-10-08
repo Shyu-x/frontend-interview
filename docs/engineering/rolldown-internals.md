@@ -1465,6 +1465,7 @@ console.log(used.includes('LINE_IMPL'), unused.includes('LINE_IMPL')) // true fa
 **怎么度量收益**：看 dist 总体积与首屏 chunk 体积，命令是 `du -sh dist` 与 `ls -l dist/*.js`；再开 Chrome DevTools 的 Coverage 面板，读未使用字节占比。
 
 **什么时候不该用**：
+
 - 图表库自带副作用，比如自动注册组件、写全局变量，删不掉，此时要换按需引入的产物。
 - 只跑一次的脚本工程，写构建配置的成本高于省下的体积。
 - 图表已经在 dynamic chunk 里且首屏不引用，不必再追这条。
@@ -1498,6 +1499,7 @@ export default {
 **怎么度量收益**：用 Lighthouse 读 LCP 与 TBT，用 Chrome DevTools Performance 面板录制首屏过程，用 `du -sh dist` 看初始 chunk 体积。
 
 **什么时候不该用**：
+
 - 首屏本来就是静态 HTML 且体积不大，改多入口看不出差别。
 - 目标浏览器不支持 ESM 时，只出 esm 会让低端机直接报错，要留降级产物。
 
@@ -1530,6 +1532,7 @@ console.log(chunks.map((c) => Object.keys(c.modules))) // 每个 chunk 装了谁
 **怎么度量收益**：看 `output` 里的 chunk 数量与文件名；用浏览器 Network 面板数首屏请求数与传输体积；用 Lighthouse 的 LCP 与 TBT 看用户侧感受。
 
 **什么时候不该用**：
+
 - 白板是单页应用且内核必须首屏就绪，拆出去会多一次请求往返。
 - 模块总量很少时，拆分的请求开销大于并行收益。
 - 服务端渲染首屏要内核直接产出 HTML，动态加载会让内容闪一下。
@@ -1563,6 +1566,7 @@ DevTools 的 Coverage 面板给出未使用字节占比，Lighthouse 给出 LCP 
 **目标**：建一个最小仓库，用 Rolldown 验证 tree shaking 的两个条件，并复现 initial、dynamic、common 三类 chunk。
 
 **步骤**：
+
 1. 建仓库，写 `src/main.js`，它引用 `src/geometry.js`，并在按钮回调里 `import('./board.js')`。
 2. 让 `src/board.js` 也引用 `src/geometry.js`，使它与入口形成共用关系。
 3. 写 `src/chart.js`，导出一个函数，函数体里放一段可搜索的字符串，另加一句写全局变量的副作用语句。
@@ -1572,6 +1576,7 @@ DevTools 的 Coverage 面板给出未使用字节占比，Lighthouse 给出 LCP 
 7. 在 README 记一次基线：初始 chunk 体积、chunk 数量、构建耗时。
 
 **验收标准**：
+
 - 不调用函数且模块无副作用时，产物里搜不到那段字符串。
 - 保留副作用语句后重新构建，该模块被保留，脚本能打印出前后差异。
 - `assert-chunks.mjs` 打印的 chunk 数量与断言一致，文件名在两次运行间稳定。

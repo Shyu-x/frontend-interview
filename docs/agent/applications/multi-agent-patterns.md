@@ -103,6 +103,7 @@ console.log(canSplit({ requiredSkills: ['search', 'write'], steps: 2 }));
 ```
 
 **这段代码在做什么**
+
 - `Set` 用来去重，避免同一个技能写两次就把种类数算高。
 - `skillKinds >= 3` 表示任务跨越三个专业方向，单个 Agent 的提示词会互相冲突。
 - `steps >= 4` 表示步骤足够多，拆分后每段仍有实际工作量。
@@ -151,6 +152,7 @@ for (const step of plan) {
 ```
 
 **这段代码在做什么**
+
 - `inputKeys` 与 `outputKey` 一起勾出隐式依赖：谁先跑、谁后跑一眼能看出来。
 - `forbidden` 是负面清单，提示词里写清楚"不许做什么"比只写"要做什么"更能约束行为。
 - 三段串起来形成 `topic → research → analysis → report` 的数据流。
@@ -315,6 +317,7 @@ console.log(await route('我想申请退款'));
 ```
 
 **这段代码在做什么**
+
 - `specialists` 是一份可配置清单，加新专家只需往数组里加一项。
 - `find` 返回第一个命中项，所以关键词顺序会影响结果，冲突词要提前排查。
 - `callAgent` 用定时器模拟网络调用，把真实模型调用换成可控延迟，便于测试。
@@ -354,6 +357,7 @@ async function orchestrate(task, maxRounds = 2) {
 ```
 
 **这段代码在做什么**
+
 - `Promise.race` 取最先落地的那个结果，谁快听谁的。
 - 超时分支只负责抛错，不改动原 Promise，所以超时后原请求仍在后台跑。
 - `maxRounds` 是硬上限，避免超时后无限重试。
@@ -507,6 +511,7 @@ console.log(await teamLead(['a', 'b']));
 ```
 
 **这段代码在做什么**
+
 - `units.map(worker)` 会立刻为每个单元发起调用，任务之间没有先后依赖。
 - `Promise.all` 等全部完成，结果数组顺序与输入顺序一致。
 - 若其中一个单元抛错，`Promise.all` 会整体拒绝，需要在外层决定是否降级。
@@ -536,6 +541,7 @@ async function director(plan) {
 console.log(await director({ front: ['a', 'b'], back: ['c'] }));
 ```
 **这段代码在做什么**
+
 - `Object.entries` 把板块配置转成可遍历的键值对。
 - 顺序 `await` 让同一时刻只有一个板块在跑，并发峰值等于单组单元数。
 - 结果用对象承载，键就是板块名，便于按板块重跑失败部分。
@@ -677,6 +683,7 @@ console.log(state);
 ```
 
 **这段代码在做什么**
+
 - `{ ...state, ...stage.run(state) }` 生成新对象，旧对象保持不变，便于逐步回放。
 - 每个阶段只关心自己读的键，`outline` 阶段甚至不需要读状态。
 - 顺序由数组顺序决定，把阶段顺序写死在配置里比写在代码里更易审阅。
@@ -715,6 +722,7 @@ console.log(await runWithTiming(stages, { topic: 'x' }));
 ```
 
 **这段代码在做什么**
+
 - `performance.now()` 取高精度时间戳，单位是毫秒。
 - `toFixed(2)` 把耗时压到两位小数，日志里更好比对。
 - 返回 `timings` 让调用方能在不改阶段代码的前提下收集指标。
@@ -867,6 +875,7 @@ console.log(runGraph(nodes, {}).state);
 ```
 
 **这段代码在做什么**
+
 - `node.run(state)` 返回补丁对象，执行器负责合并，节点不需要知道状态全貌。
 - `trace` 记录每个节点执行后的状态，便于定位是哪一步改坏了数据。
 - `condition` 返回 `false` 时用 `break` 停止，效果就是条件边不成立时跳过后续节点。
@@ -906,6 +915,7 @@ console.log(runLoopGraph(nodes, {}, 5));
 ```
 
 **这段代码在做什么**
+
 - `next` 是条件边的实现：返回下一个节点的下标，默认加一。
 - 两个节点互相指回对方，形成循环，`maxSteps` 保证循环一定结束。
 - `stopped` 标记是否因为触顶而结束，调用方据此决定重试还是告警。
@@ -1061,6 +1071,7 @@ console.log(results, elapsed);
 ```
 
 **这段代码在做什么**
+
 - `map` 里的调用立刻执行，三个定时器同时开始计时。
 - `await` 在一个循环里逐个等待，但因为任务已经启动，总耗时约等于最慢的那一个。
 - `results` 的顺序严格等于 `tasks` 的顺序，不受实际完成先后影响。
@@ -1101,6 +1112,7 @@ console.log(await collect(pending));
 ```
 
 **这段代码在做什么**
+
 - `try/catch` 放在循环内部，单个失败不会中断其余收集。
 - 成功项带上 `index`，聚合时能按原顺序还原。
 - 失败项只保留 `index` 和原因，重试时按 `index` 重新取子任务配置。
@@ -1266,6 +1278,7 @@ console.log(needed);
 ```
 
 **这段代码在做什么**
+
 - 每项约束都带一个可回答的问题，避免"要不要更好"这类无法判定的讨论。
 - `needed` 字段是布尔值，来自业务方确认，不是技术偏好。
 - 输出结果直接作为选型评审的输入清单。
@@ -1305,6 +1318,7 @@ console.log(rank({ state: 3, hitl: 3, chat: 1 }));
 ```
 
 **这段代码在做什么**
+
 - `weights` 由项目约束决定，需要持久化与人工介入的项目会给 `state`、`hitl` 高权重。
 - 加权和把多维度比较压成一个可排序的数字，便于开会讨论。
 - `sort` 返回新数组，不改动 `frameworks` 配置。

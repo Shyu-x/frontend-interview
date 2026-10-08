@@ -77,6 +77,7 @@ const PRICING_PER_MTok = {
 ```
 
 **这段代码在做什么**
+
 - `input` 与 `cacheRead` 的 10 倍差来自 Manus 官方博客：Claude Sonnet 未缓存输入约 3 美元/百万 token，缓存读约 0.30 美元/百万 token，以原文为准。
 - `cacheWrite5m` 是输入的 1.25 倍、`cacheWrite1h` 是 2 倍，来自 Anthropic 官方文档 prompt caching 定价，以原文为准。
 - `output` 设为 `null`，因为本页资料未覆盖输出单价，需核对官方文档后填入。
@@ -99,6 +100,7 @@ class TokenEntry {
 ```
 
 **这段代码在做什么**
+
 - 构造函数要求调用方一次传四列，少传就会得到 `undefined`，便于尽早发现漏记。
 - `totalTokens` 只做数量求和，不做费用计算。
 - 把列切开后，后面换算费用时才能应用不同单价。
@@ -122,6 +124,7 @@ function costOf(entry, price) {
 ```
 
 **这段代码在做什么**
+
 - 输入和缓存读各自乘以对应单价。
 - 缓存写只写了一个 5 分钟档位；1 小时档位可按同样方式加进去。
 - 输出单价为 `null` 时不计入成本，这是防止用假价格误导计算。
@@ -291,6 +294,7 @@ class TaskCostTracker {
 ```
 
 **这段代码在做什么**
+
 - `byTask` 按任务 ID 归集，每个任务再按阶段归集成本。
 - 每加一条账本条目，就按 `costOf` 计算费用。
 - `report` 返回带阶段细分的原始数据，方便后续排序和定位。
@@ -313,6 +317,7 @@ console.log('阶段成本：', Object.fromEntries(task.stages));
 ```
 
 **这段代码在做什么**
+
 - 三次调用分别归到检索、摘要、最终答案三个阶段。
 - 检索阶段成本最高，因为输入 token 最大。
 - 输出结果展示按阶段拆开的成本，而不是一个总数。
@@ -490,6 +495,7 @@ class BudgetGuard {
 ```
 
 **这段代码在做什么**
+
 - `estimateTokens` 用每 4 个字符 1 token 做保守估算；生产环境应调用官方 `count_tokens` 接口，资料见 Anthropic 官方文档。
 - `reserve` 在调用前预占 token，超限立即返回 `false` 并置 `tripped`。
 - `settle` 在接口返回精确 token 后调整实际消耗。
@@ -508,6 +514,7 @@ console.log('是否熔断：', guard.tripped);
 ```
 
 **这段代码在做什么**
+
 - 字符串较长时，估算 token 会超过 120 的任务预算。
 - 第二次预留被拒绝，说明熔断器挡住了后续调用。
 - `tripped` 变成 `true`，后续逻辑可以据此停止循环或走降级分支。
@@ -653,6 +660,7 @@ function route(task) {
 ```
 
 **这段代码在做什么**
+
 - 用 `Set` 判断简单任务类型。
 - 输入 token 小于 2000 的任务走小模型，这是可调阈值。
 - 一切不命中规则的默认走大模型，避免漏到小模型造成失败。
@@ -669,6 +677,7 @@ function resolveAfterSmall(reply) {
 ```
 
 **这段代码在做什么**
+
 - 小模型返回特定标记时，原任务转到大型模型。
 - 升级后的请求建议携带原任务和小模型失败标记，便于大模型理解。
 - 若小模型直接给出结果，就不需要再花一次大模型费用。
@@ -802,6 +811,7 @@ function parallelWallTime(latencies, coordinationOverhead) {
 ```
 
 **这段代码在做什么**
+
 - 串行总时长是所有子任务时长之和。
 - 并行总时长是最长子任务时长加协调开销。
 - 协调开销可以来自结果合并、状态同步或错误检查。
@@ -819,6 +829,7 @@ async function* streamChunks(totalTokens, tokensPerChunk, delayPerChunkMs) {
 ```
 
 **这段代码在做什么**
+
 - 把总 token 拆成多个 chunk，每 chunk 单独产出。
 - 第一个 chunk 到达后，界面就可以渲染首字。
 - 用户可感知的等待是首 chunk 延迟，不等到全部生成完。
@@ -948,6 +959,7 @@ function renderSystemPrompt(stable, now) {
 ```
 
 **这段代码在做什么**
+
 - 稳定版只返回固定字符串。
 - 时间戳版把当前时间拼进去，每个请求都不同。
 - 凡是为调试拼时间去 system prompt 的地方，都会破坏前缀稳定性。
@@ -964,6 +976,7 @@ function estimateCacheCost(matchPrefix, prefixTokens) {
 ```
 
 **这段代码在做什么**
+
 - 命中缓存时按缓存读计，这里用 0.1 倍输入做演示，来自 Anthropic 定价规则。
 - 未命中时按缓存写计，后续单价还需在价格表里处理。
 - 返回对象让调用方看到“命中读、未命中写”的差异。
@@ -1111,6 +1124,7 @@ class AgentCostSystem {
 ```
 
 **这段代码在做什么**
+
 - 先执行路由得到模型选择。
 - 用预算守卫预占 token，拒绝时立即返回。
 - 执行后把条目写进账本，并结算回预算守卫。
@@ -1130,6 +1144,7 @@ console.log('t3 状态：', t3.status, t3.decision.model);
 ```
 
 **这段代码在做什么**
+
 - 三个任务的预估 token 都在预算内，都返回 `OK`。
 - 路由结果分别应是 small、small、small，因为输入都小于 2000。
 - 第四个任务若超过预算，会得到 `BREAKER_OPEN`。
@@ -1280,6 +1295,7 @@ t2： {"decision":{"model":"large","escalated":false},"status":"BREAKER_OPEN"}
 目标：写一个带成本核算的简单 agent 模拟器，完成三阶段任务并输出成本报告、路由决策和熔断状态。
 
 步骤：
+
 1. 定义演示价格表，区分输入、缓存读、缓存写。
 2. 复用本页的 `TokenEntry`、`TaskCostTracker`、`BudgetGuard`、`route`。
 3. 模拟 5 个任务：2 个 `extract`、2 个 `summary`、1 个超过每日预算的 `generate`。
@@ -1287,6 +1303,7 @@ t2： {"decision":{"model":"large","escalated":false},"status":"BREAKER_OPEN"}
 5. 运行后打印每个任务的状态和按任务聚合的成本报告。
 
 验收标准：
+
 - 脚本一次运行通过，无依赖。
 - 5 个任务中，4 个状态为 `OK`，1 个为 `BREAKER_OPEN`。
 - 报告里能按任务 ID 看到成本，且成本总和大于 0。

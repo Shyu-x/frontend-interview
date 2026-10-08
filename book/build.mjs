@@ -170,6 +170,7 @@ function assemble(vol, sample) {
   <div class="cover-vol">${esc(volLabel)}</div>
   <h1 class="cover-title">${esc(vol.title)}</h1>
   <div class="cover-sub">${esc(manifest.site)}</div>
+  <div class="cover-scope">${esc(vol.scope || "")}</div>
   <div class="cover-meta">${ctx.count} 篇 · ${esc(updated)} 版</div>
 </section>
 <section class="titlepage">
@@ -258,6 +259,8 @@ function patchedPagedJs() {
     [/--pagedjs-height-left: 11in;/, "--pagedjs-height-left: 260mm;"],
     [/--pagedjs-pagebox-width: 8\.5in;/, "--pagedjs-pagebox-width: 185mm;"],
     [/--pagedjs-pagebox-height: 11in;/, "--pagedjs-pagebox-height: 260mm;"],
+    // 基础样式里的 @page { size: letter }：Chrome 打印时以最后一条 @page 为准，会把版面按 Letter 排再缩进纸里
+    [/@page \{\s*size: letter;/, "@page {\n\tsize: 185mm 260mm;"],
   ];
   let out = src;
   for (const [re, to] of swaps) {
@@ -277,6 +280,8 @@ const CHROME =
 
 async function toPdf(browser, htmlPath, pdfPath) {
   const page = await browser.newPage();
+  // 视口宽度取纸宽：否则 Chrome 按默认 800px（211.7mm）布局，再把整页缩小到纸宽
+  await page.setViewport({ width: 700, height: 983 });
   page.on("pageerror", (e) => console.log("  [pageerror]", String(e).slice(0, 160)));
   await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load", timeout: 180000 });
 
@@ -358,6 +363,36 @@ async function toPdf(browser, htmlPath, pdfPath) {
     });
     console.log("  [debug]", JSON.stringify(where));
   }
+  if (process.env.BOOK_PAGERULES) {
+    const r = await page.evaluate(() => {
+      const out = [];
+      for (const sh of document.styleSheets) { let rules; try { rules = sh.cssRules; } catch { continue; } for (const ru of rules) if (ru.type === CSSRule.PAGE_RULE || /@page/.test(ru.cssText.slice(0, 8))) out.push(ru.cssText.slice(0, 160)); }
+      return out;
+    });
+    console.log("  [pagerules]", r.length); r.slice(0, 12).forEach((x) => console.log("    ", x));
+  }
+  if (process.env.BOOK_WIDE) {
+    const w = await page.evaluate(() => {
+      const mm = (v) => +(v / 96 * 25.4).toFixed(1);
+      const de = document.documentElement;
+      const wide = [...document.querySelectorAll("*")].filter((e) => e.getBoundingClientRect().right > 186 / 25.4 * 96 + 2 && !e.closest("svg")).slice(0, 12).map((e) => `${e.tagName}.${String(e.className).slice(0, 40)}#${e.id} right=${mm(e.getBoundingClientRect().right)} w=${mm(e.getBoundingClientRect().width)}`);
+      return { scrollW: mm(de.scrollWidth), clientW: mm(de.clientWidth), bodyScrollW: mm(document.body.scrollWidth), innerW: mm(innerWidth), pagesW: mm(document.querySelector(".pagedjs_pages")?.getBoundingClientRect().width || 0), wide };
+    });
+    console.log("  [wide]", JSON.stringify(w, null, 1));
+  }
+  if (process.env.BOOK_GEOM) {
+    const g = await page.evaluate(() => {
+      const mm = (v) => +(v / 96 * 25.4).toFixed(1);
+      const pgs = [...document.querySelectorAll(".pagedjs_page")];
+      const pick = [0, 1, 2, 3, 4, 9, 10];
+      return pick.filter((i) => pgs[i]).map((i) => {
+        const pg = pgs[i], r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(), p = pg.getBoundingClientRect(); return [mm(b.left - p.left), mm(b.top - p.top), mm(b.width), mm(b.height)]; };
+        const cs = getComputedStyle(pg);
+        return { page: i + 1, cls: pg.className.replace(/pagedjs_/g, "").slice(0, 60), page_xywh: r(pg), sheet: r(pg.querySelector(".pagedjs_sheet")), pagebox: r(pg.querySelector(".pagedjs_pagebox")), area: r(pg.querySelector(".pagedjs_area")), content: r(pg.querySelector(".pagedjs_page_content")), cover: r(pg.querySelector(".cover")), vars: [cs.getPropertyValue("--pagedjs-margin-left"), cs.getPropertyValue("--pagedjs-margin-right"), cs.getPropertyValue("--pagedjs-pagebox-width"), cs.getPropertyValue("--pagedjs-width")].join("|") };
+      });
+    });
+    for (const x of g) console.log("  [geom]", JSON.stringify(x));
+  }
   if (Math.abs(dims.w - 185) > 1 || Math.abs(dims.h - 260) > 1) throw new Error(`页框尺寸不是 16 开（实际 ${dims.w}×${dims.h}mm）`);
 
   // 6) 回填目录页码：物理页序即印刷页码（封面为第 1 页），与页脚默认计数器一致
@@ -394,7 +429,7 @@ async function toPdf(browser, htmlPath, pdfPath) {
   console.log(`  分页完成：${pages} 页`);
   // 纸张尺寸显式指定为 16 开；并把 Paged.js 打印规则里"height: 100%"固定成 260mm，
   // 避免它依赖 Chrome 对 @page size 的解析（Paged.js 会把 @page 改写，Chrome 可能回退成 Letter）。
-  await page.addStyleTag({ content: "@media print { html, body { margin:0 !important; padding:0 !important; } .pagedjs_page, .pagedjs_sheet { width:185mm !important; height:260mm !important; min-height:260mm !important; max-height:260mm !important; } }" });
+  await page.addStyleTag({ content: "@media print { html, body { margin:0 !important; padding:0 !important; width:185mm !important; min-width:0 !important; overflow:visible !important; } .pagedjs_pages { width:185mm !important; min-width:0 !important; } .pagedjs_page, .pagedjs_sheet { width:185mm !important; height:260mm !important; min-height:260mm !important; max-height:260mm !important; overflow:hidden !important; } }" });
   await page.pdf({ path: pdfPath, printBackground: true, width: "185mm", height: "260mm", margin: { top: 0, right: 0, bottom: 0, left: 0 }, preferCSSPageSize: false, timeout: 0 });
   await page.close();
   return pages;
@@ -415,12 +450,14 @@ async function main() {
   const shut = async (b) => { if (!b) return; await Promise.race([b.close().catch(() => {}), new Promise((r) => setTimeout(r, 5000))]); const proc = b.process(); if (proc && !proc.killed) proc.kill("SIGKILL"); };
   const LIMIT = Number(process.env.BOOK_VOLUME_TIMEOUT_MIN || 12) * 60_000;
   const TRIES = 3;
+  const built = [];
   let browser = htmlOnly ? null : await launch();
   try {
     for (const v of vols) {
       const t0 = Date.now();
       const { html, count } = assemble(v, sample);
       const base = join(DIST, `${v.slug}${sample ? "-sample" : ""}`);
+      const pdfOut = join(DIST, sample ? `${v.slug}-sample.pdf` : v.file);
       writeFileSync(base + ".html", html);
       console.log(`[${v.slug}] ${v.title}：${count} 篇`);
       if (htmlOnly) continue;
@@ -430,14 +467,19 @@ async function main() {
         let timer;
         const hung = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("timeout")), LIMIT); });
         try {
-          pages = await Promise.race([toPdf(browser, base + ".html", base + ".pdf"), hung]);
+          pages = await Promise.race([toPdf(browser, base + ".html", pdfOut), hung]);
         } catch (e) {
           console.log(`  第 ${attempt} 次失败：${String(e.message || e).slice(0, 120)}${attempt < TRIES ? "，换新浏览器重试" : ""}`);
           await shut(browser); browser = await launch();
         } finally { clearTimeout(timer); }
       }
       if (pages === null) throw new Error(`${v.slug} 连续 ${TRIES} 次失败`);
-      console.log(`  → ${base}.pdf（${pages} 页，${((Date.now() - t0) / 1000).toFixed(0)}s）`);
+      console.log(`  → ${pdfOut}（${pages} 页，${((Date.now() - t0) / 1000).toFixed(0)}s）`);
+    }
+    if (built.length && !sample && !has("--volume")) {
+      writeFileSync(join(DIST, "volumes.json"), JSON.stringify(built, null, 1));
+      const rows = built.map((b) => `| ${String(b.no).padStart(2, "0")} | ${b.title} | ${b.scope || "-"} | ${b.pages} |`).join("\n");
+      writeFileSync(join(DIST, "RELEASE_NOTES.md"), `# 前端面试全家桶 · PDF 分册\n\n16 开（185×260mm），共 ${built.length} 册、${built.reduce((a, b) => a + b.pages, 0)} 页。文件名为英文（\`frontend-interview-序号-主题.pdf\`），下载页显示的是中文标签。\n\n| 册 | 主题 | 本册内容 | 页数 |\n|---|---|---|---|\n${rows}\n\n每册附封面、目录、页眉页脚与页码；代码字体 Maple Mono CN，正文 Noto Serif SC。在线版：https://shyu-x.github.io/frontend-interview/\n`);
     }
   } finally {
     // 无论成功、失败还是被中断，都要关掉浏览器并清掉临时 profile，避免遗留孤儿 Chrome

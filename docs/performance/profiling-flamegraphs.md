@@ -1081,6 +1081,7 @@ console.log('toCsv ms', t1 - t0, 'bytes', csv.length);
 **怎么度量收益**：指标：`toCsv ms`、Speedscope 中 `toCsv` 的 Self Time、进程总 CPU 时间。测量方法：用同一命令跑三次，记录中位数；用 `node --cpu-prof` 生成 `.cpuprofile`。
 
 **什么时候不该用**：
+
 - 如果瓶颈在文件写入或数据库读取，CPU profile 不显示等待时间，应改用 I/O 计时。
 - 如果导出任务只执行一次且总耗时低于用户可感知阈值，采样与对比流程不划算。
 - 如果热点在原生扩展，`--cpu-prof` 的 JS 栈无法展开，需核对原生符号工具。
@@ -1114,6 +1115,7 @@ console.log('toCsv ms', t1 - t0, 'bytes', csv.length);
 **怎么度量收益**：指标：LCP、TBT、首屏长任务总时长、主线程忙碌时间。测量方法：Chrome DevTools Performance 录制，Lighthouse 查看 LCP/TBT，PerformanceObserver longtask 记录。
 
 **什么时候不该用**：
+
 - 如果瓶颈是网络下载或图片解码，主线程火焰图不显示，应先看 Network 与解码线程。
 - 如果主要计算在 Web Worker，主线程长任务少，改主线程不会降低总计算量。
 - 如果只跑 Lighthouse 总分而不复现真机，改动可能只在测试环境有效。
@@ -1151,6 +1153,7 @@ function broadcast(clients, message) {
 **怎么度量收益**：指标：序列化耗时、send 阶段耗时、eventLoopUtilization、消息端到端延迟。测量方法：`node --cpu-prof` 加 Speedscope；`performance.eventLoopUtilization()`；客户端 `performance.mark` 与 `performance.measure`。
 
 **什么时候不该用**：
+
 - 如果客户端卡顿来自渲染大量笔画，服务端 CPU profile 无法定位，应在客户端录 Performance。
 - 如果单次广播只发给少量客户端且消息体小，采样与流程成本超过收益。
 - 如果网络丢包或延迟主导，on-CPU 优化不会改变端到端延迟。
@@ -1179,6 +1182,7 @@ function broadcast(clients, message) {
 目标：写一个可复现的慢 Node 脚本，用 `--cpu-prof` 与 Speedscope 定位热点，改一处，再验证收益。
 
 步骤：
+
 1. 新建 `slow.js`，生成 20000 行对象数组，写一个函数拼 CSV 字符串。
 2. 运行 `node slow.js`，记录 `toCsv ms` 与总耗时。
 3. 运行 `node --cpu-prof --cpu-prof-dir=./profiles slow.js`，生成 `.cpuprofile`。
@@ -1188,6 +1192,7 @@ function broadcast(clients, message) {
 7. 写结论：瓶颈函数、改动点、前后指标、仍未解释的现象。
 
 验收标准：
+
 - `.cpuprofile` 文件存在，且能在 Speedscope 打开。
 - 能说出 Self Time 最高的函数名与它所在的调用栈。
 - 改动前后使用同一命令、同一输入规模。

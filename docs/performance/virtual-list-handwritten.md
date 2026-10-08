@@ -103,6 +103,7 @@ console.table([measure(1000), measure(10000), measure(100000)]);
 ```
 
 **这段代码在做什么**
+
 - `ul` 在内存中组装，`appendChild` 到 `document.body` 之前不参与布局。
 - `performance.now()` 返回毫秒浮点数，精度高于 `Date.now()`。
 - 读取 `offsetHeight` 会强制浏览器立刻完成布局，被测对象是这一步。
@@ -129,6 +130,7 @@ console.log("节点数下降倍数", Math.round(100000 / renderedCount)); // 434
 ```
 
 **这段代码在做什么**
+
 - `Math.ceil` 让部分露出的那一行也算进可视行，否则底部会缺一条。
 - `BUFFER * 2` 是因为视口上方与下方各留 `BUFFER` 行。
 - 结果是 23 个节点，与 10 万相比少了 4348 倍。
@@ -246,6 +248,7 @@ function getFixedRange({ scrollTop, viewportHeight, rowHeight, rowCount, buffer 
 ```
 
 **这段代码在做什么**
+
 - `Math.floor(scrollTop / rowHeight)` 把像素位置换成行号。
 - `Math.max(0, ...)` 保证顶部不出现负索引。
 - `Math.min(rowCount, ...)` 保证底部不越界。
@@ -270,6 +273,7 @@ for (let i = start; i < end; i++) {
 ```
 
 **这段代码在做什么**
+
 - `spacer` 是 `position: relative` 的高容器，负责提供正确的滚动高度。
 - 每行用 `position: absolute` 脱离文档流，靠 `transform` 定位。
 - 用 `transform` 而不是 `top`，因为 `top` 改动触发布局，`transform` 只触发合成。
@@ -382,6 +386,7 @@ function buildPrefix(heights) {
 ```
 
 **这段代码在做什么**
+
 - `Float64Array` 是定长浮点数组，长度在创建时确定，读取不走哈希表。
 - 长度取 `n + 1` 是为了留一个值为 0 的哨兵位置。
 - `prefix[n]` 等于所有高度之和，直接拿来当容器高度。
@@ -405,6 +410,7 @@ function findIndex(prefix, count, y) {
 ```
 
 **这段代码在做什么**
+
 - `(lo + hi + 1) >> 1` 是向上取整的中点，配合 `lo = mid` 不会死循环。
 - `prefix[mid] <= y` 说明第 `mid` 项顶部还在滚动位置之上，答案在右半边。
 - 循环结束时 `lo` 就是最后一个满足条件的位置。
@@ -426,6 +432,7 @@ function getRange(prefix, { count, scrollTop, viewportHeight, buffer }) {
 ```
 
 **这段代码在做什么**
+
 - 两次二分，一次定顶部，一次定底部，各 O(log n)。
 - `last + 1` 把闭区间的 `last` 换成开区间的 `end`。
 - `offsetY` 直接读 `prefix[start]`，不需要乘法。
@@ -573,6 +580,7 @@ setHeight(index, height, scrollTop) {
 ```
 
 **这段代码在做什么**
+
 - `measured` 是 `Uint8Array`，用 0 和 1 表示是否量过，比对象数组省内存。
 - `anchor` 必须在写入高度之前算出来，否则行号会漂。
 - `delta` 可能是负数，说明真实高度小于估计高度。
@@ -596,6 +604,7 @@ const observer = new ResizeObserver((entries) => {
 ```
 
 **这段代码在做什么**
+
 - `dataset.index` 把 DOM 节点和纯逻辑层的数组下标对上。
 - `getBoundingClientRect().height` 取的是布局之后的真实高度。
 - `if (next !== viewport.scrollTop)` 避免无意义地写 `scrollTop`，写入会触发新的 `scroll` 事件。
@@ -612,6 +621,7 @@ console.log({ before, fixed, after });
 ```
 
 **这段代码在做什么**
+
 - 修正前用旧前缀和查到锚点行号。
 - 回填第 0 行，高度从 32 变成 100，差值 68。
 - 用修正后的 `scrollTop = 3268` 再查一次，行号保持 100。
@@ -760,6 +770,7 @@ function sync(nextIndexes, renderItem, offsetOf) {
 ```
 
 **这段代码在做什么**
+
 - `next` 是这一帧的目标下标集合，`rendered` 是上一帧的结果。
 - 差集分两趟处理：先回收多出来的，再补齐缺少的。
 - `pool.pop() || document.createElement("div")` 优先复用，池子空了才新建。
@@ -779,6 +790,7 @@ console.log({ perFrame, rowsToCover });
 ```
 
 **这段代码在做什么**
+
 - 快速滑动每帧滚过 48 像素，视口外的下一行要提前备好。
 - 48 像素对应 2 行，所以上下各留 2 行能覆盖一帧的位移。
 - 缓冲留得越多，首屏渲染越重；2 行是速度与节点数之间的起点。
@@ -904,6 +916,7 @@ function captureAnchor(prefix, count, scrollTop) {
 ```
 
 **这段代码在做什么**
+
 - `findIndex` 复用上一节的二分，成本 O(log n)。
 - `innerOffset` 是锚点行内部已经滚过了多少像素。
 - 存行号加行内偏移，而不存绝对像素，因为绝对像素在回填后会失真。
@@ -920,6 +933,7 @@ function restoreAnchor(prefix, anchor) {
 ```
 
 **这段代码在做什么**
+
 - `prefix` 已经是最新值，同一个行号拿到的是新坐标。
 - 加回 `innerOffset`，屏幕上的内容不会上下平移。
 - 函数只读不写，方便直接断言。
@@ -941,6 +955,7 @@ function setScrollTop(value) {
 ```
 
 **这段代码在做什么**
+
 - 程序写 `scrollTop` 也会触发 `scroll` 事件，不标记会形成回环。
 - 用时间窗口而不是布尔量，因为一次写入可能触发多次事件。
 - 50 毫秒覆盖同一帧的事件派发，具体数值按实测调整。
@@ -1073,6 +1088,7 @@ class VirtualScroller {
 ```
 
 **这段代码在做什么**
+
 - `Float64Array` 定长，长度在构造时确定，读取不走哈希表。
 - `prefix` 长度是 `count + 1`，因为 `prefix[0]` 固定为 0。
 - `rebuild(from, to)` 支持局部重建，回填时只跑一段。
@@ -1102,6 +1118,7 @@ class VirtualScroller {
 ```
 
 **这段代码在做什么**
+
 - 两次二分调用各消耗一次比较计数。
 - `findIndex` 返回闭区间行号，`getRange` 转成开区间的 `end`。
 - `Math.max` 与 `Math.min` 保证区间落在 0 到 `count` 之间。
@@ -1127,6 +1144,7 @@ class VirtualScroller {
 ```
 
 **这段代码在做什么**
+
 - `measured[index]` 为 1 时直接返回，同一行第二次回填不再改数据。
 - `anchor` 必须在写入之前算，否则行号会漂。
 - `rebuild(index, this.count)` 让 `prefix[index]` 保持不变，之后的格子整体加 `delta`。
@@ -1296,6 +1314,7 @@ sequenceDiagram
 ```
 
 **这段代码在做什么**
+
 - `#viewport` 是滚动容器，`overflow-y: auto` 决定滚动条出现在它身上。
 - `#spacer` 用 `position: relative` 建立定位上下文，高度由脚本设置。
 - `.row` 绝对定位后脱离文档流，不再影响兄弟节点的位置计算。
@@ -1317,6 +1336,7 @@ spacer.style.height = scroller.totalHeight + "px"; // 撑出滚动条
 ```
 
 **这段代码在做什么**
+
 - `viewport.clientHeight` 取的是容器可见高度，不含边框。
 - `scroller.totalHeight` 是前缀和数组的最后一格，等于全部高度之和。
 - 撑高元素的高度在每次回填后都要重设一次。
@@ -1341,6 +1361,7 @@ const observer = new ResizeObserver((entries) => {
 ```
 
 **这段代码在做什么**
+
 - `dataset.index` 是节点与数据下标之间的唯一联系。
 - `getBoundingClientRect().height` 取布局后的真实高度。
 - 多个条目的修正值依次累加，最后只写一次 `scrollTop`。

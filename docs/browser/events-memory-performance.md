@@ -136,6 +136,7 @@ performance.measure('Duration', 'start-operation', 'end-operation');
 | 6. Lighthouse CI | 可集成到 CI/CD，阻止性能退化 |
 
 **Auditors 审计项：**
+
 - Performance: FCP / LCP / TBT / TTI / Speed Index
 - PWA: service worker / manifest / offline
 - Best Practices: deprecated APIs / console errors / HTTPS

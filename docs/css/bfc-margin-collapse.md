@@ -204,6 +204,7 @@ export function Card({ children, gap = 16 }: CardProps) {
 | 4 | 最终结果：合并为 20px（而不是 20px + 20px） |
 
 **margin 塌陷的三种情况：**
+
 1. 相邻兄弟元素之间
 2. 父元素与第一个/最后一个子元素之间
 3. 空的块级元素（上下 margin 相遇）
@@ -216,6 +217,7 @@ export function Card({ children, gap = 16 }: CardProps) {
 ```
 
 **margin 塌陷的三种情况：**
+
 1. 相邻兄弟元素之间
 2. 父元素与第一个/最后一个子元素之间
 3. 空的块级元素（上下 margin 相遇）

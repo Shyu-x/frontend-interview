@@ -59,6 +59,7 @@ Step5: E vs D → (尾部比较) → 移动
 ```
 
 **有 key 优势**：
+
 1. 精确匹配节点，最小化 DOM 操作
 2. 列表重排时触发正确的 transition
 3. 保持组件状态（如 input 焦点）
@@ -307,6 +308,7 @@ function updateRow(id, patch) {
 **怎么度量收益**：Chrome DevTools Performance 面板录制 10 次连续提交，看 Scripting 与 Recalculate Style 两段总时长；在 `updateRow` 前后用 `performance.mark` 与 `performance.measure` 打点，统计单次提交到渲染完成的耗时分布。同一构建产物、同一台测试机重复 5 次取中位数。
 
 **什么时候不该用**：
+
 - 一页只渲染 20 行、每次交互只改 1 行时，shallowRef 与 v-memo 带来的写法约束换不来可测收益。
 - 团队还没统一行的不可变更新写法时，先补数据层约定，再加 memo，否则会出现行内容不刷新。
 
@@ -341,6 +343,7 @@ const showChart = ref(false)
 **怎么度量收益**：Lighthouse 移动端 preset 的 LCP 与 TBT，对比改动前后同一构建产物；Chrome DevTools Performance 火焰图里主线程 Scripting 段长度，录制时打开 CPU 4x 节流；用 `PerformanceObserver` 监听 `longtask`，统计首屏期间超过 50ms 的任务条数。
 
 **什么时候不该用**：
+
 - 首屏本身就是图表页时，异步拆分只多一次请求往返，图表直接放主包并按需初始化更合适。
 - 页面走 SSR 且服务端已输出该区块时，`v-once` 在两端要一致，需核对官方文档：编译器对 v-once 的 SSR 处理与 hydration 校验规则。
 
@@ -371,6 +374,7 @@ function onPointerMove(pt) {
 **怎么度量收益**：Chrome DevTools Performance 录制 10 秒连续书写，看帧间隔与长任务条数；在 `requestAnimationFrame` 回调里统计两次绘制间隔，取第 95 百分位；用 Vue Devtools 看组件更新次数，需核对官方文档：当前版本是否提供组件渲染耗时面板及其口径。
 
 **什么时候不该用**：
+
 - 白板节点只有几百个且需要模板双向绑定与 Devtools 追踪时，绕开响应式会断掉调试路径。
 - 需要把每步操作作为不可变快照上传做协同合并时，直接改内部数组会破坏快照语义，应改为生成新数组。
 
@@ -401,6 +405,7 @@ Vapor Mode 编译策略（需核对官方文档：可用状态、对现有 SFC �
 **目标**：做一个 500 行的可编辑表格，行内有勾选、改状态、改备注，底部显示已勾选数量。用本页知识把行内编辑的渲染范围收窄到命中行。
 
 **步骤**：
+
 1. 用 Vue 3 + Vite 建页面，生成 500 行假数据，字段为 id、name、status、remark、checked。
 2. 第一版用 `reactive([])` 存行、下标做 key，连续改 10 行备注，记录丢焦次数。
 3. 第二版改成业务主键做 key，写一个只替换命中行的 `updateRow`，重跑同一操作。
@@ -410,6 +415,7 @@ Vapor Mode 编译策略（需核对官方文档：可用状态、对现有 SFC �
 7. 写 README，说明每版改动对应本页哪个知识点，以及哪一版留在项目里。
 
 **验收标准**：
+
 - 连续改 10 行备注，输入框焦点不丢，已勾选数量始终正确。
 - 四版录制的 Scripting 段时长有可复现的差异，测量设备、节流档位、录制次数都写在 README 里。
 - `v-memo` 依赖覆盖该行所有参与渲染的字段，改 remark 与 checked 都能看到界面更新。

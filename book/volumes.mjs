@@ -36,6 +36,22 @@ function splitDomain(site, domain) {
   return out.map((p) => ({ nodes: [{ type: "section", title: domain.title, children: p.nodes }], chars: p.chars }));
 }
 
+// 领域名 → 英文短名（用于文件名；GitHub 会把附件名里的非 ASCII 字符替换掉，所以文件名必须是 ASCII）
+export const EN = {
+  "HTML": "html", "CSS": "css", "JavaScript": "javascript", "TypeScript": "typescript",
+  "浏览器原理": "browser-internals", "网络协议": "network-protocols", "网络安全": "web-security",
+  "API 设计与通信": "api-design", "浏览器 API": "browser-apis",
+  "React": "react", "Vue": "vue", "框架生态": "framework-ecosystem",
+  "工程化": "engineering", "构建工具": "build-tools", "包管理器与运行时": "package-managers-runtimes", "性能优化": "performance",
+  "手写代码": "hand-written-code", "算法": "algorithms",
+  "AI Agent 篇": "ai-agent", "开源项目赏析": "open-source-showcase",
+  "教学资源": "learning-resources", "设计与写作规范": "design-and-writing",
+};
+const enName = (title) => {
+  const parts = title.split("与").length > 1 && !EN[title] ? title.split("与") : [title];
+  return parts.map((t) => { if (!EN[t]) throw new Error(`volumes.mjs: 领域「${t}」没有英文短名，请在 EN 里补上`); return EN[t]; }).join("-and-");
+};
+
 /** 生成册清单：[{no, slug, title, subtitle, nodes, chars}] */
 export function planVolumes(manifest, site) {
   const tops = manifest.tree.filter((n) => n.type === "section");
@@ -59,8 +75,17 @@ export function planVolumes(manifest, site) {
     }
     for (const m of merged) {
       const name = m.domains.length > 1 ? m.domains.join("与") : m.domain;
-      vols.push({ top: top.title, title: m.part ? `${name}（第${["一","二","三","四","五","六","七","八","九","十"][m.part - 1]}册）` : name, subtitle: top.title, nodes: m.nodes, chars: m.chars });
+      vols.push({ top: top.title, base: name, part: m.part, of: m.of, title: m.part ? `${name}（第${["一","二","三","四","五","六","七","八","九","十"][m.part - 1]}册）` : name, subtitle: top.title, nodes: m.nodes, chars: m.chars });
     }
   }
-  return vols.map((v, i) => ({ ...v, no: i + 1, slug: `vol${String(i + 1).padStart(2, "0")}` }));
+  return vols.map((v, i) => {
+    const no = String(i + 1).padStart(2, "0");
+    const file = `frontend-interview-${no}-${enName(v.base)}${v.part ? `-part${v.part}` : ""}.pdf`;
+    // 本册内容：取该册实际包含的分组（或页面）标题，去掉"第 N 部分 ·"前缀，最多列 3 项
+    const top = v.nodes.length === 1 && v.nodes[0].type === "section" ? v.nodes[0].children : v.nodes;
+    const names = top.map((n) => (n.title || "").replace(/^第\s*\d+\s*部分\s*·\s*/, "").trim()).filter((t) => t && t !== "概览" && t !== v.base);
+    const scope = names.slice(0, 3).join("、") + (names.length > 3 ? " 等" : "");
+    const short = scope.length > 34 ? scope.slice(0, 33) + "…" : scope;
+    return { ...v, no: i + 1, slug: `vol${no}`, file, scope, label: `前端面试全家桶 第${no}册 ${v.title}${short ? " - " + short : ""}.pdf` };
+  });
 }

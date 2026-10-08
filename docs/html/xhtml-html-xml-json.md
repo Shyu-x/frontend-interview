@@ -202,6 +202,7 @@ const doc = parser.parseFromString(xmlString, 'text/xml');
 ### 6.1 Q1: 为什么现代 Web 开发中 JSON 取代了 XML 成为主流数据格式？
 
 **答案：**
+
 1. **语法简洁**：JSON 无需闭合标签、无需大写敏感，体积比 XML 小 20-30%
 2. **解析速度**：JSON.parse() 比 XML DOM 解析快 5-10 倍
 3. **原生支持**：JavaScript 直接处理，无需额外解析器
@@ -213,6 +214,7 @@ const doc = parser.parseFromString(xmlString, 'text/xml');
 ### 6.2 Q2: XHTML 和 HTML5 有什么区别？
 
 **答案：**
+
 - **XHTML**：XML 语法的 HTML，要求严格闭合标签、小写、引号
 - **HTML5**：融合了宽松语法（HTML4 风格）和新特性（video、canvas、WebSocket）
 
@@ -231,6 +233,7 @@ const doc = parser.parseFromString(xmlString, 'text/xml');
 
 **答案：**
 **优势：**
+
 - 可编程：通过 JavaScript 操作 SVG DOM
 - 可压缩：文本格式，gzip 压缩率高
 - 可搜索：文本内容可被搜索引擎索引
@@ -238,6 +241,7 @@ const doc = parser.parseFromString(xmlString, 'text/xml');
 - 可动画：CSS/JS/SMIL 多种动画方式
 
 **问题：**
+
 - 复杂 SVG 体积大（需要优化工具如 SVGO）
 - 浏览器兼容性问题（不同浏览器渲染略有差异）
 - 大数量节点性能差（复杂图表建议用 Canvas）
@@ -418,6 +422,7 @@ grep -c '<td' invoice.xhtml
 **目标**：做一个“发票导出与预览”小工具，输入 XML 源文件，输出经校验的 XHTML 预览页，同时提供一份 JSON 接口给前端列表用。
 
 **步骤**
+
 1. 手写一份 `invoice.xml`，包含发票号、开票日期、三行明细，字段类型写清楚。
 2. 写出 `invoice.xsd`，为发票号和金额加类型约束，日期用日期类型。
 3. 用 `xmllint --noout --schema invoice.xsd invoice.xml` 跑一遍，故意改错一个金额字段，确认能报错。
@@ -427,6 +432,7 @@ grep -c '<td' invoice.xhtml
 7. 用浏览器打开 XHTML，对照 XML 源文件核对每一行的金额与数量。
 
 **验收标准**
+
 - `xmllint --schema` 对正确文件返回成功，对改错金额的文件返回失败并指出行号。
 - `xmllint --noout invoice.xhtml` 无输出，说明标签闭合且大小写正确。
 - 生成的 XHTML 行数与 XML 明细行数一致，金额逐行核对无误。

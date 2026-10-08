@@ -85,6 +85,7 @@ function inputCost(tokens, cachedRatio, uncachedPrice, cachedPrice) {
 ```
 
 **这段代码在做什么**
+
 - 输入 `tokens` 是这一轮送入模型的总输入 token 数。
 - `cachedRatio` 是其中能命中读缓存的比例。
 - `uncachedPrice` 与 `cachedPrice` 分别代表未命中与命中的单位价格。
@@ -110,6 +111,7 @@ console.log(`缓存读价是基础输入价的 ${(cacheRead / base).toFixed(3)}x
 ```
 
 **这段代码在做什么**
+
 - 使用资料中 Anthropic 文档的 Opus 5.5 示例数字：基础输入 $4/MTok、缓存读 $0.20。
 - 断言缓存读价低于基础输入价的 0.1x。
 - 输出比例，用于判断前缀稳定性值得投入多少工程时间。
@@ -222,6 +224,7 @@ console.log("单调不增：", assertNonIncreasing(accuracies));
 ```
 
 **这段代码在做什么**
+
 - `lengths` 是输入 token 的五个档位。
 - `accuracies` 是示例数据，不是任何论文的实测值。
 - `assertNonIncreasing` 检查准确率是否随长度单调不增。
@@ -249,6 +252,7 @@ console.log("低相似度降幅：", drop(lowSimilarity).toFixed(2));
 ```
 
 **这段代码在做什么**
+
 - `highSimilarity` 与 `lowSimilarity` 是两组示例数据。
 - `drop` 计算从最短到最长时的降幅。
 - 输出展示低相似度组降幅更大，真实数据需要从模型评测中取得。
@@ -361,6 +365,7 @@ console.log(positions.map((p) => scoreByPosition(p).toFixed(2)));
 ```
 
 **这段代码在做什么**
+
 - `positions` 表示 11 个插入点。
 - `scoreByPosition` 是一个位置敏感示例函数，不是真实模型。
 - 中间位置得分最低，两端逐步升高。
@@ -386,6 +391,7 @@ console.log(`开头均值 ${headAvg.toFixed(2)}，中间均值 ${midAvg.toFixed(
 ```
 
 **这段代码在做什么**
+
 - 取开头三个位置与中间三个位置。
 - 断言开头平均分更高。
 - 这个断言是模拟实验的骨架，真实模型评测也能沿用同一结构。
@@ -500,6 +506,7 @@ export function classifyFailure(messages) {
 ```
 
 **这段代码在做什么**
+
 - `messages` 是对话历史数组。
 - `poisoning` 用重复错误目标识别，这里示例为重复出现的“买 1000 股”。
 - `distraction` 用重复旧动作识别，这里示例为多次“重新执行上一步”。
@@ -526,6 +533,7 @@ console.log("四类样本分类通过");
 ```
 
 **这段代码在做什么**
+
 - 四条样本分别触发四种返回。
 - `assert.equal` 验证分类结果。
 - 真实项目中，规则需要替换为具体日志特征。
@@ -642,6 +650,7 @@ export function toolRatio(messages) {
 ```
 
 **这段代码在做什么**
+
 - `messages` 中每个元素有 `role` 与 `content`。
 - `total` 是所有消息内容的字符总数。
 - `tool` 是所有 `role === "tool"` 的内容字符数。
@@ -664,6 +673,7 @@ console.log(`工具结果字符占比 ${(r.ratio * 100).toFixed(0)}%`);
 ```
 
 **这段代码在做什么**
+
 - user 内容为 30 个字符，tool 内容为 500 个字符，assistant 内容为 10 个字符。
 - 断言 tool 字符数等于 500。
 - 输出占比，用来判断是否达到清理阈值。
@@ -779,6 +789,7 @@ export function maskOldToolResults(messages, keep = 3) {
 ```
 
 **这段代码在做什么**
+
 - `messages` 是历史数组，`keep` 是保留的最近工具结果条数。
 - 从开头向后遍历，每遇到一条 tool 计数。
 - 超过 `keep` 的 tool 输出被替换为占位符。
@@ -803,6 +814,7 @@ console.log("旧输出已遮蔽，最近输出保留");
 ```
 
 **这段代码在做什么**
+
 - 四条工具结果按时间顺序排列。
 - `keep = 2` 表示保留最近两条，即 `OLD-C` 与 `NEW-D`。
 - 断言最早两条被替换。
@@ -920,6 +932,7 @@ export function budgetGate(estimate, toolRatio, config) {
 ```
 
 **这段代码在做什么**
+
 - `estimate` 是当前输入 token 估算。
 - `toolRatio` 是工具结果占比。
 - 先看总量是否低于预算，低于就正常。
@@ -938,6 +951,7 @@ console.log("预算闸门动作正确");
 ```
 
 **这段代码在做什么**
+
 - 低于 100,000 时正常。
 - 高于预算且工具占比为 0.8 时清理工具结果。
 - 高于预算但工具占比为 0.2 时进入摘要。

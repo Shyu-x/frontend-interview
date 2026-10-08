@@ -58,6 +58,7 @@ flowchart LR
 ```
 
 图里每一步：
+
 1. 宿主扫描用户或项目扩展目录，找到直接放置的 `.ts`、`.js` 文件。
 2. 含 `index.ts` 或 `index.js` 的子目录同样被当作扩展入口。
 3. 宿主调用默认导出的工厂，把 `ExtensionAPI` 传进去。
@@ -88,6 +89,7 @@ export default function (pi: ExtensionAPI) {
 ```
 
 **这段代码在做什么**
+
 - `export default` 提供唯一入口，宿主只认这个工厂。
 - 工厂签名是 `(pi: ExtensionAPI)`，`pi` 是宿主给的接口。
 - 工厂只做登记，不启动进程、Socket、watcher、定时器。
@@ -124,6 +126,7 @@ export function createHost() {
 ```
 
 **这段代码在做什么**
+
 - `commands` 是注册表，键是命令名，值是命令定义。
 - `api` 是传给工厂的接口，只暴露 `registerCommand`。
 - `load` 负责调用工厂，`await` 兼容异步工厂。
@@ -206,6 +209,7 @@ all assertions passed
 | 修改代码后行为没变 | reload 替换运行时，旧状态仍被引用 | reload 之后重新读取状态，不复用旧对象 |
 
 **小结**
+
 - 宿主负责发现文件、调用工厂、保存注册、分发事件四件事。
 - 扩展工厂只登记能力，长连接与定时器放到 `session_start`。
 - 扩展与宿主同进程同权限，只加载可信来源。
@@ -248,6 +252,7 @@ sequenceDiagram
 ```
 
 图里每一步：
+
 1. 输入进入后先触发 `before_agent_start`，钩子可以改提示段落、所选工具或指引。
 2. 模型返回内容与工具调用，宿主为每个工具调用触发 `tool_call`。
 3. `tool_call` 处理器可以改输入，也可以返回 `{ block: true, reason }` 拦截。
@@ -279,6 +284,7 @@ off();
 ```
 
 **这段代码在做什么**
+
 - `pi.on` 的第一个参数是事件名，第二个参数是处理器。
 - 处理器收到 `event` 与 `ctx`，`ctx` 提供 `ui` 与 `signal` 能力。
 - 返回 `{ block: true, reason }` 阻止这次工具执行。
@@ -303,6 +309,7 @@ pi.on("tool_call", async (event, ctx) => {
 ```
 
 **这段代码在做什么**
+
 - `pi.getAllTools()` 返回已注册工具的列表，含 `exposure`、`namespace`、`annotations`。
 - annotations 是 MCP 语义的提示位：`readOnlyHint`、`destructiveHint`、`idempotentHint`、`openWorldHint`。
 - 缺失注解按 MCP 默认值补：非只读，可能破坏性，可能接触外部世界。
@@ -334,6 +341,7 @@ function dispatch(value) {
 ```
 
 **这段代码在做什么**
+
 - 处理器按注册顺序执行，顺序由扩展加载与注册顺序决定。
 - `dispatch` 先复制快照，分发过程中新增或退订的处理器不影响这一轮。
 - 返回值不为 `undefined` 时替换当前值，模拟转换型事件。
@@ -420,6 +428,7 @@ all assertions passed
 | 并发工具调用读到不存在的兄弟结果 | 同一条助手消息的工具调用可以并行 | 用 ctx.signal 绑定当前轮次，不假设兄弟调用存在 |
 
 **小结**
+
 - 钩子是宿主在固定位置调用的处理器，顺序由加载与注册顺序决定。
 - 每个事件的结果类型不同：通知型只观察，转换型看返回值，取消型用声明字段。
 - 退订函数只影响后续分发，不影响已经开始的那一轮。
@@ -457,6 +466,7 @@ flowchart TB
 ```
 
 图里每一步：
+
 1. `load` 调用扩展工厂，工厂把工具与处理器登记进注册表。
 2. 注册表用名称做主键，同名工具再次注册会覆盖旧定义。
 3. 事件总线按事件名保存有序处理器数组。
@@ -491,6 +501,7 @@ function createRegistry() {
 ```
 
 **这段代码在做什么**
+
 - `tools` 用名称做键，保证按名称查找。
 - `exposure` 默认 `direct`，与文档中的默认值一致。
 - `annotations` 默认空对象，缺少注解时宿主按 MCP 默认值处理。
@@ -521,6 +532,7 @@ function createBus() {
 ```
 
 **这段代码在做什么**
+
 - 一个事件名对应一个数组，数组顺序就是调用顺序。
 - `on` 返回退订函数，调用后从数组移除该处理器。
 - `handlersOf` 返回快照，分发过程中注册的处理器不进入本次分发。
@@ -551,6 +563,7 @@ async function executeTool(host, name, args) {
 ```
 
 **这段代码在做什么**
+
 - 未注册的工具直接返回失败结果，不抛到调用方。
 - `tool_call` 处理器按顺序运行，可以改写参数或拦截。
 - `execute` 正常返回时，结果展开成 `content` 与 `details` 两个字段。
@@ -670,6 +683,7 @@ all assertions passed
 | 并发写同一文件内容错乱 | 读改写没有串行化 | 把完整读改写包进 withFileMutationQueue() |
 
 **小结**
+
 - 注册表决定有什么，事件总线决定按什么顺序通知，执行管线把两者接起来。
 - 工具结果需要模型可读的 content 与用于渲染的 details。
 - 拦截、改写、报错是三条独立路径，写代码时分开处理。
@@ -706,6 +720,7 @@ stateDiagram-v2
 ```
 
 图里每一步：
+
 1. 启动时处于未索引状态，只有扩展目录里的文件。
 2. 宿主读取元数据后进入已索引状态，正文仍在磁盘上。
 3. 查询命中某个技能的触发条件，进入已加载状态。
@@ -731,6 +746,7 @@ function indexSkills(files) {
 ```
 
 **这段代码在做什么**
+
 - 索引项只有名称、描述、路径三个常驻字段。
 - 正文不在索引里，因此启动阶段不读大文件。
 - `loaded` 标记用来避免重复读盘。
@@ -750,6 +766,7 @@ async function loadSkill(skill, readFile) {
 ```
 
 **这段代码在做什么**
+
 - 第一次调用才触发 `readFile`，之后走缓存。
 - `readFile` 由调用方注入，便于测试与替换实现。
 - `loaded` 与 `body` 一起更新，避免半完成状态。
@@ -770,6 +787,7 @@ function buildContextBlock(skills) {
 ```
 
 **这段代码在做什么**
+
 - `selectSkills` 返回索引项数组，不是正文数组。
 - 触发规则只是演示，pi 的真实匹配规则需核对官方文档。
 - `buildContextBlock` 只拼选中的技能，未命中技能不进上下文。
@@ -850,6 +868,7 @@ all assertions passed
 | 资料对不上 | 本页的技能实现是教学模型，不是 pi 的公开 API | 核对官方文档：目录约定、元数据字段名、激活方式 |
 
 **小结**
+
 - 按需加载把常驻内容压到元数据，正文只在命中时读。
 - 缓存放在宿主侧，是否加载过要显式记录。
 - 技能的具体目录与字段需核对官方文档，本页代码只演示机制。
@@ -890,6 +909,7 @@ sequenceDiagram
 ```
 
 图里每一步：
+
 1. 自动压缩在 `contextTokens` 超过 `contextWindow` 减 `reserveTokens` 时触发。
 2. 触发前发出 `session_before_compact`，`preparation` 带上要汇总的消息与边界信息。
 3. 钩子把消息转成文本，交给自建模型生成摘要。
@@ -913,6 +933,7 @@ console.log(shouldCompact(180000, 200000, 16384)); // false
 ```
 
 **这段代码在做什么**
+
 - 阈值是 `contextWindow` 减去 `reserveTokens`，不是固定的消息条数。
 - 默认 `reserveTokens` 为 16384，可在用户或项目设置里改。
 - 默认 `keepRecentTokens` 为 20000，决定保留多少近期 token 不汇总。
@@ -949,6 +970,7 @@ pi.on("session_before_compact", async (event, ctx) => {
 ```
 
 **这段代码在做什么**
+
 - `preparation.messagesToSummarize` 是要汇总的消息集合。
 - `preparation.turnPrefixMessages` 在切分用户消息跨度时才出现。
 - `convertToLlm` 把 AgentMessage 转成 LLM 消息，`serializeConversation` 再转成文本。
@@ -968,6 +990,7 @@ pi.on("session_compact_failed", async (event) => {
 ```
 
 **这段代码在做什么**
+
 - `reason` 取值为 `manual`、`threshold`、`overflow`。
 - `errorMessage` 只在非中止失败时出现。
 - `aborted` 表示压缩被取消或中止。
@@ -1067,6 +1090,7 @@ all assertions passed
 | 模型切换后阈值没变 | 手动压缩、阈值检查、溢出恢复都使用解析后的设置 | 用 compaction.modelOverrides 按 provider/modelId 调数值 |
 
 **小结**
+
 - 自动压缩的触发条件是 token 超过窗口减预留值。
 - `session_before_compact` 可以取消或替换摘要，失败由 `session_compact_failed` 配对记录。
 - 分支切换有独立的 `session_before_tree` 钩子，字段与压缩不同。
@@ -1105,6 +1129,7 @@ stateDiagram-v2
 ```
 
 图里每一步：
+
 1. 扩展文件被发现后进入工厂执行阶段。
 2. 工厂完成注册后进入已注册状态，此时还没有长连接。
 3. `session_start` 触发后进入会话运行中，长连接在这一步建立。
@@ -1133,6 +1158,7 @@ export default function (pi: ExtensionAPI) {
 ```
 
 **这段代码在做什么**
+
 - 工厂只调用 `pi.on`，不启动任何外部资源。
 - `state` 是扩展自己的内存，不写进会话记录。
 - 需要长期保存非上下文数据时用 `pi.appendEntry()`。
@@ -1152,6 +1178,7 @@ pi.on("agent_before_settle", async (event, ctx) => {
 ```
 
 **这段代码在做什么**
+
 - `agent_before_settle` 可以追加条目并请求一次继续。
 - `agent_settled` 是最终状态，只能通知，不能继续。
 - `continue: true` 没有条件时会一直触发，形成循环。
@@ -1172,6 +1199,7 @@ pi.registerCommand("reload-me", {
 ```
 
 **这段代码在做什么**
+
 - `ctx.reload` 替换扩展运行时，代码会重新走工厂。
 - `await ctx.reload()` 之后的语句仍属于旧函数的调用栈。
 - 旧运行时的连接、缓存与定时器不能在新运行时继续使用。
@@ -1249,6 +1277,7 @@ all assertions passed
 | reload 后行为异常 | 继续使用旧运行时的对象 | reload 后重新获取资源，不复用旧缓存 |
 
 **小结**
+
 - 工厂只登记，长生命周期资源从 `session_start` 开始。
 - `session_shutdown` 要幂等，关闭后把句柄清空。
 - `agent_before_settle` 可以继续一次，`agent_settled` 只能观察。

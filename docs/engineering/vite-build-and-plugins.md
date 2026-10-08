@@ -1751,6 +1751,7 @@ export default defineConfig({
 **怎么度量收益**：看 `vite build` 终端输出的每个 chunk 体积（含 gzip 一列），再用 `rollup-plugin-visualizer` 生成 treemap 确认占用来源。运行时用 Chrome DevTools 的 Network 面板按 Transfer Size 排序，配合 Lighthouse 记录 LCP。
 
 **什么时候不该用**：
+
 - 应用只有两三个页面时，拆块会增加请求数，串行加载反而拖慢首屏。
 - 把表格首屏必需的组件放进异步 chunk，会多一次请求往返。
 
@@ -1789,6 +1790,7 @@ assert.equal(p.transform('a', '/x/a.js'), null)
 **怎么度量收益**：指标是测试通过数与构建失败次数。测量方法是 `node --test` 的输出，以及 CI 上 `vite build` 的退出码。新增 `.widget` 文件后，构建应当一次通过。
 
 **什么时候不该用**：
+
 - 后缀只有一两个文件时，改成 `.json` 或 `.ts` 的维护成本低于维护一个插件。
 - 需要编辑器类型提示时，插件产出的 ESM 拿不到类型，还要额外维护 `.d.ts`。
 
@@ -1821,6 +1823,7 @@ export default defineConfig(({ command }) => ({
 **怎么度量收益**：看 DevTools Network 面板的 Transfer Size 与 Finish 时间，以及 Lighthouse 在节流条件下的 LCP 和 Total Blocking Time。部署后用 `curl -sI` 检查 CDN 返回的 `Cache-Control` 头。
 
 **什么时候不该用**：
+
 - 项目部署在同域且没有 CDN 时，把 base 设成绝对域名会让本地预览和反向代理都出问题。
 - 同一份产物要部署到多个域名时，构建期写死的 base 不能满足，要改成运行时注入。
 
@@ -1852,6 +1855,7 @@ export default defineConfig(({ command }) => ({
 目标：写一个处理 `.widget` 后缀的 Vite 插件，在一个最小项目里验证它被 `vite build` 正确打进产物，并用 `node:assert` 覆盖它。
 
 步骤：
+
 1. 用 `npm create vite@latest` 建一个 vanilla 模板项目，删掉示例文件。
 2. 新建 `plugins/vite-plugin-widget.js`，导出工厂函数，返回带 `name`、`enforce: 'pre'`、`transform` 的插件对象。
 3. 约定 `.widget` 内容是一行文本，插件把它转成 `export default <文本>`，其它后缀返回 `null`。
@@ -1861,6 +1865,7 @@ export default defineConfig(({ command }) => ({
 7. 跑 `node --test test/widget.test.js`，再启动开发服务器，确认页面同样能显示这段文本。
 
 验收标准：
+
 - `vite build` 退出码为 0，且 `dist/assets` 下的 JS 里能搜到 `.widget` 文件中的文本。
 - `node --test` 全部通过；删掉插件里 `return null` 那一行后测试失败。
 - 把同一个文件改名为 `.txt` 再 import，构建报错，说明插件只接管约定后缀。

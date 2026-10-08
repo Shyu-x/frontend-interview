@@ -1770,6 +1770,7 @@ export default component$(() => {
 ```
 
 生成的 HTML 包含：
+
 1. 完整的静态 HTML
 2. 序列化的组件状态
 3. 仅 1KB 的初始 JavaScript
@@ -2307,6 +2308,7 @@ Svelte 5 用 `$state`、`$derived`、`$effect` 声明依赖，Solid 用 `createS
 目标：做一个文档站，正文静态输出，站内搜索用岛屿实现，并在同一页对比两种激活时机。
 
 步骤：
+
 1. 用 Astro 建站，写三篇 Markdown 文档，放进内容集合。
 2. 把首页与详情页做成静态，确认构建产物里没有这两页对应的框架运行时。
 3. 写一个 Solid 搜索组件，接收标题数组，用 `createSignal` 存关键字、`createMemo` 存过滤结果。
@@ -2316,6 +2318,7 @@ Svelte 5 用 `$state`、`$derived`、`$effect` 声明依赖，Solid 用 `createS
 7. 把两次测量结果写进 README，附测量命令与设备信息。
 
 验收标准：
+
 1. 详情页在禁用 JavaScript 的浏览器里能正常阅读正文。
 2. 构建产物里有搜索组件对应的独立 chunk，首页 HTML 里没有内联该组件代码。
 3. `client:load` 与 `client:idle` 两次记录都写进 README，含工具名与节流配置。

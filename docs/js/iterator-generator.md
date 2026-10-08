@@ -409,6 +409,7 @@ for await (const rows of it) {
 **怎么度量收益**：看首屏首行绘制时间（在渲染前后各打一次 `performance.now()`）、`PerformanceObserver` 的 `largest-contentful-paint`、Performance 面板录制的长任务时长、Memory 面板的堆快照大小。测量方法：同一份数据集分别用「一次性加载」和「分页迭代」录制两次，对比同一指标。
 
 **什么时候不该用**：
+
 - 数据总量小于一屏（例如二十行以内），一次请求的往返成本低于分批。
 - 页面需要在客户端做全量排序或统计，任何一页的数据都不够算出全局结果。
 - 服务端接口没有游标或分页参数，只能整体返回。
@@ -448,6 +449,7 @@ for await (const text of readChunks(await fetch('/feed'))) {
 **怎么度量收益**：看首次内容绘制（`PerformanceObserver` 订阅 `paint`）、首字节时间（`PerformanceResourceTiming.responseStart`）、长任务数量（`PerformanceObserver` 订阅 `longtask`）。测量方法：网络面板选 Slow 4G，Performance 面板把 CPU 降速 4 倍，分别录制「等全量」和「分块渲染」两次。
 
 **什么时候不该用**：
+
 - 响应体必须完整解析才能用，半截 JSON 无法交给 `JSON.parse`。
 - 中间网关或 CDN 会把响应缓冲完再下发，块到达前端时已经没有时间差。
 - 首屏依赖同一张大图下载完成，文本块先到也改变不了首次布局的时间点。
@@ -489,6 +491,7 @@ it.return();        // 停止回放并触发 finally
 **怎么度量收益**：看单步回放耗时（`next` 调用前后的 `performance.now()` 差值）、回放期间的长任务数量（`PerformanceObserver` 订阅 `longtask`）、内存占用（Memory 面板堆快照）。测量方法：对同一份操作记录跑一次完整回放，记录每次 `next` 的耗时分布。
 
 **什么时候不该用**：
+
 - 需要随机访问任意时间点，生成器只能顺序推进，得按固定间隔存状态快照。
 - 操作需要在多个 Worker 里并行执行，生成器是单线程顺序模型。
 - 回放要长期驻留并反复回退，把历史压成不可变的 reducer 状态更合适。
@@ -517,6 +520,7 @@ it.return();        // 停止回放并触发 finally
 **目标**：写一个异步分页迭代器，并用它驱动一个列表的分块渲染。
 
 **步骤**：
+
 1. 用本地 Node 脚本模拟分页接口 `/items?cursor=&size=`，返回 `{ items, next }`。
 2. 写 `async function* paginate(url, size)`，按游标翻页，空数组或 `next` 为 `null` 时结束。
 3. 在生成器里加 `try/finally`，`finally` 中打印一行日志，用来观察退出时机。
@@ -526,6 +530,7 @@ it.return();        // 停止回放并触发 finally
 7. 用假 `fetch` 返回固定页数据，逐步 `next()` 断言每页内容与结束条件。
 
 **验收标准**：
+
 - 消费到最后一页时生成器返回 `{ done: true }`，请求次数等于页数。
 - 中途 `return()` 之后没有新的网络请求，用假 `fetch` 的调用次数断言。
 - `finally` 里的清理日志在正常结束和提前退出两种情况下都出现。

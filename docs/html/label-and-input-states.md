@@ -128,6 +128,7 @@ JAWS: "Username, 文本输入框"
 底层机制：点击 label 时，浏览器自动将 `click` 事件转发给关联的 input 控件（通过 `for/id` 或 DOM 树查找），input 接收到 click 后执行自己的默认行为（聚焦、切换 checked 状态）。
 
 从 input 的角度来看，点击 label 触发 input 聚焦，与直接点击 input 效果**完全相同**（触发同一套 focus/click 事件序列）。唯一区别是事件 target 不同：
+
 - 直接点击 input：事件 target 是 input
 - 点击 label：事件 target 先是 label，然后转发到 input
 
@@ -166,6 +167,7 @@ JAWS: "Username, 文本输入框"
 ```
 
 关键点：
+
 1. input 必须在 label 内（自动关联，无需 `for/id`）
 2. 用 `opacity:0` 而非 `display:none`（保持可访问）
 3. 点击区域 = 整个 `.custom-checkbox` = 整行，最大化可点击面积
@@ -288,6 +290,7 @@ input:disabled { pointer-events: none; }  // 配合防止切换
 #### Q2: `autocomplete="new-password"` 失效时有哪些替代方案？
 
 **答案：**
+
 1. **添加虚假 password input**：浏览器填充假 input，真实 input 保持空白
 2. **动态生成 name 属性**：如 `pwd_${Date.now()}`
 3. **确保 form action 正确**：action="/register" + name="password"
@@ -408,10 +411,12 @@ const ConditionalEditable = () => {
 - 测试里用 `getByLabelText` 查控件，没绑 label 的输入框直接查不到。
 
 **怎么度量收益**：
+
 - 指标一：每个控件都有可访问名称。测量：axe DevTools 扫 label 规则，Chrome DevTools 的 Accessibility 面板看 computed name。
 - 指标二：提交字段数与可见列数一致。测量：DevTools 的 Network 面板比对 Form Data 的字段个数。
 
 **什么时候不该用**：
+
 - 单元格只展示数字、没有输入行为时，不要硬塞 input 加 label，写文本节点就够。
 - 需要整行粘进 Excel 的表格，input 会破坏复制结果，改用只读表格或 contenteditable。
 
@@ -444,11 +449,13 @@ const ConditionalEditable = () => {
 - `required` 交给浏览器做基础校验，JS 只补业务规则。
 
 **怎么度量收益**：
+
 - 指标一：表单完成耗时中位数。测量：Chrome DevTools Performance 面板记录 INP，Lighthouse 移动端审计。
 - 指标二：逐字段输入时长。测量：埋点记 `field_focus` 到 `field_blur` 的分位值。
 - 指标三：自动填充命中率。测量：监听输入事件里有没有伴随按键事件，没有按键事件的值来自自动填充。
 
 **什么时候不该用**：
+
 - 同一页面既有付款人邮箱又有收件人邮箱时，两处都写 `autocomplete="email"`，浏览器会填同一个值，此时要靠 name 区分并考虑省略该 token。
 - 金额确认这类必须让人手动核对一次的字段，自动填充会让人跳过核对，改成手输。
 
@@ -484,11 +491,13 @@ const state = !canEdit
 - 回滚时复用同一个 `id`，不要重建 DOM，否则焦点同样会丢。
 
 **怎么度量收益**：
+
 - 指标一：回滚后的重输率。测量：埋点记冲突提示出现到该字段再次失焦之间的输入次数。
 - 指标二：焦点丢失次数。测量：Playwright 断言同步期间 `document.activeElement` 不变，MutationObserver 统计输入框卸载次数。
 - 指标三：同步延迟。测量：WebSocket 消息往返时间的中位数。
 
 **什么时候不该用**：
+
 - 字段取值决定后续控件是否出现（选了"自定义"才冒出输入框）时，readonly 会让人以为能改，应该隐藏或置 disabled 并写明原因。
 - 后端只接受全量字段提交时，别用 disabled 表达"暂不可改"，它不会进 Form Data。
 
@@ -521,6 +530,7 @@ const state = !canEdit
 **目标**：做一个"账户设置"页面，含用户名、邮箱、密码、收货地址、账号 ID 五组字段，把可编辑、readonly、disabled 三种状态都表达清楚。
 
 **步骤**：
+
 1. 用原生 HTML 写页面，每组字段配一个 label，用 `for` 与 `id` 绑好，先不写 CSS。
 2. 逐个字段补 `autocomplete`，取值从规范 token 表里挑，并在代码注释里写下选择理由。
 3. 账号 ID 设为 `readonly`，邮箱旁边加一个只读副本设为 `disabled`。
@@ -530,6 +540,7 @@ const state = !canEdit
 7. 写 Playwright 断言：五组字段能被 `getByLabelText` 查到；readonly 字段能聚焦；disabled 字段不在 Tab 顺序里。
 
 **验收标准**：
+
 - axe DevTools 扫描该页，label 类规则没有 error。
 - 每个字段都能用 `getByLabelText` 查到，测试里不出现 `getByTestId`。
 - 提交数据里含 readonly 的账号 ID，不含 disabled 的只读副本。

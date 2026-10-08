@@ -336,6 +336,7 @@ function inorderWindow(root, limit) {
 **怎么度量收益**：看可视区更新耗时、长任务次数、滚动帧率、最大调用栈深度。工具用 Chrome DevTools Performance、Lighthouse 的 Total Blocking Time、performance.measure 打点。方法：同一份 10000 行数据分别用递归中序和迭代中序，各跑 10 次取 P95 比较。
 
 **什么时候不该用**：
+
 - 服务端已经完成按分类排序和汇总，前端再来一遍是重复计算。
 - 业务顺序不是稳定按键排序，例如按人工拖拽顺序，中序会给出错误顺序。
 
@@ -369,6 +370,7 @@ function flattenVisibleComments(root, maxDepth) {
 **怎么度量收益**：看首屏可交互时间、启动崩溃率、滚动掉帧率。工具用 Android Studio Profiler、Firebase Crashlytics、Perfetto。方法：A/B 两组，一组 maxDepth 设为 4 且提供“展开更多”，一组全量递归展开；各测 20 次冷启动记录 P95。
 
 **什么时候不该用**：
+
 - 评论排序按热度或人工置顶，层序结果与业务顺序无关。
 - 首屏要求一次展示全部楼层，浅层展开会产生大量“展开更多”点击。
 
@@ -406,6 +408,7 @@ function createZOrderCursor(root) {
 **怎么度量收益**：看单次重排耗时、撤销恢复耗时、脏区刷新次数、顺序错误率。工具用 Vitest 基准、Chrome DevTools Performance、自定义埋点。方法：在 20000 节点树上连续做 100 次重排和 50 次撤销，记录 P95 和顺序校验失败数。
 
 **什么时候不该用**：
+
 - 图层允许相同 zIndex 或循环引用，严格 BST 校验会拒绝合法业务数据。
 - 只需要局部重排且树结构每次大改时，游标恢复的复杂度高于全量重建。
 
@@ -429,6 +432,7 @@ function createZOrderCursor(root) {
 目标：实现一个订单二叉搜索树的遍历与健康检查 CLI。
 
 步骤：
+
 1. 定义订单节点类型：id、amount、left、right。
 2. 构造测试数据：随机生成 10000 个订单节点，键为 amount。
 3. 实现迭代中序遍历，输出升序 amount 序列。
@@ -438,6 +442,7 @@ function createZOrderCursor(root) {
 7. 编写基准脚本，运行递归与迭代版本各 10 次并输出 P95。
 
 验收标准：
+
 - 10000 节点链式树不抛 RangeError，中序输出长度等于 10000。
 - 验证器能定位 1 个故意放错的节点并返回 false。
 - 最大深度和最大路径和分别匹配单元测试期望值。

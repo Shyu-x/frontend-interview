@@ -1908,6 +1908,7 @@ await redis.del(`chal:${sid}`);                         // 用过即删，失败
 **怎么度量收益**：在服务端日志里按「userId + credentialId + 时间」打点，统计带 credentialId 的导出记录占全部导出的比例。校验各步骤的耗时用 OpenTelemetry 的 histogram 分步骤记录，失败原因分布用 Sentry 的错误标签查看。
 
 **什么时候不该用**：
+
 - 如果后台只在内网访问，运维已用硬件密钥登录堡垒机，再套一层 Passkey 只增加操作步骤。
 - 如果导出由定时批处理完成，没有人工在场的动作，UV 无从谈起。
 - 如果浏览器环境是不支持 WebAuthn 的旧内嵌控件，先在别的后台试点。
@@ -1944,6 +1945,7 @@ await redis.set(`chal:${sid}`, options.challenge, 'EX', 300); // 5 分钟后失�
 **怎么度量收益**：前端用 PerformanceObserver 采集 `largest-contentful-paint` 与 `event`（INP），并在登录页用 `performance.mark` 标出「进入页面」和「options 返回」两个时刻。服务端用 OpenTelemetry 的 histogram 记录处理 /login/options 的耗时。两条曲线放在同一面板对比。
 
 **什么时候不该用**：
+
 - 如果登录页要求无 JS 也能提交表单，先不要接，WebAuthn 必须由脚本调用。
 - 如果目标 WebView 里 `window.PublicKeyCredential` 不存在，入口会直接抛错，要隐藏按钮并留在密码路径。
 - 如果用户绝大多数从未在别的设备注册过凭据，这段逻辑只会多一次查库。
@@ -1981,6 +1983,7 @@ await db.members.update({ roomId, userId }, { role });
 **怎么度量收益**：统计升级请求里断言校验失败的计数与原因分布，按 challenge、UV、签名三类打标签，用 OpenTelemetry 的错误计数器承载。业务侧看每天的角色升级次数，与客诉里"我没点过升级"的条数对照。
 
 **什么时候不该用**：
+
 - 如果白板链接本身就是成员邀请链接、点开即编辑，UV 不改变授权模型，先把邀请链接的有效期做短。
 - 如果房间里多数用户用的是没设锁屏的平板，强制 UV 会把他们挡在门外，需要另开一条降级路径。
 - 如果编辑权限的风险只是改错文字、没有数据外泄，这套流程的摩擦可能高于收益。

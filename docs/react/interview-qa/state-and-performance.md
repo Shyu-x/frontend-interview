@@ -80,6 +80,7 @@ const filteredState = selector({
 **数据流：** Action → Dispatch → Reducer → New State
 
 **为什么单向数据流重要：**
+
 - 可预测性：任何状态变化都来自明确的 action
 - 可追踪：action 是纯文本描述 `{type:'INCREMENT'}`
 - 可重现：同 action 序列产生同状态
@@ -237,6 +238,7 @@ React Query缓存生命周期:
 | Local | useState / useReducer | 组件私有：表单、临时 UI、动画 |
 
 **实践建议：**
+
 1. 状态尽量下沉（不放根组件）
 2. Context 按功能拆分（AuthContext, ThemeContext...）
 3. Server State 用 React Query/SWR（不放 Redux）

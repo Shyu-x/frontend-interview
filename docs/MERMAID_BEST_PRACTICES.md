@@ -224,6 +224,7 @@ node scripts/validate-mermaid.js docs --strict
 本项目使用的 Mermaid 版本要求：**11.0.0+**
 
 主要特性支持：
+
 - ✓ 中文节点文本
 - ✓ 中文字符支持
 - ✓ 多行文本 `<br/>`

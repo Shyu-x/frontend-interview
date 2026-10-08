@@ -692,6 +692,7 @@ Bun.serve({ // 启动 HTTP 服务
 **怎么度量收益**：用 `autocannon -c 10 -d 30 "http://localhost:3000/?page=1"` 记录 P99 与每秒请求数。用 `EXPLAIN QUERY PLAN` 确认索引命中。用 Chrome DevTools Performance 面板统计 Long Task 数量。
 
 **什么时候不该用**：
+
 - 多台机器需要同时写同一张订单表，SQLite 单文件无法承担并发写。
 - 需要行级权限、审计日志与多表聚合分析，改选 PostgreSQL。
 - 排序字段经常变化且无法预建索引，分页会退化成全表扫描。
@@ -724,6 +725,7 @@ if (!result.success) { // 构建失败要阻断发布
 **怎么度量收益**：用 Lighthouse 记录 LCP、TBT，用 web-vitals 在真实设备上报同一组指标。用 DevTools 的 Coverage 面板看首屏未使用的 JS 占比。构建侧记录 dist 目录总字节数。
 
 **什么时候不该用**：
+
 - 需要输出 ES5 语法以适配老 WebView，Bun.build 的目标范围不覆盖这类场景。
 - 项目已用 Next.js 等框架，SSR、路由与资源指纹由其构建链统一处理，替换打包器会增加接缝。
 - 首屏瓶颈在网络往返而非 JS 体积时，拆分产物对 LCP 没有帮助。
@@ -764,6 +766,7 @@ const server = Bun.serve({ // 启动服务
 **怎么度量收益**：服务端记录 message 回调用时与 publish 返回时刻，在 `/metrics` 暴露分位值。客户端用 DevTools 的 WS 帧时间戳算端到端延迟。用 bun test 起两个客户端连接，断言双方都收到同一条消息。
 
 **什么时候不该用**：
+
 - 需要真正的协同编辑语义，单人广播无法解决同一图形的并发冲突，要上 CRDT 或 OT。
 - 房间数量增长到需要多进程共享状态时，进程内订阅不成立，要换外部 pub/sub。
 - 笔迹必须长期可追溯并支持复杂查询时，SQLite 单文件要换成 PostgreSQL。
@@ -797,6 +800,7 @@ const server = Bun.serve({ // 启动服务
 **目标**：做一个带分页的订单查询服务，接口用 Bun.serve，数据用 bun:sqlite，前端页面只渲染当前页。
 
 **步骤**：
+
 1. 用 `bun init` 建项目，确认 bun:sqlite 可直接引入。
 2. 写脚本生成十万行订单数据，写入 orders.db。
 3. 为排序字段建索引，用 `EXPLAIN QUERY PLAN` 确认走了索引。
@@ -806,6 +810,7 @@ const server = Bun.serve({ // 启动服务
 7. 用 autocannon 压测，把 P99 与每秒请求数记进 README。
 
 **验收标准**：
+
 - `bun test` 全部通过，四类边界输入都有对应用例。
 - 查询计划输出为索引扫描，没有全表扫描字样。
 - page=0 与 page=abc 返回 400，不返回 500。

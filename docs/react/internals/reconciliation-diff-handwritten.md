@@ -1480,6 +1480,7 @@ patch(tbody, createElement('tbody', {}, rows));
 **怎么度量收益**：在 patch 内部对 insertBefore、removeChild、createElement 计数；用 Chrome DevTools Performance 面板看一次排序后的 Scripting 时长。
 
 **什么时候不该用**：
+
 - 数据每次刷新都是全量新对象、行内没有可保留状态时，key 对齐换不到收益，直接重建整块行。
 - 数据源没有稳定主键时，不要用行号加时间戳拼 key，每轮渲染 key 全变，全部节点重建。
 
@@ -1511,6 +1512,7 @@ patch(ul, createElement('ul', {}, children));
 **怎么度量收益**：Chrome DevTools Performance 面板的 Long Tasks 与 scripting 时长，Lighthouse 的 Total Blocking Time，PerformanceObserver 观测 largest-contentful-paint，另外统计 document 中 li 元素个数。
 
 **什么时候不该用**：
+
 - 列表总高度小于两屏时，滚动监听与区间计算换不到收益，直接全量挂载。
 - 需要浏览器原生 Ctrl+F 查找全文或打印整页时，未挂载的文本不在 DOM 中，会被漏掉。
 
@@ -1539,6 +1541,7 @@ patch(layer, createElement('div', {}, nodes));
 **怎么度量收益**：在 patch 内加 insertBefore 与 removeChild 计数器；用 requestAnimationFrame 记录相邻帧间隔；在 Performance 面板看 Recalculate Style 与 Layout 次数。
 
 **什么时候不该用**：
+
 - 元素数量在个位数时，LIS 计算与 key 对齐的代码量换不到可见收益。
 - 切换房间或整页重载时旧节点全部丢弃，patch 没有可复用的对象。
 
@@ -1571,6 +1574,7 @@ Snabbdom 的 updateChildren 从新旧数组两端各取指针，比较四种组�
 **目标**：实现一个 keyed children 的 patch，用同一组输入对比 React 式两轮遍历与 Vue3 LIS 式算法在宿主操作次数上的差异。
 
 **步骤**：
+
 1. 写 createElement 与 mount，用数组保存真实 DOM 节点，方便断言。
 2. 写 patch，覆盖同类型更新属性、不同类型整棵重建两个分支。
 3. 实现 keyed children 的第一版：第一轮遍历按 key 复用，第二轮遍历用 lastPlacedIndex 判断移动。
@@ -1580,6 +1584,7 @@ Snabbdom 的 updateChildren 从新旧数组两端各取指针，比较四种组�
 7. 用表格记录每组的操作次数与最终 DOM 顺序。
 
 **验收标准**：
+
 - 三组输入下两版算法的最终 DOM 顺序与输入数组一致。
 - 尾部追加一组中两版算法的 createElement 次数只等于新增节点数。
 - 整段倒序一组中两版算法的 insertBefore 次数有可解释的差值，并能在报告中说明差值的来源。

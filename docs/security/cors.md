@@ -540,6 +540,7 @@ function cors(req, res, next) {
 **怎么度量收益**：看 OPTIONS 请求占比这一项指标。方法是服务端按 `method=OPTIONS` 统计访问日志条数，除以往返总请求数；前端侧在 DevTools 的 Network 面板按方法过滤，对比开启 `Max-Age` 前后的条数。导出接口的 P95 延迟看 Performance 面板的服务端计时瀑布。
 
 **什么时候不该用**：
+
 - 公开只读接口不需要凭证时，把 ACAO 设为 `*` 并去掉 `credentials`，可以省掉整套白名单维护。
 - 接口只服务单一前端域名时，改用同域反向代理把跨源变成同源，比开 CORS 的配置面更小。
 - 不要把 `Access-Control-Max-Age` 设成小时级的大值，白名单变更后旧缓存未过期会继续放行已下线的来源。
@@ -573,6 +574,7 @@ location /assets/ {
 **怎么度量收益**：指标是被拦请求数与 LCP。被拦请求数在 DevTools 的 Network 面板按状态过滤统计；LCP 用 `web-vitals` 库或 `PerformanceObserver` 监听 `largest-contentful-paint`，在真实设备上分位数对比。另看字体加载失败的 console 报错条数。
 
 **什么时候不该用**：
+
 - 资源只给本站使用，把 CORP 设为 `cross-origin` 等于向任意站点开放，应保持默认的 `same-origin`。
 - 站点不需要共享内存或高精度计时能力时，不要为了别的目的引入 COEP，它会让全部跨源资源的合规成本上升。
 - 依赖 Cookie 的第三方脚本不要改成 `credentialless` 加载，否则脚本拿不到会话，行为会与预期不符。
@@ -605,6 +607,7 @@ if (crossOriginIsolated) {                       // 先确认隔离已生效
 **怎么度量收益**：指标有三项，分别是 `crossOriginIsolated` 为 true 的页面占比、帧间隔 P95、主线程长任务条数。占比通过页面读取该布尔值后上报得到；帧间隔用 `requestAnimationFrame` 记录相邻时间戳差值；长任务用 `PerformanceObserver` 监听 `longtask` 条目。
 
 **什么时候不该用**：
+
 - 站点嵌入了无法改响应头的第三方 iframe，且产品流程依赖 `window.opener` 回传结果，此时开 COOP: same-origin 会切断这条链路。
 - 页面没有共享内存或高精度计时需求时，引入跨源隔离只换来约束，没有可感知的收益。
 - 打算用 `credentialless` 替代 `require-corp` 前，需要核对官方文档：目标浏览器对 `Cross-Origin-Embedder-Policy: credentialless` 的支持情况，支持不完整时隔离不会生效。
@@ -645,6 +648,7 @@ Fetch Metadata 请求头做服务端决策（出处：W3C 的 Fetch Metadata Req
 **目标**：在本机用两个端口搭出跨源环境，跑通简单请求、预检、携带凭证、跨源隔离四条路径。
 
 **步骤**：
+
 1. 用 Node.js 起两个服务，静态页在 `http://127.0.0.1:8080`，API 在 `http://127.0.0.1:3000`。
 2. 前端用 `fetch` 请求 API 的 GET 接口，在 Network 面板观察是否出现 OPTIONS。
 3. 给该请求加上自定义头 `X-Trace`，观察预检被触发以及响应头中的 `Access-Control-Allow-Headers`。
@@ -654,6 +658,7 @@ Fetch Metadata 请求头做服务端决策（出处：W3C 的 Fetch Metadata Req
 7. 在页面里打印 `crossOriginIsolated`，确认隔离生效后 `new SharedArrayBuffer(8)` 不抛错。
 
 **验收标准**：
+
 - 第 2 步的 GET 在 Network 面板中只有一条请求；第 3 步出现一条 OPTIONS，状态码为 204。
 - 用 `curl -H "Origin: http://evil.test" http://127.0.0.1:3000/api` 请求，响应头中不含 `Access-Control-Allow-Origin: http://evil.test`。
 - 携带凭证的请求在 ACAO 为 `*` 时被浏览器拒绝并给出报错，改为回显具体来源后请求成功。

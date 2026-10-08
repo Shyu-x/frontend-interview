@@ -105,6 +105,7 @@ const toolResult = {
 ```
 
 **这段代码在做什么**  
+
 - `role` 决定消息由谁产生，循环靠它区分消息类型。  
 - `assistantFinal` 没有 `tool_calls`，表示本轮是最终回答。  
 - `assistantToolCall.content` 是 `null`，因为模型这轮没有文本回答。  
@@ -131,6 +132,7 @@ const addToolDef = {
 ```
 
 **这段代码在做什么**  
+
 - `name` 是 Harness 查表和模型指定工具时用的键。  
 - `description` 是模型决定“现在该不该用这个工具”的依据。  
 - `parameters` 描述参数形状，将来可以接入模型厂商的 JSON Schema 校验。  
@@ -167,6 +169,7 @@ console.log('消息形状测试通过');
 | 工具结果没回填 | `tool_call_id` 与 `id` 不一致 | 结果消息逐字复制原 `id` |
 
 **小结**  
+
 - 消息历史是数组，所有消息都需要 `role`。  
 - 工具调用参数放在 `function.arguments`，并且是 JSON 字符串。  
 - 工具结果必须携带 `tool_call_id`，否则模型不知道结果对应哪次调用。
@@ -244,6 +247,7 @@ export class FakeModel {
 ```
 
 **这段代码在做什么**  
+
 - `#queue` 用私有字段保存预设响应，外部无法误改。  
 - 构造时用 `slice()` 拷贝响应数组，防止外部后续拖动影响模型。  
 - `this.requests` 记录每条输入历史，断言可检查模型是否收到 steering 消息。  
@@ -278,6 +282,7 @@ export class FakeModel {
 ```
 
 **这段代码在做什么**  
+
 - `delayMs` 为 0 时无等待，保持一般测试速度快。  
 - `setTimeout` 模拟真实模型接口的网络耗时。  
 - `signal.addEventListener` 监听 abort，一旦取消就清掉定时器。  
@@ -317,6 +322,7 @@ FakeModel 测试通过
 | 无法测试中止 | 模型不订阅 abort | 在延迟 Promise 里监听 abort 事件 |
 
 **小结**  
+
 - FakeModel 的核心是队列消费与请求记录。  
 - 每次 `chat` 都记录 `messages`，后续才能验证 steering 是否注入。  
 - 支持 `delayMs` 和 abort 监听，才能测出中段取消路径。
@@ -387,6 +393,7 @@ export class ToolRegistry {
 ```
 
 **这段代码在做什么**  
+
 - `#tools` 是私有 Map，避免外部直接改动。  
 - `register` 遇到重复名称直接抛错，暴露接线错误。  
 - `get` 把“未定义工具”这个错误集中到一处。  
@@ -408,6 +415,7 @@ function assertRequiredParams(def, args) {
 ```
 
 **这段代码在做什么**  
+
 - `??` 在 `required` 为 `undefined` 时取空数组。  
 - 遍历 `required`，只检查 `undefined`，不检查类型。  
 - 类型校验通常由模型厂商的 JSON Schema 完成，这里保持最小。  
@@ -446,6 +454,7 @@ ToolRegistry 测试通过
 | 调用不存在工具 | 查表后未处理未命中 | 在 `get` 中抛未定义错误 |
 
 **小结**  
+
 - 注册表把工具名、描述、参数校验、执行函数绑定在一起。  
 - 重复注册要失败，避免测试里的接线错误被隐藏。  
 - `call` 的固定顺序是查表、校验、执行。
@@ -528,6 +537,7 @@ export class AgentLoop extends EventEmitter {
 ```
 
 **这段代码在做什么**  
+
 - `extends EventEmitter` 让循环能发布事件，后面会用到。  
 - `#messages` 拷贝初始历史，避免外部数组被循环改动。  
 - `#steering` 也拷贝初始队列。  
@@ -560,6 +570,7 @@ export class AgentLoop extends EventEmitter {
 ```
 
 **这段代码在做什么**  
+
 - 每一轮正文开始前查 abort 和 steering，保证优先级。  
 - `this.#messages.slice()` 传给模型，避免模型同时修改内部历史。  
 - 模型返回后先写回 assistant 消息。  
@@ -596,6 +607,7 @@ export class AgentLoop extends EventEmitter {
 ```
 
 **这段代码在做什么**  
+
 - `for` 依次处理该响应中的全部工具调用。  
 - 每次处理前发布 `tool:start`，处理后发布 `tool:end`。  
 - `toolMessage` 追加到内部历史，供下一轮模型使用。  
@@ -648,6 +660,7 @@ Agent Loop 测试通过
 | final 消息被忽略 | 循环未判断 `tool_calls` 为空 | 检查 `calls.length === 0` |
 
 **小结**  
+
 - Agent Loop 的核心是“先判断取消，再注入 steering，再调用模型”。  
 - 工具结果必须用 `tool_call_id` 写回历史。  
 - final 的条件是 `tool_calls` 为空数组，不是文本为空。
@@ -704,6 +717,7 @@ sequenceDiagram
 ```
 
 **这段代码在做什么**  
+
 - `#rounds` 每轮加一，编号从 1 开始。  
 - `round:start` 在模型调用前发布。  
 - 它比 `model:end` 早，事件日志能证明这一点。  
@@ -728,6 +742,7 @@ assert.deepEqual(events, [
 ```
 
 **这段代码在做什么**  
+
 - `events` 只存事件名，方便用数组断言顺序。  
 - 订阅 4 个关键生命周期事件。  
 - 第一轮先 `round:start`，再进入工具执行。  
@@ -771,6 +786,7 @@ console.log('事件系统测试通过');
 | 内存告警 | 添加超过 10 个监听器 | 测试用局部监听或及时 removeListener |
 
 **小结**  
+
 - 主循环生命周期事件顺序固定，可以作为回归断言。  
 - `round:start` 必须在模型调用前发布。  
 - 事件系统让 Harness 从黑盒变成可观察序列。
@@ -840,6 +856,7 @@ stateDiagram-v2
 ```
 
 **这段代码在做什么**  
+
 - 整个循环包在 `try` 中，方便统一处理取消错误。  
 - `isAbortError` 只识别 `error.name === 'AbortError'`。  
 - 取消后返回当前历史，而不是跑到下一轮。  
@@ -860,6 +877,7 @@ async function delayAdd(args, context) {
 ```
 
 **这段代码在做什么**  
+
 - `isAbortError` 用可选链安全读取 `name`。  
 - `delayAdd` 会把取消信号传入工具。  
 - 工具在真正执行前检查信号，能避免“循环已被叫停，工具仍然执行”。  
@@ -905,6 +923,7 @@ AbortSignal 测试通过
 | 工具仍继续执行 | 工具没有内部检查 | 工具执行前也调用 `throwIfAborted` |
 
 **小结**  
+
 - AbortSignal 需要贯穿模型调用与工具执行。  
 - `catch` 中只处理 `AbortError`，其他错误继续抛出。  
 - 中止后返回 `finishReason: 'aborted'`，不要把未完成的响应写回历史。
@@ -961,6 +980,7 @@ flowchart TD
 ```
 
 **这段代码在做什么**  
+
 - `steer` 在循环结束后不能继续注入。  
 - 停止判断根据 `#stopped`，它由 final、abort、maxRounds 三个出口置为 true。  
 - `push` 后要等到下一轮顶部才进入历史。  
@@ -976,6 +996,7 @@ flowchart TD
 ```
 
 **这段代码在做什么**  
+
 - 用 `while` 而不是 `if`，确保本轮所有插队消息一次性清空。  
 - 每条插队消息都是一条普通消息，必须有 `role` 和 `content`。  
 - 注入顺序是 `push` 的顺序。  
@@ -997,6 +1018,7 @@ flowchart TD
 ```
 
 **这段代码在做什么**  
+
 - 检查放在新增一轮之前，保证模型调用次数不超过 maxRounds。  
 - 达到上限不再调用模型，直接返回。  
 - `finishReason` 为 `maxRounds`，让调用方知道是保护退出。  
@@ -1063,6 +1085,7 @@ maxRounds 测试通过
 | 保护退出后还能 steer | 退出分支没置 `#stopped` | 在所有终态置 `#stopped = true` |
 
 **小结**  
+
 - steering 在每一轮模型调用前统一清空。  
 - maxRounds 判断必须放在新增轮数之前。  
 - 两个机制都修改退出状态，防止循环结束后继续改变历史。
@@ -1126,6 +1149,7 @@ function isAbortError(error) {
 ```
 
 **这段代码在做什么**  
+
 - `EventEmitter` 是 AgentLoop 的父类。  
 - `assert` 带类型比较，适合做结构断言。  
 - `abortError` 统一创建 `AbortError`。  
@@ -1165,6 +1189,7 @@ class FakeModel {
 ```
 
 **这段代码在做什么**  
+
 - `requests` 与 `calls` 留下了测试观测点。  
 - `delayMs` 为 0 时不等待。  
 - 延迟 Promise 在 abort 时清理定时器并抛错。  
@@ -1201,6 +1226,7 @@ class ToolRegistry {
 ```
 
 **这段代码在做什么**  
+
 - 重复注册会抛错，不会覆盖。  
 - `call` 负责查表、校验、执行。  
 - `context` 直接交给工具执行函数。  
@@ -1229,6 +1255,7 @@ class AgentLoop extends EventEmitter {
 ```
 
 **这段代码在做什么**  
+
 - 构造器拷贝外部数组，防止内部修改。  
 - `steering` 队列可提前传入也可后续通过 `steer` 追加。  
 - `maxRounds` 默认 8，但测试代码显式传值。  
@@ -1285,6 +1312,7 @@ class AgentLoop extends EventEmitter {
 ```
 
 **这段代码在做什么**  
+
 - 循环内四个步骤顺序固定：检查取消、注入 steering、检查上限、调用模型。  
 - 工具循环处理完整 `calls` 数组。  
 - final、abort、maxRounds 三个返回值都带 `messages` 和 `finishReason`。  
@@ -1311,6 +1339,7 @@ class AgentLoop extends EventEmitter {
 ```
 
 **这段代码在做什么**  
+
 - 解析参数失败时报告原始字符串。  
 - 工具执行前再查一次取消信号。  
 - 工具上下文包含 `signal` 和 `messages`。  
@@ -1346,6 +1375,7 @@ function makeToolCall(id, name, args) {
 ```
 
 **这段代码在做什么**  
+
 - `addToolDef` 同时包含模型信息和执行逻辑。  
 - `makeToolCall` 避免测试代码重复写 `JSON.stringify`。  
 - `execute` 执行前检查信号，测取消时能覆盖工具路径。  
@@ -1394,6 +1424,7 @@ async function testLoopWithToolAndEvents() {
 ```
 
 **这段代码在做什么**  
+
 - `testFakeModel` 验证假模型按队列返回。  
 - `testLoopWithToolAndEvents` 验证完整工具链路。  
 - 事件顺序断言覆盖了工具回填和 final 结束。  
@@ -1438,6 +1469,7 @@ async function testSteering() {
 ```
 
 **这段代码在做什么**  
+
 - `testAbort` 测试 30ms 延迟中在 10ms 取消。  
 - 循环应返回 `aborted`，模型最终响应未进入历史。  
 - `testSteering` 验证插队消息在模型请求历史中出现。  
@@ -1478,6 +1510,7 @@ console.log('全部测试通过');
 ```
 
 **这段代码在做什么**  
+
 - maxRounds 测试用两个工具调用响应，让循环刚跑满 2 轮。  
 - 第 3 轮开始前应退出，不再调用模型。  
 - 五个测试函数顺序执行，方便对比输出。  
@@ -1511,6 +1544,7 @@ node harness.mjs
 | abort 测试偶发通过 | 延迟时间太短 | 把 delayMs 设为 30，把 abort 设置成 10 |
 
 **小结**  
+
 - 完整脚本无第三方依赖，Node 内置模块即可跑。  
 - 全部测试覆盖响应形状、工具循环、事件、取消、插队、上限。  
 - 输出顺序固定，可用作回归测试。

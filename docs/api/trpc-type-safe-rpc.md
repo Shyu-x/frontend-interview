@@ -1360,6 +1360,7 @@ export const tableRouter = t.router({
 **怎么度量收益**：指标是 `tsc --noEmit` 错误数、联调返工次数、表格首屏 LCP。测量：CI 里跑 tsc，Chrome DevTools Network 看 query 参数与 mutation 请求体，Lighthouse 看 LCP。
 
 **什么时候不该用**：
+
 - 表格列由用户运行时配置，zod 静态 schema 覆盖不了，需要在服务端按配置校验。
 - 后端不是 TypeScript，或跨公司无法共享包，Proxy 客户端拿不到 router 类型。
 - 对外公开 API 需要 OpenAPI 文档给第三方，tRPC 类型不能让非 TS 客户端使用。
@@ -1402,6 +1403,7 @@ await api.table.updateCell.mutate({ id: '1', field: 'name', value: '新值' });
 **怎么度量收益**：指标是 LCP、首屏请求数、首屏 JS 体积。测量：Lighthouse 跑移动端，Chrome DevTools Network 数请求，`PerformanceObserver` 监听 `largest-contentful-paint`。
 
 **什么时候不该用**：
+
 - 首屏只有一个请求，批量链接只增加配置复杂度。
 - 首屏必须由服务端渲染完整 HTML 给搜索引擎，客户端 tRPC 请求不能作为唯一数据源。
 - CDN 缓存公开读接口时，tRPC 的 POST 批量链接不适合直接缓存。
@@ -1447,6 +1449,7 @@ export const boardRouter = t.router({
 **怎么度量收益**：指标是操作端到端延迟 p95、操作拒绝率、重连后快照一致率。测量：OpenTelemetry 记录 mutation 耗时，Playwright 开多个页面模拟并发编辑，对比快照哈希。
 
 **什么时候不该用**：
+
 - 需要离线优先，用户操作要本地立即生效，HTTP mutation 往返延迟不适合。
 - 跨端客户端不是 TypeScript，共享 router 类型无法覆盖。
 - 每秒高频小操作，HTTP 请求头开销占比高，二进制协议或 WebSocket 消息更合适。
@@ -1481,6 +1484,7 @@ Hono 从路由定义推断客户端请求与响应类型，和 tRPC 的 Proxy �
 目标：在 monorepo 里做一个“待办清单”小项目，server 暴露 `list`、`add`、`toggle` 三个 procedure，client 用 Proxy 客户端调用，输入用 zod。
 
 步骤：
+
 1. 建 pnpm workspace，包含 `packages/api`、`apps/server`、`apps/web`。
 2. 在 `packages/api` 写 zod schema：Todo 的 `id`、`title`、`done`。
 3. 写 router：`list` 用 query，`add` 和 `toggle` 用 mutation。
@@ -1490,6 +1494,7 @@ Hono 从路由定义推断客户端请求与响应类型，和 tRPC 的 Proxy �
 7. 写一个测试：传非法 `title`，断言客户端收到错误，服务端没有写入。
 
 验收标准：
+
 - 根目录 `pnpm tsc --noEmit` 通过。
 - 浏览器 Network 面板能看到 `list` 的读请求与 `add` 的写请求，写请求体包含输入。
 - 把 `title` 改成 number，编辑器在调用处报错。

@@ -106,6 +106,7 @@ interface DecisionContext {
 ```
 
 **这段代码在做什么**
+
 - `taskType` 决定候选模型的能力维度，是筛选和评分的入口。
 - `inputLength` 与 `expectedOutputLength` 一起用于估算成本与上下文占用。
 - `maxBudget` 是硬约束，超预算的候选会在筛选阶段就被剔除。
@@ -129,6 +130,7 @@ interface Decision {
 ```
 
 **这段代码在做什么**
+
 - `modelId` 与 `strategyId` 是执行层的两个直接输入。
 - `riskScore` 决定执行层是否需要插入人工确认。
 - `alternatives` 让执行层在首选模型失败时有明确的第二选择。
@@ -163,6 +165,7 @@ async function decide(ctx: DecisionContext): Promise<Decision> {
 ```
 
 **这段代码在做什么**
+
 - 函数体内没有 if 之外的分支逻辑，四个组件的细节都在各自模块里。
 - 空候选直接抛错，因为静默兜底会让预算和合规失控。
 - `alternatives` 取第 2 到第 4 名，为执行层的降级留出三次机会。
@@ -251,6 +254,7 @@ console.log(ranked.map((r) => `${r.id}:${r.score.toFixed(3)}`).join(" "));
 - LangGraph 官方文档的路由与回退章节，演示用条件边表达「满足条件才走这条分支」。出处名称：LangGraph 官方文档。怎么借鉴：把策略条件写成条件边的形式，便于把一次决策画成图并回放。
 
 **小结**
+
 - 决策层只做取舍，不做任务理解，也不做实际执行。
 - 输入是 DecisionContext，输出是 Decision，两者都要能序列化。
 - 决策理由必须落日志，否则线上排障没有抓手。
@@ -315,6 +319,7 @@ function validateContext(ctx: DecisionContext): string[] {
 ```
 
 **这段代码在做什么**
+
 - 返回错误数组而不是抛异常，方便一次性把问题都列给调用方。
 - 权重之和必须为 1，否则排序结果无法跨请求比较。
 - 用 0.001 的容差处理浮点数相加的误差。
@@ -339,6 +344,7 @@ function withDefaults(ctx: DecisionContext): Required<DecisionContext> {
 ```
 
 **这段代码在做什么**
+
 - 权重缺省值沿用旧页示例里的 0.4 / 0.3 / 0.3，这是示例值不是实测结论。
 - `expectedOutputLength` 缺省 500，只是一个保守估计，需按你的业务重新设。
 - `containsPII` 缺省为 false 有风险，安全要求高的业务应当改成缺省 true。
@@ -416,6 +422,7 @@ console.log("上下文校验通过：", JSON.stringify(filled));
 - JSON Schema 官方文档的数值校验章节，说明如何用最小值、最大值等关键字约束数值。出处名称：JSON Schema 官方文档。怎么借鉴：把 DecisionContext 的校验规则写成一份 schema，校验逻辑与类型定义来自同一份描述。
 
 **小结**
+
 - 上下文是唯一取数口，散落的全局状态会让决策不可回放。
 - 权重之和必须归一，否则不同请求的打分不可比。
 - 缺省值要按业务风险定，合规相关字段宁可从严。
@@ -491,6 +498,7 @@ function estimateCost(model: AIModel, ctx: DecisionContext): number {
 ```
 
 **这段代码在做什么**
+
 - 三层过滤顺序固定：窗口、能力、预算，前面的便宜判断放在前面。
 - `requiredCapabilities` 用键值对表达，不写死具体的任务类型。
 - 成本估算按每 1K token 的口径，这个口径来自旧页示例，实际计价以你的供应商账单为准。
@@ -521,6 +529,7 @@ function rankModels(models: AIModel[], ctx: DecisionContext) {
 ```
 
 **这段代码在做什么**
+
 - 成本和延迟都取反，让「越小越好」的指标变成「越大越好」，才能统一加权。
 - 归一化的分母取当前候选集里的最大值，候选集变了分数也会变，跨请求比较时要小心。
 - 能力分按任务类型查表得到，表里没有的类型给一个保守的中间值。
@@ -625,6 +634,7 @@ console.log("成本优先：", costFirst.map((r) => r.id).join(" > "));
 - LangGraph 官方文档的回退章节，演示主路径失败后切换到备用路径。出处名称：LangGraph 官方文档。怎么借鉴：把选择器返回的备选列表接进执行层的降级逻辑，而不是失败就报错。
 
 **小结**
+
 - 先筛后排，筛选用布尔判断，排序用加权评分，两者不要混在一起。
 - 归一化的分母决定分数的可比范围，跨请求比较要固定基准。
 - 备选列表是降级的基础，选择器要顺手返回。
@@ -711,6 +721,7 @@ function evaluateCondition(cond: StrategyCondition, ctx: unknown): boolean {
 ```
 
 **这段代码在做什么**
+
 - `getFieldValue` 支持 `runtime.retryCount` 这样的路径，避免为每种组合定义新字段。
 - 路径中断时返回 undefined，而不是抛错，让条件求值保持纯函数。
 - `gt` 与 `lt` 先转数字，防止字符串比较出现 `"10" < "9"` 这种结果。
@@ -747,6 +758,7 @@ async function execute(strategy: Strategy, ctx: unknown): Promise<ActionResult[]
 ```
 
 **这段代码在做什么**
+
 - 条件用 `every` 求合取，全部为真才算命中。
 - 没有命中时只接受 id 为 default 的策略，缺了就抛错。
 - 排序用优先级降序，优先级相同时保持数组原顺序。
@@ -834,6 +846,7 @@ console.log("策略选择验证通过");
 - OpenTelemetry 官方文档的追踪章节，建议为每个跨度记录开始与结束时间。出处名称：OpenTelemetry 官方文档。怎么借鉴：给策略执行的每一步记一条跨度，超时问题一眼能看出卡在哪个动作。
 
 **小结**
+
 - 条件求值必须是纯函数，同一输入永远同一结果。
 - 优先级之外要有稳定的二级排序键，否则命中顺序不可复现。
 - default 策略是必须项，缺了它边界状态会直接抛错。
@@ -907,6 +920,7 @@ function calculateOverallRisk(risks: Risk[]): number {
 ```
 
 **这段代码在做什么**
+
 - 空列表返回 0，避免除零。
 - 严重度权重来自旧页示例，是你项目的起点而非定论。
 - 先求平均再放大，让大量低风险条目不会盖过一条严重条目。
@@ -934,6 +948,7 @@ function generateRecommendations(risks: Risk[]): Recommendation[] {
 ```
 
 **这段代码在做什么**
+
 - 只有 critical 和 high 进入建议列表，其余仅留在日志里。
 - 每条缓解动作单独成条，便于分别指派负责人。
 - critical 标记为立即处理，high 标记为尽快处理。
@@ -1023,6 +1038,7 @@ console.log("建议条数：", generateRecommendations(mixed).length);
 - OpenTelemetry 官方文档的语义约定章节，建议属性名保持统一以便跨服务聚合。出处名称：OpenTelemetry 官方文档。怎么借鉴：给风险条目起固定字段名，让不同业务的评分可以横向统计。
 
 **小结**
+
 - 风险分是概率乘严重度权重，再对条目求平均并叠加放大因子。
 - critical 条目要有独立硬门槛，不能被平均值稀释。
 - 概率与阈值都需要用真实事故数据定期校准。
@@ -1093,6 +1109,7 @@ function calculateBaseline(ctx: OptimizationContext, model: CostModel): CostItem
 ```
 
 **这段代码在做什么**
+
 - 每个条目都带 `type`，方便按类型汇总和定位。
 - 输出 token 按两倍单价计算，这个系数来自旧页示例，实际以你的供应商计价为准。
 - `?? 0` 兜底，避免缺字段算出 NaN。
@@ -1113,6 +1130,7 @@ function optimizeTokens(ctx: OptimizationContext, model: CostModel): Optimizatio
 ```
 
 **这段代码在做什么**
+
 - 只有 token 总量超过 1000 才尝试压缩，小请求不值得引入压缩开销。
 - 0.7 是旧页示例写下的假设值，用在你项目里必须先做小样本实验。
 - 节省额按压缩掉的比例乘单价计算，未经实验验证不要写进预算承诺。
@@ -1207,6 +1225,7 @@ console.log("优化后：", (baseline - savings).toFixed(4));
 - LangGraph 官方文档的持久化与恢复章节，演示任务中断后从检查点继续。出处名称：LangGraph 官方文档。怎么借鉴：把成本优化后的执行计划存成检查点，重跑时不必重新走一遍筛选与评分。
 
 **小结**
+
 - 成本要拆成条目算，才能定位到具体哪一项超了。
 - 任何压缩比例与批处理比例都必须用实测数据替换示例假设。
 - 成本优化的约束条件里有质量指标，缺了它就会把任务做废。
@@ -1291,6 +1310,7 @@ async function decide(ctx: DecisionContext): Promise<Decision> {
 ```
 
 **这段代码在做什么**
+
 - 顺序固定为选择、策略、成本、风险，风险评分最后回填到决定里。
 - 候选集为空直接抛错，这类问题属于配置错误，不该被静默兜底。
 - 风险超过阈值时替换策略而不是替换模型，因为保守策略往往同时收窄了动作范围。
@@ -1316,6 +1336,7 @@ async function decideWithFallback(ctx: DecisionContext, maxAttempts = 3): Promis
 ```
 
 **这段代码在做什么**
+
 - 每次失败记录原因，抛错时把整条失败链带上，便于排障。
 - 放宽预算的做法来自旧页示例，实际是否放宽要由业务决定。
 - 次数上限默认 3，与选择器返回的备选数量对齐。
@@ -1426,6 +1447,7 @@ console.log("高风险请求：", JSON.stringify(risky));
 - OpenTelemetry 官方文档的追踪章节，建议用父子跨度表达调用层次。出处名称：OpenTelemetry 官方文档。怎么借鉴：给四个组件各建一个子跨度，挂在同一个决策父跨度下，耗时分布一眼可见。
 
 **小结**
+
 - 四个组件串行执行，顺序固定为选择、策略、成本、风险。
 - 全流程共享同一份上下文，不允许各自复制后修改。
 - 风险超阈值时优先换策略，而不是先换模型。
@@ -1495,6 +1517,7 @@ interface DecisionLog {
 ```
 
 **这段代码在做什么**
+
 - `requestId` 是与上游认知层日志关联的钥匙。
 - `candidates` 保留每个候选的分维度分数，这是回答「为什么不是它」的依据。
 - `riskScore` 与 `estimatedCost` 让日志同时支撑风控与账单核对。
@@ -1521,6 +1544,7 @@ function replay(
 ```
 
 **这段代码在做什么**
+
 - 回放只跑筛选与排序，不调用真实模型，所以可以离线大批量跑。
 - 每个上下文跑两遍，分别用新旧权重。
 - 只统计首选模型是否变化，备选顺序变化不在统计范围内。
@@ -1610,6 +1634,7 @@ console.log("回放对比：", JSON.stringify(report));
 - LangGraph 官方文档的持久化与恢复章节，演示检查点机制。出处名称：LangGraph 官方文档。怎么借鉴：把回放任务当作离线检查点重跑，而不是复制一份线上逻辑。
 
 **小结**
+
 - 决策日志要能回答「为什么选它、为什么不是它」。
 - 回放用历史上下文跑新参数，成本为零，收益是可量化的影响面。
 - 参数改动先回放、再灰度、最后全量，三步不能省。

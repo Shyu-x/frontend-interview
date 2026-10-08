@@ -82,6 +82,7 @@ export const unsuitableScenarios = [
 ```
 
 **这段代码在做什么**
+
 - `suitableScenarios` 列出四个适合 SSE 的具体业务场景。
 - `unsuitableScenarios` 列出四个应改用 WebSocket 或轮询的场景。
 - 元组长度固定，增删场景时类型校验会强制同步修改。
@@ -100,6 +101,7 @@ console.log('expected: SSE 适合单向文本流');
 ```
 
 **这段代码在做什么**
+
 - 验证场景数组与预期一致。
 - 运行输出：`expected: SSE 适合单向文本流`。
 - 依赖：Node 20 内置 `node:assert`，无外部依赖。
@@ -209,6 +211,7 @@ server.listen(0, () => {
 ```
 
 **这段代码在做什么**
+
 - `writeHead` 设置 SSE 三件套：MIME、禁用缓存、保持连接。
 - `flushHeaders` 让响应头立即发到网络，不等首个 body。
 - `res.write('data: hello\n\n')` 产出一条完整 SSE 帧。
@@ -226,6 +229,7 @@ console.log(tokenFrame('你'));
 ```
 
 **这段代码在做什么**
+
 - JSON 内容含换行时，`JSON.stringify` 会转义为 `\n`，不会破坏 SSE 帧边界。
 - 运行输出：`data: {"choices":[{"delta":{"content":"你"}}]}\n\n`。
 - 使用 OpenAI 兼容结构，前端可复用已有解析函数。
@@ -242,6 +246,7 @@ console.log('expected: frame ends with double newline');
 ```
 
 **这段代码在做什么**
+
 - 断言 token 帧携带 `data:` 前缀。
 - 断言帧以 `\n\n` 结尾，符合 SSE 分帧规则。
 - 运行输出：`expected: frame ends with double newline`。
@@ -346,6 +351,7 @@ export function createSSEParser() {
 ```
 
 **这段代码在做什么**
+
 - `leftover` 缓存跨块未完整的最后一行。
 - `split('\n')` 后取 `pop()` 作为下一块开头。
 - 只处理 `data: ` 前缀行，跳过注释与 `event:`。
@@ -368,6 +374,7 @@ export async function readSSE(response, onData) {
 ```
 
 **这段代码在做什么**
+
 - `getReader` 获取字节流读取器。
 - `decoder.decode(value, { stream: true })` 支持半汉字分片。
 - 每块交给 parser，由 parser 维护半行。
@@ -388,6 +395,7 @@ console.log('expected: get 2 token frames');
 ```
 
 **这段代码在做什么**
+
 - 模拟两个块，验证正常分帧与 `[DONE]` 跳过。
 - 运行输出：`expected: get 2 token frames`。
 - 依赖：Node 20 内置 `node:assert`。
@@ -491,6 +499,7 @@ export class BackpressureWriter {
 ```
 
 **这段代码在做什么**
+
 - 缓冲区按“未 flush 帧数”限制，达到 100 时每 10 毫秒重试。
 - `write` 返回 `false` 时监听一次 `drain` 事件。
 - 只等待一次 drain，避免并发重复监听。
@@ -510,6 +519,7 @@ console.log('expected: drain path was awaited once');
 ```
 
 **这段代码在做什么**
+
 - 模拟 `write` 返回 `false` 一次后走 drain 分支。
 - 断言写入路径可以完成。
 - 运行输出：`expected: drain path was awaited once`。
@@ -610,6 +620,7 @@ export class ReconnectStrategy {
 ```
 
 **这段代码在做什么**
+
 - 退避从 1000 毫秒开始，最大 30000 毫秒。
 - 抖动幅度为当前延迟的 10%，来源为旧版页面。
 - 超过 10 次返回 `null` 表示停止。
@@ -630,6 +641,7 @@ console.log('expected: delays are exponential with jitter');
 ```
 
 **这段代码在做什么**
+
 - 第一次延迟处于 1000 至 1100 毫秒区间。
 - 第二次延迟处于 2000 至 2200 毫秒区间。
 - 运行输出：`expected: delays are exponential with jitter`。
@@ -723,6 +735,7 @@ export function customFrame(type, payload) {
 ```
 
 **这段代码在做什么**
+
 - `openAIFrame` 生成 OpenAI 兼容帧。
 - `anthropicFrame` 生成 Anthropic 事件帧。
 - `customFrame` 用 `event:` 字段开启自定义分发。
@@ -741,6 +754,7 @@ console.log('expected: three protocol frames encode correctly');
 ```
 
 **这段代码在做什么**
+
 - 分别断言三种协议帧包含标志字段。
 - 运行输出：`expected: three protocol frames encode correctly`。
 - 依赖：Node 20，无法外部依赖。
@@ -841,6 +855,7 @@ export class MessageBatcher {
 ```
 
 **这段代码在做什么**
+
 - `Map` 按连接隔离待发帧，默认 50 毫秒间隔。
 - `add` 只累积，不触发 I/O。
 - `startFlush` 返回清理函数，调用方可清除定时器。
@@ -865,6 +880,7 @@ setTimeout(() => {
 ```
 
 **这段代码在做什么**
+
 - 两次 `add` 累积到同一连接。
 - 定时器触发后一次性写入两帧。
 - 运行输出：`expected: two frames wrote as one batch`。
@@ -958,6 +974,7 @@ export function isRetryable(error = {}) {
 ```
 
 **这段代码在做什么**
+
 - `AbortError` 是用户取消，不重试。
 - 429 与 5xx 属于瞬时故障，可重试。
 - 网络错误码 `ECONNRESET`、`ETIMEDOUT` 可重试。
@@ -989,6 +1006,7 @@ export async function* retryStream(fetchStream, messages, maxRetries = 3) {
 ```
 
 **这段代码在做什么**
+
 - `produced` 标记是否已产出数据。
 - 已产出后再断线不自动重试，避免重复输出。
 - 等待 1 秒、2 秒，最多 3 次重试。
@@ -1008,6 +1026,7 @@ console.log('expected: retryable classification matches');
 ```
 
 **这段代码在做什么**
+
 - 断言 429 与 500 可重试。
 - 断言 400 与用户取消不可重试。
 - 运行输出：`expected: retryable classification matches`。
@@ -1069,6 +1088,7 @@ console.log('expected: retryable classification matches');
 目标：实现一个最小 OpenAI 兼容 SSE 代理，能把 Mock 模型 token 推送给前端。
 
 步骤：
+
 1. 用 Node 原生 `http` 创建 `/chat/stream` 端点。
 2. 设置 SSE 响应头，`flushHeaders` 后发送 `connected` 帧。
 3. 用 `setInterval` 模拟模型生成，每 100 毫秒发一个 `data:` 帧。
@@ -1077,6 +1097,7 @@ console.log('expected: retryable classification matches');
 6. 为读取器加 AbortController 取消逻辑。
 
 验收标准：
+
 - 运行代理后，终端能按 100 毫秒打印出 token，而不是一次性打印全文。
 - `curl -N` 能看到 `Content-Type: text/event-stream`。
 - 超过 10 秒未 newline 的帧流不能出现。

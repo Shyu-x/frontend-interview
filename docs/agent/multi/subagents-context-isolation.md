@@ -993,6 +993,7 @@ console.log("预期：slowPaths 被压缩到 3 项，total 保持原值");
 目标：写一个只读 subagent 工具，用来扫描一个小型前端项目，返回三步以内的慢接口清单。
 
 步骤：
+
 1. 定义任务书：目标是"找出超过 500ms 的接口路径"，约束为"只读、最多 6 步"，输出格式为 `slowPaths` 数组与 `total` 数字。
 2. 实现 `createTurnBudget` 与 `compressReport`，压缩规则为数组保留前 5 项。
 3. 实现 `runSubagent`，带一次重试，首次失败后从 checkpoint 恢复。

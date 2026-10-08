@@ -86,6 +86,7 @@ async function getUser(id) {
 ```
 
 **这段代码在做什么**  
+
 - `await fetch` 只等到响应头到达。  
 - `res` 是 `Response` 对象，不是直接的数据。  
 - `res.json()` 读取完整响应体并做 JSON 解析。  
@@ -105,6 +106,7 @@ const data = await res.json();
 ```
 
 **这段代码在做什么**  
+
 - `res.ok` 在 2xx 时为 `true`。  
 - 404、500 等状态不会让 `fetch` reject，只能手动检查。  
 - 手动 `throw` 后，外层 `try/catch` 才能收到错误。  
@@ -125,6 +127,7 @@ async function requestJSON(url) {
 ```
 
 **这段代码在做什么**  
+
 - `res.text()` 先取出错误响应体，便于开发者排查。  
 - `text.slice(0, 100)` 只截取前 100 个字符，避免长 HTML 刷屏。  
 - `return res.json()` 返回的是 Promise，因此 `requestJSON` 是异步函数。  
@@ -186,6 +189,7 @@ console.log('预期输出：验证通过；/ok 返回对象，/bad 抛出“请�
 | 每个请求都写一遍 `res.ok` | 裸 `fetch` 没有统一处理 | 第 2 节会做统一封装 |
 
 **小结**  
+
 - `fetch` 在状态行到达时 resolve，不检查状态码。  
 - `res.ok` 才是 2xx 判断入口，4xx/5xx 要手动处理。  
 - `res.json()` 是异步的，body 格式错误时才会 reject。
@@ -237,6 +241,7 @@ function createClient({ baseURL = '', headers = {} } = {}) {
 ```
 
 **这段代码在做什么**  
+
 - `createClient` 接收全局默认配置。  
 - 返回的 `request` 函数每次拼接完整 URL。  
 - `options.headers` 可以覆盖默认 headers。  
@@ -257,6 +262,7 @@ async function requestJSON(path, options = {}) {
 ```
 
 **这段代码在做什么**  
+
 - `request` 先负责发送和合并配置。  
 - 状态检查和 JSON 解析不需要调用方再写。  
 - 业务代码拿到的就是解析后的对象。  
@@ -282,6 +288,7 @@ const client = {
 ```
 
 **这段代码在做什么**  
+
 - `get` 和 `post` 只是 `requestJSON` 的快捷包装。  
 - `post` 自动设置 JSON Content-Type。  
 - 调用方不需要手动 `JSON.stringify`。  
@@ -362,6 +369,7 @@ console.log('预期输出：验证通过；默认 headers 已合并，响应已�
 | 快捷方法层层包装后参数丢失 | `post` 没把 `options.method` 合并好 | 每层只合并一层配置并透明传递 |
 
 **小结**  
+
 - 客户端库先解决“重复代码放在哪里”的问题。  
 - 默认配置与快捷方法让调用方少写样板。  
 - 这一层是后续拦截器、重试、取消的载体。
@@ -421,6 +429,7 @@ api.interceptors.request.use(config => {
 ```
 
 **这段代码在做什么**  
+
 - `axios.create` 生成独立实例，避免污染全局默认配置。  
 - 请求拦截器收到当前 `config`。  
 - 给 `config.headers` 加上 Authorization。  
@@ -442,6 +451,7 @@ api.interceptors.response.use(
 ```
 
 **这段代码在做什么**  
+
 - 第一个函数处理成功响应，这里直接返回 `response.data`。  
 - 第二个函数处理失败响应。  
 - `error.response` 存在时，说明服务器返回了状态码。  
@@ -475,6 +485,7 @@ console.log(order);
 ```
 
 **这段代码在做什么**  
+
 - 请求拦截器 `req1` 首先添加。  
 - 请求拦截器 `req2` 后添加。  
 - axios 1.x 中，后添加的请求拦截器先执行。  
@@ -535,6 +546,7 @@ console.log('预期输出：请求拦截器 req2 先于 req1，响应拦截器 r
 | 拦截器里直接改全局对象 | axios 实例间 headers 易串 | 创建独立实例，避免修改公共默认值 |
 
 **小结**  
+
 - axios 拦截器解决“横切关注点”的统一处理。  
 - 请求拦截器后添加先执行，响应拦截器先添加先执行。  
 - 拦截器必须返回约定类型：请求拦截器返回 config，响应拦截器返回 response 或 data。
@@ -603,6 +615,7 @@ async function fetchWithTimeout(url, ms, options = {}) {
 ```
 
 **这段代码在做什么**  
+
 - 每个请求创建自己的 `AbortController`。  
 - `setTimeout` 到点后调用 `abort`。  
 - `try/finally` 保证无论成功或失败都清除定时器。  
@@ -624,6 +637,7 @@ try {
 ```
 
 **这段代码在做什么**  
+
 - `abort()` 触发的 reject 错误名通常是 `AbortError`。  
 - 超时和主动取消都会走到这里。  
 - 业务层可按 `error.name` 给出不同提示。  
@@ -648,6 +662,7 @@ async function loadUser(id) {
 ```
 
 **这段代码在做什么**  
+
 - 每次新请求前，先中止上一次还没完成的请求。  
 - 旧请求被中止后会进入 `AbortError`，不会覆盖新数据。  
 - 新请求使用自己的 controller。  
@@ -708,6 +723,7 @@ console.log('预期输出：验证通过；/slow 超时中止，/fast 在超时�
 | 同一个 signal 已中止再拿来用 | signal 不可重复使用 | 每次请求创建新的 AbortController |
 
 **小结**  
+
 - `fetch` 默认没有超时，必须借助 `AbortController`。  
 - 定时器触发 `abort` 后，请求会以 `AbortError` reject。  
 - 竞态场景要在发起新请求前中止旧请求。
@@ -772,6 +788,7 @@ function delay(ms) {
 ```
 
 **这段代码在做什么**  
+
 - 5xx 通常表示服务端故障，值得重试。  
 - 408 表示请求超时，429 表示限流，某些策略下会重试。  
 - 4xx 一般表示客户端请求有误，重试没有意义。  
@@ -791,6 +808,7 @@ console.log(getBackoffDelay(200, 2)); // 800
 ```
 
 **这段代码在做什么**  
+
 - 第 0 次重试等待 `baseDelay * 1`。  
 - 第 1 次重试等待 `baseDelay * 2`。  
 - 第 2 次重试等待 `baseDelay * 4`。  
@@ -818,6 +836,7 @@ async function requestWithRetry(url, { maxRetries = 2, baseDelay = 200 } = {}) {
 ```
 
 **这段代码在做什么**  
+
 - `for` 循环的 `attempt` 从 0 开始，表示第 0 次尝试。  
 - 非 2xx 被转成带有 `status` 的 Error。  
 - 只有状态码在可重试集合内，且次数未用完，才等待后重试。  
@@ -893,6 +912,7 @@ console.log('预期输出：验证通过；前两次 503 自动重试，第三�
 | 最终失败丢了原始状态码 | Error 对象没存 status | 抛错时挂上 `status` 属性 |
 
 **小结**  
+
 - 重试要先把“可重试错误”和“不可重试错误”分开。  
 - 指数退避用 `baseDelay * 2 ** attempt` 计算等待时间。  
 - 默认只对幂等请求打开重试，避免写操作重复执行。
@@ -960,6 +980,7 @@ async function downloadWithProgress(url, onProgress) {
 ```
 
 **这段代码在做什么**  
+
 - `res.body.getReader()` 拿到可异步读取的流。  
 - `read()` 每次返回一块数据和一个 `done` 标志。  
 - `loaded` 是已读字节数，`total` 来自响应头。  
@@ -997,6 +1018,7 @@ async function uploadWithProgress({ url, file, chunkSize = 64 * 1024, onProgress
 ```
 
 **这段代码在做什么**  
+
 - `file` 是 `Buffer`，`file.byteLength` 是总字节数。  
 - 每次把文件切出一个 chunk，累加 `sent`。  
 - `ReadableStream` 会逐步把 chunk 提供给 fetch。  
@@ -1018,6 +1040,7 @@ function renderProgress(loaded, total) {
 ```
 
 **这段代码在做什么**  
+
 - 百分比向下取整，只保留整数。  
 - 只有整数百分比变化时才输出。  
 - 这样 chunk 再多，同一秒内也最多更新 101 次。  
@@ -1129,6 +1152,7 @@ console.log('预期输出：验证通过；下载总字节一致，上传服务�
 | 把本地读取进度当作网络发送进度 | fetch 不暴露发送进度 | 需要网络级进度时用 XHR 或 axios onUploadProgress |
 
 **小结**  
+
 - 下载进度用 `res.body.getReader()` 逐块累加。  
 - 上传进度可用自建 ReadableStream 记录入队字节。  
 - 真实 UI 必须做百分比特化节流，避免频繁渲染。
@@ -1191,6 +1215,7 @@ const data = await api.get('users').json();
 ```
 
 **这段代码在做什么**  
+
 - `prefixUrl` 统一拼接基础路径。  
 - `timeout` 设置请求超时。  
 - `retry: 2` 表示最多重试两次。  
@@ -1207,6 +1232,7 @@ console.log(user.name);
 ```
 
 **这段代码在做什么**  
+
 - `ofetch` 会自动处理 JSON 响应。  
 - 非 2xx 的错误行为需要核对官方文档的 `parseResponse` 与 `retry` 选项。  
 - 它适合喜欢 fetch 风格、不想再包一层解析逻辑的代码。  
@@ -1225,6 +1251,7 @@ const data = await got.get('https://example.com/api/user', {
 ```
 
 **这段代码在做什么**  
+
 - `retry.limit` 控制重试次数。  
 - `retry.methods` 只允许 GET 重试，避免 POST 重放。  
 - `timeout.request` 覆盖整个请求周期。  
@@ -1263,6 +1290,7 @@ console.log('预期输出：验证通过；ky 的 .json() 返回解析后的对�
 | POST 被 got 默认重试 | 重试方法集没限制 | 配置 `retry.methods: ['GET']` 等幂等方法 |
 
 **小结**  
+
 - ky 适合浏览器优先、想要 hooks 和 fetch 风格的项目。  
 - ofetch 适合想少写解析样板、需要核对当前版本 API 的 fetch 用户。  
 - got 适合 Node 脚本，需要内置重试、流式和完整超时控制。
@@ -1326,6 +1354,7 @@ class InterceptorManager {
 ```
 
 **这段代码在做什么**  
+
 - `handlers` 数组保存每个拦截器的两个回调。  
 - `use` 返回新增后的长度，可作为拦截器 ID。  
 - `forEach` 让调用方决定 unshift 或 push。  
@@ -1368,6 +1397,7 @@ async function dispatchRequest(config) {
 ```
 
 **这段代码在做什么**  
+
 - 每次尝试都创建新的控制器和定时器。  
 - 5xx 且还有重试次数时，等待退避后继续下一次循环。  
 - 非 2xx 直接抛出带 status 的错误。  
@@ -1418,6 +1448,7 @@ class MiniAxios {
 ```
 
 **这段代码在做什么**  
+
 - `chain` 初始只有 dispatchRequest。  
 - 请求拦截器用 `unshift`，所以后添加的请求拦截器先执行。  
 - 响应拦截器用 `push`，所以先添加的响应拦截器先执行。  
@@ -1558,6 +1589,7 @@ console.log('预期输出：验证通过；两次 503 后第三次成功，请�
 | 5xx 被直接抛给业务 | 没有在重试条件里排除最后一次 | `attempt < maxRetries` 才继续重试 |
 
 **小结**  
+
 - 迷你 axios 的核心是 `InterceptorManager` 加一个 Promise 链。  
 - 请求拦截器用 unshift，响应拦截器用 push，得到与 axios 一致顺序。  
 - 重试应放在 dispatchRequest 内部，避免拦截器重复执行。

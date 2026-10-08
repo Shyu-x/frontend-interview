@@ -1095,6 +1095,7 @@ const results = rows.filter(r => fold(r.name).includes(fold(query)));
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录一次表头排序，读 Scripting 时长与 Long Tasks 条数；在排序前后用 `performance.now()` 打点，取 20 次的中位数记为 `sortMs`。搜索侧准备固定查询语料（全角、半角、连字各若干条），对照期望命中条数，看召回是否齐全。
 
 **什么时候不该用**：
+
 - 数据只有几百行时，预计算排序键和 Collator 缓存换来的时间低于维护成本，直接用 `localeCompare` 即可。
 - 导出文件、算哈希、做二进制对比需要稳定的码元顺序时，不要用 Collator。
 - NFKC 折叠结果不能回写数据库，员工姓名要保留原文一列，否则原文丢失无法恢复。
@@ -1134,6 +1135,7 @@ function truncateGraphemes(text, max) {
 **怎么度量收益**：用 Lighthouse 的移动端模式读 LCP 与 TBT；用 DevTools Performance 录首屏，数超过 50ms 的长任务。再自己埋一个 `truncateTotalMs`，统计一屏全部卡片调用截断的合计耗时。正确性用固定语料断言，语料要覆盖 BMP 外字符、emoji ZWJ 序列、区域指示符、组合音标。
 
 **什么时候不该用**：
+
 - 金额、地址、法律条款这类不能丢信息的内容，不要做截断展示。
 - 只用 CSS 的 `text-overflow: ellipsis` 或 `-webkit-line-clamp` 就能满足视觉要求时，不要再用 JS 截断，否则原文被丢弃。
 - 服务端已经返回了截断后的展示字段时，前端不要再截一次，两次截断的边界规则可能不同。
@@ -1172,6 +1174,7 @@ function moveLeft(bounds, caret) {
 **怎么度量收益**：用 `performance.mark` 与 `performance.measure` 给光标移动打上 `caret-move` 标记，采集样本后看 P95 耗时。把边界数据接进单测，统计字素边界用例的通过条数。再埋点统计断连重连后文本 diff 长度为 0 的会话占比。
 
 **什么时候不该用**：
+
 - 远端协议已按码元偏移约定时，前端不能自行改按字素簇发送偏移，两端会错位。
 - 纯 ASCII 的代码编辑器不需要字素簇切分，按码元处理即可。
 - 编辑器库自身已有位置模型时，不要在外面再套一层 Segmenter 做换算。
@@ -1212,6 +1215,7 @@ NFC 是组合式的稳定形式，适合当存储形式与去重键；NFKC 会�
 **目标**：写一个昵称展示组件，输入任意 Unicode 文本，输出按字素簇截断的展示串、字素簇计数，以及 NFC 归一化后的去重键。
 
 **步骤**：
+
 1. 准备语料固件，至少 20 条字符串，覆盖 BMP 外字符、emoji ZWJ 序列、区域指示符、组合音标、全角字母。
 2. 写 `graphemeLength` 与 `truncateGraphemes`，切分器实例放模块作用域，另写 `Array.from` 的码点回退分支。
 3. 写 `dedupeKey`，先 `normalize('NFC')` 再统一大小写，只用于去重，不用于展示。
@@ -1221,6 +1225,7 @@ NFC 是组合式的稳定形式，适合当存储形式与去重键；NFKC 会�
 7. 用 DevTools Performance 录一次渲染，确认没有超过 50ms 的长任务。
 
 **验收标准**：
+
 - 20 条语料的字素簇计数与截断结果全部通过断言，代码里不出现用 `str.length` 当字符数。
 - 把 `Intl.Segmenter` 置为 `undefined` 后重新跑测试，截断函数仍返回码点级结果且不抛异常。
 - 去重键测试里，`ﬁle` 与 `file` 在 NFKC 下相同、在 NFC 下不同，两条断言都通过。

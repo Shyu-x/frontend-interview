@@ -48,6 +48,7 @@ description: 解析、样式、布局、绘制、合成各阶段，Layout/Paint/
 | 'text' > text | 'text' | 文本节点 |
 
 **注意：**
+
 - display:none 的元素节点从 DOM 中保留，但不出现在 Render Tree
 - visibility:hidden 元素出现在 Render Tree 中，但不绘制
 
@@ -390,6 +391,7 @@ React 的 startTransition（出处：React 官方文档）
 目标：给一个自写的长列表页做一次阻塞排查与修复，留下可复现的前后对比材料。
 
 步骤：
+
 1. 本地建一个页面，用脚本生成 5000 行数据，每行含一段文本和一个按钮。
 2. 打开 DevTools 的 Performance 面板，勾选禁用缓存，录制滚动 5 秒，导出 JSON。
 3. 在 Rendering 面板勾选 Paint flashing 与 Frame Rendering Stats，记录滚动时哪些区域在重绘。
@@ -399,6 +401,7 @@ React 的 startTransition（出处：React 官方文档）
 7. 保持同一设备和同一节流配置，重录一次，把两次 JSON 放在同一目录下。
 
 验收标准：
+
 - 第二次录制里 Layout 阶段总时长低于第一次，两次的 JSON 或截图都在仓库里。
 - 挂载的 DOM 节点数与视口高度成比例：把视口高度翻倍，节点数随之翻倍。
 - 控制台不再打印任何 longtask 记录。

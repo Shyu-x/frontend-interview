@@ -293,6 +293,7 @@ const columns: Record<keyof ListRow, { title: string; width: number }> = {
 **怎么度量收益**：指标是类型相关缺陷数与列定义漏写次数。测量方法：CI 里跑 `tsc --noEmit` 统计错误条数，用 `tsc --extendedDiagnostics` 看类型检查耗时；线上在错误监控里按“读取 undefined 属性”分类统计条数。
 
 **什么时候不该用**：
+
 - 列由后端配置下发、前端运行时才知道列名时，用 Record 穷举会让每次配置变更都改类型。
 - 列表只有 3 列且长期不改动时，引入派生类型只增加一层跳转。
 
@@ -326,6 +327,7 @@ function pickListItem(raw: Product): ListItem {
 **怎么度量收益**：指标是首屏 LCP 与接口响应的传输体积。测量方法：Chrome DevTools Network 面板读单次响应的 transferred 值；用 `PerformanceObserver` 订阅 `largest-contentful-paint` 取 LCP；在 Network 面板把节流设为 Slow 4G 复现弱网。
 
 **什么时候不该用**：
+
 - 详情页需要完整字段时，裁剪会让后续交互再发一次请求。
 - 服务端已经按查询语句返回字段时，前端再裁一次是重复劳动。
 
@@ -367,6 +369,7 @@ type ReplayEvent = Exclude<DrawEvent, { kind: 'clear' }>;
 **怎么度量收益**：指标是事件漏处理次数与单批事件处理耗时。测量方法：对每种 kind 各造一条事件跑单元测试，断言对应处理器被调用；用 `PerformanceObserver` 订阅 `longtask` 条目，统计超过 50ms 的任务条数。
 
 **什么时候不该用**：
+
 - 事件来自第三方且 kind 是开放字符串时，穷举映射会频繁编译失败。
 - 只有两种事件且分发逻辑只有一行时，映射表增加阅读成本。
 
@@ -402,6 +405,7 @@ tRPC 让客户端从服务端 router 的类型推导出调用签名，路径与�
 **目标**：给一个用户列表页做类型驱动的列配置与筛选条件，并让筛选变更事件的上报字段与列定义来自同一份类型。
 
 **步骤**：
+
 1. 定义领域模型 `User`，至少含 6 个字段，类型互不相同。
 2. 用 `Pick` 裁出列表视图类型 `ListRow`，用 `Omit` 裁出详情视图类型。
 3. 用 `Partial<Pick<User, ...>>` 定义筛选条件类型 `Filters`。
@@ -411,6 +415,7 @@ tRPC 让客户端从服务端 router 的类型推导出调用签名，路径与�
 7. 在 CI 配置里加入 `tsc --noEmit` 与 `tsc --extendedDiagnostics`。
 
 **验收标准**：
+
 - 给 `ListRow` 删掉一个字段后，列配置对象在编译期报错并指到具体键。
 - 给 `FilterEvent` 新增一种 kind 后，`HandlerMap` 实现处报缺少键。
 - 各处理器参数不需要手写类型断言即可访问该事件的独有字段。

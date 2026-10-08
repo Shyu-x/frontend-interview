@@ -961,3 +961,9 @@ input,
   --md-mermaid-sequence-note-fg-color: #f0e6c0;
   --md-mermaid-sequence-note-border-color: #8a7a30;
 }
+
+/* 代码里关闭连字：教程要让读者看清每个字符（否则 <!-- 会被画成箭头） */
+.md-typeset code, .md-typeset pre, .md-typeset kbd, .md-typeset samp {
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0, "liga" 0;
+}

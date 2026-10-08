@@ -113,10 +113,12 @@ const named = document.querySelector('[name="save-btn"]'); // CSS 选择器
 HTMLCollection 内部维护了对 DOM 树的实时引用。当 DOM 变化时，HTMLCollection 自动更新，无需重新查询。
 
 **优点：**
+
 - 始终反映 DOM 最新状态，不需要手动刷新
 - 适合需要实时监听 DOM 变化的场景
 
 **缺点：**
+
 - 每次访问 `.length` 或索引时，都会重新计算（遍历底层引用）
 - 在循环中修改 DOM 时可能导致意外行为（跳过元素）
 - 内存占用比静态 NodeList 高（需要维护引用）
@@ -129,6 +131,7 @@ HTMLCollection 内部维护了对 DOM 树的实时引用。当 DOM 变化时，H
 在现代浏览器中，`querySelectorAll` 返回的 NodeList 是**静态的**（snapshot），DOM 变化不会影响已返回的 NodeList 内容。
 
 但需要注意：
+
 1. **子 NodeList** 可能不是静态的：`element.childNodes` 返回的 NodeList 在某些场景下是 live 的（规范允许）
 2. **旧版浏览器**（如 IE）行为可能不同
 3. **TreeWalker/NodeIterator** 返回的不是 NodeList
@@ -221,6 +224,7 @@ Content Security Policy (CSP) 会阻止 `document.write`：
 ```
 
 现代浏览器越来越倾向于弃用 `document.write`，原因：
+
 1. **安全风险**：XSS 攻击常用手段
 2. **性能问题**：同步阻塞解析
 3. **与现代 Web 不兼容**：模块系统、async/defer 等机制无法配合
@@ -277,6 +281,7 @@ function App() {
 3. 触发新的页面解析和渲染流程
 
 **后果：**
+
 - 当前页面的 DOM 树完全销毁
 - 所有 JavaScript 变量和状态丢失
 - 所有事件监听器被解除
@@ -298,6 +303,7 @@ document.close(); // 结束写入
 几乎没有。现代 Web 开发中，**没有任何场景必须使用 `document.write`**。
 
 可能的遗留场景：
+
 1. **极老项目的书签脚本**（bookmarklet）
 2. **CDN 注入脚本的简单方案**（但有安全风险）
 3. **测试/调试时的快速注入**（仅开发阶段）
@@ -365,6 +371,7 @@ snapshot
 **怎么度量收益**：用 Chrome DevTools Performance 面板录制一次批量删除，数 `Recalculate Style` 与 `Layout` 的出现次数。再用 `performance.mark` 和 `performance.measure` 包住删除逻辑，通过 `PerformanceObserver` 读时长。最后核对删除前后的 `table.rows.length` 与勾选数是否吻合。
 
 **什么时候不该用**：
+
 - 表格只有几十行、删除后由后端返回整段 HTML 时，直接替换容器内容，省掉遍历逻辑。
 - 需要保留滚动位置和输入焦点时，逐行 `remove()` 会触发多次重排，改为一次性替换或 CSS 隐藏。
 
@@ -396,6 +403,7 @@ snapshot
 **怎么度量收益**：用 DevTools Coverage 面板看首屏关键脚本的未使用字节占比。在 Performance 面板里看 FCP 与 LCP 标记的时间点。用 Lighthouse 对改造前后各跑 3 次，取中位数比较。
 
 **什么时候不该用**：
+
 - 配置不需要在解析期同步返回时，用 `defer` 或 `type="module"` 加载。
 - 页面加载完成后才需要动态加载脚本时，用 `createElement('script')` 加 `appendChild`。
 
@@ -428,6 +436,7 @@ const after = document.querySelectorAll('.node');
 **怎么度量收益**：用 `performance.mark` 在消息到达和渲染结束处打点，读 `performance.measure` 的时长。用 Performance 面板看一次消息触发的 Layout 次数。用 `MutationObserver` 记录一次消息产生的 DOM 变更条数，确认只动受影响的节点。
 
 **什么时候不该用**：
+
 - 远端消息携带完整画布状态、节点只有几十个时，重建容器内容比逐个算差异少写代码。
 - 单机模式、本地是唯一写入方时，直接用实时集合遍历，不需要额外快照。
 
@@ -460,6 +469,7 @@ MDN 明确标注 HTMLCollection 为实时集合，`querySelectorAll` 返回静�
 **目标**：做一个页面，用同一份数据分别演示实时集合与静态集合在循环删除时的差别，并测出各自耗时。
 
 **步骤**：
+
 1. 写一个脚本生成 200 行表格，每行带一个复选框。
 2. 写函数 A：用 `getElementsByTagName` 拿到集合，在 `for` 循环里按索引删除勾选行。
 3. 写函数 B：先用 `Array.from` 做快照，再按快照删除勾选行。
@@ -469,6 +479,7 @@ MDN 明确标注 HTMLCollection 为实时集合，`querySelectorAll` 返回静�
 7. 在控制台输出删除后的 `table.rows.length`，与勾选数做对照。
 
 **验收标准**：
+
 1. 函数 A 在勾选数大于 0 时出现漏删，且代码注释里写明了原因。
 2. 函数 B 删除后的行数等于原行数减勾选数。
 3. 页面上打印的 measure 时长，与 Performance 面板中同一次操作的脚本耗时相差不超过 2 倍。

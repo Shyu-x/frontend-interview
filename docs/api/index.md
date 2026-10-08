@@ -93,6 +93,7 @@ const plan = {
 ```
 
 **这段代码在做什么**  
+
 - `method` 对应用户动作：读取用 GET，创建用 POST，删除用 DELETE。  
 - `path` 始终指向资源，而不是写 `getUserByOne` 之类的动作地址。  
 - `createUser.body` 说明创建动作需要携带新资源内容。  
@@ -113,6 +114,7 @@ console.log(result);
 ```
 
 **这段代码在做什么**  
+
 - `fetch` 是 Node 20+ 内置全局函数，不需要安装任何第三方包。  
 - `res.status` 保存 HTTP 状态码，`res.ok` 表示状态码在 200 到 299 之间。  
 - `res.text()` 先拿文本，可以避免响应体不是 JSON 时直接 `json()` 抛错。  
@@ -140,6 +142,7 @@ console.log(summarizeREST({ status: 204 }));
 ```
 
 **这段代码在做什么**  
+
 - 200 用于普通读取，201 用于创建成功，204 用于删除或部分更新成功。  
 - 404 表示资源不存在，这通常是客户端路径错误或资源被删除。  
 - 500 及以上的状态码表示服务端异常，客户端重试时需要加退出条件。  
@@ -174,6 +177,7 @@ console.log("REST 验证通过：GET /users/1 返回 200 和 name=小林");
 ```
 
 **这段代码在做什么**  
+
 - `server.listen(0)` 使用随机的本地端口，避免固定端口被占用。  
 - `server.address().port` 拿到真实端口后拼成完整请求地址。  
 - 断言确认状态码是 200，且响应体中的姓名字段符合预期。  
@@ -189,6 +193,7 @@ console.log("REST 验证通过：GET /users/1 返回 200 和 name=小林");
 | 把创建、更新都塞到 POST | 语义不明确，后续难以做缓存和重放 | 创建用 POST，修改用 PUT 或 PATCH |
 
 **小结**  
+
 1. REST 的核心是资源 URL 加 HTTP 方法，读、建、改、删各有对应语义。  
 2. 状态码承担结果描述，客户端应针对 200、201、204、404、5xx 分别处理。  
 3. REST 最容易落地，但在复杂页面中可能出现请求次数多或字段冗余，需要配合批量接口或 GraphQL。
@@ -243,6 +248,7 @@ query {
 ```
 
 **这段代码在做什么**  
+
 - `query` 表示这是一次读取操作，GraphQL 中写不写 query 关键字都可。  
 - `user(id: "1")` 是根查询字段，参数 `id` 用于定位用户。  
 - `name`、`avatar` 是标量字段，直接返回字符串。  
@@ -270,6 +276,7 @@ type Query {
 ```
 
 **这段代码在做什么**  
+
 - `type User` 声明用户对象有哪些字段，`ID!` 中感叹号表示不可为 null。  
 - `posts: [Post!]!` 表示列表本身不可为 null，且列表内每一项不可为 null。  
 - `type Query` 是入口类型，`user(id: ID!): User` 暴露按 ID 查用户的读接口。  
@@ -299,6 +306,7 @@ console.log(JSON.stringify(result, null, 2));
 ```
 
 **这段代码在做什么**  
+
 - `buildSchema` 把 schema 字符串编译成服务端可校验的对象。  
 - `root.user` 接收查询参数 `{ id }`，返回用户对象。  
 - `graphql` 函数同时执行 schema 校验、resolver 调用、错误收集。  
@@ -355,6 +363,7 @@ console.log("GraphQL 验证通过：一次查询同时取回 name、avatar、pos
 ```
 
 **这段代码在做什么**  
+
 - 依赖 `graphql` 提供 `buildSchema` 和 `graphql` 两个函数。  
 - `posts` 数组作为用户字段的嵌套数据来源，`posts[0].title` 被返回。  
 - 断言确认没有 `errors`，并验证嵌套对象中的字段值。  
@@ -370,6 +379,7 @@ console.log("GraphQL 验证通过：一次查询同时取回 name、avatar、pos
 | 循环查询导致服务端长时间执行 | 客户端可无限嵌套字段 | 添加查询深度和复杂度上限 |
 
 **小结**  
+
 1. GraphQL 的返回形状由客户端 query 决定，能减少字段浪费和请求次数。  
 2. schema 定义可查询结构，resolver 负责给字段填充真实数据。  
 3. GraphQL 不是数据库，也不会自动加权限，安全控制必须在 resolver 一层完成。
@@ -419,6 +429,7 @@ const rpcRequest = {
 ```
 
 **这段代码在做什么**  
+
 - `jsonrpc: "2.0"` 明确这是 JSON-RPC 2.0 协议。  
 - `id` 是请求标识，服务端返回时会带同一个 ID。  
 - `method` 表达要执行的服务端函数名。  
@@ -441,6 +452,7 @@ async function callRPC(url, method, params = {}) {
 ```
 
 **这段代码在做什么**  
+
 - `fetch` 使用 POST，因为方法名和参数放在请求体里。  
 - 请求体每次都是标准 JSON，不分 GET、POST、DELETE 语义。  
 - 如果响应包含 `error` 字段，说明服务端方法执行失败，直接抛错。  
@@ -467,6 +479,7 @@ function dispatchRPC(payload) {
 ```
 
 **这段代码在做什么**  
+
 - `add` 方法执行加法，返回求和结果。  
 - `echo` 方法原样返回文本，用来演示参数回传。  
 - 未知方法返回 `-32601` 错误码，这是 JSON-RPC 标准中的方法未找到错误。  
@@ -513,6 +526,7 @@ console.log("JSON-RPC 验证通过：add(2, 3) 返回 result 为 5");
 ```
 
 **这段代码在做什么**  
+
 - 服务端通过 `for await` 读完请求体，得到文本后 `JSON.parse`。  
 - `dispatchRPC` 只处理 `add`，未知方法返回错误对象。  
 - 客户端断言 `result` 等于 5，并确认响应 ID 与请求一致。  
@@ -528,6 +542,7 @@ console.log("JSON-RPC 验证通过：add(2, 3) 返回 result 为 5");
 | tRPC 只在浏览器端起效果 | tRPC 类型推导依赖前端后端共享代码 | 保持同仓库或使用可导入的共享包 |
 
 **小结**  
+
 1. RPC 的目标是让跨进程函数调用像本地函数一样直接。  
 2. JSON-RPC 是最小实现，gRPC 用二进制协议获得类型和传输约束，tRPC 用 TypeScript 推导减少代码生成。  
 3. RPC 的代价是客户端和服务端通常需要共享方法契约、类型或 proto 文件。
@@ -580,6 +595,7 @@ const soapRequest = `<?xml version="1.0"?>
 ```
 
 **这段代码在做什么**  
+
 - `soap:Envelope` 是 SOAP 1.2 消息的最外层容器。  
 - `soap:Body` 存放业务数据，这里是获取城市的温度操作。  
 - `m:GetTemperature` 带 `m` 命名空间，表示业务操作由具体服务定义。  
@@ -602,6 +618,7 @@ async function callSOAP(url, body) {
 ```
 
 **这段代码在做什么**  
+
 - `Content-Type` 使用 SOAP 1.2 的媒体类型，而不是普通 XML。  
 - 响应体先读成文本，因为浏览器和 Node 不会把 SOAP 自动转成对象。  
 - `match` 用正则提取 `m:Temperature` 标签中的温度值。  
@@ -620,6 +637,7 @@ console.log(hasSOAPFault(sampleFault));
 ```
 
 **这段代码在做什么**  
+
 - SOAP 错误在响应 XML 中用 Fault 节点表示，请求可能仍返回 HTTP 200。  
 - `faultcode` 区分客户端错误和服务端错误，`faultstring` 提供人类可读描述。  
 - `hasSOAPFault` 只做演示，真实解析需要处理命名空间前缀变化。  
@@ -672,6 +690,7 @@ console.log("SOAP 验证通过：解析 Temperature 得到 28.5");
 ```
 
 **这段代码在做什么**  
+
 - 服务端对任何 SOAP 请求都返回固定响应，用于演示客户端解析。  
 - 客户端把完整 SOAP 信封放入 fetch body。  
 - 正则从响应 XML 提取温度值，断言为 `28.5`。  
@@ -687,6 +706,7 @@ console.log("SOAP 验证通过：解析 Temperature 得到 28.5");
 | 把 SOAP 返回体直接 `JSON.parse` | 响应是 XML | 使用 XML 解析器或专用 SOAP 工具 |
 
 **小结**  
+
 1. SOAP 使用 XML Envelope 和 WSDL 强制接口合同，适合银行、政务等集成场景。  
 2. 成功和失败都在 XML 中表达，客户端必须解析 Fault 节点。  
 3. SOAP 不适合追求小字段和高频率的移动端或纯前端接口。
@@ -757,6 +777,7 @@ const server = http.createServer((req, res) => {
 ```
 
 **这段代码在做什么**  
+
 - `Content-Type: text/event-stream` 告诉客户端这是 SSE 流。  
 - `event:` 行指定事件名，`data:` 行携带实际数据。  
 - 每个事件块用空行分隔，客户端据此切分独立事件。  
@@ -789,6 +810,7 @@ async function readSSE(base) {
 ```
 
 **这段代码在做什么**  
+
 - `res.body.getReader()` 暴露 Node 支持的 Web 流读取接口。  
 - `TextDecoder` 增量解码 UTF-8，避免一次块读取破坏多字节字符。  
 - 用 `\n\n` 切分事件，因为 SSE 每个事件块以空行结束。  
@@ -808,6 +830,7 @@ console.log(pushDirection.serverToClientOnly);
 ```
 
 **这段代码在做什么**  
+
 - 如果只做服务端推消息，SSE 使用普通 HTTP，部署和观测成本低。  
 - 如果客户端和服务端都要主动发消息，选择 WebSocket。  
 - 两者都不能保证连接永远不断，重连策略必须由客户端自己处理。  
@@ -873,6 +896,7 @@ console.log("SSE 验证通过：收到两条服务端主动推送的消息");
 ```
 
 **这段代码在做什么**  
+
 - 服务端每隔 50 ms 推送一条 SSE 消息，共两条后结束。  
 - 客户端通过 Web 流读取响应，并按空行还原事件。  
 - `assert.deepEqual` 验证事件顺序和内容都符合预期。  
@@ -888,6 +912,7 @@ console.log("SSE 验证通过：收到两条服务端主动推送的消息");
 | 断线后客户端不再收消息 | 没有重连和最后事件 ID | 客户端捕获 close 后延迟重连，服务端配合 `id:` 字段续传 |
 
 **小结**  
+
 1. SSE 适合服务端单向往浏览器推送，基于普通 HTTP，客户端读取流即可。  
 2. WebSocket 适合双向实时通信，需要先完成 HTTP Upgrade。  
 3. 实时通道必须设计重连、心跳和消息去重，不能假设连接永远在线。
@@ -944,6 +969,7 @@ const payload = {
 ```
 
 **这段代码在做什么**  
+
 - `webhookUrl` 是接收方提前注册给支付服务的回调地址。  
 - `event` 字段让接收方一次只处理一类事件。  
 - `orderId` 是业务唯一标识，用于去重和幂等。  
@@ -965,6 +991,7 @@ async function deliverWebhook(url, payload) {
 ```
 
 **这段代码在做什么**  
+
 - POST 方法携带事件 JSON，接收方按 JSON 解析即可。  
 - `res.ok` 检查 HTTP 状态码是否在 2xx 范围内。  
 - 接收方没有正确处理时，`deliverWebhook` 抛错，调用方可以决定重试。  
@@ -988,6 +1015,7 @@ console.log(handleWebhook({ event: "order.paid", orderId: "o-1001" }));
 ```
 
 **这段代码在做什么**  
+
 - `event:orderId` 作为幂等键，保证同一笔支付只处理一次。  
 - 第一次调用时需要保存完成状态，这里用内存 Set 模拟。  
 - 后续同键事件被标记为重复，接收方跳过业务处理。  
@@ -1044,6 +1072,7 @@ console.log("Webhook 验证通过：重复事件只写入一次 received");
 ```
 
 **这段代码在做什么**  
+
 - 接收服务把请求体解析成事件对象，并维护 `seen` 集合。  
 - 第二次相同事件被识别为重复，返回 `duplicated: true`。  
 - `assert.equal(received.length, 1)` 证明业务列表只写入一次。  
@@ -1059,6 +1088,7 @@ console.log("Webhook 验证通过：重复事件只写入一次 received");
 | 消息丢失且没有追踪 | 消费者崩溃且没有确认机制 | 使用消息确认和死信队列记录未处理事件 |
 
 **小结**  
+
 1. Webhook 适合把一个事件直接推到配置好的 HTTP 地址。  
 2. 消息队列适合多消费者、高吞吐和消费者故障隔离，AMQP 重路由，MQTT 重轻量传输。  
 3. 事件驱动体系必须设计幂等、重试和确认，否则重复投递会放大业务错误。
@@ -1132,6 +1162,7 @@ const scenario = {
 ```
 
 **这段代码在做什么**  
+
 - 每个字段对应决策图中的一个是或否判断。  
 - `needsTypeSafe: true` 表示这个项目希望前后端共享类型。  
 - 所有字段默认 false，避免默认值偏向某种技术。  
@@ -1154,6 +1185,7 @@ function chooseAPIStyle(s) {
 ```
 
 **这段代码在做什么**  
+
 - 顺序与流程图一致，硬约束先判断，默认值最后判断。  
 - 实时分支先问是否双向，再分别返回 WebSocket 或 SSE。  
 - 事件分发位于 TypeSafe 之前，因为它需要不同的基础设施。  
@@ -1172,6 +1204,7 @@ console.log(explainChoice(scenario));
 ```
 
 **这段代码在做什么**  
+
 - 调用决策函数得到结果，不重复判断逻辑。  
 - `JSON.stringify` 把条件完整打印，便于复盘。  
 - 返回字符串可以直接贴在技术方案文档里作为初稿。  
@@ -1211,6 +1244,7 @@ console.log("选型验证通过：七个分支均输出预期风格");
 ```
 
 **这段代码在做什么**  
+
 - `cases` 中每个元素是输入对象和预期输出。  
 - 七个断言覆盖 SOAP、WebSocket、SSE、事件、GraphQL、RPC、REST。  
 - `for` 循环一次性执行所有验证，不需要重复写样板代码。  
@@ -1238,6 +1272,7 @@ console.log("选型验证通过：七个分支均输出预期风格");
 | 把消息队列当成 Webhook 的无差别替代 | 消息队列需要部署中间件 | 单接收方用 Webhook，多接收方或需积压重试再上消息队列 |
 
 **小结**  
+
 1. 选型先淘汰硬约束不满足的方案，再比较开发成本。  
 2. 用决策函数把条件固定下来，可以避免每次讨论都从零开始。  
 3. 学习路径按周拆分，能把 API 风格逐个变成可运行且可说清的能力。

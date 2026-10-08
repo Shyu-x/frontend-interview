@@ -82,6 +82,7 @@ const prompt = PromptTemplate.fromTemplate("用一段话解释：{concept}");
 ```
 
 **这段代码在做什么**
+
 - `PromptTemplate.fromTemplate` 扫描大括号，识别出变量名 concept。
 - 模板文本是固定骨架，变量在调用时才填。
 - 变量缺失时 LangChain 会抛出缺少变量的错误。
@@ -100,6 +101,7 @@ const chain = prompt.pipe(llm).pipe(new StringOutputParser());
 ```
 
 **这段代码在做什么**
+
 - `prompt.pipe(llm)` 表示 prompt 输出自动传给 llm 作为输入。
 - `llm.pipe(new StringOutputParser())` 把 AI 消息转成纯字符串。
 - `chain` 本身是 Runnable 实例，拥有 invoke、batch、stream 方法。
@@ -130,6 +132,7 @@ const result = await chain.invoke({ concept: "闭包" });
 console.log(result); // 闭包是指函数记住其定义时作用域的能力。
 ```
 **这段代码在做什么**
+
 - `invoke` 接收一个普通对象，键名与模板变量一致。
 - 输入先被渲染成完整提示词，再发给模型。
 - 模型输出经过解析器后变成字符串。
@@ -191,6 +194,7 @@ console.log("执行顺序:", order.join(" -> "));
 | 链执行慢且无法观测 | 没有记录每步输入输出 | 使用 callbacks 记录各节点生命周期 |
 
 **用在哪里**
+
 - 场景一：营销落地页批量生成。
   业务背景：给 200 个商品自动生成一句广告语。
   本节知识怎么用：把商品信息作为输入对象，使用 `prompt | llm | parser` 批量生成。
@@ -208,12 +212,14 @@ console.log("执行顺序:", order.join(" -> "));
   什么时候不该用：输入文本含生僻方言或代码混排，翻译质量不稳定时不宜全自动。
 
 **行业实践**
+
 - LangChain 官方文档《LCEL》建议把链定义为一段可序列化的表达式，便于传播与缓存。
 - LangChain 官方文档《Runnable》建议给每个节点加 `withConfig({ runName })`，在 LangSmith 中按节点定位延迟。
 - OpenAI 官方文档《Function calling》强调工具输出应尽量短且结构化，降低模型下一步解析负担。
   怎么借鉴到你的项目：给生产链每个节点命名，工具返回只保留模型需要的字段。
 
 **小结**
+
 1. LCEL 的 `|` 是数据流声明，不是控制流。
 2. `Runnable` 接口提供 invoke、batch、stream。
 3. 管道可以扩展为并行和条件分支。
@@ -272,6 +278,7 @@ const template = ChatPromptTemplate.fromMessages([
 ```
 
 **这段代码在做什么**
+
 - 数组中的每项是 `[角色, 文本]` 二元组。
 - system 消息定义模型行为与语气约束。
 - human 消息携带用户问题。
@@ -294,6 +301,7 @@ const parser = StructuredOutputParser.fromZodSchema(
 ```
 
 **这段代码在做什么**
+
 - `fromZodSchema` 读取 Zod 形状，生成格式说明文本。
 - `describe` 会进入格式说明，帮助模型理解字段语义。
 - 解析器在模型返回后执行 `JSON.parse` 和 Zod 校验。
@@ -314,6 +322,7 @@ const prompt = ChatPromptTemplate.fromMessages([
 ```
 
 **这段代码在做什么**
+
 - `getFormatInstructions` 返回一段自然语言加 JSON 示例。
 - 这段说明必须注入提示，否则模型不知道要输出 JSON。
 - 用户输入与格式说明可以分别放在不同 system 消息。
@@ -370,6 +379,7 @@ try {
 | `JSON.parse` 抛错被吞成英文 | 未捕获解析异常 | 捕获解析错误并转成中文提示给调用方 |
 
 **用在哪里**
+
 - 场景一：批量简历信息抽取。
   业务背景：从 PDF 转出的纯文本中提取姓名、电话、工作年限。
   本节知识怎么用：用结构化解析器把模型输出约束为固定 JSON。
@@ -387,12 +397,14 @@ try {
   什么时候不该用：品牌方有严格命名规范或法律审查流程时，只可作草稿。
 
 **行业实践**
+
 - OpenAI 官方文档《Structured Outputs》提供 json_schema 模式，把输出格式限制内建到模型解码层。
 - LangChain 官方文档《Output parsers》建议解析器与提示模板共用一份 schema 说明，避免口型不一致。
 - Anthropic 提示工程指南建议 few-shot 示例覆盖边界案例，尤其包括模型最常见的错误输出。
   怎么借鉴到你的项目：为每个严重错误输出补一条负例，比只给正例更能稳定结果。
 
 **小结**
+
 1. 提示模板负责告诉模型「要做什么」。
 2. 输出解析器负责校验「交付物是否合格」。
 3. 格式说明必须注入提示，否则解析没有保障。
@@ -458,6 +470,7 @@ export const getCurrentTime = tool(
 ```
 
 **这段代码在做什么**
+
 - `tool` 把普通异步函数包装成结构化工具。
 - 第一个参数是工具实现，第二个参数是元信息。
 - `name` 是模型选择工具时的标识。
@@ -478,6 +491,7 @@ console.log(response.tool_calls);
 ```
 
 **这段代码在做什么**
+
 - `bindTools` 把工具元信息注入请求。
 - 模型决定是否调用工具；本例会返回一个工具调用。
 - `tool_calls` 包含工具名、参数、调用 id。
@@ -502,6 +516,7 @@ console.log(finalResponse.content);
 ```
 
 **这段代码在做什么**
+
 - 取出模型产生的第一个工具调用。
 - `getCurrentTime.invoke` 执行真实函数并返回字符串。
 - `ToolMessage` 必须携带与 AI 消息一致的调用 id。
@@ -551,6 +566,7 @@ console.log("工具执行结果:", toolMessage.content);
 | 模型重复调用同一工具 | 工具结果没回答用户问题 | 在工具返回中加入足够的业务字段 |
 
 **用在哪里**
+
 - 场景一：订单查询助手。
   业务背景：用户问「订单号 1234 到哪了」。
   本节知识怎么用：定义 `get_order_status` 工具，schema 要求订单号数字。
@@ -568,12 +584,14 @@ console.log("工具执行结果:", toolMessage.content);
   什么时候不该用：涉及多账号权限校验时，不允许绕过授权直接建会。
 
 **行业实践**
+
 - OpenAI 官方文档《Function calling》建议工具描述里包含典型调用示例，减少模型误判。
 - LangChain 官方文档《Tools》建议工具返回短文本加必要字段，不返回整段 HTML 或长日志。
 - Anthropic 工具使用文档建议把可选参数写在 schema 中，模型按需填充，降低缺参率。
   怎么借鉴到你的项目：工具函数返回只保留下一步所需的字段，日志单独外发。
 
 **小结**
+
 1. 工具是模型决定调用、服务实际执行的函数。
 2. `bindTools` 注入元信息，模型返回 tool_calls。
 3. ToolMessage 必须回填原调用 id。
@@ -634,6 +652,7 @@ Observation: 工具结果
 ```
 
 **这段代码在做什么**
+
 - `tools` 数组列出 Agent 可调用的工具。
 - 提示要求模型按固定格式输出 Thought、Action、Observation。
 - `Final Answer:` 是循环结束的信号词。
@@ -670,6 +689,7 @@ async function runAgent(query, maxIterations = 4) {
 ```
 
 **这段代码在做什么**
+
 - `maxIterations` 设置循环上限，防止无限调用。
 - 当模型输出包含 `Final Answer:` 时直接返回答案。
 - 用正则从模型输出中提取 Action 与 Action Input。
@@ -694,6 +714,7 @@ const result = await agent.invoke({
 ```
 
 **这段代码在做什么**
+
 - `createReactAgent` 返回一个预构建的 ReAct Agent。
 - LangGraph 负责循环执行，直到模型输出最终答案。
 - `ToolNode` 自动执行工具并生成 ToolMessage。
@@ -750,6 +771,7 @@ console.log("最终判断:", verdict);
 | 最终答案不出现 | 模型状态被截断 | 检查上下文长度与工具结果长度 |
 
 **用在哪里**
+
 - 场景一：多步数据管道。
   业务背景：用户要「拉取上周订单并统计华北区销售额」。
   本节知识怎么用：Agent 先调 SQL 查询，再统计结果，必要时拆两个工具。
@@ -767,12 +789,14 @@ console.log("最终判断:", verdict);
   什么时候不该用：来源数据未授权获取时，不应让 Agent 自行拼凑。
 
 **行业实践**
+
 - LangChain 官方文档《createReactAgent》建议设置最大迭代次数与终止条件，防止令牌浪费。
 - LangGraph 官方文档《prebuilt》强调 Agent 是状态机，应显式定义状态与转移边。
 - OpenAI 官方文档《Best practices for agents》建议工具返回结构化结果，帮助模型尽快到达终止条件。
   怎么借鉴到你的项目：工具返回带 `ok` 或 `error` 状态，帮助模型判断是否重试。
 
 **小结**
+
 1. ReAct 把推理、行动、观察编成一个循环。
 2. 循环必须有上限和终止条件。
 3. 工具异常应转成文本，避免整个循环中断。
@@ -836,6 +860,7 @@ console.log(vars.history);
 ```
 
 **这段代码在做什么**
+
 - `memoryKey` 声明历史注入提示时用的变量名。
 - `saveContext` 同时接收用户输入与模型输出。
 - 输入输出被拼接成一段历史文本。
@@ -864,6 +889,7 @@ console.log(messages.history.length); // 6，三轮每轮两条
 ```
 
 **这段代码在做什么**
+
 - `k: 3` 表示只保留最近三轮。
 - `returnMessages` 控制返回消息对象而非字符串。
 - 保存十轮后，加载时只剩三轮。
@@ -895,6 +921,7 @@ class CustomMemory {
 ```
 
 **这段代码在做什么**
+
 - `loadMemoryVariables` 返回注入提示的历史键值。
 - `saveContext` 把输入输出拼成一条记录。
 - `clear` 清空数组，供会话重置。
@@ -955,6 +982,7 @@ console.log("保存、加载、清空全部通过");
 | 旧对话被无关信息淹没 | 全量加载不检索 | 使用 VectorStoreRetrieverMemory |
 
 **用在哪里**
+
 - 场景一：在线客服上下文同步。
   业务背景：客服转人工后，机器人要与客服共享前文。
   本节知识怎么用：用 BufferMemory 把全量对话传给人工坐席，帮助接续。
@@ -972,12 +1000,14 @@ console.log("保存、加载、清空全部通过");
   什么时候不该用：涉及过敏等健康信息，应写入业务系统而非内存。
 
 **行业实践**
+
 - LangChain 官方文档《Memory》区分短期与长期记忆，建议按会话生命周期选择对应类型。
 - OpenAI 文档《多轮对话历史管理》建议对长会话做摘要而非简单截断，保留关键结论。
 - Anthropic 研究系统文章提到将用户偏好写入工具可读的长期记忆，可减少重复提问。
   怎么借鉴到你的项目：把稳定用户偏好写入工具存储，把临时会话内容保留在内存。
 
 **小结**
+
 1. 内存是对话历史的保存与裁剪边界。
 2. 窗口内存删除旧消息，摘要内存压缩旧消息。
 3. 自定义内存需保持 memoryVariables 与返回值一致。
@@ -1052,6 +1082,7 @@ console.log("向量条数:", vectors.length);
 ```
 
 **这段代码在做什么**
+
 - `chunkSize` 控制每块最大字符数，`chunkOverlap` 为块间重叠字符数。
 - 切分器输出文档列表，保留原始页面内容。
 - `embedDocuments` 一次处理多个文本。
@@ -1081,6 +1112,7 @@ console.log(ranked[0].text); // 差旅标准
 ```
 
 **这段代码在做什么**
+
 - 余弦相似度使用两向量点积除以模长乘积。
 - 分数范围在 -1 到 1，越接近 1 表示方向越一致。
 - 查询向量与候选向量逐个计算分数。
@@ -1102,6 +1134,7 @@ console.log(answerPrompt);
 console.log(finalAnswer);
 ```
 **这段代码在做什么**
+
 - 把检索得到的文本作为上下文注入提示。
 - 明确要求模型只依据片段回答，减少编造。
 - 最终答案可附上来源片段名称或编号。
@@ -1164,6 +1197,7 @@ console.log("相似度分数:", best.score.toFixed(3));
 | 模型回答不支持来源 | 提示未要求附出处 | 在提示中要求引用片段编号 |
 
 **用在哪里**
+
 - 场景一：企业内部知识库问答。
   业务背景：员工查询差旅、报销、休假制度。
   本节知识怎么用：把制度文档切块向量化，检索后拼入提示回答。
@@ -1181,12 +1215,14 @@ console.log("相似度分数:", best.score.toFixed(3));
   什么时候不该用：合同文本未 OCR 清洗，向量检索会漏掉表格与图片条款。
 
 **行业实践**
+
 - LangChain 官方文档《RAG》建议先做无模型检索评测，确认检索质量后接入生成。
 - OpenAI 官方文档《Embeddings》README 推荐检索结果与生成部分分离，便于审计中间过程。
 - Anthropic RAG 指南建议保留引用，让模型在答案中逐条标注，避免拼凑。
   怎么借鉴到你的项目：检索步骤输出 Top K 与分数，生成前先检查分数是否低于阈值。
 
 **小结**
+
 1. RAG 先检索后生成，检索质量决定答案质量。
 2. 切分与重叠影响片段完整性。
 3. 答案应附来源，检索分数应可观测。
@@ -1273,6 +1309,7 @@ class Monitor extends BaseCallbackHandler {
 ```
 
 **这段代码在做什么**
+
 - `name` 是回调处理器标识，便于追踪。
 - `handleLLMStart` 在模型请求前触发。
 - `handleLLMEnd` 在模型返回后触发。
@@ -1334,6 +1371,7 @@ await chain.invoke(
 );
 ```
 **这段代码在做什么**
+
 - `invoke` 第二个参数中传入 callbacks 数组。
 - 链执行时每个生命周期节点都会通知 monitor。
 - 回调不改变业务输入输出，只负责观测。
@@ -1353,6 +1391,7 @@ for await (const chunk of stream) {
 ```
 
 **这段代码在做什么**
+
 - `stream` 返回异步可迭代对象。
 - 流式 token 会触发 `handleLLMNewToken`。
 - 可用来实现打字机效果或实时计费。
@@ -1422,6 +1461,7 @@ chain_start:qa -> llm_start:请回答问题 -> llm_end -> tool_start:search -> t
 | 日志顺序混乱 | 多个回调并发写入 | 使用事件时间戳与链路 id 排序 |
 
 **用在哪里**
+
 - 场景一：LLM 成本与延迟监控。
   业务背景：运营要看到每条链的 token 消耗与每跳耗时。
   本节知识怎么用：在 LLM 回调里记录令牌数，工具回调里记录耗时。
@@ -1439,12 +1479,14 @@ chain_start:qa -> llm_start:请回答问题 -> llm_end -> tool_start:search -> t
   什么时候不该用：日志未加密存储时，不应记录敏感字段。
 
 **行业实践**
+
 - LangChain 官方文档《Callbacks》建议把回调处理器设计为无状态、幂等，避免重复调用影响主链路。
 - LangSmith 文档《Tracing》提供链级别 trace，按节点展示耗时与输入输出。
 - OpenAI API 文档《Token usage》建议在流式结束时再汇总令牌，避免在高频回调里做统计。
   怎么借鉴到你的项目：回调只负责收集事件，统计与告警独立成服务。
 
 **小结**
+
 1. 回调是观测链生命周期的主要接口。
 2. 回调顺序为链开始、模型、工具、链结束。
 3. 高频 token 回调中只做缓冲，不做重 IO。
@@ -1467,6 +1509,7 @@ chain_start:qa -> llm_start:请回答问题 -> llm_end -> tool_start:search -> t
 目标：构建「内部差旅助手」命令行原型。
 
 步骤：
+
 1. 准备 5 条内部差旅制度文本，写入本地 data.js。
 2. 实现文本切分与向量化，使用本地余弦相似度检索。
 3. 定义两个工具：读取本地制度片段、计算报销金额。
@@ -1474,6 +1517,7 @@ chain_start:qa -> llm_start:请回答问题 -> llm_end -> tool_start:search -> t
 5. 加入事件插槽，记录 chain、tool、llm 三类回调。
 
 验收标准：
+
 - 输入「一线城市住宿标准是多少」，输出包含 600 与来源片段。
 - 输入「三晚住宿 600 元，报销多少」，输出 1800，并显示计算步骤。
 - 所有日志按回调顺序输出，循环超过 5 步自动终止。

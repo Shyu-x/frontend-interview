@@ -82,6 +82,7 @@ r.on('end', () => console.log('读完了'));
 ```
 
 **这段代码在做什么**
+
 - `Readable.from` 把数组变成可读流，每个元素作为一个 chunk。
 - 监听 `data` 后，流进入 flowing 模式，数据自动推送。
 - `end` 事件表示数据全部读完，流已到达结尾。
@@ -107,6 +108,7 @@ w.on('finish', () => console.log('全部写完了'));
 ```
 
 **这段代码在做什么**
+
 - `write()` 返回布尔值：`true` 表示可以继续写，`false` 表示缓冲已满。
 - 自定义 `_write` 里的 `cb()` 是告诉 Node 这一块已经真正写完。
 - 调用 `end()` 表示不再写入，写完后触发 `finish` 事件。
@@ -144,6 +146,7 @@ w.on('finish', () => {
 | `write()` 之后立刻读不到结果 | `_write` 是异步回调 | 在回调里收集结果，别同步断言 |
 
 **小结**
+
 1. Readable 负责产出（`data`、`readable`、`end`），Writable 负责落地（`write`、`drain`、`finish`）。
 2. 四类流是理解背压的坐标：数据方向不同，背压信号不同。
 3. `pipe` 是最小串联方式，错误与清理需要额外处理。
@@ -196,6 +199,7 @@ r.on('readable', () => {
 ```
 
 **这段代码在做什么**
+
 - `r.read()` 在数据未到达时返回 `null`，这是 paused 模式的手动取数方式。
 - 监听 `readable` 事件表示缓冲里可能有数据了，再循环 `read()`。
 - `read()` 返回 `null` 表示本次缓冲已取空，但后面可能还有数据。
@@ -219,6 +223,7 @@ r.on('end', () => console.log('全部吞下'));
 ```
 
 **这段代码在做什么**
+
 - 挂上 `data` 监听后，流进入 flowing 模式。
 - `pause()` 让流停止推送，但已产出的 chunk 不会丢。
 - `resume()` 恢复推送，剩余数据继续流出直到 `end`。
@@ -259,6 +264,7 @@ r.on('end', () => {
 | 切换模式丢数据 | 切换前已有监听且读走了一部分 | 切换前确认模式，必要时用 `pause()` 再挂 `data` |
 
 **小结**
+
 1. Readable 初始是 paused；挂 `data` 进入 flowing；用 `read()` 是 paused 下的主动取数。
 2. `pause()` 与 `resume()` 只控制推送节奏，不改变缓冲内容。
 3. 之所以需要两种模式：paused 适合按需逐块消费，flowing 适合"来多少处理多少"的管道式消费。
@@ -325,6 +331,7 @@ class BoundedReadable extends Readable {
 ```
 
 **这段代码在做什么**
+
 - `highWaterMark: 2` 表示内部缓冲最多囤 2 块数据。
 - `_read()` 是关键：Node 在缓冲有空间时自动调用它。
 - `push()` 返回 `false` 时立即 return，把生产权交还给消费者。
@@ -344,6 +351,7 @@ r.on('end', () => console.log('收到:', got.join(', ')));
 ```
 
 **这段代码在做什么**
+
 - `readable` 事件在缓冲有数据或到达结尾时触发。
 - `read(1)` 每次最多取 1 字节，故意放慢消费速度。
 - 生产者会在 `push()` 返回 `false` 后暂停，直到缓冲再有空间。
@@ -379,6 +387,7 @@ r.on('end', () => {
 ```
 
 **这段代码在做什么**
+
 - 定时器每秒产生 1000 块数据，消费者用 `resume()` 快速排空。
 - `readableLength` 是只读属性，反映当前内部缓冲字节数。
 - 一旦 `push()` 返回 `false`，立即停止定时器并结束流。
@@ -394,6 +403,7 @@ r.on('end', () => {
 | 缓冲涨到几个 GB | 无视返回值持续推 | 检查返回值并暂停，消费者取走后恢复 |
 
 **小结**
+
 1. 为什么需要 `highWaterMark`：没有它，缓冲要么无限涨，要么每次只允许 1 字节，吞吐量被压死。
 2. `push()` 返回 `false` 是暂停信号，`read()` 消耗数据是恢复信号。
 3. `_read()` 是 Node 与自写 Readable 之间的调度入口，生产逻辑必须放这里。
@@ -460,6 +470,7 @@ for (let i = 0; i < 5; i++) {
 ```
 
 **这段代码在做什么**
+
 - `highWaterMark: 2` 让缓冲最多囤 2 块数据。
 - 底层写入故意延迟 5ms，让前两块还没落地。
 - 从第三块开始 `write()` 返回 `false`，因为缓冲已堆到水位。
@@ -497,6 +508,7 @@ pump();
 ```
 
 **这段代码在做什么**
+
 - `pump()` 是写入泵：循环写，遇到 `false` 就停。
 - `w.once('drain', pump)` 注册一次性监听，排空后自动恢复。
 - 写完后调用 `end()`，回调里断言所有块都已提交。
@@ -546,6 +558,7 @@ w.on('finish', () => {
 | `finish` 之后 `write` 报错 | `end()` 之后不允许再写 | 先写完所有数据，最后才 `end()` |
 
 **小结**
+
 1. 为什么需要 `drain`：没有恢复信号，生产者只能靠轮询或猜测，容易写穿缓冲。
 2. `write()` 返回 `false` 是停手信号，`drain` 是继续信号。
 3. 自写 `_write` 的 `cb()` 必须每次调用，否则缓冲计数不减少，`drain` 永不触发。
@@ -607,6 +620,7 @@ dest.on('finish', () => console.log('目标 finish'));
 ```
 
 **这段代码在做什么**
+
 - `bad` 在第一次 `_read` 时直接销毁自己并抛出"读盘失败"。
 - 源上的 `error` 监听能拿到错误信息。
 - `dest` 没有收到错误，也不会被自动销毁，进程可能无法退出。
@@ -629,6 +643,7 @@ pipeline(bad, mid, dest, (err) => {
 ```
 
 **这段代码在做什么**
+
 - `pipeline` 把三个流连成一条链。
 - 源错误自动销毁整条链上的流。
 - 回调收到第一个错误，不会重复执行。
@@ -660,6 +675,7 @@ pipeline(bad, mid, (err) => {
 ```
 
 **这段代码在做什么**
+
 - `calls` 计数器用来断言回调只执行一次。
 - 断言 `destroyed` 为 `true`，确认两个流都被清理。
 - `final` 是正常结束前的钩子，出错路径不应执行。
@@ -675,6 +691,7 @@ pipeline(bad, mid, (err) => {
 | 回调执行两次 | 同时监听 `close` 和 `finish` | `pipeline` 回调只监听一次完成或错误 |
 
 **小结**
+
 1. 为什么需要 `pipeline`：裸 `pipe` 只搬数据，不管错误与清理，多流组合时每个流都要手工兜底。
 2. `pipeline` 在任一流出错时销毁全部流，并只回调一次。
 3. 生产环境的多流串联，默认用 `pipeline`，不用裸 `pipe`。
@@ -730,6 +747,7 @@ parseJson.end();
 ```
 
 **这段代码在做什么**
+
 - `objectMode: true` 让输入输出按对象处理，不需要手动拼 Buffer。
 - `_transform` 里 `cb(null, data)` 等于 `this.push(data); cb();`。
 - 空行不调用 `cb(null, ...)` 而是 `cb()`，表示跳过这一块。
@@ -753,6 +771,7 @@ const keepError = new Transform({
 ```
 
 **这段代码在做什么**
+
 - `this.push(obj)` 把符合条件的对象交给下游。
 - 不符合条件的对象直接 `cb()`，不 push。
 - `cb()` 必须在每个 chunk 处理后调用，否则流卡住。
@@ -773,6 +792,7 @@ const save = new Writable({
 ```
 
 **这段代码在做什么**
+
 - `objectMode: true` 下，`write` 收到的 chunk 就是上游 push 的对象。
 - `result` 数组按到达顺序收集对象。
 
@@ -819,6 +839,7 @@ parse.end();
 ```
 
 **这段代码在做什么**
+
 - 第一条 Transform 解析 JSON 字符串。
 - 第二条 Transform 只放行 `level === 'error'` 的对象。
 - 最后的 Writable 收集对象，断言只保留一条日志。
@@ -834,6 +855,7 @@ parse.end();
 | 数量少也出现背压 | 对象模式默认 `highWaterMark: 16` | 按吞吐需求调整 `highWaterMark` |
 
 **小结**
+
 1. 为什么需要对象模式：不用它，结构化数据要反复 JSON 序列化加手工切块，容易在边界处出错。
 2. Transform 的 `cb()` 是必须的，push 是可选的，过滤就是只 cb 不 push。
 3. 对象模式的 `highWaterMark` 单位是"对象个数"，默认 16。
@@ -890,6 +912,7 @@ class MyReadable extends Readable {
 ```
 
 **这段代码在做什么**
+
 - 构造器接收一个数组作为数据源。
 - `_read` 是 Node 在缓冲有余量时的回调入口。
 - `push()` 返回 `false` 就退出循环，等下一轮 `_read`。
@@ -912,6 +935,7 @@ class MyWritable extends Writable {
 ```
 
 **这段代码在做什么**
+
 - `_write` 收到数据块，先记录下来。
 - `setTimeout(cb, 5)` 模拟 5ms 的慢速写入。
 - `cb()` 让 Node 扣减缓冲计数，缓冲空后触发 `drain`。
@@ -932,6 +956,7 @@ class MyTransform extends Transform {
 ```
 
 **这段代码在做什么**
+
 - `_transform` 把每个输入块转数字再乘 2。
 - 非法输入通过 `cb(new Error(...))` 抛给下游统一处理。
 - `this.push` 输出转换后的字符串，`cb()` 表示本块处理完成。
@@ -972,6 +997,7 @@ pipeline(r, t, w, (err) => {
 ```
 
 **这段代码在做什么**
+
 - 三个类都在脚本内完整定义，可单独运行。
 - `pipeline` 串联三者，错误自动清理。
 - 断言最终接收到的数组为 `[2, 4, 6, 8]`。
@@ -987,6 +1013,7 @@ pipeline(r, t, w, (err) => {
 | `push` 后不判断返回值 | 缓冲可无限上涨 | `false` 就停止 push，等 `_read` 再继续 |
 
 **小结**
+
 1. 手写流只有三个入口：Readable 的 `_read`、Writable 的 `_write`、Transform 的 `_transform`。
 2. 背压逻辑完全体现在 `push`/`write` 的返回值与 `readable`/`drain` 的恢复信号上。
 3. 为什么需要手写：理解这三个钩子，才能读懂所有第三方流库的背压实现。
@@ -1042,6 +1069,7 @@ const bigSource = new Readable({
 ```
 
 **这段代码在做什么**
+
 - `count` 从 0 数到 64，每轮产出一块 1MB 数据。
 - `read()` 会在缓冲有空间时被自动调用。
 - 64 轮后 `push(null)` 结束流，共 64MB。
@@ -1060,6 +1088,7 @@ const slowSink = new Writable({
 ```
 
 **这段代码在做什么**
+
 - 每块 1MB 数据写入需要 20ms。
 - `cb()` 通知 Node 该块已写盘，缓冲计数减一。
 
@@ -1075,6 +1104,7 @@ console.log('无背压峰值 writableLength:', maxLen);
 ```
 
 **这段代码在做什么**
+
 - 循环一口气提交 64 块，不检查 `write()` 返回的布尔值。
 - `writableLength` 每轮记录一次，取最大值。
 - 由于底层每块要 20ms，大部分数据会滞留在缓冲。
@@ -1099,6 +1129,7 @@ pipeline(bigSource, slowSink, (err) => {
 ```
 
 **这段代码在做什么**
+
 - `pipeline` 自动处理 `drain`，源会在目标缓冲满时暂停。
 - `data` 监听里持续取样目标的 `writableLength`。
 - 峰值应远低于 64MB，因为源被反复暂停。
@@ -1153,6 +1184,7 @@ function makeSlowSink() {
 ```
 
 **这段代码在做什么**
+
 - 两轮实验使用同样的源与目标参数，只改变写入方式。
 - 第一轮用 `pipeline`，断言 `writableLength` 峰值低于 4MB。
 - 第二轮写循环无视返回值，断言峰值高于 20MB。
@@ -1168,6 +1200,7 @@ function makeSlowSink() {
 | 无背压那组也没涨起来 | 目标太快，源和目标同速 | 让目标每块加 10ms 延迟 |
 
 **小结**
+
 1. 背压的价值可用 `writableLength` 量化：有背压时缓冲只有几个 MB，无背压时涨到几十 MB。
 2. `pipe` 与 `pipeline` 内部把 `write()` 返回值和 `drain` 串成闭环，这是我们不写 while 循环的原因。
 3. 为什么需要实验：只看 API 文档记不住背压，跑一遍数字就记住了。
@@ -1225,6 +1258,7 @@ const reader = webR.getReader();       // Web 侧用 reader 读取
 ```
 
 **这段代码在做什么**
+
 - `Readable.toWeb` 把 Node 流包成 Web `ReadableStream`。
 - Web 侧的 `getReader().read()` 返回 Promise，value 是 `Uint8Array`。
 - `Buffer.from(value).toString()` 把字节转回文本。
@@ -1255,6 +1289,7 @@ const nodeR = Readable.fromWeb(webStream); // 转回 Node 流
 ```
 
 **这段代码在做什么**
+
 - `new ReadableStream` 是 Node 17+ 自带的 Web 全局对象。
 - `Readable.fromWeb` 把 Web 流转成 Node `Readable`。
 - Node 侧可用 `for await` 消费，chunk 为 Buffer 或字符串。
@@ -1296,6 +1331,7 @@ const assert = require('node:assert');
 ```
 
 **这段代码在做什么**
+
 - 第一段验证 Node 到 Web 的转换与数据完整性。
 - 第二段验证 Web 到 Node 的转换与数据完整性。
 - 两端背压语义各自成立，转换层负责衔接。
@@ -1311,6 +1347,7 @@ const assert = require('node:assert');
 | 转接后背压不联动 | 生产者没有遵守 Web 侧 `desiredSize` | 检查 `controller.desiredSize` 再决定是否 `enqueue` |
 
 **小结**
+
 1. 为什么需要互转：前端用 fetch 上传下载流，后端用 Node 文件流，互转是打通全栈的必经之路。
 2. 转接口是成对的：`toWeb` 与 `fromWeb` 覆盖 Readable、Writable、Duplex。
 3. 转接不是免费，背压信号要在两侧分别遵守。
@@ -1388,6 +1425,7 @@ pipeline(source, toCsv, res, (err) => {
 **怎么度量收益**：指标看导出接口的 RSS 峰值、堆使用峰值、首字节时间。用 `process.memoryUsage()` 定时采样，压测用 autocannon 或 wrk，堆曲线用 `--inspect` 加 DevTools 观察。
 
 **什么时候不该用**：
+
 - 结果集小于一个 `highWaterMark` 且能一次放内存时，加流只增加代码量。
 - 需要提前写 `Content-Length` 的场景，流式无法预知总长度，应改用分片下载。
 
@@ -1424,6 +1462,7 @@ setTimeout(abort, 5000); // 超时放弃渲染，避免慢接口拖住连接
 **怎么度量收益**：看 TTFB（`curl -w '%{time_starttransfer}'`）、LCP（Lighthouse 或 web-vitals 的 onLCP）、首个 JS 请求时间（DevTools Network 面板）。用 DevTools 的 Slow 4G 加 4x CPU 降速复现低端机。
 
 **什么时候不该用**：
+
 - 页面必须输出完整 HTML 才能被抓取，且爬虫不做流式处理时，先确认抓取行为再决定。
 - 鉴权在渲染中途才发现失败时无法改 401，鉴权必须挪到发头之前。
 
@@ -1464,6 +1503,7 @@ function onEvent(evt) {
 **怎么度量收益**：看 `process.memoryUsage().heapUsed` 峰值、事件从产生到落盘的耗时、`socket.pause` 触发次数。用 `clinic doctor` 或 `--inspect` 加 DevTools Memory 采样，压测用 autocannon 持续发事件。
 
 **什么时候不该用**：
+
 - 事件速率长期低于磁盘写入速率，缓冲不会堆积，用 `fs.appendFile` 就够。
 - 审计日志要求跨记录的事务或原子写入，追加文件做不到，应改用数据库事务。
 
@@ -1496,6 +1536,7 @@ React 文档提供 `onShellReady` 与 `abort` 两个钩子，让外壳先发出�
 **目标**：写一个命令行工具，统计一个 1 GB 文本文件的词频并输出前 10 名，进程 RSS 峰值不超过 200 MB。
 
 **步骤**：
+
 1. 用 `fs.createReadStream` 打开文件，显式设置 `highWaterMark`，先打印一次默认值。
 2. 手写一个 Transform，把字节块切成行，处理一行被拆到两个块里的情况。
 3. 手写一个 Writable，接收行并累加计数，`write()` 返回 false 时暂停上游读。
@@ -1505,6 +1546,7 @@ React 文档提供 `onShellReady` 与 `abort` 两个钩子，让外壳先发出�
 7. 换一版把整个文件读成字符串再统计，用同一份输入对比峰值。
 
 **验收标准**：
+
 - 输入 1 GB 文件时 RSS 峰值低于 200 MB，并给出采样脚本与输出。
 - 文件最后一行没有换行符时，该行仍被计入。
 - 路径不存在时进程退出码非 0，并打印可读的错误信息。

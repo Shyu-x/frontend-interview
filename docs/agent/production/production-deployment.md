@@ -85,6 +85,7 @@ export function selectDeployment(p: Profile): 'serverless' | 'container' | 'kube
 ```
 
 **这段代码在做什么**  
+
 - 用 `peakQps` 表示业务量，`teamSize` 表示团队人数。
 - 峰值低于 200 且团队不超过 3 人时返回 `serverless`。
 - 峰值在 200 到 2000 之间且团队不超过 5 人时返回 `container`。
@@ -102,6 +103,7 @@ export function needsKubernetes(availability: { uptimeSla: number; maxDowntimeMi
 ```
 
 **这段代码在做什么**  
+
 - `uptimeSla` 表示服务可用性目标。
 - 当可用性要求达到 99.9% 且最大停机时间小于 5 分钟时，返回 `true`。
 - 这个条件可以作为选型函数的补充判断。
@@ -140,6 +142,7 @@ console.log('所有部署选型断言通过');
 | Kubernetes 副本数设为 3 但流量仍打到一个节点 | 没有配置 Pod 反亲和 | 增加 `podAntiAffinity` 打散副本 |
 
 **用在哪里**  
+
 - 业务背景：电商促销期间的客服机器人，峰值流量是日常的 8 倍。  
   这一节知识怎么用：用流量曲线判断峰值是否超过固定阈值，选择 Serverless 吸峰。  
   衡量收益：对比常驻机器的账单金额。  
@@ -151,6 +154,7 @@ console.log('所有部署选型断言通过');
   什么时候不该用：如果后续需要多团队共享同一集群，不应长期停在单机 Docker。
 
 **行业实践**  
+
 - AWS Lambda 官方文档说明预留并发可以控制函数并发并减少冷启动。  
   怎么借鉴到你的项目：对延迟敏感的函数设置预留并发，并观察账单变化。  
 - Google Cloud 官方文档建议用队列对突发任务做背压。  
@@ -159,6 +163,7 @@ console.log('所有部署选型断言通过');
   怎么借鉴到你的项目：流式接口返回 SSE，前端用 SDK 自动解析。
 
 **小结**  
+
 1. Serverless 适合突发且低频的接口，但要注意平台超时上限。  
 2. 容器适合中等流量和需要自定义环境的服务。  
 3. Kubernetes 适合高可用、多副本、自动扩缩容的场景。
@@ -216,6 +221,7 @@ provider:
 ```
 
 **这段代码在做什么**  
+
 - `service` 成为 CloudFormation 栈名前缀。
 - `frameworkVersion: '3'` 锁死框架主版本，防止 CI 某天部署失败。
 - `stage` 与 `region` 决定资源部署到哪个环境。
@@ -245,6 +251,7 @@ functions:
 ```
 
 **这段代码在做什么**  
+
 - `chat` 处理非流式请求，`streamChat` 处理流式请求。
 - `reservedConcurrency: 100` 预留 100 个并发额度。
 - `streamChat` 的 `timeout: 60` 是函数内部时限。
@@ -280,6 +287,7 @@ export const streamChat = async (event: { body: string }) => {
 ```
 
 **这段代码在做什么**  
+
 - 客户端每次请求都要携带完整历史。
 - `messages.stream` 返回流句柄，`await` 等待连接建立而非生成完毕。
 - `toReadableStream` 把 SDK 流包装成 Web 流。
@@ -324,6 +332,7 @@ SSE 响应构建断言通过
 | 插件名拼写错误导致部署失败 | 找不到对应 npm 包 | 核对包名并锁版本 |
 
 **用在哪里**  
+
 - 业务背景：聊天机器人 Web 端逐字输出。  
   这一节知识怎么用：把路由返回 `text/event-stream`，前端用 SSE 客户端读取。  
   衡量收益：首字延迟和完整回答到达时间。  
@@ -335,6 +344,7 @@ SSE 响应构建断言通过
   什么时候不该用：如果会话历史很长且没有摘要，不要依赖单次请求携带全部历史。
 
 **行业实践**  
+
 - AWS Lambda 官方文档说明函数内存与 CPU 配额正相关。  
   怎么借鉴到你的项目：实测模型流式响应在 1024MB 与 2048MB 下的耗时差，再决定是否调大。  
 - Vercel AI SDK 文档提供 `toDataStreamResponse` 方法。  
@@ -343,6 +353,7 @@ SSE 响应构建断言通过
   怎么借鉴到你的项目：生产环境改写成对象形式限制来源域。
 
 **小结**  
+
 1. Serverless 函数要区分同步超时与流式超时。  
 2. 流式响应必须同时设置 SSE 响应头和正确的流编码。  
 3. 环境变量与插件包名都要在部署期校验，避免延迟到运行时才失败。
@@ -399,6 +410,7 @@ CMD ["node", "dist/main.js"]
 ```
 
 **这段代码在做什么**  
+
 - builder 阶段安装生产依赖并清理 npm 缓存。
 - runtime 阶段创建 UID 1001 的非 root 用户。
 - `HEALTHCHECK` 每 30 秒请求 `/health`，连续 3 次非 200 才判定不健康。
@@ -445,6 +457,7 @@ volumes:
 ```
 
 **这段代码在做什么**  
+
 - `target: runtime` 指定构建到运行阶段。
 - `depends_on.condition: service_healthy` 等待 Redis 健康后才启动 Agent。
 - `restart: unless-stopped` 允许人工停止后不自动拉起。
@@ -494,6 +507,7 @@ server.listen(0, async () => {
 | Redis 数据丢失 | `docker compose down -v` 删除命名卷 | 下线前备份命名卷 |
 
 **用在哪里**  
+
 - 业务背景：内部知识库问答服务需要每天运行 10 小时。  
   这一节知识怎么用：用 Dockerfile 固定 Node 版本与依赖环境。  
   衡量收益：开发与线上环境一致度。  
@@ -505,6 +519,7 @@ server.listen(0, async () => {
   什么时候不该用：如果 Redis 已在云平台托管，不要把本地 Redis 容器推到生产。
 
 **行业实践**  
+
 - Docker 官方文档推荐多阶段构建以缩小镜像体积。  
   怎么借鉴到你的项目：builder 阶段用完即弃，runtime 阶段只带运行依赖。  
 - Redis 官方文档说明 `appendonly yes` 会开启 AOF。  
@@ -513,6 +528,7 @@ server.listen(0, async () => {
   怎么借鉴到你的项目：升级 CLI 后再依赖该门控。
 
 **小结**  
+
 1. Dockerfile 要区分构建阶段和运行阶段。  
 2. 健康检查是接入流量的前置条件。  
 3. Compose 只解决启动期依赖，运行期断连仍需应用层重试。
@@ -616,6 +632,7 @@ spec:
 ```
 
 **这段代码在做什么**  
+
 - `replicas: 3` 期望同时运行 3 个副本。
 - 滚动更新 `maxSurge: 1` 与 `maxUnavailable: 0` 保证任何时刻可用副本数不少于 3。
 - `runAsNonRoot` 与 `runAsUser: 1001` 让 kubelet 拒绝 root 容器。
@@ -677,6 +694,7 @@ spec:
 ```
 
 **这段代码在做什么**  
+
 - HPA 为每个指标计算期望副本数，取最大值作为最终期望。
 - CPU 目标为平均 70%，内存目标为平均 80%。
 - 自定义指标 `http_requests_per_second` 按每副本 100 QPS 计算。
@@ -713,6 +731,7 @@ spec:
 ```
 
 **这段代码在做什么**  
+
 - Service 把端口 80 映射到 Pod 的 4000。
 - `selector` 决定哪些 Pod 接入流量。
 - PDB 的 `minAvailable: 2` 保证主动驱逐时至少保留 2 个副本。
@@ -753,6 +772,7 @@ console.log(`当前 4 副本，三个指标比例最大为 1.5，期望副本为
 | HPA 不生效 | 容器未配置 `resources.requests.cpu` | 补上 CPU 请求，否则利用率无法计算 |
 
 **用在哪里**  
+
 - 业务背景：多租户 Agent API，要求滚动发布零中断。  
   这一节知识怎么用：设置 `maxUnavailable: 0` 与就绪探针。  
   衡量收益：发布期间可成功处理的请求比例。  
@@ -764,6 +784,7 @@ console.log(`当前 4 副本，三个指标比例最大为 1.5，期望副本为
   什么时候不该用：如果流量变化是分钟级脉冲，HPA 默认周期可能跟不上，需要事件源。
 
 **行业实践**  
+
 - Kubernetes 官方文档说明 `autoscaling/v2` 支持多指标与行为控制。  
   怎么借鉴到你的项目：把缩容稳定窗口设为 5 分钟以上。  
 - Prometheus Adapter 社区文档说明自定义指标需要暴露在 metrics API。  
@@ -772,6 +793,7 @@ console.log(`当前 4 副本，三个指标比例最大为 1.5，期望副本为
   怎么借鉴到你的项目：把 `minAvailable` 设为 `replicas - 1` 作为基础值。
 
 **小结**  
+
 1. Deployment 的滚动更新策略直接决定发布期间的可用性。  
 2. HPA 用短板原则取多个指标中的最大期望副本数。  
 3. Service 只认就绪探针，PDB 只约束主动驱逐。
@@ -839,6 +861,7 @@ export const processQueue = async () => {
 ```
 
 **这段代码在做什么**  
+
 - `MaxNumberOfMessages: 10` 限制单次拉取数量，实现消费端背压。
 - `WaitTimeSeconds: 20` 是长轮询等待，减少空请求。
 - `VisibilityTimeout: 60` 防止同一条消息被其他消费者重复处理。
@@ -865,6 +888,7 @@ app.get('/ready', async (req, res) => {
 ```
 
 **这段代码在做什么**  
+
 - `/health` 只描述进程还活着，不检查依赖。
 - `/ready` 检查 Redis 连接和 API Key 有效性。
 - 就绪失败时返回 503，负载均衡器会摘掉该实例。
@@ -899,6 +923,7 @@ console.log('队列批次计算断言通过');
 | 队列堆积但消费者空闲 | 单次拉取数量太少或长轮询时间不足 | 提高 `MaxNumberOfMessages` 或 `WaitTimeSeconds` |
 
 **用在哪里**  
+
 - 业务背景：批量文档摘要，单个任务耗时 30 秒以上。  
   这一节知识怎么用：用 SQS 承载任务，消费者按 10 个一批处理。  
   衡量收益：任务完成时间与重复处理率。  
@@ -910,6 +935,7 @@ console.log('队列批次计算断言通过');
   什么时候不该用：如果用户只在一个区域内，多区域部署增加成本和复杂度。
 
 **行业实践**  
+
 - AWS 官方文档说明 SQS 长轮询可以减少空响应和成本。  
   怎么借鉴到你的项目：消费者 `WaitTimeSeconds` 设为 20，而非 0。  
 - Google Cloud 官方博客建议对长任务使用推送队列加手动伸缩。  
@@ -918,6 +944,7 @@ console.log('队列批次计算断言通过');
   怎么借鉴到你的项目：把 QPS 指标作为扩容信号，比 CPU 更早发现流量上涨。
 
 **小结**  
+
 1. 健康检查要区分存活与就绪，依赖检查不能放进存活探测。  
 2. 队列驱动扩展的核心是限制消费者拉取速率。  
 3. 水平扩展增加实例，垂直扩展提高单实例资源，地理分布减少网络距离。
@@ -985,6 +1012,7 @@ const tokensUsedTotal = new client.Counter({
 ```
 
 **这段代码在做什么**  
+
 - `Counter` 只增不减，适合请求数和 token 数。
 - `Histogram` 记录延迟分布，桶边界覆盖 10ms 到 10s。
 - `labelNames` 用来区分不同路径、状态和 token 类型。
@@ -1028,6 +1056,7 @@ export const tracedAgentCall = async (messages) => {
 ```
 
 **这段代码在做什么**  
+
 - `service.name` 是追踪后端区分服务的依据。
 - `startActiveSpan` 把 Span 写入当前异步上下文。
 - `span.setAttributes` 只记录低基数元数据，不记录完整对话文本。
@@ -1064,6 +1093,7 @@ console.log('直方图桶查找断言通过');
 | 指标标签顺序错乱 | 标签每次调用顺序不同 | 固定调用顺序或使用对象传参 |
 
 **用在哪里**  
+
 - 业务背景：多租户 Agent API 需要按客户查看错误率和延迟。  
   这一节知识怎么用：在自定义 Span 里加租户 ID 作为属性。  
   衡量收益：单租户问题定位时间。  
@@ -1075,6 +1105,7 @@ console.log('直方图桶查找断言通过');
   什么时候不该用：如果输入文本包含个人数据，不要写入日志或第三方平台。
 
 **行业实践**  
+
 - OpenTelemetry 官方文档要求先启动 SDK，再导入业务模块。  
   怎么借鉴到你的项目：把 `sdk.start()` 作为进程第一行执行。  
 - Prometheus 官方文档建议 Histogram 桶按观测范围设置。  
@@ -1083,6 +1114,7 @@ console.log('直方图桶查找断言通过');
   怎么借鉴到你的项目：在 `ChatAnthropic` 的 `callbacks` 传入追踪处理器。
 
 **小结**  
+
 1. 监控关注聚合指标，追踪关注单次请求链路。  
 2. Span 属性只存低基数元数据，不放大文本。  
 3. 追踪 SDK 必须早于业务模块加载。
@@ -1138,6 +1170,7 @@ const config = configSchema.parse({
 ```
 
 **这段代码在做什么**  
+
 - `anthropicApiKey` 不能为空。
 - `redisUrl` 必须是合法 URL。
 - `nodeEnv` 只能是开发或生产。
@@ -1172,6 +1205,7 @@ export const distributedRateLimit = async (
 ```
 
 **这段代码在做什么**  
+
 - 用有序集合存每个请求的时间戳。
 - `zremrangebyscore` 删除窗口外的记录。
 - `zadd` 写入当前请求，成员用随机数避免时间戳冲突。
@@ -1194,6 +1228,7 @@ export const getSecret = async (secretName: string): Promise<string> => {
 ```
 
 **这段代码在做什么**  
+
 - `SecretId` 是密钥名称，不是明文值。
 - `GetSecretValueCommand` 只获取当前版本。
 - 调用方拿到的是 JSON 字符串，需要自行解析。
@@ -1227,6 +1262,7 @@ console.log('限流判断断言通过');
 | 密钥管理服务访问延迟拖慢首字节 | 每次请求都拉取密钥 | 冷启动加 TTL 缓存 |
 
 **用在哪里**  
+
 - 业务背景：不同等级用户有不同限流额度。  
   这一节知识怎么用：从 Redis 读用户等级，再返回动态 `limit`。  
   衡量收益：429 响应比例与用户投诉量。  
@@ -1238,6 +1274,7 @@ console.log('限流判断断言通过');
   什么时候不该用：如果密钥必须放在本地文件且网络不可用，不要强制远程读取。
 
 **行业实践**  
+
 - AWS Secrets Manager 官方文档支持自动轮换密钥。  
   怎么借鉴到你的项目：为模型 API Key 创建轮换策略，减少手工改配置。  
 - zod 官方文档说明 `parse` 会收集所有校验错误。  
@@ -1246,6 +1283,7 @@ console.log('限流判断断言通过');
   怎么借鉴到你的项目：开启 `standardHeaders: true` 并关闭 `legacyHeaders`。
 
 **小结**  
+
 1. 环境变量只应存非敏感配置，敏感值改用密钥管理服务。  
 2. 配置校验要在启动期做，不能推迟到每次请求。  
 3. 分布式限流要用 Redis 等共享存储，不能只靠进程内计数。
@@ -1305,6 +1343,7 @@ behavior:
 ```
 
 **这段代码在做什么**  
+
 - 缩容回看过去 5 分钟的期望副本建议，取最大值执行。
 - 每 60 秒最多缩掉当前副本数的 10%。
 - 扩容不做滞后平滑，指标超阈值立即扩。
@@ -1328,6 +1367,7 @@ spec:
 ```
 
 **这段代码在做什么**  
+
 - 限制命名空间总 CPU 请求为 8 核。
 - 总内存请求为 16Gi。
 - CPU 上限为 16 核，内存上限为 32Gi。
@@ -1350,6 +1390,7 @@ spec:
 ```
 
 **这段代码在做什么**  
+
 - `minAvailable: 2` 表示任意主动驱逐发生时，可用副本数不能少于 2。
 - `selector` 选择受约束的 Pod。
 - 节点维护和集群升级会先检查 PDB。
@@ -1384,6 +1425,7 @@ console.log('缩容稳定窗口逻辑断言通过');
 | 节点维护被阻塞 | PDB 要求过高 | 把 `minAvailable` 设为副本数减一 |
 
 **用在哪里**  
+
 - 业务背景：夜间低流量但偶尔有定时任务。  
   这一节知识怎么用：缩容窗口设为 5 分钟，避免定时任务触发的短暂低谷缩容。  
   衡量收益：实例启停次数与缩容后扩容延迟。  
@@ -1395,6 +1437,7 @@ console.log('缩容稳定窗口逻辑断言通过');
   什么时候不该用：如果用户只有一个区域，多区域只会增加成本。
 
 **行业实践**  
+
 - Kubernetes HPA 文档提供 `stabilizationWindowSeconds` 控制扩缩速。  
   怎么借鉴到你的项目：为缩容设置 300 秒，扩容保留 0 秒。  
 - Kubernetes 官方文档建议用 ResourceQuota 限制命名空间资源总量。  
@@ -1403,6 +1446,7 @@ console.log('缩容稳定窗口逻辑断言通过');
   怎么借鉴到你的项目：只对延迟敏感的函数启用预留并发，避免所有函数都开启。
 
 **小结**  
+
 1. 成本管理通过限制副本上限和缩容速度体现。  
 2. 高可用通过 PDB 和跨区域副本保障主动维护不中断。  
 3. 非对称扩缩策略比对称策略更适合突发流量。
@@ -1455,6 +1499,7 @@ export const checkConfig = () => {
 ```
 
 **这段代码在做什么**  
+
 - 列出生产必需的环境变量。
 - 逐个检查是否为空。
 - 返回所有缺失项，一次定位而非逐个报错。
@@ -1469,6 +1514,7 @@ kubectl describe pod ai-agent-7c9d5f8b-abcde
 ```
 
 **这段代码在做什么**  
+
 - `get pods` 看 Pod 是否 Running、Pending、CrashLoopBackOff。
 - `describe pod` 返回 Events 区域，记录拉镜像、挂载、探针失败等信息。
 - 事件是故障排查第一步，不用先查应用日志。
@@ -1483,6 +1529,7 @@ kubectl get events | grep -E "Liveness|Readiness"
 ```
 
 **这段代码在做什么**  
+
 - `describe hpa` 会显示当前副本、期望副本和指标值。
 - 如果 HPA 处于 TargetNotFound，说明指标没有暴露。
 - 探针事件会记录重启和摘除原因。
@@ -1525,6 +1572,7 @@ console.log('缺失配置检查断言通过');
 | 流式回答无输出 | 响应头缺失 `Content-Type: text/event-stream` | 核对 API 返回头部 |
 
 **用在哪里**  
+
 - 业务背景：新环境部署后跑通冒烟测试。  
   这一节知识怎么用：把配置检查脚本作为部署后第一步执行。  
   衡量收益：首次请求成功率。  
@@ -1536,6 +1584,7 @@ console.log('缺失配置检查断言通过');
   什么时候不该用：如果日志平台没接入，先查日志会拖慢定位。
 
 **行业实践**  
+
 - Kubernetes 官方文档建议用 `kubectl describe` 查看事件。  
   怎么借鉴到你的项目：排障第一命令是 `describe pod`，而不是直接翻应用日志。  
 - OpenTelemetry 官方文档说明导出端点缺失会回退到 localhost。  
@@ -1544,6 +1593,7 @@ console.log('缺失配置检查断言通过');
   怎么借鉴到你的项目：CI 中禁止意外传入 `--stage dev`，使用固定化命令。
 
 **小结**  
+
 1. 配置参考要列出必填项，并区分敏感与非敏感值。  
 2. 故障排查先看 Kubernetes 事件，再查应用日志和追踪。  
 3. 修复后写回配置，避免手工改运行态。
@@ -1566,6 +1616,7 @@ console.log('缺失配置检查断言通过');
 目标：把一个对话接口从本地运行推进到带监控和限流的生产形态。  
 
 步骤：  
+
 1. 用 Express 写一个 `/chat` 和 `/health` 接口，返回模拟模型回复。  
 2. 加入 Prometheus 指标，暴露 `/metrics`。  
 3. 加入 Redis 分布式限流，限制每个用户 20 次/分钟。  
@@ -1573,6 +1624,7 @@ console.log('缺失配置检查断言通过');
 5. 用 `curl` 模拟请求，观察 `/metrics` 和限流行为。  
 
 验收标准：  
+
 - `/health` 返回 200，`/metrics` 返回有效 Prometheus 文本。  
 - 同一用户第 21 次请求返回 429 或错误响应。  
 - 容器内服务以非 root 用户运行，`id -u` 输出 1001。  

@@ -1424,6 +1424,7 @@ function onScroll() {
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录制 10 秒连续滚动，读 Main 火焰图里 Layout 与 Recalculate Style 的总耗时。在 `renderRows` 前后打 `performance.mark`，再用 `performance.measure` 打印单次 duration，与 16.67ms 比较。挂载行数直接读 `document.querySelectorAll('.row').length`。
 
 **什么时候不该用**：
+
 - 行高不固定且无法预知时，窗口计算的偏移会算错，滚动条位置与内容对不上。
 - 总行数只有几十行时，窗口计算与占位逻辑的代码量超过直接渲染，收益看不出来。
 - 用户依赖浏览器原生 Ctrl+F 查找表格内容时，未挂载的行搜不到。
@@ -1461,6 +1462,7 @@ console.log(sections.length - visible);  // 屏外区块数，即被跳过的候
 **怎么度量收益**：Performance 面板录制从导航到首屏渲染完成，比较 Layout 与 Paint 阶段总耗时。DevTools 的 Rendering 面板打开 Paint flashing，观察屏外区块是否被绘制。滚动条跳动看 Cumulative Layout Shift，在 Performance 面板的 Experience 轨道里读。
 
 **什么时候不该用**：
+
 - 需要在屏外精确测量元素真实尺寸时（例如导出 PDF 前算分页），跳过布局会拿到占位高度。
 - 区块内含表单控件，且依赖浏览器恢复滚动位置时，跳过渲染会让恢复的位置偏掉。
 - 整页只有一两屏时，屏外区块占比低，跳过布局的机会少。
@@ -1497,6 +1499,7 @@ canvas.addEventListener('pointermove', (e) => {
 **怎么度量收益**：Performance 面板录制 10 秒连续绘制，对比 Main 与 Compositor 两条轨道的占用。用 `performance.measure` 标记从 `pointermove` 到下次绘制的间隔。图层总数在 DevTools 的 Layers 面板读。
 
 **什么时候不该用**：
+
 - 笔迹需要与 DOM 元素做命中测试或精确对齐时，Worker 里拿不到 DOM，坐标系要自己维护。
 - 每帧传给 Worker 的数据量远大于绘制计算量时，postMessage 的序列化开销会吃掉收益。
 - 画布内容还要导出成可编辑图元时，绘制与数据模型分开会带来两套状态。
@@ -1521,6 +1524,7 @@ canvas.addEventListener('pointermove', (e) => {
 **目标**：做一个 5000 行的可滚动表格页面，让滚动时的单帧布局耗时可测、可见、可比较。
 
 **步骤**：
+
 1. 生成 5000 行数据，容器固定高度并设 `overflow: auto`，先全量渲染所有行。
 2. 用 Chrome DevTools 的 Performance 面板录制 10 秒连续滚动，保存火焰图。
 3. 在滚动回调里加 `performance.mark` 与 `performance.measure`，打印每次处理的 duration。
@@ -1530,6 +1534,7 @@ canvas.addEventListener('pointermove', (e) => {
 7. 再录一次 10 秒滚动，把两次火焰图与 measure 输出放在一起对比，写出结论。
 
 **验收标准**：
+
 - 能贴出 `performance.measure` 的 duration 列表，并指出超过 16.67ms 的那一次落在哪几行代码。
 - 滚动过程中 `document.querySelectorAll('.row').length` 不超过可见行数加 10。
 - 改动后的火焰图里，Layout 阶段总耗时不高于改动前。

@@ -88,6 +88,7 @@ console.log(addr.hash);     // "#top"
 ```
 
 **这段代码在做什么**
+
 - `new URL()` 是解析入口，不用手写字符串切割。
 - `protocol` 带冒号，`hostname` 不含端口。
 - `pathname` 是路径部分，从第一个斜杠开始。
@@ -111,6 +112,7 @@ console.log(addr.href); // https://shop.example.com/list?page=3&category=tablet#
 ```
 
 **这段代码在做什么**
+
 - `searchParams.set()` 用键值对方式修改查询参数，会自动编码。
 - 新键会被追加到查询串末尾，已有键则在原位置更新。
 - 直接给 `hash` 赋值会触发生成新的地址字符串。
@@ -131,6 +133,7 @@ console.log(css.href);  // "https://example.com/a.css"
 ```
 
 **这段代码在做什么**
+
 - 第二个参数是 base，浏览器会从 base 推导协议和主机。
 - `/docs/` 是绝对路径，会覆盖 base 的 `/start/` 路径部分。
 - `../a.css` 会先回到上一级目录，再拼上 `a.css`。
@@ -164,6 +167,7 @@ console.log("URL 对象解析与修改通过");
 ```
 
 **这段脚本在做什么**
+
 - 先断言完整 URL 的五个字段值。
 - 再断言修改查询参数后，`get()` 能取到新值。
 - 最后断言相对地址按 base 规则解析正确。
@@ -232,6 +236,7 @@ console.log(qs.has("page"));   // true
 ```
 
 **这段代码在做什么**
+
 - `get()` 返回指定键的第一个值。
 - `getAll()` 返回该键的所有值，解决重复键问题。
 - `has()` 用于判断键是否存在，返回值是布尔。
@@ -254,6 +259,7 @@ console.log(qs.toString()); // "page=2&q=vue+%E6%95%99%E7%A8%8B&tag=js&tag=node"
 ```
 
 **这段代码在做什么**
+
 - `set()` 会覆盖该键已有值，不产生重复键。
 - `append()` 会保留已有值并追加新值。
 - 空格被编码为 `+`，中文字符被编码为百分号序列。
@@ -276,6 +282,7 @@ for (const [key, value] of qs) {
 ```
 
 **这段代码在做什么**
+
 - `sort()` 按键排序，不改变每个键原来的值顺序。
 - `URLSearchParams` 可以被 `for...of` 遍历。
 - 每次迭代得到一个 `[key, value]` 数组。
@@ -307,6 +314,7 @@ console.log("URLSearchParams 读取、编码与排序通过");
 ```
 
 **这段脚本在做什么**
+
 - 用 `assert.deepEqual` 检查重复键的所有值。
 - 用 `includes()` 检查空格和中文字符被正确编码。
 - 用 `[...sorted.keys()]` 检查排序后的键顺序。
@@ -380,6 +388,7 @@ document.querySelector("#category-phone").addEventListener("click", () => {
 ```
 
 **这段代码在做什么**
+
 - `pushState` 第一个参数是状态对象，可以保存当前页需要的少量数据。
 - 第二个参数是标题，多数浏览器忽略，传空字符串即可。
 - 第三个参数是新地址，必须与当前页面同源。
@@ -401,6 +410,7 @@ if (location.pathname === "/redirect") {
 ```
 
 **这段代码在做什么**
+
 - `replaceState` 不增加历史栈长度。
 - 用户点后退时，不会退回到 `/redirect`。
 - 参数顺序与 `pushState` 相同。
@@ -422,6 +432,7 @@ window.addEventListener("popstate", (event) => {
 ```
 
 **这段代码在做什么**
+
 - `popstate` 在用户前进或后退时触发。
 - `event.state` 是当初 `pushState` 或 `replaceState` 传入的状态对象。
 - 本例根据状态对象里的 `category` 还原视图。
@@ -454,6 +465,7 @@ console.log("History API 验证通过");
 ```
 
 **这段脚本在做什么**
+
 - 用 `jsdom` 提供浏览器 `window.history` 和 `window.location`。
 - 断言 `pushState` 后地址改变、历史长度加一。
 - 断言 `replaceState` 后地址改变、历史长度不变。
@@ -530,6 +542,7 @@ function render(view) {
 ```
 
 **这段代码在做什么**
+
 - `popstate` 会在历史记录变化时触发。
 - 事件对象里的 `state` 是 `pushState` 时写入的数据。
 - 如果状态对象里没有视图信息，退化为解析 `location.pathname`。
@@ -550,6 +563,7 @@ window.addEventListener("hashchange", () => {
 ```
 
 **这段代码在做什么**
+
 - `hashchange` 在 `location.hash` 变化时触发。
 - `location.hash` 包含井号，例如 `#/list`。
 - `slice(1)` 去掉井号得到 `/list`。
@@ -573,6 +587,7 @@ window.addEventListener("popstate", (event) => {
 ```
 
 **这段代码在做什么**
+
 - `event.state` 是当前记录的状态对象，可以自定义方向字段。
 - 方向字段需要在你调用 `pushState` 时写入。
 - 该例子说明状态对象可以承载导航所需的业务数据。
@@ -602,6 +617,7 @@ console.log("hashchange 验证通过");
 ```
 
 **这段脚本在做什么**
+
 - 用 `jsdom` 构造带初始哈希的页面。
 - 注册 `hashchange` 监听器，把新路径存入 `seen`。
 - 手动改变哈希并派发 `HashChangeEvent`。
@@ -678,6 +694,7 @@ navigateHash("/detail/42"); // hashchange 触发 render("/detail/42")
 ```
 
 **这段代码在做什么**
+
 - `navigateHash` 只给 `location.hash` 赋值。
 - 修改哈希不会触发整页刷新。
 - `hashchange` 监听器负责取出路径并渲染。
@@ -705,6 +722,7 @@ navigateHistory("/detail/42"); // 直接 render("/detail/42")
 ```
 
 **这段代码在做什么**
+
 - `pushState` 改真实路径，不触发 `popstate`。
 - 所以要在导航函数里手动调用 `render`。
 - `popstate` 只负责处理后退和前进。
@@ -733,6 +751,7 @@ app.listen(3000);
 ```
 
 **这段代码在做什么**
+
 - 先提供 `dist` 下的真实静态文件。
 - 对于非静态资源路径，返回入口 HTML。
 - SPA 在客户端读取路径后渲染对应视图。
@@ -762,6 +781,7 @@ console.log("hash 与 history 路径差异验证通过");
 ```
 
 **这段脚本在做什么**
+
 - 初始 hash 路由下，`pathname` 仍然是根路径。
 - 断言 hash 内容是 `#/list`，服务器不会收到它。
 - 调用 `pushState` 后，`pathname` 变为真实路径 `/detail/42`。
@@ -851,6 +871,7 @@ function matchRoute(routes, pathname) {
 ```
 
 **这段代码在做什么**
+
 - `compilePath` 把 `:id` 替换为正则命名捕获组。
 - 命名捕获组的名字就是参数名，这里以 `id` 为例。
 - `^...$` 保证整段路径精确匹配。
@@ -887,6 +908,7 @@ class Router {
 ```
 
 **这段代码在做什么**
+
 - `beforeEach` 注册一个守卫函数。
 - `runGuards` 按注册顺序执行所有守卫。
 - 守卫接收 `to` 和 `from` 两个上下文。
@@ -934,6 +956,7 @@ export function createRouter({ routes, history }) {
 ```
 
 **这段代码在做什么**
+
 - `createRouter` 接收路由表和注入的 `history`，解耦浏览器对象。
 - `navigate` 先执行守卫，再改历史栈和地址。
 - 守卫失败时不改 `currentPath`，也不渲染。
@@ -1036,6 +1059,7 @@ console.log("SPA 路由器匹配、参数、守卫与 404 验证通过");
 ```
 
 **这段脚本在做什么**
+
 - `HistoryStub` 模拟 `pushState` 和 `location.pathname`。
 - 第一个守卫对非 `/login` 路径返回 `false`，验证阻止跳转。
 - 添加第二个始终放行的守卫后，验证成功跳转。
@@ -1120,6 +1144,7 @@ async function goToDetail(id) {
 ```
 
 **这段代码在做什么**
+
 - `navigation.navigate()` 发起一次导航。
 - 返回值带 `finished` 承诺，导航完成后兑现。
 - 本例子在进入详情前校验 `id` 是整数。
@@ -1147,6 +1172,7 @@ navigation.addEventListener("navigate", (event) => {
 ```
 
 **这段代码在做什么**
+
 - `navigate` 事件在导航发生前派发。
 - `event.intercept()` 接管导航，不会离开当前页面。
 - `handler()` 负责自定义拦截后的 UI 行为。
@@ -1171,6 +1197,7 @@ navigation.addEventListener("navigate", trackNavigation);
 ```
 
 **这段代码在做什么**
+
 - `currentEntry` 是当前导航条目，不是普通的 History 状态对象。
 - `key` 是会话内唯一标识，可用于缓存或追踪。
 - `url` 是当前地址。
@@ -1237,6 +1264,7 @@ console.log(calls.join(", "));
 ```
 
 **这段脚本在做什么**
+
 - `NavigationStub` 模拟 `navigate` 与 `addEventListener`。
 - 普通导航未拦截时更新 `currentEntry`。
 - 对 `/blocked` 调用 `intercept`，导航条目不更新。

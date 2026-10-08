@@ -542,6 +542,7 @@ React.lazy 接收一个返回 Promise 的函数，该 Promise 解析出含 defau
 **目标**：给一个含表格页与详情页的前端项目做按需加载与摇树改造，并在 Node 侧验证内部包的双格式导出。
 
 **步骤**：
+
 1. 用打包分析器记录改造前的首屏 JS 体积与完整 chunk 列表。
 2. 把详情页组件与导出功能改成 import() 动态加载，给每块写可读的 chunk 名。
 3. 给内部 UI 包补 exports 与 sideEffects 字段，分别为 import 与 require 各写一个消费 demo。
@@ -551,6 +552,7 @@ React.lazy 接收一个返回 Promise 的函数，该 Promise 解析出含 defau
 7. 把首屏体积阈值与环数量阈值写进 CI 脚本。
 
 **验收标准**：
+
 - 同一构建命令下，首屏 JS 字节数低于改造前，两份分析报告可复现。
 - 点击详情页入口与导出按钮时，Network 面板出现对应的独立 chunk 请求。
 - exports 字段的 import 与 require 两条路径各有一个 demo 能正常执行。

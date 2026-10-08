@@ -336,6 +336,7 @@ function bulkDelete() {
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录制"连续勾选 100 行"的过程，看总耗时、长任务个数与脚本时间。在代码里用 `performance.mark` 和 `performance.measure` 包住 `toggle`，读 `performance.getEntriesByName` 的时长分布（中位数与第 95 百分位）。
 
 **什么时候不该用**：
+
 - 选中数量固定在几十以内、且需要按"最后勾选的排最前"输出时，Set 只保留插入序，还要额外维护数组，不如直接用数组。
 - 需要把选中状态写入 localStorage 或发给后端时，Set 不能直接 `JSON.stringify`，转数组这一步必须显式写出来。
 - 表格需要按行内字段对选中集合排序展示时，排序前仍要转成数组，Set 不提供排序能力。
@@ -373,6 +374,7 @@ function derive(instance) {
 **怎么度量收益**：用 Chrome DevTools 的 Network 面板统计同一 URL 的请求条数，确认合并生效。用 Performance 面板看 FCP、LCP 与长任务；用 Memory 面板在跳转前后各拍一次堆快照，比较模块实例的保留数量。
 
 **什么时候不该用**：
+
 - 请求需要带上用户身份或一次性令牌时，复用别人的 Promise 会返回不属于当前用户的数据。
 - 结果需要跨实例共享并设置过期时间时，WeakMap 以实例为键做不到共享，应该用 Map 加上时间戳。
 - 需要给缓存做过期淘汰、容量上限或命中率上报时，WeakMap 不可枚举，这些指标无法从中读出。
@@ -414,6 +416,7 @@ function selectionBounds() {
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录制 10 秒连续拖拽，看每帧耗时与掉帧情况。在 `applyPatch` 与 `scheduleRender` 里各加一个计数，观察调用次数之比，确认合并生效。
 
 **什么时候不该用**：
+
 - 需要按 z 轴频繁重排图层时，Map 的插入序帮不上忙，要另外维护一个顺序数组。
 - 需要把状态持久化到 localStorage 或发给只接受 JSON 的接口时，Map 与 Set 都要手动转成数组或对象。
 - 图元数量只有几十个、且每帧本来就要全量重绘时，增量更新的复杂度换不来收益。
@@ -442,6 +445,7 @@ function selectionBounds() {
 **目标**：做一个"可搜索、可勾选、可批量导出"的本地数据面板，用 Set 管选中、Map 管数据、WeakMap 管实例级缓存，并用 DevTools 给出前后对比。
 
 **步骤**：
+
 1. 生成 5000 条本地数据，每条带唯一字符串 id，渲染成列表，先不做虚拟滚动。
 2. 用数组实现勾选与"全选/反选/清空"，用 `performance.mark` 与 `performance.measure` 记录连续勾选 200 次的总耗时。
 3. 改成 Set 存选中 id、Map 存 id 到数据，重复同一段测量，把两组读数写进 README。
@@ -451,6 +455,7 @@ function selectionBounds() {
 7. 用 Chrome DevTools 的 Performance 面板录制全选加搜索的过程，记录长任务个数。
 
 **验收标准**：
+
 - README 里有两组可复现的耗时读数，写明测量方法、操作步骤与运行环境。
 - 搜索、翻页、全选之后，勾选集合里的每个 id 都能在 Map 里取到对应数据。
 - 移出一批行后拍堆快照，确认这些行对应的派生对象没有被保留。

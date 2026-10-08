@@ -1462,6 +1462,7 @@ console.log('structured 块:', markdownChunkByHeading(md));
 **目标**：为一份 5000 字的中文 Markdown 教程实现三种切块器，并用评测集对比.
 
 **步骤**：
+
 1. 准备一篇至少 10 个二级标题的中文 Markdown 文档。
 2. 实现固定切块、递归切块、Markdown 结构感知切块。
 3. 准备 20 条带标注的查询，比如“如何配置端口”。
@@ -1469,6 +1470,7 @@ console.log('structured 块:', markdownChunkByHeading(md));
 5. 计算 recall@5 和 MRR。
 
 **验收标准**：
+
 - 三个切块器都能在 Node 20+ 运行。
 - 结构感知切块至少输出 10 个块，每个块以标题开头。
 - 评测脚本能输出三种策略的 recall@5 和 MRR 对比表。

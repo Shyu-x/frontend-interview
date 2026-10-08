@@ -37,6 +37,7 @@ CSRF（Cross-Site Request Forgery）利用用户已登录的身份，诱导用�
 ### 1.2 CSRF为什么能成功
 
 CSRF成立的两个前提：
+
 1. **浏览器自动携带Cookie**：符合HTTP规范，浏览器发往`bank.com`的请求会自动携带该域的Cookie
 2. **Cookie-based认证**：服务器只验证Cookie，不验证请求来源
 

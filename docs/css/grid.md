@@ -460,6 +460,7 @@ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录制首屏，比较改造前后 Layout 任务的耗时；用 Lighthouse 记录 CLS；用 PerformanceObserver 监听 layout-shift 条目，统计首屏内的偏移次数。
 
 **什么时候不该用**：
+
 - 万行表格的行不要做成网格项目，行数增长会让布局节点数量随之增长，行渲染交给虚拟滚动加普通表格行。
 - 只有一栏的移动端列表不要上 Grid，单列排列用块级流即可。
 - 行高需要随图片比例变化的瀑布流不要用固定 grid-template-rows，改用 auto-rows 或交给瀑布流脚本。
@@ -497,6 +498,7 @@ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 **怎么度量收益**：用 Lighthouse 记录 LCP 与 TBT；用 DevTools 的 Rendering 面板打开 Paint flashing 与 Frame Rendering Stats，滚动时看重绘范围；用 PerformanceObserver 监听 largest-contentful-paint，对比改造前后的取值。
 
 **什么时候不该用**：
+
 - 卡片宽度需要按图片原始比例变化时，等宽轨道不适用，改用 Flex 换行。
 - 目标浏览器不支持 content-visibility 时不要硬上，先核对兼容表，保留 contain 作为降级。
 - 首屏卡片总数不足一行时，跳过渲染带来的收益低于调试成本，去掉该属性。
@@ -536,6 +538,7 @@ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 **怎么度量收益**：用 DevTools 的 Performance 面板录制拖拽过程，看帧率曲线与 Layout 区段；用 requestAnimationFrame 采样帧间隔，统计超过 16.7ms（60Hz 下的单帧预算）的帧数量。
 
 **什么时候不该用**：
+
 - 画布内部的图形定位不要用 Grid，坐标交给 Canvas 2D 变换或 SVG 的 viewBox。
 - 屏幕上只有工具栏与画布两块时，用 Flex 单列布局足够，不必上 Grid。
 - 属性面板宽度需要随内容自适应的场景不要写死 280px，改成 max-content 加上限。
@@ -560,6 +563,7 @@ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 **目标**：做一个响应式后台页面，包含顶栏、侧栏、主区卡片阵列，并在三档宽度下通过检查。
 
 **步骤**：
+
 1. 写 HTML，用 header、aside、main、footer 四个语义标签，DOM 顺序按移动端阅读顺序排。
 2. 给容器写 grid-template-areas，桌面端为两列两行，侧栏在主区左侧。
 3. 主区用 repeat(auto-fill, minmax(160px, 1fr)) 加 gap 排卡片，卡片数量不少于 12 张。
@@ -569,6 +573,7 @@ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 7. 用 Lighthouse 跑一次，把 CLS 与 LCP 的取值和测量步骤写进 README。
 
 **验收标准**：
+
 - 三档宽度下无横向滚动条，卡片实际宽度不低于 160px。
 - 侧栏内容超长时只有侧栏滚动，页面滚动位置保持不变。
 - 窄屏下侧栏不占列，主区占满可用宽度。

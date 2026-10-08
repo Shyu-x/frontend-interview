@@ -53,11 +53,13 @@ Web安全本质是**在不可信的网络环境中构建可信的应用**。攻�
 | 事件系统 | 处理用户交互 |
 
 **约束：**
+
 - 只能通过 IPC 与浏览器主进程通信
 - 无法直接访问文件系统
 - 无法直接调用系统 API
 
 **Chrome 进程模型：**
+
 - Site Isolation：不同站点页面在独立进程中
 - 每个渲染进程沙箱化，即使 V8 被攻破也难以逃逸
 
@@ -353,6 +355,7 @@ Vary: Origin
 **目标**：在两个不同源的页面上完成一次安全的跨文档通信，并亲身验证 origin 校验、sandbox 与 `frame-ancestors` 各自拦住了什么。
 
 **步骤**：
+
 1. 建两个目录，分别用 `python3 -m http.server 8000` 和 `python3 -m http.server 8080` 启动，把它们当作两个源。
 2. 在 8000 的页面里放一个指向 8080 的 iframe，父页面注册 `message` 监听并对 `event.origin` 做白名单校验。
 3. 在 8080 的页面里，收到消息后只向 `http://localhost:8000` 回发一条确认消息。
@@ -362,6 +365,7 @@ Vary: Origin
 7. 记录每一步 Console 与 Network 面板的差异，整理成一页说明。
 
 **验收标准**：
+
 - 正常路径下父子页面各打印一条通过校验的日志，日志里的 `event.origin` 与预期字符串一致。
 - 白名单改成 `http://localhost:9999` 后，接收端的渲染函数不被调用，Console 出现自定义拒绝日志。
 - CSP 生效后，用 `127.0.0.1` 访问父页面时 iframe 拒绝加载，Console 出现 `frame-ancestors` 违规提示。

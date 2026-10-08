@@ -35,6 +35,7 @@ function defineReactive(obj, key, val) {
 ```
 
 缺陷：
+
 - **无法监听新增属性**：`Vue.set(obj, 'newProp', 1)` 变通方案
 - **无法监听删除**：`Vue.delete(obj, 'prop')` 变通方案
 - **数组下标**：Vue2.2+ 才支持通过索引设置（性能代价大）
@@ -206,6 +207,7 @@ const age = toRef(state, 'a') // age.value === state.a
 ```
 
 **原理简析**：
+
 - `ref` 内部创建了一个包裹对象，通过 `get value() / set value()` 拦截，当 value 是对象时内部调用 `reactive()` 处理。
 - `reactive` 直接返回 `new Proxy(target, ...)`。
 
@@ -288,6 +290,7 @@ stop() // 停止
 ```
 
 **选择策略**：
+
 - 需要旧值 → `watch`
 - 回调内明确知道依赖 → `watch`
 - 只需响应式状态副作用，不关心旧值 → `watchEffect`（更简洁）

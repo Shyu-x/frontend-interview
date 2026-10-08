@@ -76,6 +76,7 @@ function commonKernel(store, hasNext) {
 ```
 
 **这段代码在做什么**
+
 - store 是状态容器：pi 里是 agent.state，dsh 里是会话语义日志。
 - 四条语句对应四个阶段，任何一行都可以在真实实现中单独替换。
 - hasNext 对应后续第 6 节的循环终止决策点。
@@ -117,6 +118,7 @@ console.log('预期输出：', JSON.stringify(store.log));
 | 面试只背架构图，不讲数据怎么流 | 缺四阶段的具体数据流 | 按本节 run 函数的四条语句复述一遍 |
 
 **小结**：
+
 - 两个产品共享同一个 turn 循环，差异在实现与扩展方式。
 - 桩对象 store 就是最小 harness 的雏形。
 - 后面 8 个决策点都挂在这个循环的某一环上。
@@ -160,6 +162,7 @@ const messages = [
 ```
 
 **这段代码在做什么**
+
 - ui_notice 是应用自己声明的角色，模型不认识它。
 - 这三条是内部账本，不能原样发送。
 - 转换层要能识别并处理后两种而保留第一种。
@@ -175,6 +178,7 @@ function convertToLlm(msgs) {                  // 投影语义
 ```
 
 **这段代码在做什么**
+
 - allowed 集合固定了模型只认识的三种角色。
 - filter 做投影，不深拷贝内容，保持消息字段原样。
 - dsh 的 deriveMessages 做同类投影，输入是持久日志而非内存数组。
@@ -211,6 +215,7 @@ console.log('预期输出：只剩 user 与 assistant 两条');
 | 落库数组与请求数组混用一个 | 状态源和请求口径耦合 | 保持内部账本独立，请求前才投影 |
 
 **小结**：
+
 - 内外部消息分口径是 pi 和 dsh 的共同决定。
 - 转换层让自定义类型只活在应用侧，不污染模型。
 - dsh 的"模型可见意味着已落日志"是额外一层约束：先落盘，再投影。
@@ -253,6 +258,7 @@ console.log(state.messages.length); // 1
 ```
 
 **这段代码在做什么**
+
 - 赋值时先展开旧数组再拼新元素，这就是 pi 材料的"拷贝顶层数组"。
 - 读 state.messages 拿到的只是当前快照，没有历史分支。
 
@@ -275,6 +281,7 @@ console.log(pathOf(2), pathOf(3)); // ['root','b1'] ['root','b2']
 ```
 
 **这段代码在做什么**
+
 - pid 是父引用，对应 dsh 条目"refers to its parent"的字段。
 - 两个 add 从节点 1 分叉，日志天然支持树形历史。
 - pathOf 就是投影：输入节点 id，折叠出该路径的历史。
@@ -311,6 +318,7 @@ console.log('预期输出：两条分支共享 root、各自延伸一条消息')
 | 把摘要写回日志覆盖原文 | 没有区分遮蔽与原样保留 | dsh 的 compaction 插入 summary，原文仍在树中 |
 
 **小结**：
+
 - pi 选对象状态：同步读快照直接，代价是分支能力弱。
 - dsh 选追加日志：换来分叉、回放、持久化，代价是每个视图都要投影。
 - 面试要点：只要讲"可回放"，必然导向日志或树结构。
@@ -356,6 +364,7 @@ const agent = {
 ```
 
 **这段代码在做什么**
+
 - subscribe 只是往数组里推函数，对应 pi 的 Agent.subscribe。
 - emit 按注册顺序逐个 await，对应"listeners are awaited in registration order"。
 
@@ -376,6 +385,7 @@ function waterfall(middlewares) {
 ```
 
 **这段代码在做什么**
+
 - 每个中间件收到 req 和 next，这对应 dsh 的 waterfalls。
 - 不调用 next() 就停在中途，这正是 tools/pre-execute 等瀑布的语义。
 - 与第一步的单流相比，waterfall 多了一个"可否决"的能力。
@@ -409,6 +419,7 @@ console.log('预期输出：两个监听器按注册顺序执行');
 | 想从 live 增量推断已发送内容 | live 块是进程内增量，未落日志 | dsh 的 assistant/message 内嵌完整 compact 流 |
 
 **小结**：
+
 - pi 用单流：顺序固定、上手直接；dsh 用三域：durable、live、capability。
 - 持久事件负责回放，live 事件负责增量，职责分离。
 - 面试分开答两问：能不能回放，能不能拦截。
@@ -463,6 +474,7 @@ function pool(limit) {
 ```
 
 **这段代码在做什么**
+
 - limit 对应 maxParallelToolCalls，限制同时在跑的调用数。
 - 任务完成后释放位置并补跑，是最小并发池模式。
 
@@ -486,6 +498,7 @@ function plan(calls, isExclusive) {
 ```
 
 **这段代码在做什么**
+
 - 批内可并行，批间必须串行。
 - 排他调用单独成批，正是 dsh 的 exclusive 顺序屏障语义。
 - 每批再交给第一步的 pool 控制并发数。
@@ -528,6 +541,7 @@ console.log('预期输出：三个批次，notify 单独一批');
 | 全局并行但某工具总被串行 | 批次中含一个 sequential 就会整批串行 | 检查批内是否夹带着 sequential 调用 |
 
 **小结**：
+
 - pi 默认 parallel，dsh 默认 maxParallelToolCalls 为 10。
 - 两家都有"排他、串行"作为批次屏障。
 - 拦截钩子：pi 提供 beforeToolCall、afterToolCall；dsh 提供 tools 的 pre-execute、execute、post-execute 瀑布。
@@ -578,6 +592,7 @@ function schedule(finishTurn, alreadyHasNext) {
 ```
 
 **这段代码在做什么**
+
 - end 走立即停路径，continue 先检查是否已有触发源。
 - undefined 与"已满足的 continue"都落回 default。
 - alreadyHasNext 对应工具结果、steering、follow-up 已触发的既有调度。
@@ -593,6 +608,7 @@ function scheduleWithExit(stopReason, finishTurn, alreadyHasNext) {
 ```
 
 **这段代码在做什么**
+
 - 错误与中止直接硬退出，不看决策返回值。
 - 这对应 pi 材料"错误与中止响应保持硬退出，其决策被忽略"。
 
@@ -624,6 +640,7 @@ console.log('预期输出：四种组合的断言全部通过');
 | 想停但排队消息仍被处理 | 用了别的机制阻止调度 | 用 end，它在 turn_end 后立即收束 |
 
 **小结**：
+
 - 终止必须是一个可观测的决策点，不藏在循环深处。
 - 错误与中止是硬退出，continue 拉不回来。
 - dsh 的等价规则是：turn 在不再欠任何请求时关闭，turn-stopping 可提前停。
@@ -671,6 +688,7 @@ function createAgent(hooks) {
 ```
 
 **这段代码在做什么**
+
 - hooks 只是配置字段，宿主在固定时机调用指定字段。
 - 没写钩子就走默认路径，不加额外分支。
 
@@ -690,6 +708,7 @@ function unmount(key) {
 ```
 
 **这段代码在做什么**
+
 - 每个注册都有配对的清理函数，对应 Cordis 的可逆 effect。
 - unmount 调用清理并从注册表移除，防止二次注销。
 - 两类形态的差异落在"生命周期归谁"：钩子归宿主，插件归注册表。
@@ -722,6 +741,7 @@ console.log('预期输出：安装一次、清理一次');
 | 热更新后旧配置仍生效 | 旧 effect 未 unwind | 用注册表保证按登记逆序回滚 |
 
 **小结**：
+
 - pi 面向明确的定制点：钩子数量固定，宿主统一编排。
 - dsh 面向可组合产品：全部能力都是插件，一行配置可换掉一个模型适配器。
 - 面试落到一句判断：生命周期由宿主还是由注册表持有。
@@ -771,6 +791,7 @@ function claim(id) {
 ```
 
 **这段代码在做什么**
+
 - 插入给 id 并同步入数组，对应 inbox/spliced 的插入坐标。
 - claim 是纯删除，对应 dsh 的 agent/inbox/claimed。
 
@@ -786,6 +807,7 @@ function cancel(id) {
 ```
 
 **这段代码在做什么**
+
 - cancel 返回 outcome 与消息体，对应 agent/inbox/discarded。
 - 两种删除都走 splice 坐标，所以投影可以同步折叠同一套事件。
 
@@ -822,6 +844,7 @@ console.log('预期输出：认领与取消都从 inbox 删除，事件不同');
 | 投影里的 inbox 总慢半拍 | 没有在 append 返回前同步折叠 splice | 在 splice 事件提交时立即折叠投影 |
 
 **小结**：
+
 - 排队输入要有轨道与模式两层设计。
 - 认领用纯删除，普通删除带 outcome，两类事件分开。
 - 投影一致性靠事件提交即折叠，不靠定时刷新。
@@ -873,6 +896,7 @@ function freezeRequest(head) {
 ```
 
 **这段代码在做什么**
+
 - 深拷贝切断与原对象的引用，对应 dsh 冻结请求身份。
 - Object.freeze 让后续修改报错，强制请求不可变。
 
@@ -891,6 +915,7 @@ function onCancel(stream, toolCalls) {
 ```
 
 **这段代码在做什么**
+
 - 前缀保留用户已经看到的文本。
 - 未派发的工具调用补一个结果，防止后续请求缺配对历史。
 
@@ -922,6 +947,7 @@ console.log('预期输出：保留已交付前缀，补一个未派发结果');
 | 工具历史缺配对使模型困惑 | 未派发调用没有结果 | 补 ABORTED_BEFORE_DISPATCH 合成对 |
 
 **小结**：
+
 - 请求准备是每次请求的必经点：pi 用 prepareRequest，dsh 用 prepareCall。
 - 取消是协作式：已交付保留，未提交丢弃。
 - 未派发工具调用必须补合成结果，维持工具历史配对。
@@ -978,6 +1004,7 @@ function createStore(model, tools) {
 ```
 
 **这段代码在做什么**
+
 - messages 是内存账本，对应 pi 的 agent.state.messages。
 - derive 投影掉 internal 角色，对应 convertToLlm 的过滤语义。
 - model 与 tools 都是构造时注入，符合依赖注入。
@@ -999,6 +1026,7 @@ async function run(store, input) {
 ```
 
 **这段代码在做什么**
+
 - 用户消息先落库，再投影出模型可读历史。
 - 每次工具结果执行完就 append，下一轮模型一定看得到。
 - 这是 pi 与 dsh 共享的循环内核，不含任何产品专用扩展。
@@ -1052,6 +1080,7 @@ console.log('预期输出：用户、助手、工具结果三条消息依次落�
 | 拿桩模型当成品用 | 桩不校验任何 API 契约 | 换真实模型时保持 store.model 签名不变 |
 
 **小结**：
+
 - 约 40 行装得下 turn 循环、投影、工具分派、落库。
 - 这个子集与 pi、dsh 的关系是公共分母，不是替代品。
 - 面试可把它当白板起点，再逐个叠加 8 个决策点。
@@ -1108,6 +1137,7 @@ const outline = {
 ```
 
 **这段代码在做什么**
+
 - kernel 五个词就是白板上先画的循环。
 - decisions 前两项先引出数据流起点。
 
@@ -1123,6 +1153,7 @@ outline.crosscutting = ['persistence', 'security', 'observability'];
 ```
 
 **这段代码在做什么**
+
 - 8 个决策点对应第 2 到第 9 节。
 - 三个横切话题让答案落到工程落地上。
 - 每个决策点都用"两方案一取舍"回答，不背名词。
@@ -1151,6 +1182,7 @@ console.log('预期输出：八个决策点不重不漏');
 | 只给方案不给选型理由 | 没有具体维度的对比 | 按综合对比表的行给维度 |
 
 **小结**：
+
 - 框架顺序：公共内核、8 个决策点、三个横切话题。
 - 8 个决策点与本页第 2 到第 9 节一一对应。
 - 每个决策点用两方案加一个取舍回答，不背名次。
@@ -1343,10 +1375,13 @@ def dispatch(tool_calls, ctx):
 
 1. 第 1 步：在一个内部工具的批量操作里试点，只接只读工具与单行写工具。
 验收标准：用 40 行循环跑通一次真实任务，日志里能看到完整的 turn 与 step。
+
 2. 第 2 步：验证行为。固定输入跑 20 次，对照 `harness.tool.error_rate` 与人工确认次数。
 验收标准：没有一次越权写，所有终止都能在日志里找到原因。
+
 3. 第 3 步：推广到第二个团队。只改工具注册表与钩子函数，循环代码不动。
 验收标准：第二个团队接入时，循环文件的 diff 为空。
+
 4. 第 4 步：防回退。把"终止必须留痕""写操作必须过钩子""取消必须落终态"写成测试用例，进 CI。
 验收标准：任一用例失败则阻断合并。
 
@@ -1355,6 +1390,7 @@ def dispatch(tool_calls, ctx):
 **目标**：写一个能查本地文件并回答问题的 harness，覆盖请求、工具、日志、终止、取消。
 
 **步骤**
+
 1. 定工具接口：写出 `read_file` 与 `list_dir` 的名称、入参、出参、错误码。
 2. 定日志结构：写出 turn 级与 step 级事件的字段，含时间戳与序号。
 3. 写循环：请求由日志生成，工具串行执行，步数上限设为 10。
@@ -1364,6 +1400,7 @@ def dispatch(tool_calls, ctx):
 7. 跑三组输入：正常提问、工具报错、中途取消，各跑一遍并存档日志。
 
 **验收标准**
+
 1. 每份日志里有且只有一条终态事件（final、abort、wait_human 三者之一）。
 2. 工具报错时循环不崩，错误进日志且最终仍有终态事件。
 3. 取消后最后一条事件是 `aborted`，且没有后续模型调用。

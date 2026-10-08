@@ -32,6 +32,7 @@ XSS 能做的事:
 | DOM 型 XSS | 前端 JS 从 URL/DOM 读取恶意代码 | 不经过服务器，前端 JS 直接解析 | 危害较小 |
 
 **典型场景：**
+
 - 存储型：评论/帖子等用户生成内容
 - 反射型：搜索结果页面（URL 参数直接显示）
 - DOM 型：前端从 location.hash 读取内容
@@ -235,6 +236,7 @@ const dirty = '<p>Hello</p><script>alert(1)</script><img src=x onerror=alert(1)>
 ```
 
 DOMPurify的核心原理：
+
 1. 使用浏览器的`DOMParser`将HTML字符串解析为DOM节点树
 2. 遍历节点树，只保留白名单中的标签和属性
 3. 丢弃所有事件处理器属性（如`onerror`、`onclick`）

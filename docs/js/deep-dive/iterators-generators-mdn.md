@@ -1140,11 +1140,13 @@ for await (const row of fetchOrders(keyword, controller.signal)) { // 按需消�
 - 生成器实例只能完整迭代一次，别把它挂在组件状态里复用。
 
 **怎么度量收益**：
+
 - 指标：首屏可交互时间、长任务数量、JS 堆峰值。
 - 工具：Chrome DevTools Performance 面板、`PerformanceObserver` 的 `longtask`、`performance.memory`。
 - 测量：固定 Fast 3G 限速，滚动 30 秒，记录 Long Task 次数与 JS 堆峰值。
 
 **什么时候不该用**：
+
 - 总行数少于 200 且接口一次返回全部数据时，分页生成器增加状态。
 - 表格要求前端全量排序或全量聚合时，逐行 `yield` 拿不到完整数组。
 - 需要随机跳到第 9000 行而后端只支持游标分页时，生成器无法直接定位。
@@ -1184,11 +1186,13 @@ try {
 - 如果接口之间有依赖，先并发会拿到未就绪的数据，要改成串行。
 
 **怎么度量收益**：
+
 - 指标：LCP、白屏时间、TTFB。
 - 工具：`web-vitals`、Lighthouse 移动端节流、Chrome DevTools Network。
 - 测量：DevTools 设 Slow 4G + 4x CPU 降速，跑 10 次取 LCP 中位数。
 
 **什么时候不该用**：
+
 - 首屏布局必须等三个接口全部成功才能定高时，分片渲染会多次重排。
 - 接口 B 的请求参数依赖接口 A 返回的 token 时，不能先并发。
 - 页面要求首屏内容整体一次性出现在截图里时，分片交付会让截图不完整。
@@ -1229,11 +1233,13 @@ function run(gen) { // 极简调度器
 - 重试次数和退避公式写在生成器里，测试时替换 `waitAck` 即可。
 
 **怎么度量收益**：
+
 - 指标：操作端到端确认延迟 P95、重连后未确认操作数、残留定时器数量。
 - 工具：Chrome DevTools Network 的 Offline 开关、自建 counter、Sentry。
 - 测量：切 Offline 再恢复，记录队列从积压到清零的耗时。
 
 **什么时候不该用**：
+
 - 服务端已提供可靠有序队列和确认机制时，客户端不要再叠一层重试。
 - 单个操作体积大且需要二进制批处理时，逐条 `yield` 会增加调度开销。
 - 白板只允许单人编辑或冲突由服务端全权裁决时，本地协程重试没有收益。
@@ -1267,6 +1273,7 @@ async generator 作为 `pipeline` 的一环，下游慢时上游暂停。内存�
 **目标**：做一个“可取消的分页日志查看器”，支持关键词过滤和提前停止。
 
 **步骤**：
+
 1. 写 `async function* fetchLogs(query, signal)`，每页 50 条，逐条 `yield`。
 2. 写同步生成器 `mapLogs(it, fn)` 与 `filterLogs(it, pred)`，包成惰性管道。
 3. 写 `takeLogs(it, n)`，取够 n 条后调用 `it.return()`。
@@ -1276,6 +1283,7 @@ async generator 作为 `pipeline` 的一环，下游慢时上游暂停。内存�
 7. 写测试覆盖 `break`、`return`、`throw` 三条路径。
 
 **验收标准**：
+
 - 连续输入 5 个关键词，Network 面板没有旧请求处于 pending。
 - `takeLogs(10)` 只发起 1 次分页请求（每页 50 条）。
 - 提前 `break` 后，`finally` 中的清理日志恰好执行 1 次。

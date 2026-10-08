@@ -26,6 +26,7 @@ tags:
 **触发条件**：块容器（块级元素）内部**不包含**任何块级盒子，即全是行内盒子。
 
 **布局规则**：
+
 - 行内元素从左到右水平排列，超出一行自动换行
 - 每行生成一个 **Line Box（行盒）**，高度由内部实际高度最高的元素决定
 - 垂直方向的 `padding` / `margin` 不撑开 Line Box 高度
@@ -57,6 +58,7 @@ ASCII 布局图：
 **触发条件**：`display: grid` 或 `display: inline-grid`。
 
 **核心概念**：
+
 - **Grid Container（网格容器）**：设置了 `display: grid` 的元素
 - **Grid Lines（网格线）**：构成网格的水平和垂直线，从 1 开始编号
 - **Grid Tracks（网格轨道）**：两条相邻网格线之间的区域（行/列）
@@ -80,6 +82,7 @@ grid-template-rows: auto auto;        /* 两行自动高度 */
 **触发条件**：`display: flex` 或 `display: inline-flex`。
 
 **核心概念**：
+
 - **主轴（Main Axis）**：默认水平，从左到右
 - **交叉轴（Cross Axis）**：默认垂直，从上到下
 - **主轴起点/终点**：`main start` / `main end`
@@ -224,6 +227,7 @@ export function GridLayout() {
 **IFC** 是行内格式化上下文，由行内级元素（inline/inline-block）参与形成。
 
 **规则：**
+
 - 盒子水平排列
 - 垂直方向：baseline 对齐
 - 一行放不下时换行（受 `white-space` 影响）
@@ -279,6 +283,7 @@ row 1 / row 2 = 行1 / 行2
 ```
 
 **规则：**
+
 - 子元素变为 grid item
 - 按网格轨道（grid track）排列
 - 网格线（grid line）定义放置规则
@@ -337,6 +342,7 @@ row 1 / row 2 = 行1 / 行2
 **怎么度量收益**：Chrome DevTools Performance 面板录制滚动过程，看 Layout 与 Recalculate Style 的耗时；PerformanceObserver 订阅 `longtask` 统计滚动期间超过 50ms 的任务数；对比截图验证表头与首列是否始终在视口内。
 
 **什么时候不该用**：
+
 - 表格总行数在几十行以内，引入虚拟滚动只增加状态同步的负担。
 - 需要"打印整表"或"一键导出完整 DOM"时，虚拟滚动只渲染可视区，导出结果会缺行。
 
@@ -372,6 +378,7 @@ row 1 / row 2 = 行1 / 行2
 **怎么度量收益**：在 DevTools 控制台比较消息容器与每个气泡的 `scrollWidth` 和 `clientWidth`，溢出时前者大于后者；用 ResizeObserver 记录容器尺寸变化后是否仍有子元素溢出；Lighthouse 检查是否有横向滚动导致的可访问性问题。
 
 **什么时候不该用**：
+
 - 消息气泡需要按列等宽对齐（时间线式布局），此时用网格轨道而不是 Flexbox。
 - 内容都是短中文且不含长串，加 `min-width: 0` 会掩盖真实的溢出问题。
 
@@ -408,6 +415,7 @@ row 1 / row 2 = 行1 / 行2
 **怎么度量收益**：用 `getBoundingClientRect()` 记录同一段落粘贴前后的高度差；Chrome DevTools Performance 面板看粘贴操作引发的 Layout 次数；web-vitals 的 CLS 指标观察编辑区是否出现内容跳动。
 
 **什么时候不该用**：
+
 - 纯源码模式的 Markdown 编辑器，没有图文混排，调基线不会带来变化。
 - 以画布或 SVG 为主的编辑器，排版规则不由 IFC 决定。
 
@@ -440,6 +448,7 @@ row 1 / row 2 = 行1 / 行2
 **目标**：做一个能切三种格式化上下文的对照页面，用同一份内容观察 IFC、GFC、FFC 下的布局差异，并写出测量结论。
 
 **步骤**：
+
 1. 准备一份含长链接、长英文单词、中文长句、一张图片的样例内容。
 2. 用同一份 HTML 结构，分别写 IFC 版（默认 `display: block` 段落加行内元素）、GFC 版（`display: grid` 两列）、FFC 版（`display: flex` 横向排列）。
 3. 在 FFC 版中先不加 `min-width: 0`，记录气泡或卡片的 `scrollWidth` 与 `clientWidth`。
@@ -449,6 +458,7 @@ row 1 / row 2 = 行1 / 行2
 7. 在页面上写一块结论区，列出每个版本触发的现象、测量值和对应结论。
 
 **验收标准**：
+
 - 三种版本的截图能看出布局差异，且差异与代码里声明的 `display` 值对应。
 - FFC 版在加与不加 `min-width: 0` 两种情况下的 `scrollWidth` 差值与测量记录一致。
 - GFC 版在 320px 窗口宽度下不出现页面级横向滚动条。

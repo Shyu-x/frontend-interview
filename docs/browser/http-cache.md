@@ -215,6 +215,7 @@ HTTP 缓存由浏览器自动管理，遵循 HTTP 头指令。Service Worker 缓
 | 条件请求 | 发送 If-None-Match / If-Modified-Since | 服务端确认后返回 304 或新资源 |
 
 **决策树：**
+
 1. HTTP 响应到达浏览器
 2. 检查强缓存（Cache-Control / Expires）→ 命中直接返回 200 OK
 3. 未命中则检查协商缓存（ETag / Last-Modified）

@@ -60,6 +60,7 @@ React渲染流程:
 ```
 
 **虚拟DOM的优势：**
+
 1. 跨平台: React Native用同一套虚拟DOM渲染原生组件
 2. 声明式: 开发体验好,无需手动追踪更新
 3. 批量更新: 多个setState只触发一次渲染
@@ -116,6 +117,7 @@ function FiberNode(tag, pendingProps, key, mode) {
 | 切换 | 构建完成后 alternate 指针切换，current = workInProgress（原子性替换） |
 
 **Fiber 双缓冲优势：**
+
 1. 屏幕上始终展示完整的旧树，没有半成品状态
 2. 新树构建完成后再一次性替换，更新原子化
 3. 通过 `alternate` 指针实现 O(1) 的树切换
@@ -147,6 +149,7 @@ function performUnitOfWork(fiber) {
 ```
 
 **Fiber双缓冲优势：**
+
 1. 屏幕上始终展示完整的旧树，没有半成品状态
 2. 新树构建完成后再一次性替换，更新原子化
 3. 通过`alternate`指针实现O(1)的树切换
@@ -164,6 +167,7 @@ React Diff是Fiber架构的"协调"阶段，通过比较新旧虚拟DOM树找出
 | Element Diff | 通过 key 标记稳定元素，支持移动/新增/删除 |
 
 **React Diff 三大核心前提：**
+
 1. Web DOM 节点跨层级操作很少（tree diff 用 O(n) 算法）
 2. 不同类型的元素产生不同树（component diff）
 3. 通过 key 标记稳定元素（element diff）
@@ -241,11 +245,13 @@ keys: 1(A),2(B),3(C) → 1(A),3(C),2(B)
 | IdleLane | 空闲最低 |
 
 **位运算优势：**
+
 - `lanes = laneA | laneB`：标记多个优先级
 - `(lanes & lane) > 0`：冲突检测
 - `lanes &= ~lane`：清除已处理车道
 
 **调度流程：**
+
 1. setState() 分配 lane → root.pendingLanes
 2. scheduler.scheduleCallback(priority, callback)
 3. 等待主线程空闲时执行
@@ -434,6 +440,7 @@ return <Toolbar onUndo={() => setVersion((v) => v + 1)} />;
 **目标**：做一个行数可调的列表页，用实测数据说明 key 的选择和窗口化各自影响哪一段耗时。
 
 **步骤**：
+
 1. 搭一个 React 页面，数据用本地生成的 1 万行对象，每行带稳定 id 与几个数值字段。
 2. 每行放一个受控输入框，用来观察排序后状态是否错位。
 3. 第一版用 index 作 key，分别做顶部插入一行、按某列倒序、删除中间一行，记录每次 commit 时长。
@@ -443,6 +450,7 @@ return <Toolbar onUndo={() => setVersion((v) => v + 1)} />;
 7. 写一页结论，说明哪一步带来的变化最大，以及在什么条件下不值得引入窗口化。
 
 **验收标准**：
+
 - 三组操作在 index 与 id 两种 key 下的 commit 时长都有记录。
 - 能指出输入框内容错位出现在哪一组操作里，并说明与 key 的关系。
 - 总行数从 1 万改到 10 万时，窗口化版本的 commit 时长不随总行数成比例增长。

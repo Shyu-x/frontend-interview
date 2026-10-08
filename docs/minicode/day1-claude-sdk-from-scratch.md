@@ -76,6 +76,7 @@ type ClaudeClient struct {
 ```
 
 **这段代码在做什么**
+
 - baseUrl 统一保存服务地址，后续拼接 /v1/messages。
 - apiKey 小写私有，避免被包外直接读取。
 - httpClient 复用连接，避免每次请求重新建连。
@@ -98,6 +99,7 @@ func NewClient(baseurl string, apikey string) (*ClaudeClient, error) {
 ```
 
 **这段代码在做什么**
+
 - 两个 HasPrefix 判断覆盖 http 与 https 协议。
 - 不合法地址在构造阶段直接报错，不让它进入请求阶段。
 - resty.New() 创建可复用的 HTTP 客户端。
@@ -136,6 +138,7 @@ client init ok
 | API key 被打印到日志 | 字段导出或日志打印整个结构体 | 保持小写私有，日志只打印字段名不打印值 |
 
 **用在哪里**：
+
 - 业务背景：一个内部工单系统要接入 Claude 做摘要，但团队不想引入官方 SDK 的额外依赖。
 - 这一节的知识怎么用：用 fetch 或轻量 HTTP 客户端保存 baseUrl 与 apiKey，自己封装 NewClient；校验前置让配置错误在启动时暴露。
 - 用什么指标衡量收益：启动配置错误率从请求时发现提前到启动时发现；依赖数量保持不变。
@@ -147,11 +150,13 @@ client init ok
 - 什么时候不该用：真实生产直接推裸客户端而不做错误恢复与类型生成。
 
 **行业实践**：
+
 - 公开可查做法：Anthropic 官方 SDK 把 baseURL、apiKey、authToken 等配置集中在 ClientOptions，并在请求前做配置合并。出处：Anthropic SDK 官方文档，章节 Setup 与 Client Options。
 - 公开可查做法：官方 SDK 文档建议不要在客户端代码里硬编码 API key，改用环境变量。出处：Anthropic SDK 官方文档，章节 Setup。
 - 怎么借鉴到你的项目：你的 ClientOptions 里保留 baseUrl、apiKey、maxRetries 三个字段，NewClient 先合并默认值再校验；apiKey 从环境变量读取，不落入版本库。
 
 **小结**：
+
 1. 客户端最小状态是 baseUrl、apiKey、httpClient 三件事。
 2. 地址校验要在最前面，错误越早暴露成本越低。
 3. 官方 SDK 的价值在请求外保障，协议本身可以用 fetch 复现。
@@ -205,6 +210,7 @@ type SingleStringMessage string
 ```
 
 **这段代码在做什么**
+
 - Message 用 any 接受单字符串或内容块数组，避免为 17 种 content 类型建 17 个字段。
 - 角色用常量，避免调用方手滑写错大小写。
 - SingleStringMessage 处理最简单的纯文本消息。
@@ -236,6 +242,7 @@ type ToolUseBlock struct {
 ```
 
 **这段代码在做什么**
+
 - system 用 omitempty，不传 system 时该字段不序列化。
 - Stream 为 false 时返回一次性 JSON，为 true 时返回 SSE。
 - TextBlock 的 Text 是非流式最终文本，流式时由多个 delta 拼接。
@@ -264,6 +271,7 @@ type Usage struct {
 ```
 
 **这段代码在做什么**
+
 - Content 数组是非流式下的完整内容块列表。
 - StopReason 表示结束原因，如 end_turn 或 tool_use。
 - Usage 包含输入与输出 token 数，调用方可后置记账。
@@ -303,6 +311,7 @@ message shape ok
 | role 写了 system 或 tool 导致 400 | Messages API 只允许 user 与 assistant | 用常量约束 role |
 
 **用在哪里**：
+
 - 业务背景：一个客服机器人需要把多轮对话和一段系统提示发给模型。
 - 这一节的知识怎么用：请求体顶层放 system，messages 数组只放 user 与 assistant。
 - 用什么指标衡量收益：400 错误占比下降；对话轮数可扩展到 10 轮以上不因结构错误失败。
@@ -314,11 +323,13 @@ message shape ok
 - 什么时候不该用：对超大 content 做全量 JSON.stringify 展示，性能会随内容线性下降。
 
 **行业实践**：
+
 - 公开可查做法：Anthropic Messages API 文档明确 system 为顶层参数，role 仅 user 与 assistant。出处：Claude API Reference，章节 Create a Message 与 Body parameters。
 - 公开可查做法：Anthropic 官方 SDK 用 TypeScript 联合类型区分 TextBlock、ToolUseBlock 等 block。出处：Anthropic SDK 官方文档，章节 Messages。
 - 怎么借鉴到你的项目：在 TypeScript 中用联合类型 `type Role = 'user' | 'assistant'` 直接排除非法角色，block 也用 `type` 字段联合收窄。
 
 **小结**：
+
 1. system 在请求体顶层，messages 的 role 只有 user 与 assistant。
 2. content 用 any 或联合类型，是兼容 17 种类型的关键。
 3. 内容块 type 是后续解析分支的开关。
@@ -390,6 +401,7 @@ func frontCall(httpClient *resty.Client, inBaseUrl string, apiKey string,
 ```
 
 **这段代码在做什么**
+
 - baseurl 末尾无 / 时补一个，避免拼接出错误路径。
 - body 里只在 tools 非空时才写入 Tools。
 - 非流式用 SetResult 自动把 JSON 解析到 CallResponse。
@@ -433,6 +445,7 @@ for _, item := range res.Content {
 ```
 
 **这段代码在做什么**
+
 - 先把 interface{} 断言成 map，失败说明响应格式与预期不一致。
 - 再取 type 字段判断内容块类型。
 - text 分支创建 TextBlock。
@@ -477,6 +490,7 @@ call parse ok
 | content 字段为空 | 代理层返回了非 200 但被无视 | 在 frontCall 先判断状态码 |
 
 **用在哪里**：
+
 - 业务背景：一个代码审查机器人要把模型的完整回复写入评论。
 - 这一节的知识怎么用：用 Call 拿完整 text，再写入 GitHub 评论，不需要流式槽位。
 - 用什么指标衡量收益：评论写入成功率达到 99% 以上（需以你项目实测为准）；响应解析错误率下降。
@@ -488,11 +502,13 @@ call parse ok
 - 什么时候不该用：100 条并发过高会触发限流，需要设置并发上限。
 
 **行业实践**：
+
 - 公开可查做法：Anthropic SDK 对非流式响应直接用类型化模型解析 content，并暴露 .content 数组。出处：Anthropic SDK 官方文档，章节 Messages 与 Streaming。
 - 公开可查做法：Messages API 返回的 stop_reason 可用于判断是否发生了工具调用或 token 超限。出处：Claude API Reference，章节 Create a Message 返回字段。
 - 怎么借鉴到你的项目：你的 parseContent 返回强类型联合，而不是 any；未知 type 抛错，方便调试。
 
 **小结**：
+
 1. Call 的核心是 frontCall 发请求加遍历 content 分支解析。
 2. 非流式适合一次性任务，流式适合交互型展示。
 3. 未知 type 要显式报错，不要吞掉。
@@ -559,6 +575,7 @@ for {
 ```
 
 **这段代码在做什么**
+
 - ReadString('\n') 一次读一行，避免整包读进内存。
 - EOF 是正常终止，break 后交给 finalize。
 - 空行跳过，SSE 用空行分隔事件块。
@@ -618,6 +635,7 @@ case "content_block_delta":
 ```
 
 **这段代码在做什么**
+
 - content_block_start 负责新建一个消息并挂上空内容块。
 - text 增量用字符串加法实现拼接。
 - tool_use 的增量在 stream 阶段是 PartialJson，不是 Input。
@@ -644,6 +662,7 @@ for i := 0; i < len(resMessages); i++ {
 ```
 
 **这段代码在做什么**
+
 - 流式结束时才把 PartialJson 转成 Input。
 - 用 reflect.TypeOf 判断块类型，避免 type switch 误判。
 - 解析失败返回专门错误，不静默留空。
@@ -691,6 +710,7 @@ sse parse ok
 | PartialJson 转 Input 失败 | 流在 JSON 中间被中断 | 读取完整流后再解析，解析失败重试请求 |
 
 **用在哪里**：
+
 - 业务背景：一个网页聊天框需要打字机效果，用户看到字一个个出来。
 - 这一节的知识怎么用：用 CallStream 每次把 delta.text 回调给界面，界面立即更新最后一行的文字。
 - 用什么指标衡量收益：首字出现时间缩短；感知等待低于固定阈值。
@@ -702,11 +722,13 @@ sse parse ok
 - 什么时候不该用：需要严格完整包做签名校验的存档，不应边写边归档。
 
 **行业实践**：
+
 - 公开可查做法：Anthropic SDK 支持流式事件，message_delta 事件携带 usage 增量。出处：Anthropic SDK 官方文档，章节 Streaming 与 Message events。
 - 公开可查做法：官方文档把流式事件顺序定义为 message_start、content_block_start、content_block_delta、content_block_stop、message_delta、message_stop。出处：Claude API Reference，章节流式 Events。
 - 怎么借鉴到你的项目：你的解析器把 message_start 的 usage 单独保存，message_delta 时更新输出 token 数，避免到最后一刻才拿到用量。
 
 **小结**：
+
 1. SSE 解析用逐行读加 data 前缀判断。
 2. start 新建块，delta 拼增量，EOF 结束读取后统一 finalize。
 3. tool_use 在流式阶段用 PartialJson 传递，解析后才能执行。
@@ -765,6 +787,7 @@ type ToolPropertyDetail struct {
 ```
 
 **这段代码在做什么**
+
 - Name 与 Description 是模型挑选工具的依据。
 - InputSchema 使用对象类型，匹配官方要求的工具参数根节点。
 - Required 列出必填参数，让模型知道哪些不能缺。
@@ -798,6 +821,7 @@ func NewTool(name string, description string,
 ```
 
 **这段代码在做什么**
+
 - name 与 description 为空时立刻返回错误。
 - InputSchema 的 Type 固定为 object。
 - properties 与 required 从调用方传入，保持定义可控。
@@ -838,6 +862,7 @@ func toolCall(tools []Tool, messages []Message, resMessages []Message) (bool, []
 ```
 
 **这段代码在做什么**
+
 - continueFlag 表示还有工具要执行。
 - 用 Name 在 tools 里找对应函数。
 - 执行函数拿 Input map，返回字符串。
@@ -875,6 +900,7 @@ func (c *ClaudeClient) CallTools(model string, system string, messages []Message
 ```
 
 **这段代码在做什么**
+
 - for 循环没有显式最大次数，生产代码需要补 maxIterations 等保护（本站提醒）。
 - 每次 Call 返回的 assistant 消息写入 messages，保持多轮上下文。
 - toolCall 执行后返回 tool_result，写入 messages。
@@ -937,6 +963,7 @@ tool loop ok
 | 重复执行工具 | 同一 tool_use 被处理两次 | 在 toolCall 中把已处理的 id 放到 visited 集合 |
 
 **用在哪里**：
+
 - 业务背景：一个智能客服需要查订单并退款，涉及两个工具先后调用。
 - 这一节的知识怎么用：先定义 get_order 与 refund 两个 Tool，再交给模型，CallTools 会串起两次工具调用。
 - 用什么指标衡量收益：单次会话工具调用成功率；用户问题一次解决率。
@@ -948,11 +975,13 @@ tool loop ok
 - 什么时候不该用：如果步骤顺序固定且无分支，直接写固定代码即可，不需要模型规划工具调用。
 
 **行业实践**：
+
 - 公开可查做法：Anthropic 官方工具循环示例中，assistant 的 tool_use 后必须跟 user 的 tool_result，然后继续生成 assistant 文本。出处：Anthropic Claude 官方工具文档，章节 Direct tool use。
 - 公开可查做法：Anthropic 官方工具文档建议工具描述用词精确，并给参数写正例。出处：Anthropic Claude 官方工具文档，章节 Best practices。
 - 怎么借鉴到你的项目：在你的循环里，每轮先把 tool_result 拼回，再发下一次请求；不要漏掉 user 角色。工具库限制在业务必须的 3 到 8 个。
 
 **小结**：
+
 1. CallTools 的核心是「请求、执行、拼回、再请求」的循环。
 2. tool_result 的 role 必须是 user，ToolUseID 必须唯一关联。
 3. 生产代码要加最大迭代次数与工具白名单。
@@ -1000,6 +1029,7 @@ type CallError struct {
 ```
 
 **这段代码在做什么**
+
 - 外层 error 对象包含 type 和 message。
 - Type 表示错误类别，如 bad_request。
 - Message 是人类可读的错误原因。
@@ -1020,6 +1050,7 @@ return res, httpRes, err
 ```
 
 **这段代码在做什么**
+
 - StatusCode 不等于 200 就进入错误分支。
 - io.ReadAll 一次性读完 body，确保不残留。
 - defer 关闭 body 释放连接。
@@ -1066,6 +1097,7 @@ http error ok
 | 网络层错误与 HTTP 错误混在一起 | 没有区分 err 与 statusCode | 先判 statusCode，再判 transport error |
 
 **用在哪里**：
+
 - 业务背景：一个计费系统在用户额度不足时，API 返回 429，前端需要提示用户并引导升级。
 - 这一节的知识怎么用：解析错误 body 里的 message，前端根据 type 分类展示提示。
 - 用什么指标衡量收益：用户从 429 到升级页的转化率；错误提示准确率。
@@ -1077,11 +1109,13 @@ http error ok
 - 什么时候不该用：生产环境对外展示 body 可能泄露敏感信息，需要脱敏。
 
 **行业实践**：
+
 - 公开可查做法：Anthropic 错误响应使用 error.type 与 error.message。出处：Anthropic Claude API Reference，章节 Errors。
 - 公开可查做法：Anthropic SDK 区分 APIError 与网络错误，APIError 带 status 字段。出处：Anthropic SDK 官方文档，章节 Error handling。
 - 怎么借鉴到你的项目：你的错误对象同时保留 status、type、message 三字段，网络错误 status 置 0 或 null。
 
 **小结**：
+
 1. HTTP 错误要读 body 的 error.message，不能只看状态码。
 2. 网络层错误与 HTTP 层错误要分开。
 3. 错误对象要保留原始 body 摘要，方便排查。
@@ -1138,6 +1172,7 @@ type Tool = {
 ```
 
 **这段代码在做什么**
+
 - Role 联合类型只允许 user 与 assistant。
 - ContentBlock 用字面量 type 字段做 tagged union。
 - tool_use 的 input 是结构化对象，tool_result 的 content 是字符串。
@@ -1175,6 +1210,7 @@ async function call(model: string, system: string, messages: Message[], tools: T
 ```
 
 **这段代码在做什么**
+
 - fetch 直接调用 Messages API。
 - tools 序列化时用解构除去 fn，避免 400。
 - fetch 返回 body 不一定按预期类型，用 as 显式断言。
@@ -1214,6 +1250,7 @@ async function parseSse(res: Response, blocks: ContentBlock[], onDelta: (text: s
 ```
 
 **这段代码在做什么**
+
 - getReader 与 TextDecoder 处理流式 body。
 - buffer 按行切割，最后一段不完整时留在 buffer 里。
 - data: 前缀判断与前文 Go 版一致。
@@ -1246,6 +1283,7 @@ async function runToolsLoop(model: string, system: string, messages: Message[], 
 ```
 
 **这段代码在做什么**
+
 - for 循环限制为 10 次，防止无限工具调用。
 - call 返回 blocks 与 error，error 抛给上层。
 - assistant 消息先拼回，再执行工具。
@@ -1311,6 +1349,7 @@ sse fake server ok
 | SSE 解析行不完整 | 网络包把一行拆成两半后直接 split | 保留 buffer 最后一段，下轮继续拼接 |
 
 **用在哪里**：
+
 - 业务背景：你要在浏览器里跑一个纯前端的 Claude 调试面板。
 - 这一节的知识怎么用：用 fetch 与 read 流写 parseSse，把打字机效果画在 textarea。
 - 用什么指标衡量收益：首屏响应时间；用户输入到看见第一个字的等待时间。
@@ -1322,11 +1361,13 @@ sse fake server ok
 - 什么时候不该用：面试只问 fetch 基础，不需要展开工具循环。
 
 **行业实践**：
+
 - 公开可查做法：Anthropic 官方 SDK 在流式解析中同时监听 text、thinking、tool_use 三类 delta。出处：Anthropic SDK 官方文档，章节 Streaming。
 - 公开可查做法：官方 Messages API 要求带 anthropic-version 头，当前版本以官方文档为准。出处：Claude API Reference，章节 Headers。
 - 怎么借鉴到你的项目：你的 fetch 请求头里固定写 anthropic-version 与 content-type，并用解构排除本地函数字段。
 
 **小结**：
+
 1. TypeScript 版用 tagged union 表达内容块，用 fetch 发请求。
 2. SSE 解析保留 buffer 最后一段，处理跨网络包的半行。
 3. 工具循环要限制最大迭代次数，防止成本失控。
@@ -1349,6 +1390,7 @@ sse fake server ok
 **目标**：写一个 TypeScript 的最小 ClaudeMessages 客户端，包含 `call`、`callStream`、`runToolsLoop` 三个函数，并用假服务器验证工具循环。
 
 **步骤**：
+
 1. 定义 `Role`、`ContentBlock`、`Message`、`Tool` 四个类型。
 2. 实现 `call`，用 fetch 发非流式请求，解析 text 与 tool_use。
 3. 实现 `callStream`，保留 buffer 尾段，按 data: 行解析 text 增量。
@@ -1356,6 +1398,7 @@ sse fake server ok
 5. 写一个 node:http 假服务器，第一次返回 tool_use，第二次返回 text，用断言验证最终 text。
 
 **验收标准**：
+
 - `call` 能把假响应解析为 `{ type: 'text', text: '你好' }` 数组。
 - `callStream` 能把假 SSE 字节流解析为完整 text，断言 `text === '你好世界'`。
 - `runToolsLoop` 能跑通「用户提问 → tool_use → tool_result → 最终 text」。

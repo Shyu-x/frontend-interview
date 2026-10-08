@@ -86,6 +86,7 @@ console.log(FRAME_MS.toFixed(2), JS_BUDGET_MS.toFixed(2));
 ```
 
 **这段代码在做什么**
+
 - 1000 除以 60 得到 16.67 毫秒，这是两次屏幕刷新之间的间隔。
 - 6、2、3 是浏览器渲染管线在每帧要花掉的固定开销，加起来 11 毫秒。
 - 相减得到 5.67 毫秒，这就是这一帧里 JavaScript 的安全上限。
@@ -111,6 +112,7 @@ console.log(totalMs, droppedFrames);
 ```
 
 **这段代码在做什么**
+
 - 0.05 乘 3000 等于 150 毫秒，这段计算期间主线程没有空档。
 - 150 除以 16.67 约等于 9，说明用户会看到约 9 帧没有更新。
 - 关键不是 150 这个数字，而是它超过了 5.67 毫秒的预算且无处让出。
@@ -166,6 +168,7 @@ JS 预算 5.67 毫秒
 | 认为切成 5 毫秒就一定不卡 | 单次任务体量仍然超过预算 | 检查每个切片内的实际工作量 |
 
 **小结**
+
 - 一帧 16.67 毫秒，浏览器自己要用掉约 11 毫秒，JavaScript 预算约 5.67 毫秒。
 - 递归 reconcile 在 3000 个节点上耗时 150 毫秒，期间主线程无法交出。
 - 解决办法不是让计算更快，而是给计算增加可中断的边界。
@@ -232,6 +235,7 @@ function createFiber(type, props, key) {
 ```
 
 **这段代码在做什么**
+
 - tag 用数字区分节点种类，这里只用到 0 和 5 两个值。
 - type 存组件函数或标签名，比对时用它判断节点能否复用。
 - key 存列表身份，同层比对时先看 key 再看 type。
@@ -256,6 +260,7 @@ console.log(ul.child.type, ul.child.sibling.type, liA.return.type);
 ```
 
 **这段代码在做什么**
+
 - root.child 指向 ul，同时 ul.return 指回 root，这两个字段必须成对写。
 - ul.child 指向第一个子节点 liA，第二个子节点不出现在 child 里。
 - liA.sibling 指向 liB，这是找到同层第二个节点的唯一路径。
@@ -320,6 +325,7 @@ Fiber 字段检查通过
 | 节点建完就被回收 | 局部变量建完没挂到根节点 | 从 root 一路可达，节点才不会被回收 |
 
 **小结**
+
 - Fiber 把递归调用栈变成堆内存里的对象图，机器的栈不再参与遍历。
 - child、sibling、return 三个指针定义了一棵树的深度优先顺序。
 - flags 与 lanes 用整数位掩码存储，读写成本低。
@@ -381,6 +387,7 @@ function createWorkInProgress(current, pendingProps) {
 ```
 
 **这段代码在做什么**
+
 - 先读 current.alternate，有就复用，避免每次渲染都新建对象。
 - 没有 alternate 时新建节点，并把两个方向的 alternate 都写全。
 - 复用分支里重置 flags，上一轮记录的副作用不能带到这一轮。
@@ -403,6 +410,7 @@ function commitRoot(root) {
 ```
 
 **这段代码在做什么**
+
 - root.current.alternate 就是本轮构建出来的 workInProgress 根节点。
 - 交换指针只改一个字段，整棵树的身份在同一时刻完成切换。
 - 交换之后，旧树自动成为下一轮的 alternate 容器。
@@ -464,6 +472,7 @@ console.log('双缓冲指针检查通过');
 | 恢复后从根节点重来 | 没有复用 child 线索 | 创建时把 wip.child 指向 current.child |
 
 **小结**
+
 - 双缓冲让"构建一半"和"屏幕上显示"互不干扰。
 - alternate 是复用单位，保证同一组件的 Fiber 对象数量有上界。
 - 提交只需要一次指针交换，成本与树的大小无关。
@@ -527,6 +536,7 @@ function beginWork(fiber) {
 ```
 
 **这段代码在做什么**
+
 - pendingProps 是本次要渲染的属性，memoizedProps 是上一次渲染的属性。
 - 两者不等就按位或上 Update 位，表示这个节点有副作用要做。
 - 返回 fiber.child，没有子节点时返回 null，驱动进入向上阶段。
@@ -546,6 +556,7 @@ function completeWork(fiber) {
 ```
 
 **这段代码在做什么**
+
 - 向上阶段每个节点只执行一次，顺序正好是向下阶段的镜像。
 - 记录 type 是为了在验证脚本里断言顺序。
 - flags 的冒泡发生在这一步，子节点的副作用要合并到父节点。
@@ -583,6 +594,7 @@ function completeUnitOfWork(unit) {
 ```
 
 **这段代码在做什么**
+
 - performUnitOfWork 是向下与向上的分叉点。
 - memoizedProps 在向下阶段结束后立刻更新，保证属性只比对一次。
 - completeUnitOfWork 用 while 沿 return 一路向上，直到遇到有兄弟的节点。
@@ -664,6 +676,7 @@ console.log('向上顺序', completedOrder.join(' '));
 | 副作用丢失 | 子节点的 flags 没有冒泡到父节点 | 在 completeWork 里把子节点 flags 按位或给父节点 |
 
 **小结**
+
 - 遍历分两个阶段：向下做 beginWork，向上做 completeWork。
 - 每个节点被访问两次，顺序固定，可以预测。
 - 中断发生在两次访问之间的任意位置，靠 workInProgress 记录断点。
@@ -729,6 +742,7 @@ function shouldYield() {
 ```
 
 **这段代码在做什么**
+
 - deadline 是一个绝对时刻，不是剩余毫秒数，比较时不用做减法。
 - startSlice 在每个时间片开头调用一次，把截止时刻往后推 5 毫秒。
 - shouldYield 用大于等于判断，时间刚好到点也算用完。
@@ -751,6 +765,7 @@ function workLoopConcurrent() {
 ```
 
 **这段代码在做什么**
+
 - 循环条件先判断还有没有节点，再判断时间片是否用完。
 - performUnitOfWork 内部会根据遍历结果推进 workInProgress。
 - 退出循环时不做清理，断点信息完整保留。
@@ -772,6 +787,7 @@ function driveToCompletion() {
 ```
 
 **这段代码在做什么**
+
 - 外层 while 对应真实环境里 Scheduler 反复排宏任务的过程。
 - 每次循环重新调用 startSlice，把 deadline 往后推。
 - workLoopConcurrent 可能一次就做完，也可能只处理一个节点。
@@ -847,6 +863,7 @@ console.log('访问顺序', visited.join(' '), '时间片数量', slices);
 | 恢复后重复处理节点 | 中断前没有推进 workInProgress | 在 performUnitOfWork 里先推进指针再返回 |
 
 **小结**
+
 - 可中断的关键是把断点放在堆内存的变量里，而不是引擎的调用栈里。
 - shouldYield 每处理一个节点检查一次，粒度越细中断越及时。
 - 一套 workInProgress 指针加一棵 Fiber 树，就能表达任意位置的断点。
@@ -923,6 +940,7 @@ function expirationTimeFor(priority, now) {
 ```
 
 **这段代码在做什么**
+
 - 优先级用 1 到 5 表示，数字小的对应更紧急的交互。
 - ImmediatePriority 的过期时间是 -1，在堆里永远排最前。
 - 其余优先级用当前时刻加超时毫秒数，超时越长越不急。
@@ -955,6 +973,7 @@ class MinHeap {
 ```
 
 **这段代码在做什么**
+
 - 数组第一个元素是堆顶，不用额外保存指针。
 - push 先放到数组末尾，再让新元素向上冒泡。
 - 父节点下标用右移一位计算，等价于除以 2 取整。
@@ -993,6 +1012,7 @@ bubbleDown(i) {
 ```
 
 **这段代码在做什么**
+
 - pop 先保存堆顶，再把末尾元素移到堆顶位置。
 - 末尾元素移到根后堆序被破坏，需要向下调整。
 - 每次比较左右孩子，挑出较小的那个。
@@ -1067,6 +1087,7 @@ console.log('最小堆弹出顺序正确');
 | 空闲任务一直排在最前 | IdlePriority 的过期时间设得太小 | 用 1073741823 表示几乎不过期 |
 
 **小结**
+
 - 最小堆让取堆顶的代价与任务数量无关。
 - expirationTime 把优先级翻译成一个可比较的数字。
 - 过期时间小于当前时间的任务会被强制执行，避免饿死。
@@ -1138,6 +1159,7 @@ function requestHostCallback(cb) {
 ```
 
 **这段代码在做什么**
+
 - port2.postMessage 发出的消息由 port1.onmessage 接收，方向由创建时决定。
 - isScheduled 防止同一个时间片内重复排队。
 - 回调取走后把局部变量清空，避免重复执行。
@@ -1158,6 +1180,7 @@ setTimeout(() => console.log(order.join(' ')), 20);
 ```
 
 **这段代码在做什么**
+
 - postMessage 把 onmessage 排进宏任务队列。
 - Promise.then 把回调排进微任务队列，当前同步代码结束后立刻清空。
 - 事件循环先清微任务再取宏任务，所以 microtask 排在 macrotask 前面。
@@ -1222,6 +1245,7 @@ console.log('顺序', order.join(' '));
 | 认为微任务能替代宏任务 | 微任务会在当前宏任务结束前全部清空 | 需要让出主线程时必须排宏任务 |
 
 **小结**
+
 - MessageChannel 的 postMessage 是宏任务，规范没有给它设置最小延迟。
 - 嵌套超过 5 层的 setTimeout 每次至少延迟 4 毫秒，会消耗一帧的四分之一。
 - 排宏任务时要用布尔标志防重，避免消息在队列里堆积。
@@ -1286,6 +1310,7 @@ function getHighestPriorityLane(lanes) {
 ```
 
 **这段代码在做什么**
+
 - 每个常量只有一个 bit 是 1，其余是 0，方便按位运算。
 - 按位或可以把多个 lane 合成一个集合。
 - lanes 与负 lanes 按位与，是利用补码特性提取最低位 1 的写法。
@@ -1304,6 +1329,7 @@ console.log(getHighestPriorityLane(merged), includesLane(merged, TransitionLane1
 ```
 
 **这段代码在做什么**
+
 - 按位或得到的 merged 同时含 SyncLane 与 DefaultLane 两个位。
 - getHighestPriorityLane 返回最低位的 1，也就是 SyncLane。
 - 判断包含关系时不能用大于号，要用不等于零，因为结果是一个位而不是数值大小。
@@ -1339,6 +1365,7 @@ function markStarvedLanes(lanes, now) {
 ```
 
 **这段代码在做什么**
+
 - Map 的键是 lane 的值，值是这个 lane 第一次出现的时刻。
 - 循环用左移遍历每一位，从 1 一直到最高位的 16。
 - 第一次看到某个 lane 时写入当前时刻作为等待起点。
@@ -1407,6 +1434,7 @@ Lane 位运算与饥饿标记检查通过
 | 过期 lane 反复被标记 | 标记后没有从等待表删除 | 标记过期时同步删除对应记录 |
 
 **小结**
+
 - lane 用单个二进制位表示优先级，位运算完成合并与筛选。
 - 提取最高优先级的最小位用 lanes 与负 lanes 按位与。
 - 饥饿处理靠记录等待时长，超时的 lane 被强制并入下一次渲染。
@@ -1480,6 +1508,7 @@ let currentTask = null;
 ```
 
 **这段代码在做什么**
+
 - 五个优先级对应五种超时时长，数值来自 React Scheduler 源码。
 - taskIdCounter 用来给任务编号，也用作相同过期时间时的次级排序键。
 - taskQueue 是最小堆实例，堆顶是下一次要执行的任务。
@@ -1508,6 +1537,7 @@ function scheduleCallback(priorityLevel, callback) {
 ```
 
 **这段代码在做什么**
+
 - expirationTime 为 -1 表示立刻过期，堆顶优先。
 - sortIndex 单独存一份，方便以后换成按开始时间排序。
 - 每个任务记录 startTime，用于统计等待时长。
@@ -1541,6 +1571,7 @@ function workLoop(hasTimeRemaining, initialTime) {
 ```
 
 **这段代码在做什么**
+
 - hasTimeRemaining 是一个函数，由调用方决定时间片是否还有剩余。
 - 只有"没过期"且"时间片用完"两个条件同时成立才让出。
 - 已过期的任务会跳过时间片检查，直接执行，这是饥饿保护。
@@ -1572,6 +1603,7 @@ function requestHostCallback() {
 ```
 
 **这段代码在做什么**
+
 - isHostCallbackScheduled 防止同一个时间片里重复排队。
 - sliceCount 记录宏任务轮次，用来验证任务是否真的被切片。
 - hasTimeRemaining 用当前时刻减去片起点，结果小于 5 表示还有剩余。
@@ -1739,6 +1771,7 @@ console.log('续体执行批次', ups.length, '宏任务轮次', sliceCount - fi
 | 时间片为 0 时死循环 | hasTimeRemaining 永远返回真 | 确保 now 在每轮循环里被重新读取 |
 
 **小结**
+
 - 最小堆负责挑任务，workLoop 负责时间片，MessageChannel 负责把控制权交还浏览器。
 - 续体是任务自己返回的函数，它让一个逻辑任务跨多个宏任务轮次执行。
 - 过期检查先于时间片检查，这是低优先级任务不被饿死的保证。
@@ -1797,6 +1830,7 @@ function buildTree() {
 ```
 
 **这段代码在做什么**
+
 - 每个节点只保留遍历需要的四个字段。
 - return 在建节点时直接写好，避免后面漏写。
 - sibling 只写在 liA 上，liB 保持 null 表示同层结束。
@@ -1836,6 +1870,7 @@ function performUnitOfWork(fiber) {
 ```
 
 **这段代码在做什么**
+
 - beginWork 只做记录并返回 child，把 diff 细节留空。
 - 有子节点时直接把指针移到子节点，函数返回。
 - 没有子节点时进入内层 while，沿 return 一路向上。
@@ -1862,6 +1897,7 @@ function workLoopConcurrent() {
 ```
 
 **这段代码在做什么**
+
 - 假时钟让中断点完全可控，测试结果不会随机器性能变化。
 - 时间片长度设为 2 毫秒，每个节点消耗 1 毫秒。
 - 每个时间片最多处理 2 个节点，第 3 个节点必然留到下一片。
@@ -1966,6 +2002,7 @@ console.log('时间片数量', slices);
 | 遍历提前结束 | sibling 指针没连上 | 建树时把同层节点用 sibling 串联 |
 
 **小结**
+
 - 可中断遍历的全部状态就是 workInProgress 指针加 Fiber 上的三个字段。
 - 中断只是退出循环，恢复只是重新进入循环，没有额外保存和还原动作。
 - 假时钟让切片行为可以精确断言，测试结果不依赖机器速度。
@@ -2035,6 +2072,7 @@ function FilterTable({ rows }) {
 **怎么度量收益**：看 INP 和长任务条数。用 web-vitals 采 INP，用 `PerformanceObserver` 订阅 `longtask` 条目；固定数据集重复 20 次，取 p75。
 
 **什么时候不该用**：
+
 - 行数在 500 以内、筛选耗时低于一帧的可感知阈值，同步渲染省掉一轮渲染。
 - 排序与过滤必须与服务端分页结果对齐时，应把条件下推到查询接口。
 - 需要一次性拿到完整 DOM 做打印或导出时，推迟渲染会拿到半成品。
@@ -2065,6 +2103,7 @@ const { pipe } = renderToPipeableStream(<App />, {
 **怎么度量收益**：看 Lighthouse 报告里的 TBT 与 INP，加上 `longtask` 条数与总时长。测量方法：同一台设备、同一网络档位，冷启动跑 10 次取中位数。
 
 **什么时候不该用**：
+
 - 首屏只有一个小组件时，切边界会多出请求与调度开销。
 - 纯静态展示页不依赖交互，服务端直接输出完整 HTML，无需等 JS 解析。
 - 水合期间必须完成全量数据初始化时，提前让出主线程会推后数据就绪时间。
@@ -2102,6 +2141,7 @@ function onRemoteOp(op) {
 **怎么度量收益**：指标是 `pointermove` 到下一帧 `requestAnimationFrame` 的时间差，取 p95，另看 INP。测量方法：mock 恒定推 50 条每秒，连续画 30 秒。
 
 **什么时候不该用**：
+
 - 画布内容必须与服务端状态逐帧一致时，本地先行绘制会引入回滚。
 - 单人在线、没有远端操作时，队列与合批只是多出一层间接调用。
 
@@ -2132,6 +2172,7 @@ function onRemoteOp(op) {
 **目标**：给一个 1 万行假数据表格加上自研调度层，让筛选与滚动在 6x CPU 节流下不产生超过 50 毫秒的长任务，并把首屏拆出一个 Suspense 边界。
 
 **步骤**：
+
 1. 用固定随机种子生成 1 万行假数据，脚本可重复运行。
 2. 用 `PerformanceObserver` 订阅 `longtask`，把条数与总时长打到控制台。
 3. 先跑同步筛选版本，记录基线数据。
@@ -2141,6 +2182,7 @@ function onRemoteOp(op) {
 7. 把基线与优化后的两组数据写进 README，附录制文件路径。
 
 **验收标准**：
+
 - 同一脚本连续 20 次，`longtask` 条数低于基线的一半。
 - 输入框连续输入 50 个字符，回显无丢字。
 - 筛选结果与同步版本逐行一致，用 JSON 比对通过。

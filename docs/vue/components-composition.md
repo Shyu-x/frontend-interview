@@ -137,6 +137,7 @@ export function useCounter() {
 ```
 
 **三大优势**：
+
 1. **逻辑复用**：mixin 有命名冲突、来源不明的问题，composable 函数清晰可控
 2. **代码组织**：按功能而非选项类型组织大型组件代码
 3. **类型推导**：更好的 TypeScript 支持
@@ -177,6 +178,7 @@ defineExpose({
 ```
 
 **原理**：
+
 - `defineProps/defineEmits/defineExpose` 是编译器在编译 `<script setup>` 时识别的特殊编译器宏
 - 编译后生成 `__sfc__` 元数据，供 devtools 和 HMR 使用
 - 运行时它们是编译器宏，不是真正的函数调用

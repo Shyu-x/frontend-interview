@@ -1305,6 +1305,7 @@ self.addEventListener('fetch', (e) => {
 **怎么度量收益**：在 Chrome DevTools 的 Application 面板勾选 Offline 后刷新，看页面是否还能渲染外壳；在 Network 面板过滤 /api/，看响应来源标记。真实用户侧用 web-vitals 上报 LCP 与 INP，与改造前同一页面的数据对照。
 
 **什么时候不该用**：
+
 - 支付、库存扣减这类状态接口不能回落到旧响应，读到过期数据会造成重复下单。
 - 审计留痕接口返回的是历史快照时会误导排查，这类请求直接放行更安全。
 - 同一浏览器多账号切换的后台，不按用户分缓存名必然串数据。
@@ -1347,6 +1348,7 @@ self.addEventListener('fetch', (e) => {
 **怎么度量收益**：用 web-vitals 上报 LCP、INP、CLS，按机型维度拆分；用 DevTools 的 Performance 面板录一次冷启动，看主线程长任务时长；用 Lighthouse 跑一次移动端性能审计，记录改造前后的同一组审计项。
 
 **什么时候不该用**：
+
 - 页面每天发版且静态文件名不带内容哈希时，预缓存会一直拿到旧文件，需要文件名带哈希或同步改缓存名。
 - 首屏资源体积大且内容随时变的营销活动页，把全部资源塞进 install 会拖长首次进入的等待。
 - 只在登录后才有内容的页面，把导航请求统一回落到外壳会让未登录用户看到空壳。
@@ -1389,6 +1391,7 @@ self.addEventListener('notificationclick', (e) => {
 **怎么度量收益**：在 notificationclick 里带参数上报埋点，统计通知点击次数；在 flushOutbox 成功后上报队列长度与重放耗时；用 DevTools 的 Application 面板观察 Service Worker 状态，若当前版本没有 Background Services 记录分组，改用 console.log 打点。
 
 **什么时候不该用**：
+
 - Background Sync 只在部分浏览器可用，把提交逻辑只写在 sync 事件里，其他浏览器会永久丢单。
 - 页面一打开就请求通知权限会被浏览器忽略或直接拒绝，必须先有用户手势并说明用途。
 - 冲突需要人工裁决的字段（例如排期时间），自动重放会覆盖他人修改，改为提示用户手动合并。
@@ -1419,6 +1422,7 @@ self.addEventListener('notificationclick', (e) => {
 **目标**：给一个待办清单页面做出可安装、断网能打开、能在提交后发本地通知的 PWA。
 
 **步骤**：
+
 1. 写 manifest.webmanifest，填 name、short_name、start_url、display、192 与 512 图标，在 HTML 的 head 里用 link 关联。
 2. 在页面加载完成后注册 Service Worker，注册失败时在页面上提示，不静默吞掉错误。
 3. 在 install 里预缓存外壳文件列表，在 activate 里删除非当前版本的缓存名。
@@ -1428,6 +1432,7 @@ self.addEventListener('notificationclick', (e) => {
 7. 在 DevTools 勾选 Offline，重跑一遍打开、翻页、提交的流程，记录每一步结果。
 
 **验收标准**：
+
 - DevTools 的 Application 面板能看到已激活的 Service Worker，Cache Storage 里只有当前版本的缓存名。
 - 勾选 Offline 后刷新，页面外壳与已缓存静态资源正常渲染，Network 面板显示响应来自 Service Worker。
 - Application 的 Manifest 面板没有报错，192 与 512 图标都能加载。

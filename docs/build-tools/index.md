@@ -82,6 +82,7 @@ flowchart LR
 ```
 
 **核心优势**：
+
 - Dev/Build 使用同一打包器，行为完全一致
 - Rollup 生态插件可直接使用
 - 性能大幅提升（Rust 实现）

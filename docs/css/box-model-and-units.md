@@ -237,6 +237,7 @@ IE6 及更早版本在"怪异模式"（Quirks Mode）下使用 border-box 盒模
 ```
 
 **为什么推荐 `box-sizing: border-box`：**
+
 - 元素宽度更直观，方便布局计算
 - 配合 Flexbox/Grid 使用时更易控制尺寸
 - 避免"加了 padding/border 盒子就变大"的问题
@@ -417,6 +418,7 @@ h2 { font-size: 1.5rem; }             /* 24px */
 **怎么度量收益**：看首屏的 Recalculate Style 与 Layout 耗时、滚动帧率。工具用 Chrome DevTools 的 Performance 面板录制 10 秒滚动，数 Frames 里超过 16.7ms 的帧；再用 Lighthouse 移动端跑一次。测量方法：同一台机器、同一网络节流、同一份 100 行数据各测 3 次取中位数。
 
 **什么时候不该用**：
+
 - 地址、备注这类列不能截断时，fixed 会把内容挤在一格宽度里，该保留自动布局或改成横向滚动。
 - 表格只有 5 到 10 行且列数少，改 fixed 要多写一遍 col 宽度，维护成本换不到收益。
 - 列宽需要随内容自动适应的看板表格，不要套这套写法。
@@ -448,6 +450,7 @@ h2 { font-size: 1.5rem; }             /* 24px */
 **怎么度量收益**：看 Largest Contentful Paint、Cumulative Layout Shift、首屏 CSS 传输体积。工具用 Lighthouse 移动端默认节流、Chrome DevTools 的 Network 面板看 Transfer Size、Performance 面板看 Layout Shift 标记。测量方法：320px、375px、414px 三个宽度各跑一次 Lighthouse 移动端，把三份记录放在一起。
 
 **什么时候不该用**：
+
 - 页面嵌在固定高度的 iframe 里，视口单位取的是 iframe 的视口，`svh` 会算错，该用百分比或读容器高度。
 - 设计走查要求字号与设计稿逐像素对齐时，根字号跟视口缩放会让字宽对不上，该锁死根字号。
 - 内容需要放到 200% 才看清的用户，vw 主导的根字号会与浏览器缩放叠加，字会放得过大。
@@ -481,6 +484,7 @@ const hitBox = { x, y, w: rect.width / scale, h: rect.height / scale };
 **怎么度量收益**：看拖动 10 秒内超过 16.7ms 的帧数、批注框与图形边缘的偏移像素。工具用 Chrome DevTools 的 Performance 面板录制拖动过程看 Frames 行，在 `requestAnimationFrame` 里打点记录每帧耗时。可复现方法：同一份含 200 个批注的测试文档，从 100% 缩放到 300% 再拖回，记录偏移像素。
 
 **什么时候不该用**：
+
 - 批注节点用 CSS `transform` 做位移时，`getBoundingClientRect()` 返回变换后的值，该读 `offsetLeft` 这类布局属性。
 - 节点上跑着入场动画，每帧矩形都在变，此时不要把矩形写进协作数据，等动画结束再取。
 - 白板只有本地单人使用、不做同步时，偏差不会被放大，可以不引入这套换算。
@@ -514,6 +518,7 @@ const hitBox = { x, y, w: rect.width / scale, h: rect.height / scale };
 **目标**：给一个订单列表页做盒模型与长度单位改造，留下两份可复现的测量记录。
 
 **步骤**：
+
 1. 选一个 200 行以上、列数 10 列以上的表格页，导出一份 100 行的测试数据。
 2. 用 Lighthouse 移动端与 DevTools Performance 各测一次，把 FCP、LCP、Layout 耗时抄进表格。
 3. 在 reset 文件里加 border-box 全局设置，刷新页面确认没有元素被撑破。
@@ -523,6 +528,7 @@ const hitBox = { x, y, w: rect.width / scale, h: rect.height / scale };
 7. 重跑第 2 步的测量，把两份数字并列写进 MR 描述。
 
 **验收标准**：
+
 1. DevTools 盒模型面板能逐层核对任意一列的 content、padding、border、margin 四层数值。
 2. 320px、768px、1280px 三个宽度下页面没有横向滚动条。
 3. MR 里有两份测量记录，含工具名、指标名、测试数据行数与网络节流设置。

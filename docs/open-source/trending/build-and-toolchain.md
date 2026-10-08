@@ -120,6 +120,7 @@ const server = Bun.serve({
 ```
 
 **参考链接**:
+
 - [Bun 官网](https://bun.sh)
 - [Bun GitHub](https://github.com/oven-sh/bun)
 
@@ -508,11 +509,13 @@ build
 - 改进的错误提示
 
 **npm 下载统计**:
+
 - 54K+ GitHub stars
 - 30M+ 周下载量
 - 行业标准
 
 **参考链接**:
+
 - [Prettier 官网](https://prettier.io)
 - [Prettier GitHub](https://github.com/prettier/prettier)
 
@@ -606,11 +609,13 @@ npx @biomejs/biome check --write ./src  # 格式化 + Lint
 ```
 
 **npm 下载统计**:
+
 - 12K+ GitHub stars
 - 500K+ 周下载量
 - 快速增长中
 
 **参考链接**:
+
 - [Biome 官网](https://biomejs.dev)
 - [Biome GitHub](https://github.com/biomejs/biome)
 
@@ -796,6 +801,7 @@ npx turbo link
 ```
 
 **参考链接**:
+
 - [pnpm 官网](https://pnpm.io)
 - [Turborepo 官网](https://turbo.build/repo)
 
@@ -957,6 +963,7 @@ export default defineConfig({
 ```
 
 **参考链接**:
+
 - [Playwright 官网](https://playwright.dev)
 - [Playwright GitHub](https://github.com/microsoft/playwright)
 
@@ -1124,6 +1131,7 @@ export default app
 ```
 
 **参考链接**:
+
 - [Hono 官网](https://hono.dev)
 - [Hono GitHub](https://github.com/honojs/hono)
 
@@ -1222,6 +1230,7 @@ function VirtualRows({ rows, scrollTop, viewportH }) {
 **怎么度量收益**：Chrome DevTools Performance 面板录制同样的滚动动作，对比 Long Tasks 条数与最长任务时长。用 PerformanceObserver 观察 event 条目，读 INP。
 
 **什么时候不该用**：
+
 - 总行数在可视区两倍以内，虚拟滚动的滚动条换算与命中检测开销超过收益。
 - 需要浏览器原生 Ctrl+F 搜全表内容，屏外行不在 DOM 里就搜不到。
 - 行高随内容变化且无法预估，先做行高测量，再决定是否上虚拟滚动。
@@ -1259,6 +1268,7 @@ export default defineConfig({
 **怎么度量收益**：Lighthouse 的 LCP 与 TBT；Chrome DevTools Network 面板的 transferred 体积；WebPageTest 的 Filmstrip 首屏帧时间。三次取样取中位数。
 
 **什么时候不该用**：
+
 - 首屏只有一个页面且没有可拆分的路由，强行拆包只多出一次网络往返。
 - 拿不到目标机型，target 与降级范围就没有验证依据，配置只能靠猜。
 - 页面已由服务端输出完整 HTML，首屏瓶颈在首字节时间（TTFB），拆包不解决问题。
@@ -1288,6 +1298,7 @@ export default defineConfig({
 **怎么度量收益**：Chrome DevTools Performance 面板的 Frames 轨道看掉帧位置；Rendering 面板的 Frame Rendering Stats 看每秒帧数；页面内用 `requestAnimationFrame` 计数输出每秒帧数到控制台。
 
 **什么时候不该用**：
+
 - 白板图形在几十个以内，直接用 DOM 就能满足帧率要求，改造成本收不回来。
 - 命中检测与缩放已经用 Canvas 实现，再叠 DOM 合成层只多一次数据同步。
 - 元素上挂了滤镜或阴影动画，单独提升合成层会抬高显存占用。
@@ -1316,6 +1327,7 @@ Monorepo 任务缓存与影响范围执行（出处：Turborepo 官方文档、N
 目标：给一个万行订单表做渲染与构建优化，并留下可复现的测量记录。
 
 步骤：
+
 1. 写脚本生成 10000 行订单数据，字段含 id、金额、状态、创建时间。
 2. 用 `performance.mark` 与 `performance.measure` 测首次渲染耗时与滚动时长任务。
 3. 在同一浏览器与网络档下录三次基线，把 Long Tasks 条数写进表格。
@@ -1325,6 +1337,7 @@ Monorepo 任务缓存与影响范围执行（出处：Turborepo 官方文档、N
 7. 按与基线相同的步骤复测三次，两张表并排对比。
 
 验收标准：
+
 - 有一份表同时记录三次基线测量与三次优化后测量的 Long Tasks 条数与最长任务时长。
 - 滚动到表格底部，DOM 中的行元素数量不随总行数增长。
 - 每一处改动都能指到对应指标，并说明哪一处收益为零或为负。

@@ -121,6 +121,7 @@ description: preload、prefetch、preconnect、dns-prefetch 的区别，以及 f
 | **prefetch 滥用** | prefetch 过多反而浪费带宽，影响当前页面加载 | 仅 prefetch 下一个确定会访问的页面 |
 
 **Chrome DevTools 验证：**
+
 - Network 面板中，preload 资源显示为 `preload` 类型（橙色）
 - prefetch 资源显示为 `prefetch` 类型（灰色，`High` 优先级请求在末尾）
 - 检查是否有 `preload-missing` 警告（说明 preload 了但未实际使用）
@@ -226,6 +227,7 @@ description: preload、prefetch、preconnect、dns-prefetch 的区别，以及 f
 ```
 
 **Critical CSS（关键渲染路径 CSS）：**
+
 - 提取首屏可见内容所需的 CSS
 - 内联到 `<head>` 中（避免额外网络请求）
 - 非关键 CSS 异步加载（不阻塞渲染）
@@ -319,6 +321,7 @@ description: preload、prefetch、preconnect、dns-prefetch 的区别，以及 f
 看 LCP（Chrome DevTools Performance 面板的 Timings 轨道、Lighthouse 的 Largest Contentful Paint 审计、web-vitals 库采集的字段数据）。看请求时序用 Network 面板的瀑布图与 Initiator 列。跨版本对比用 WebPageTest 的 filmstrip view 与 Start Render。
 
 **什么时候不该用**
+
 - 主图在折叠线以下：preload 会与关键样式、字体抢同一条连接，用户看不到的图先到。
 - 图片 URL 由运行时逻辑拼接（例如按设备型号查表生成），HTML 里写不出确定的候选集，preload 与真实请求不匹配会产生下载两次。
 - 页面同时存在轮播图的多张候选：只 preload 第一张，其余等用户操作后再加载。
@@ -353,6 +356,7 @@ if ('requestIdleCallback' in window) requestIdleCallback(prefetchDetail);
 在路由点击前后各打一个 `performance.mark`，用 `performance.measure` 读取从点击到详情页首帧的时长。用 Network 面板核对点击瞬间是否还有新的 JS 分块请求，用 Performance 面板核对 prefetch 请求的 Priority 是否为 Low。
 
 **什么时候不该用**
+
 - 列表中占比高的链接指向需要登录、跳转后会重定向的页面，预取命中率低还会浪费请求。
 - 用户在省流模式或按流量计费的网络下，预取的字节会直接变成用户成本。
 - 分块本身体积大、用户设备内存紧张时，预取会占用内存与解码时间。
@@ -392,6 +396,7 @@ if ('requestIdleCallback' in window) requestIdleCallback(prefetchDetail);
 Network 面板按域名筛选，看该域名首个请求的 Connection Start 与 SSL 时间戳是否与文档请求重合。跨域资源的 `connectStart`、`connectEnd` 需要响应头 `Timing-Allow-Origin` 才能在 `performance.getEntriesByType('resource')` 中读到。进房间到画布首帧用自定义 `performance.mark` 度量。
 
 **什么时候不该用**
+
 - 多数会话只在房间列表浏览、不进房间时，preconnect 与 preload 都是空付成本。
 - 同一个页面 preconnect 多个第三方域，会占用连接与移动设备的电量，应该按优先级保留少量域名。
 - 房间快照体积大且用户可能马上退出时，提前拉取等于把带宽浪费在一次不发生的会话上。
@@ -426,6 +431,7 @@ Next.js 的字体能力在构建期把字体文件放到自身域名，并生成
 给一个静态详情页加上首屏资源提示，用同机同网络的对照实验判断每条提示的收益与代价。
 
 **步骤**
+
 1. 准备页面：首屏一张大图、一个自托管字体、一个第三方域上的图标资源；本地用不同端口模拟跨域。
 2. 在 DevTools 里开 Slow 4G 限速跑基线，记录 Network 面板的请求顺序、Initiator 列与 LCP 数值。
 3. 逐条加入 `dns-prefetch`、`preconnect`、`preload`，每加一条重跑一次并记录差异，保证单变量。
@@ -435,6 +441,7 @@ Next.js 的字体能力在构建期把字体文件放到自身域名，并生成
 7. 汇总一张表：每条资源提示分别影响了哪个指标的哪一段，代价是额外请求数还是额外字节。
 
 **验收标准**
+
 - 能展示开启前后的 Network 面板记录或 HAR，指出每个请求的 Initiator 是 parser 还是 preload。
 - Console 中没有 preloaded but not used 警告。
 - 同一 URL 在 Network 面板中只出现一次，字体请求带 crossorigin。

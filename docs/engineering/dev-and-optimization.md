@@ -29,6 +29,7 @@ description: HMR、code splitting 与 webpack 优化
 **更新顺序：** 自底向上更新（子模块 → 父模块 → 视图）
 
 **Vite vs webpack HMR**：
+
 - webpack HMR：webpack-dev-server 重新编译 → WebSocket推送 → 浏览器执行 accept 回调
 - Vite HMR：esbuild 重新编译单个文件（ms级）→ WebSocket推送 → 浏览器替换对应模块
 
@@ -294,6 +295,7 @@ function onExportClick(rows) {
 **怎么度量收益**：用 webpack-bundle-analyzer 看各 chunk 的组成与体积；用 Lighthouse 看 FCP 与 TTI；用 DevTools 的 Network 面板统计首屏请求的 JS 数量与 gzip 后体积。每项在同一台机器、同一网络下重复 3 次。
 
 **什么时候不该用**：
+
 - 单页应用只有一个页面，第三方依赖总量在 gzip 后低于团队设定的阈值，拆分只增加一次网络往返。
 - 服务端只有 HTTP/1.1 且页面已经接近并发连接上限，新增 chunk 会排队等待。
 
@@ -328,6 +330,7 @@ if (import.meta.webpackHot) { // webpack 5 的写法，webpack 4 用 module.hot
 **怎么度量收益**：在 dev-server 终端看到编译完成的时刻，与页面上元素变化的时刻做对比，重复 5 次；用 DevTools 的 Network 面板筛选 WS，看整页刷新次数与连接数；看控制台里 [HMR] 前缀日志是否出现 Nothing hot updated。
 
 **什么时候不该用**：
+
 - 生产环境。HMR Runtime 与 dev-server 只服务于开发，生产要用构建产物。
 - 一次改动就会影响全局状态的页面，整页刷新本来就是预期行为，写 accept 只是多一个维护点。
 - 纯静态落地页，没有需要保留的运行期状态，整页刷新与热更新的差别测不出来。
@@ -365,6 +368,7 @@ module.exports = {
 **怎么度量收益**：连续构建两次，第二次只改一行业务代码，对比产物目录里文件名变化的文件个数；用 DevTools 的 Network 面板看第二次访问时 JS 的 Size 列是否显示 from disk cache；看 webpack 的 performance 输出或 stats.json 里各 chunk 的体积。
 
 **什么时候不该用**：
+
 - 只有单个页面，且先用 analyzer 量出依赖总体积低于团队阈值，拆 vendor 只会增加请求数。
 - 依赖每天都在升级的开发期，每次升级都改 hash，等到依赖版本稳定后再拆。
 
@@ -404,6 +408,7 @@ Vite 在开发阶段用 esbuild 把 CommonJS 与 ESM 依赖预打包，减少浏
 **目标**：把一个含 3 个路由页面的应用改成按需加载，并用脚本守住后续体积。
 
 **步骤**
+
 1. 建一个含 3 个路由页面的应用，其中至少一个页面静态引入体积排第一的第三方库，构建后保存产物清单。
 2. 用 webpack-bundle-analyzer 生成 treemap，记录每个 chunk 的名字与体积，找出体积排第一的第三方库。
 3. 把 3 个页面改成动态 import，加上 webpackChunkName 注释，重新构建并与第 1 步的清单对比。
@@ -412,6 +417,7 @@ Vite 在开发阶段用 esbuild 把 CommonJS 与 ESM 依赖预打包，减少浏
 6. 写一条体积检查命令，接到本地脚本或 CI，构造一次超阈值的提交验证它会被拦下。
 
 **验收标准**
+
 - 首屏 Network 面板里的 JS 请求数与 gzip 体积有前后对比记录。
 - 点击重依赖功能之前，Network 面板中不出现该依赖所在 chunk。
 - 只改业务代码的一次构建里，vendor chunk 的文件名保持不变。

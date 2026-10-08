@@ -1587,6 +1587,7 @@ function mountCell(td, path) {
 **怎么度量收益**：用 `performance.mark` 与 `performance.measure` 在聚焦和失焦处打点，取 `cell-edit` 耗时的 P75。再用 Chrome DevTools 的 Performance 面板录制一次编辑，比较主线程 Long Task 的条数与总时长。
 
 **什么时候不该用**：
+
 - 需要在表格上做跨单元格区域选择与整块复制：只有聚焦单元格可编辑时，浏览器原生的表格选区行为不生效。
 - 单元格内要嵌可编辑的嵌套表格或图片拖拽：局部 contenteditable 无法把 DOM 与撤销栈跨单元格统一起来。
 
@@ -1624,6 +1625,7 @@ function enterEdit(blockIndex) {
 **怎么度量收益**：用 `performance.getEntriesByName("first-contentful-paint")` 读首屏时间，用 Lighthouse 读 LCP 与 TBT。再用 DevTools Performance 面板统计主线程忙碌时长。
 
 **什么时候不该用**：
+
 - 需要整篇查找替换并高亮全部命中：分段渲染时只有可视块在 DOM 里，命中统计要在模型上算。
 - 需要一次选中跨越大量段落的范围：这些节点不在 DOM 里，原生选区无法建立。
 
@@ -1659,6 +1661,7 @@ text.onRemoteChange(() => {                        // 本端提交不触发
 **怎么度量收益**：写一段随机操作脚本，跑插入与删除序列后断言锚点解析到的仍是同一字符，统计漂移次数。协作延迟用 `performance.measure` 打点，从本地提交到收到远端确认。
 
 **什么时候不该用**：
+
 - 批注只允许一个人写、其余人只读：用服务端带版本号的覆盖写即可，不需要 CRDT。
 - 文本只在一个客户端被编辑、其他端只做展示：直接广播最终文本，锚点用固定偏移。
 
@@ -1691,6 +1694,7 @@ Tiptap 把节点、标记、命令打包成 Extension，编辑器只加载声明
 **目标**：做一个"迷你富文本字段"组件，能在单元格里编辑加粗文字，支持撤销，并能把光标在整数偏移与路径之间来回换算，耗时指标可导出。
 
 **步骤**：
+
 1. 定义扁平模型：字符数组，每个字符带 id 与 bold 标记，给出 `readAt(path)`。
 2. 实现 `insert`、`delete`、`toggleBold` 三个命令，每个命令返回带 invert 的 step 对象。
 3. 写事务函数 `commit(steps)`：依次应用 step、压入撤销栈、重算选区。
@@ -1699,6 +1703,7 @@ Tiptap 把节点、标记、命令打包成 Extension，编辑器只加载声明
 6. 用 `performance.mark` 与 `performance.measure` 在每次 commit 打点，脚本导出 P75。
 
 **验收标准**：
+
 - 撤销 20 次再重做 20 次后，模型 JSON 快照与初始快照相等。
 - 在文档中间插入 10 个字符后，之前记录的光标路径仍指向同一字符。
 - 中文输入法候选阶段模型不变，一次上屏只产生一条撤销记录。

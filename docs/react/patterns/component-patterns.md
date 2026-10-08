@@ -1153,6 +1153,7 @@ function OrderList({ items, onSelect }) {
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板录制 5 秒连续滚动，记录 Long Task 数量和 Scripting 时长。用 React DevTools Profiler 录制同一段操作，看每次提交里 Row 的渲染数量。DOM 行数可以直接在 Elements 面板数，或在控制台执行 `document.querySelectorAll('.row').length`。
 
 **什么时候不该用**：
+
 - 数据量在一屏加缓冲范围内，虚拟化只会增加代码复杂度。
 - 页面需要浏览器 Ctrl+F 查找全部行，或需要一次性打印完整列表做导出，虚拟化后 DOM 里只有可视行，这两类需求都会失效。
 
@@ -1188,6 +1189,7 @@ function App() {
 **怎么度量收益**：Lighthouse 切到移动端模式，记录 LCP、TBT、页面总字节数。构建产物用 webpack-bundle-analyzer 或 `vite build` 的输出看 chunk 清单。线上用 web-vitals 采集 LCP 与 INP，在真机分布里对比改动前后同一分位。
 
 **什么时候不该用**：
+
 - 首屏就是唯一核心页面且产物体积已经很小，拆分后多出的请求往返会拖慢而不是加快。
 - 依赖完整 SSR 首屏 HTML 做 SEO 的页面，懒加载会把关键内容推迟到客户端渲染。
 
@@ -1234,6 +1236,7 @@ function Canvas() {
 **怎么度量收益**：Chrome DevTools Performance 录制 10 秒连续书写，看帧率曲线和 Long Task 出现次数。React DevTools Profiler 录制同一段操作，看提交次数是否与坐标点数量脱钩。线上看 web-vitals 的 INP 在移动端的分布。
 
 **什么时候不该用**：
+
 - 光标位置要参与 React 布局，比如带尾巴的弹层跟随光标计算位置，这时搬出去反而要手写同步逻辑。
 - 绘制频率很低，比如每秒只有一两个点，直接放 state 也够用。
 
@@ -1266,6 +1269,7 @@ function Canvas() {
 **目标**：做一个订单列表页，包含 2000 条本地生成的模拟数据、列配置、详情面板和路由级懒加载。要求用上本页的容器/展示分离、惰性组件、提供者模式和受控/非受控取舍。
 
 **步骤**：
+
 1. 用脚本生成 2000 条订单数据，字段包含 id、标题、金额、状态、创建时间。
 2. 写纯展示的 OrderRow，只接收 item、top、onSelect，用 memo 包住。
 3. 写容器 OrderList，持有滚动偏移与筛选条件，实现固定行高的可视区渲染。
@@ -1275,6 +1279,7 @@ function Canvas() {
 7. 用 Profiler 与 Lighthouse 各录一次，把结果写进 README。
 
 **验收标准**：
+
 - Elements 面板里行元素数量不超过可视行数加缓冲行数。
 - Network 面板按文件名过滤，进入页面时不下载详情面板的 chunk，点击行后才出现。
 - Profiler 录制滚动过程，OrderRow 的重渲染次数与滚动距离无关；录制筛选输入，列表不重渲染。

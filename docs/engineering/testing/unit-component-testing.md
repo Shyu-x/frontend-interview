@@ -1381,6 +1381,7 @@ it('滚到底部时 end 等于 total', () => {
 **怎么度量收益**：看三项。`vitest run --coverage` 输出 `range.ts` 的 % Stmts 与 % Branch。测试文件里 `container.querySelector` 的出现次数用 `grep -rn` 统计。改动前后各跑 20 次，对比该测试文件的 Duration 中位数波动。
 
 **什么时候不该用**：
+
 - 表格高度固定、行数只有几十时，直接写组件测试，硬拆纯函数多出一层间接。
 - 虚拟滚动由不可替换的第三方库提供时，别为它写单元测试，改为在集成层验证传进去的 props 与回调。
 
@@ -1410,6 +1411,7 @@ it('接口第一次失败，点击重试后渲染标题', async () => {
 **怎么度量收益**：两个指标。一是该用例连续 50 次的失败次数，用 shell 循环执行 `npx vitest run` 统计。二是 Lighthouse CI 的 `largest-contentful-paint` 与 `total-blocking-time`，在预发环境对比改动前后的中位数。
 
 **什么时候不该用**：
+
 - 测试环境接口总返回固定假数据，重试分支走不到，不如直接对重试计数逻辑写单元测试。
 - 重试由原生页面壳负责时，在 Web 层写这组用例覆盖不到真实行为。
 
@@ -1443,6 +1445,7 @@ test('收到远端光标后写入 store', () => {
 **怎么度量收益**：数两件事。一是 `grep -rn "vi.mock" src --include="*.test.ts"` 的行数。二是 `vitest run --coverage` 里 store 目录的 % Funcs。mock 行数下降、函数覆盖率上升，说明边界收窄了。
 
 **什么时候不该用**：
+
 - 协议细节由第三方 SDK 封装时，用假 socket 会测到 SDK 的私有约定，改用集成环境连真实服务端。
 - 这一层只把消息透传给服务端、没有本地状态合并时，补一条协议契约测试即可。
 
@@ -1475,6 +1478,7 @@ MSW 在 fetch 与 XHR 层拦截请求，组件代码里没有测试分支。业�
 **目标**：给一个“带搜索与分页的订单列表”模块补上分层测试，并把测试清单标注到金字塔的对应层。
 
 **步骤**：
+
 1. 建项目：`npm create vite@latest` 选 React + TypeScript，装上 vitest、@testing-library/react、@testing-library/user-event、jsdom、msw。需核对官方文档：各包当前版本号与配置项名称。
 2. 写分页纯函数 `pageRange(total, pageSize, current)`，先写测试再写实现，覆盖首页、末页、越界三种输入。
 3. 写列表组件，用 fetch 取数，用 MSW 在测试里返回两页数据。
@@ -1484,6 +1488,7 @@ MSW 在 fetch 与 XHR 层拦截请求，组件代码里没有测试分支。业�
 7. 故意改坏 `pageRange` 的边界判断，确认对应单元测试变红后改回。
 
 **验收标准**：
+
 - `npx vitest run` 全部通过，且 `--coverage` 报告里 `pageRange` 的 % Branch 达到 100%。
 - 测试文件里 `container.querySelector` 出现次数为 0，`vi.mock` 只出现在网络模块。
 - 重试用例用 shell 循环执行 20 次，失败次数为 0。

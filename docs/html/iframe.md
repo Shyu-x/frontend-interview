@@ -522,6 +522,7 @@ function ParentComponent() {
 ```
 
 **安全做法**：
+
 - 如果 iframe 内容不需要同源访问，**不要加 `allow-same-origin`**
 - 如果必须同源（需要共享数据），配合 CSP 的 `child-src` 和 `frame-src` 限制来源
 - 始终限制 `allow-scripts`，按需加上 `allow-same-origin`
@@ -577,6 +578,7 @@ window.addEventListener('message', (event) => {
 **答**：主要问题和优化策略：
 
 **内存问题**：
+
 - 每个 iframe 创建一个独立的 JS 上下文，开销约 2-5MB+
 - 不使用的 iframe 应当移除并设为 `src="about:blank"` 再 remove
 
@@ -592,6 +594,7 @@ function cleanupIframe(iframe: HTMLIFrameElement) {
 ```
 
 **加载阻塞问题**：
+
 - iframe 是独立资源，会和主页面竞争带宽和 TCP 连接
 - 使用 `loading="lazy"` 让视口外的 iframe 延迟加载
 - 对关键 iframe 提前用 `prefetch` 预加载
@@ -605,6 +608,7 @@ function cleanupIframe(iframe: HTMLIFrameElement) {
 ```
 
 **CLS 问题**：
+
 - iframe 没有设定宽高会导致布局偏移
 - 始终在 iframe 上设置 `width` 和 `height`（或 `aspect-ratio`）
 - 使用 CSS `contain` 属性隔离重排/重绘影响
@@ -617,6 +621,7 @@ function cleanupIframe(iframe: HTMLIFrameElement) {
 ```
 
 **渲染层问题**：
+
 - iframe 创建新的 **浏览上下文**，与父页面共享主线程
 - 重 iframe 的 JS 计算会抢占主线程，影响 INP（Interaction to Next Paint）
 - 使用 `sandbox` 隔离并限制功能，防止 iframe 内 JS 过度消耗

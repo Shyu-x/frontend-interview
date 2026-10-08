@@ -89,6 +89,7 @@ function isSecureContextLike(url) {
 ```
 
 **这段代码在做什么**：
+
 - 函数名带 Like，提醒这只是规则复刻，不是浏览器实现。
 - https 前缀判断放在最前面，覆盖绝大多数生产环境。
 - localhost 与 127.0.0.1 单独列出，因为浏览器对它们特殊放行。
@@ -120,6 +121,7 @@ function decideClipboardAccess({ secureContext, focused, userGesture, mode, perm
 ```
 
 **这段代码在做什么**：
+
 - 参数对象把环境事实与操作模式分开，方便逐个组合测试。
 - 三道闸门按顺序短路，命中一条就立刻返回。
 - 读与写走不同分支，因为判定条件不同。
@@ -158,6 +160,7 @@ console.log('权限决策用例通过');
 ```
 
 **这段代码在做什么**：
+
 - deepEqual 比对完整对象，同时校验 allowed 与 reason。
 - 后两个用例只关心 reason 字段，用 equal 断言。
 - 三个用例分别覆盖第一道闸门、第二道闸门、读权限失败。
@@ -269,6 +272,7 @@ clipboard-permission.mjs 全部断言通过
 | 读取剪贴板每次都弹授权框 | clipboard-read 权限状态是 prompt | 先用 permissions.query 看状态，再决定按钮文案 |
 
 **小结**：
+
 - 剪贴板的判定顺序是安全上下文、页面焦点、用户手势，读操作多一道权限查询。
 - navigator.clipboard 只在安全上下文存在，http 页面连对象都拿不到。
 - 把决策逻辑抽成纯函数后，可以用 node:assert 覆盖每条分支。
@@ -333,6 +337,7 @@ function describePermission(state) {
 ```
 
 **这段代码在做什么**：
+
 - 入参是 PermissionStatus.state 的三个标准取值。
 - 每个分支返回一句可以直接渲染的中文文案。
 - denied 分支提示用户去浏览器设置，而不是反复重试。
@@ -358,6 +363,7 @@ function parseOrderText(raw) {
 ```
 
 **这段代码在做什么**：
+
 - 正则要求开头两个大写字母，后面紧跟十位数字。
 - trim 处理复制时附带的换行，这是最常见的脏数据来源。
 - 空字符串与格式错误用不同 reason 区分。
@@ -424,6 +430,7 @@ clipboard-read.mjs 全部断言通过
 | 在 iframe 里读取失败 | 权限策略限制了 clipboard-read | 需要核对官方文档：Permissions Policy 中 clipboard-read 的页面配置 |
 
 **小结**：
+
 - 先用 permissions.query 看状态，再在用户手势内调用 readText。
 - 剪贴板返回的文本必须先 trim 再校验，换行是最常见的脏数据。
 - 把权限状态映射成文案，用户才知道下一步该做什么。
@@ -481,6 +488,7 @@ function buildClipboardPlan(content) {
 ```
 
 **这段代码在做什么**：
+
 - text/plain 无条件写入，保证接收方至少拿到纯文本。
 - text/html 与 image/png 都是可选项，缺失时跳过。
 - 返回普通对象，键是 MIME 类型，值是字符串或 Blob。
@@ -501,6 +509,7 @@ function pickBestFormat(availableTypes, preference) {
 ```
 
 **这段代码在做什么**：
+
 - availableTypes 代表剪贴板里实际存在的格式。
 - preference 代表接收方从高到低的偏好顺序。
 - 命中第一项就返回，符合偏好优先的语义。
@@ -586,6 +595,7 @@ clipboard-write.mjs 全部断言通过
 | 复制图片失败 | 浏览器对可写入的图片格式支持不同 | 需要核对官方文档：各浏览器对 image/png 与 image/jpeg 的写入支持 |
 
 **小结**：
+
 - 只有纯文本用 writeText，多格式用 ClipboardItem 加 write。
 - text/plain 应当始终写入，作为所有接收方的兜底。
 - write 通常要在用户手势的同步阶段发起，先 await 其他 Promise 会丢失手势。
@@ -669,6 +679,7 @@ function reduceDragEvent(state, event) {
 ```
 
 **这段代码在做什么**：
+
 - 状态里用 phase 记录当前阶段，便于断言。
 - dropAccepted 由 dragover 事件的 defaultPrevented 决定。
 - drop 分支先检查 dropAccepted，未举手时退回 dragging 阶段。
@@ -695,6 +706,7 @@ assert.equal(state.dropAccepted, true);
 ```
 
 **这段代码在做什么**：
+
 - 每一步都把归约结果重新赋给同一个 state 变量，模拟事件流水。
 - 断言 phase 从 idle 到 dragging 再到 overTarget。
 - 断言 dragstart 携带的数据被保存在 state.data。
@@ -719,6 +731,7 @@ assert.equal(rejected.phase, 'ended');
 ```
 
 **这段代码在做什么**：
+
 - 第二个场景模拟放置区忘记调用 preventDefault 的情况。
 - 断言 dropAccepted 保持 false。
 - 断言 drop 之后 phase 不是 dropped，说明数据没有被接收。
@@ -810,6 +823,7 @@ drag-sequence.mjs 全部断言通过
 | 放置区内的子元素导致 dragover 反复触发 | 指针在子元素之间移动，事件冒泡 | 用 dragenter 与 dragleave 计数，或用 CSS 让子元素 pointer-events 为 none |
 
 **小结**：
+
 - 完整序列是 dragstart、dragenter、dragover、drop、dragend，外加 dragleave。
 - drop 是否触发取决于 dragover 是否调用 preventDefault。
 - 清理工作必须放在 dragend，因为取消拖拽时不会触发 drop。
@@ -869,6 +883,7 @@ function chooseFormat(types, preference) {
 ```
 
 **这段代码在做什么**：
+
 - types 代表拖放数据里实际存在的格式列表。
 - preference 代表接收方从高到低的偏好顺序。
 - 返回命中的第一个格式名，调用方据此决定解析方式。
@@ -903,6 +918,7 @@ function resolveDropEffect(effectAllowed, requested) {
 ```
 
 **这段代码在做什么**：
+
 - 展开表把 effectAllowed 的八个取值映射成允许的效果数组。
 - ?? 处理未知取值，取不到时用空数组兜底。
 - 请求值合法就采用，非法时退回第一个允许项。
@@ -986,6 +1002,7 @@ data-transfer.mjs 全部断言通过
 | types 里出现小写与自定义类型混杂 | 自定义类型没有加 application/x- 前缀 | 自定义类型统一写成 application/x- 加应用名 |
 
 **小结**：
+
 - DataTransfer 同时保存多种 MIME 类型的数据，接收方按偏好挑选。
 - 受保护模式下，dragenter 与 dragover 阶段只能看 types，不能读数据。
 - effectAllowed 在 dragstart 设置，dropEffect 在 dragover 设置，两者必须兼容。
@@ -1063,6 +1080,7 @@ function validateFiles(files, rules) {
 ```
 
 **这段代码在做什么**：
+
 - 规则集中在常量里，改上限只改一处。
 - 遍历时用 continue 跳过后续检查，避免对同一文件报多个错。
 - 拒绝项带 name 与 reason，界面可以逐条显示。
@@ -1087,6 +1105,7 @@ function handleDragOver(event, setHint) {
 ```
 
 **这段代码在做什么**：
+
 - hasFiles 只读 types，不在受保护模式下调用 getData。
 - preventDefault 放在第一行，保证 drop 一定会触发。
 - setHint 由调用方传入，便于在测试里替换成断言函数。
@@ -1191,6 +1210,7 @@ file-drop.mjs 全部断言通过
 | 大文件把内存占满 | file.arrayBuffer 会把整个文件读进内存 | 大文件改用流式读取或直接作为请求体上传 |
 
 **小结**：
+
 - 拖入的文件通过 dataTransfer.files 获取，内容要用异步方法读取。
 - 校验顺序是先比大小再比类型，拒绝时给出具体原因。
 - dragover 阶段只能读 types，用它可以提前显示提示。
@@ -1253,6 +1273,7 @@ function moveItem(list, fromIndex, toIndex) {
 ```
 
 **这段代码在做什么**：
+
 - slice 复制数组，保证调用方的原数组不被修改。
 - 两个越界判断都返回副本，函数不会抛错。
 - fromIndex 与 toIndex 相同时也提前返回。
@@ -1277,6 +1298,7 @@ function nextIndexForKey(key, index, length) {
 ```
 
 **这段代码在做什么**：
+
 - ArrowUp 与 ArrowDown 用 Math.max、Math.min 夹住边界。
 - Home 与 End 直接给出首尾下标。
 - 其他按键返回原下标，调用方据此判断是否需要重排。
@@ -1293,6 +1315,7 @@ function describeMove(itemLabel, position, total) {
 ```
 
 **这段代码在做什么**：
+
 - 文案里同时给出元素名称与新的序号。
 - 序号从 1 开始，避免出现"第 0 项"。
 - 总数一起播报，用户能判断是否到边界。
@@ -1380,6 +1403,7 @@ sortable-list.mjs 全部断言通过
 | 触摸设备上拖放不工作 | HTML 拖放 API 在触摸屏上的支持不完整 | 提供上下移动按钮作为所有输入方式的通用路径 |
 
 **小结**：
+
 - 把重排逻辑抽成纯函数，鼠标与键盘各自负责把操作换算成下标。
 - 键盘路径至少支持上下移动，并在边界处夹住下标。
 - 用 aria-live 区域播报变化，重排后把焦点放回被移动项。
@@ -1445,6 +1469,7 @@ async function copyRange(rows, cols) {
 **怎么度量收益**：看两个数：一次复制“指针抬起”到“提示出现”的耗时，以及复制失败次数占比。用 `performance.mark` 与 `performance.measure` 打点，在 Chrome DevTools Performance 面板里对时间轴核对。
 
 **什么时候不该用**：
+
 - 目标只是一个纯文本输入框，没有接收 text/html 的对象，写 text/plain 就够。
 - 单元格里是 `=SUM(A1:A9)` 这种文本，Excel 会当公式执行，需要先加前缀转义。
 - 页面嵌在跨域 iframe 里且没有 clipboard-write 的 Permissions Policy，写入会被拒。
@@ -1483,6 +1508,7 @@ board.addEventListener('drop', async (e) => {
 **怎么度量收益**：指标是“drop 到占位框出现”的间隔，以及失败后占位框是否回滚。在 drop 回调首尾各打一个 `performance.mark`，用 `performance.measure` 读间隔，在 DevTools Performance 面板核对长任务。
 
 **什么时候不该用**：
+
 - 用户按 Ctrl+V 贴截图走的是 paste 事件，拖放监听拿不到剪贴板里的图。
 - 拖进来的是文件夹时 `dataTransfer.files` 拿不到里面内容，要改走 entries 接口。
 - 目标用户主要在平板上用触屏，HTML 拖放整体不触发，应改为文件选择加长按菜单。
@@ -1518,6 +1544,7 @@ onKeyDown = (e, i) => {                        // 键盘路径改的是同一份
 **怎么度量收益**：看“一次调整需要的按键次数”和“播报文案与最终顺序是否一致”。用 axe DevTools 或 Lighthouse 的 Accessibility 分类跑一遍，再开 NVDA 或 VoiceOver 手工走一次纯键盘路径。
 
 **什么时候不该用**：
+
 - 列表有几百项时，每次 render 重建 DOM 会丢滚动位置，应改成只移动被操作的那个节点。
 - 只改一个优先级数值时，用带序号的输入框比整体重排代价低。
 - 排序结果要落库时，先想清楚并发写入的合并规则，否则两人同时排会互相覆盖。
@@ -1551,6 +1578,7 @@ APG 的要求是所有功能都能只用键盘完成，排序类组件要给方�
 **目标**：做一个支持鼠标拖放、键盘方向键、触屏按钮三条路径的任务排序卡片列表，并在每次改动后播报新位置。
 
 **步骤**：
+
 1. 用一份 `items` 数组渲染列表，每项是 `{id, title}`，先不做任何交互。
 2. 写 `move(list, from, to)` 函数，做数组的取出与插入，并重排 DOM。
 3. 给每项加 `draggable="true"`，在 `dragstart` 记录下标，在 `dragover` 调 preventDefault，在 `drop` 调 `move`。
@@ -1560,6 +1588,7 @@ APG 的要求是所有功能都能只用键盘完成，排序类组件要给方�
 7. 加一个 `aria-live="polite"` 的隐藏区域，每次 `move` 后写入“已把第 X 项移到第 Y 位”。
 
 **验收标准**：
+
 - 只用 Tab 与方向键能把任意一项从队首移到队尾再移回，鼠标不做任何操作。
 - 鼠标拖放与键盘按键得到的结果数组完全一致，可用同一份 id 序列断言。
 - 关掉鼠标，开 NVDA 或 VoiceOver，每次调整后都能听到新的位置播报。

@@ -85,6 +85,7 @@ LIMIT 5;
 ```
 
 **这段代码在做什么**
+
 - `vector(1536)` 声明该列只能存 1536 维向量。
 - `<=>` 是 pgvector 的余弦距离运算符；余弦距离越小，两个向量越接近。
 - 未建索引时，SQL 走全表扫描，对每行计算余弦距离。
@@ -203,6 +204,7 @@ LIMIT 5;
 ```
 
 **这段代码在做什么**
+
 - `USING hnsw` 指定 HNSW 近似索引类型。
 - `vector_cosine_ops` 对应 `<=>` 余弦距离运算符。
 - `m = 16` 控制每个节点在第 0 层的最大邻居数。
@@ -330,6 +332,7 @@ LIMIT 5;
 ```
 
 **这段代码在做什么**
+
 - `USING ivfflat` 指定倒排类聚簇索引。
 - `WITH (lists = 1000)` 将 100 万行分成约 1000 个簇；pgvector README 推荐 1M 以上取 `sqrt(rows)`。
 - 建 IVFFlat 前需要数据，因为它要跑 k-means 学习簇中心。
@@ -447,6 +450,7 @@ SET ivfflat.max_probes = 100;
 ```
 
 **这段代码在做什么**
+
 - `relaxed_order` 允许候选顺序略微偏离距离顺序，换取更高召回；`strict_order` 严格按距离排序，但可能更慢。
 - `hnsw.max_scan_tuples` 是 HNSW 单次查询累计扫描行数的上限，默认约 20000。
 - `ivfflat.max_probes` 控制 IVFFlat 在迭代扫描中最多探测的簇数。
@@ -568,6 +572,7 @@ CREATE TABLE items_part_customer_7 PARTITION OF items_part
 ```
 
 **这段代码在做什么**
+
 - 部分索引的 `WHERE` 只对 `category_id = 123` 的行建索引。
 - 未来查询必须带同样条件，才可能走这个部分索引。
 - `PARTITION BY LIST (customer_id)` 按客户 ID 列表创建分区表。
@@ -690,6 +695,7 @@ LIMIT 5;
 ```
 
 **这段代码在做什么**
+
 - 表达式索引把 `embedding` 转成 `halfvec`，索引维度上限放宽到 4000。
 - `halfvec_cosine_ops` 对应半精度向量的余弦距离。
 - `binary_quantize` 将每维正负转为 bit，适合 Hamming 距离过滤。
@@ -819,6 +825,7 @@ console.log('小样本 recall@2 约', recall);
 ```
 
 **这段代码在做什么**
+
 - `topK` 是暴力扫描，生成真值。
 - `indexTop` 模拟近似索引只在一个子集上排序，可能漏真实近邻。
 - 两个查询的 recall 取平均，得到整体 recall@k。
@@ -941,6 +948,7 @@ console.log('两个簇中心', centers);
 ```
 
 **这段代码在做什么**
+
 - `trainIVF` 做最简 k-means，随机取前 k 个点作为初始中心。
 - 每轮把每个点分给最近中心。
 - 每个簇按均值更新中心。
@@ -973,6 +981,7 @@ console.log('查询 2 的最近节点是', greedySearch(2, 0, layer0, 4));
 ```
 
 **这段代码在做什么**
+
 - `layer0` 表示第 0 层图邻接表。
 - `greedySearch` 从入口节点出发，沿最近邻居移动。
 - 如果邻居更近就跳过去，否则停止，返回当前节点。
@@ -1059,6 +1068,7 @@ console.log('IVF 与 HNSW 玩具均通过断言');
 目标：在本地 Postgres 中创建一个 10 万条 1536 维向量表，分别建 HNSW 与 IVFFlat 索引，并测量 recall@10 与 p95。
 
 步骤：
+
 1. 用 pgvector 建表，插入 10 万条随机向量。
 2. 为同一个表分别建 HNSW 与 IVFFlat，使用默认参数。
 3. 生成 100 条查询向量，先用暴力扫描得到真值 top 10。
@@ -1066,6 +1076,7 @@ console.log('IVF 与 HNSW 玩具均通过断言');
 5. 计算每个参数下的 recall@10 与 p95，形成对比表。
 
 验收标准：
+
 - 能复现一个参数组合下 recall@10 大于 0.9。
 - 能给出 HNSW 与 IVFFlat 在相同 recall 线下的 p95 数据。
 - 能用 `pg_relation_size` 比较两个索引的存储大小。

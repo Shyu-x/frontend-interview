@@ -284,6 +284,7 @@ gantt
 
 **答案：**
 LCP 波动通常由以下原因导致：
+
 1. **缓存命中率不一致**：动态内容（如个性化 hero 图）无法被 CDN 缓存
 2. **网络波动**：第三方资源（如字体、API）响应时间不稳定
 3. **CLS 导致延迟**：图片无尺寸导致布局偏移，LCP 元素位置变化
@@ -296,6 +297,7 @@ LCP 波动通常由以下原因导致：
 ### 5.2 Q2: SSG 和 SSR 各自的不可替代场景是什么？
 
 **答案：**
+
 - **SSG 不可替代**：构建时数据已固定的页面（文档站、博客、帮助中心），构建速度最快，SEO 最优
 - **SSR 不可替代**：需要用户个性化内容的页面（个性化首页、用户专属 Dashboard），或内容依赖实时数据库/外部 API
 
@@ -307,6 +309,7 @@ LCP 波动通常由以下原因导致：
 
 **答案：**
 **不能直接提升排名**，但对 SEO 有间接帮助：
+
 1. **丰富摘要（Rich Snippets）**：搜索结果出现星级、价格、FAQ 等样式，提升 CTR（点击率）
 2. **帮助爬虫理解内容**：结构化数据让 Google 更准确理解页面主题
 3. **语音搜索优化**：FAQ 结构化数据对语音搜索有帮助
@@ -508,6 +511,7 @@ export default function Doc({ doc }) {
 **目标**：把一个 2000 字图文教程页改成 SSG，并优化到移动端 LCP 和 CLS 达标。
 
 **步骤**：
+
 1. 用 Next.js 建立项目，把教程正文放进 Markdown 文件。
 2. 用 `getStaticProps` 和 `getStaticPaths` 生成静态文章页。
 3. 给封面图设置 `width` 和 `height`，并加 `fetchpriority="high"`。
@@ -517,6 +521,7 @@ export default function Doc({ doc }) {
 7. 用 Chrome DevTools Performance 检查主线程长任务，把非关键脚本改为 `defer`。
 
 **验收标准**：
+
 - Lighthouse 移动端模拟中端设备，3 次结果中最差的 LCP 小于 2.5 秒，CLS 小于 0.1。
 - 页面 HTML 源码包含文章首段文字和 JSON-LD Article。
 - Rich Results Test 能检测到 Article 类型。

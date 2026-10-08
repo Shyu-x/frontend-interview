@@ -70,6 +70,7 @@ traverse(ast, {
 | @babel/generator | 新 AST → 目标代码 + sourcemap |
 
 **preset vs plugin：**
+
 - preset = plugin 集合（@babel/preset-env = 所有 ES6+ 语法转换插件）
 - plugin 优先级高于 preset，plugin 按顺序执行
 

@@ -388,6 +388,7 @@ Cloudflare Polish 自动移除图片元数据并转换格式，Image Resizing �
 **目标**：把一个含 50 张图的活动页改造成 WebP 优先、懒加载、Brotli 压缩、CDN 缓存版本。
 
 **步骤**：
+
 1. 用 Chrome DevTools 记录改造前 Network 面板的图片总字节、图片请求数和 LCP。
 2. 给 12 张首屏关键图片保留同步加载，其余 38 张图加 `loading="lazy"`。
 3. 把 JPEG/PNG 图片批量转换为 WebP，并用 `<picture>` 提供原格式回退。
@@ -397,6 +398,7 @@ Cloudflare Polish 自动移除图片元数据并转换格式，Image Resizing �
 7. 在低端安卓真机上用远程调试走一遍首屏到可交互。
 
 **验收标准**：
+
 - 图片传输总字节比改造前下降至少 20%。
 - Lighthouse Performance 分数上升至少 10 分，或 LCP 下降至少 0.5 秒。
 - 支持 WebP 的浏览器中，Network 面板里图片响应的 `Content-Type` 为 `image/webp`。

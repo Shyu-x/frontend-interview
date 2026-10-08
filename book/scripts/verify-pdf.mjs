@@ -14,6 +14,24 @@ const fail = (m) => { problems++; console.log("  FAIL", m); };
 if (Math.abs(w - 185) > 1.5 || Math.abs(h - 260) > 1.5) fail(`页尺寸 ${w.toFixed(1)}×${h.toFixed(1)}mm 不是 16 开`);
 let dup = 0; for (let i = 1; i < T.length; i++) if (T[i] && T[i] === T[i - 1]) dup++;
 if (dup) fail(`${dup} 处相邻两页文字完全相同`);
+// 整页被缩放检测：正文奇数页（右页）的页码紧贴右边距线（185−22=163mm）。
+// 内容被 Chrome 按更宽的版面缩小时，页码会落到约 140mm，页面尺寸检查发现不了这种问题。
+{
+  const MM = 25.4 / 72, bad = [];
+  let tested = 0;
+  for (let n = Math.min(11, doc.numPages); n <= doc.numPages && tested < 6; n += 37) {
+    if (n % 2 === 0) n++;
+    if (n > doc.numPages) break;
+    const pg = await doc.getPage(n), vp = pg.getViewport({ scale: 1 }), items = (await pg.getTextContent()).items.filter((i) => i.str.trim());
+    const foot = items.filter((i) => (vp.height - i.transform[5]) * MM > 240 && /^\d+$/.test(i.str.trim()));
+    if (!foot.length) continue;
+    tested++;
+    const right = Math.max(...foot.map((i) => (i.transform[4] + i.width) * MM));
+    if (right < 158 || right > 166) bad.push(`第 ${n} 页页码右缘 ${right.toFixed(1)}mm（应约 163mm）`);
+  }
+  if (bad.length) fail(`版面疑似被缩放：${bad.join("；")}`);
+}
+
 const manifestPath = file.replace(/\.pdf$/, ".chapters.json");
 let checked = 0, wrong = 0;
 if (existsSync(manifestPath)) {

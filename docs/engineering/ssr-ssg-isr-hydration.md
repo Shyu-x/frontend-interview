@@ -1732,6 +1732,7 @@ function renderHome(products) {
 **怎么度量收益**：用 WebPageTest 跑移动端配置，读 TTFB、Start Render、LCP、TTI 四项。用 Lighthouse 移动端看 Total Blocking Time，它反映主线程被脚本占住多久。用 web-vitals 库在真实设备上上报 LCP 与 INP，按设备档位看分位数。
 
 **什么时候不该用**：
+
 - 首屏内容本身很短且没有交互，SSR 省下的白屏时间小于服务端渲染与传输的开销。
 - 团队没有值守 Node 进程的能力，扩容靠人工，先出 SSG 静态页把线上跑稳。
 - 首屏每个请求都要拉第三方接口且不能缓存，服务端渲染会把接口延迟放大到用户侧。
@@ -1774,6 +1775,7 @@ function handler(req, res) {
 **怎么度量收益**：服务端日志按小时聚合 `x-cache` 的 HIT、STALE、MISS 计数。算回源次数除以总请求数，改 TTL 后重测一次并对比。CDN 面板看缓存命中率与回源带宽。
 
 **什么时候不该用**：
+
 - 页面要显示价格、库存或账户余额，返回过期 HTML 会引发投诉或合规问题。
 - 页面属于超长尾，单个 key 每天的请求次数只有个位数，再生成的算力收不回来。
 
@@ -1811,6 +1813,7 @@ function handler(req, res) {
 **怎么度量收益**：用 Chrome DevTools 的 Performance 面板记录 Scripting 时间与挂载耗时。用 PerformanceObserver 监听 longtask，统计超过 50 毫秒的任务数量。滚动时用 requestAnimationFrame 打点，统计每秒帧数。
 
 **什么时候不该用**：
+
 - 表格数据要出现在搜索结果里，或者链接被分享后首屏必须直接看到数据，CSR 出不来内容。
 - 用户只看首屏前 20 行就离开，客户端取数会多一次往返，SSR 直出这批数据能省下这段时间。
 
@@ -1850,6 +1853,7 @@ function handler(req, res) {
 **目标**：写一个 Node HTTP 服务，对同一批 URL 提供 SSR、SSG、ISR 三种取数方式，并用断言覆盖缓存未命中、命中、过期、再验证四条路径。
 
 **步骤**：
+
 1. 用 `http.createServer` 起服务，路由分三段：`/ssr/`、`/ssg/`、`/isr/`。
 2. `/ssr/` 每次请求都调用 `renderPage`，响应头固定为 `x-cache: BYPASS`。
 3. `/ssg/` 在进程启动时把页面列表全部渲染进内存，请求只读内存，并用计数器记录 `renderPage` 调用次数。
@@ -1859,6 +1863,7 @@ function handler(req, res) {
 7. 再验证分支断言两次请求：第一次响应的 `x-cache` 是 `STALE`，等再生成完成后的那次是 `HIT` 且内容已换。
 
 **验收标准**：
+
 - 四条路径各有断言，`node --test` 全部通过。
 - 过期后的首次响应体仍是旧 HTML，响应头是 `x-cache: STALE`。
 - `/ssg/` 的渲染计数器在多次请求后仍为启动时的次数。

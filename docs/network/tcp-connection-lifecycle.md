@@ -272,6 +272,7 @@ process.on('SIGTERM', () => {
 ### 2.1 为什么是三次握手，不是两次
 
 **两次握手的问题：**
+
 - 无法防止历史连接初始化混乱
 - 无法同步初始序列号 (ISN)
 
@@ -628,6 +629,7 @@ for _ in range(50):
 **怎么度量收益**：客户端看 `ss -tan state time-wait | wc -l` 的峰值；服务端看 `nstat -az` 里的 `TcpExtListenOverflows` 与 `TcpExtListenDrops`，判断瓶颈是否转移到 accept 队列；业务侧用压测工具的请求成功率和 p99 延迟。
 
 **什么时候不该用**：
+
 - 一次性上传单个大文件的接口，每条连接只发一个请求，连接池拿不到复用收益，还多占内存。
 - 客户端与服务端在同一台机器上走回环的压测，源端口不是瓶颈，改连接池测不出差别，这时应先看 accept 队列。
 
@@ -665,6 +667,7 @@ conn.close()
 **怎么度量收益**：看发布期间的重连次数、`ss -tan state fin-wait-2` 与 `close-wait` 的连接数、以及消息丢失率。消息丢失率的算法是服务端发出的笔迹编号序列与落库编号序列做差集。
 
 **什么时候不该用**：
+
 - 对端长时间不发数据，服务端发出 FIN 后对方不回 FIN，连接会停在 FIN_WAIT_2 等超时；业务不在意在途消息时，直接关闭并让客户端重连，代码行数少。
 - 实时语音房间若走 UDP，没有连接与半关闭的概念，这套流程用不上。
 
@@ -695,6 +698,7 @@ nstat -az | grep -i listen
 **怎么度量收益**：看 `nstat -az` 里的 `TcpExtListenOverflows`、`TcpExtListenDrops`、`TcpExtSyncookiesSent`、`TcpExtSyncookiesRecv`；配合正常客户端的握手成功率与首字节延迟。压测时把攻击流量速率和成功率画在同一张图上找拐点。
 
 **什么时候不该用**：
+
 - 纯内网服务之间没有伪造源地址的攻击面，开 SYN Cookie 还要处理 TCP 选项丢失带来的兼容问题。
 - 攻击流量已经打满出口带宽，调内核参数没有效果，要在上游做流量清洗或扩容带宽。
 
@@ -727,6 +731,7 @@ Pod 删除时先执行 preStop，再发 SIGTERM，超过宽限期才 SIGKILL。�
 **目标**：在本机或一台测试机上搭出最小实验，把 TIME_WAIT 的成因和 SYN 队列溢出的现象都复现出来，并留下可复核的记录。
 
 **步骤**：
+
 1. 准备一台 Linux 机器或容器，确认有 `ss`、`nstat`、`python3`，记录 `net.ipv4.tcp_syncookies`、`net.ipv4.tcp_max_syn_backlog`、`net.core.somaxconn` 的当前值。
 2. 写一个最小 TCP 服务端，`listen` 的 backlog 设为 5，接受连接后不读数据。
 3. 用 Python 客户端连续建 200 次连接并立刻关闭，每次之后跑一次 `ss -tan state time-wait | wc -l` 并记录。
@@ -736,6 +741,7 @@ Pod 删除时先执行 preStop，再发 SIGTERM，超过宽限期才 SIGKILL。�
 7. 把两次实验整理成表：参数取值、TIME_WAIT 峰值、`TcpExtListenOverflows`、正常握手成功率，最后把改过的 sysctl 恢复成第 1 步记录的原值。
 
 **验收标准**：
+
 - 能给出连接复用前后 TIME_WAIT 峰值两个数字，并说明差值来自哪一端的主动关闭。
 - 能指出 `ss -tan state time-wait` 输出里哪一列说明本机是主动关闭方。
 - 能在半连接队列打满时复现出 `TcpExtListenOverflows` 增长，并给出开启 SYN Cookie 后的对比数据。

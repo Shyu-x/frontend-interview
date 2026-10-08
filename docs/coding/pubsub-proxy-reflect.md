@@ -83,6 +83,7 @@ emitter.emit('user-login', { username: 'Bob' });
 ```
 
 **关键考点**：
+
 - `this.events` 对象存储结构：键为事件名，值为回调数组
 - `emit` 时遍历数组依次执行回调
 - `off` 使用 `indexOf` + `splice` 移除指定回调
@@ -190,6 +191,7 @@ console.log(count); // 1
 ```
 
 **关键考点**：
+
 - `once` 使用闭包创建 `onceWrapper`，执行后调用 `off` 移除自身
 - `emit` 使用 `[...callbacks]` 浅拷贝避免循环中修改数组导致的问题
 

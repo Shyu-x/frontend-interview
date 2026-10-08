@@ -82,6 +82,7 @@ console.log(`渲染 ${view.length} 行耗时 ${(end - start).toFixed(2)}ms`);
 ```
 
 **这段代码在做什么**
+
 - 用 `node:perf_hooks` 记录一段纯计算的前后时间。
 - 模拟 1 万行数据的过滤与映射，得到 5000 行展示对象。
 - 得到基线耗时，供后续改动对比。
@@ -133,6 +134,7 @@ console.log(`断言通过：长度=${view.length}，耗时=${(end - start).toFix
 - React 官方文档《useMemo》提示用 console.time 测量计算是否昂贵。怎么借鉴：不确定是否值得缓存时，先测该计算单次耗时。
 
 **小结**
+
 - 先度量再改动，避免无效优化。
 - 用 Profiler 和生产构建控制对比环境。
 - 每次改动后回到度量步骤验证结果。
@@ -190,6 +192,7 @@ export default function App() {
 ```
 
 **这段代码在做什么**
+
 - Profiler 包裹 SearchPage 子树。
 - 每次该子树提交更新，onRender 收到四个参数。
 - id 标识哪棵子树。
@@ -242,6 +245,7 @@ console.log(`断言通过：SearchPage 平均更新耗时=${averageDuration(reco
 - React 官方文档《React Developer Tools》说明 Profiler 标签页能以火焰图和排序视图交互查看。怎么借鉴：开发排查优先用开发工具图形界面，自动化度量再用 Profiler 组件。
 
 **小结**
+
 - Profiler 通过 actualDuration 与 baseDuration 揭示渲染热点与 memo 命中情况。
 - 要区分开发构建与 profiling 生产构建的耗时差异。
 - 优先缩小测量范围到可疑子树。
@@ -299,6 +303,7 @@ export default function App() {
 ```
 
 **这段代码在做什么**
+
 - 用 Profiler 包裹 Checkout 子树并指定 id。
 - 生产 profiling 构建下，Checkout 会出现在 Components 性能轨道。
 - 开发构建下，所有组件都会出现在 Components 轨道。
@@ -351,6 +356,7 @@ console.log('断言通过：render 轨道 2 条，paint 轨道 1 条');
 - React 官方文档《Profiler》提到组件被包裹后也会出现在性能轨道。怎么借鉴：为关键交互包裹具名 Profiler。
 
 **小结**
+
 - 性能轨道解决时间线无法按组件归因的问题。
 - 需要 profiling 生产构建才能看到生产环境的组件标记。
 - 先找轨道区间，再回看 Profiler 火焰图确认组件级热点。
@@ -400,6 +406,7 @@ function Page() {
 ```
 
 **这段代码在做什么**
+
 - Page 持有 hovered 状态。
 - 每次 hover 变化，Page 重渲染。
 - BigForm 作为 Page 的子组件也会默认重渲染。
@@ -422,6 +429,7 @@ function Page() {
 ```
 
 **这段代码在做什么**
+
 - HoverBox 自持 hovered 状态，Page 不再持有。
 - hover 变化时只有 HoverBox 重渲染。
 - BigForm 仍可能重渲染，但不再因 Page 的 hover 状态触发。
@@ -448,6 +456,7 @@ function Page() {
 ```
 
 **这段代码在做什么**
+
 - Page 创建 BigForm 并通过 children 传入 HoverBox。
 - HoverBox 更新 hovered 时，不会重新创建 BigForm。
 - 这样 BigForm 默认不会被 hover 状态影响。
@@ -501,6 +510,7 @@ console.log('断言通过：下沉状态后 BigForm 不再进入重渲染列表'
 - React 官方文档《memo》建议不要让表单、hover 等临时状态抬到树顶或全局状态库。怎么借鉴：状态评审时标记“这个状态到底属于哪个组件”。
 
 **小结**
+
 - 不必要渲染的第一原因常常是状态放得太高。
 - children 透传能在父组件更新时天然隔开子组件。
 - 先做结构下沉，再考虑 memo 与缓存。
@@ -568,6 +578,7 @@ export default function App() {
 ```
 
 **这段代码在做什么**
+
 - Greeting 被 memo 包裹，name 是唯一 props。
 - 每次点击只改 count，name 保持 `'Anna'`。
 - React 比较前后 props，Object.is('Anna', 'Anna') 返回 true，跳过渲染。
@@ -612,6 +623,7 @@ console.log('断言通过：props 相同才跳过渲染');
 - React 官方文档《memo》说明单个“总是新”的值足以破坏整棵组件的 memo。怎么借鉴：检查 memo 子组件是否接收每次渲染新建的函数或对象。
 
 **小结**
+
 - memo 在 props 不变时跳过渲染，默认用 Object.is 逐项比较。
 - 对象和函数引用不稳定时 memo 会失效。
 - 仅对高频同 props 且重渲染开销大的组件使用。
@@ -666,6 +678,7 @@ console.log(range);
 ```
 
 **这段代码在做什么**
+
 - scrollTop 除以 rowHeight 得到开始行号。
 - viewportHeight 除以 rowHeight 得到可见行数。
 - end 用总数拦截避免越界。
@@ -721,6 +734,7 @@ console.log('断言通过：可见范围', range);
 - 资料未覆盖，需核对官方文档：React 官方未内置虚拟列表组件，工程中接入第三方虚拟列表库时需核对选型库的 API 与滚动容器要求。
 
 **小结**
+
 - 虚拟列表用 range 计算让 DOM 数量与数据总量解耦。
 - 固定行高实现简单，动态行高需要测量机制。
 - overscan 可减少快速滚动的空白区。
@@ -792,6 +806,7 @@ export default function Editor() {
 ```
 
 **这段代码在做什么**
+
 - lazy 包裹动态 import，模块代码不会进首包。
 - 首次勾选显示预览时才发请求。
 - Suspense 在请求完成前渲染 fallback。
@@ -853,6 +868,7 @@ console.log('断言通过：load 只被调用一次，Promise 被缓存');
 - React 官方文档《lazy》说明 Promise 拒绝时交由最近的 Error Boundary 处理。怎么借鉴：懒加载模块必须配错误边界。
 
 **小结**
+
 - lazy 延迟组件代码下载到首次渲染时。
 - Suspense 提供加载期间的回退 UI。
 - 拆包要按使用频率切分，并用错误边界兜底。
@@ -920,6 +936,7 @@ export default function Search({ items }) {
 ```
 
 **这段代码在做什么**
+
 - `setQuery` 直接执行，保证输入实时显示。
 - 结果过滤通过 `startTransition` 包住，属于非紧急更新。
 - `isPending` 表示后台过滤尚未完成。
@@ -968,6 +985,7 @@ console.log('断言通过：紧急输入先于后台过滤');
 - React 官方文档在 memo 的内容中指出 Effect 更新状态是常见性能问题，应减少不必要的状态链。怎么借鉴：transition 只能缓解计算阻塞，不能替代对状态更新链的治理。
 
 **小结**
+
 - transition 区分紧急与非紧急更新，保证输入不被慢计算阻塞。
 - 只把可延迟的结果更新放进 startTransition。
 - 纯计算过重时仍需拆分任务或移动 worker。
@@ -1018,6 +1036,7 @@ function List({ rows }) {
 ```
 
 **这段代码在做什么**
+
 - Row 用 memo 跳过未变 props 的渲染。
 - List 用 useMemo 缓存过滤结果。
 - 手写缓存让数据变化不频繁时不重复计算。
@@ -1037,6 +1056,7 @@ function List({ rows }) {
 ```
 
 **这段代码在做什么**
+
 - 直接写组件逻辑，不再出现 memo、useMemo。
 - 等价缓存交给编译器生成。
 - 代码可读性提高，依赖数组消失。
@@ -1080,6 +1100,7 @@ console.log('断言通过：仅纯函数且无不稳定依赖的手写缓存可�
 - React 官方文档《memo》指出 React Compiler 能自动应用等价 memo。怎么借鉴：组件级 memo 也在可删列表，但需结合 Profiler 复核跳过效果。
 
 **小结**
+
 - React Compiler 自动生成等价缓存，减少手写 memo 化。
 - 可删除的前提是纯渲染逻辑与稳定依赖。
 - 删除后仍需用 Profiler 和测试基线复核，不因开启 Compiler 就跳过度量。
@@ -1102,12 +1123,14 @@ console.log('断言通过：仅纯函数且无不稳定依赖的手写缓存可�
 **目标**：做一个 10 万行虚拟日志查看器，输入过滤后不卡输入，并对结果列表做可验证的优化。
 
 **步骤**
+
 1. 用固定行高实现可见行范围计算函数，并写 4 条 node:assert 断言。
 2. 在 React 页面里只渲染可见行，设置总占位高度。
 3. 输入过滤放入 startTransition，观察输入框不被过滤阻塞。
 4. 用 Profiler 比较开启过滤时渲染耗时，记录基线。
 
 **验收标准**
+
 - 10 万行数据下首屏只渲染不超过 30 行，DOM 节点数量可数。
 - 输入过滤时输入框字符实时出现，无肉眼可见卡顿。
 - 提交 Profiler 基线、优化后 actualDuration 对比和全部断言的输出。

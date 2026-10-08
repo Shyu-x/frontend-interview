@@ -492,11 +492,13 @@ pnpm --filter admin-web build         # 再构建应用，验证依赖能否解�
 - 共享构建工具在根目录声明一次；若要用 catalog 收敛版本，字段名与最低版本需核对官方文档。
 
 **怎么度量收益**：
+
 - 安装与构建耗时：在 CI 日志里给 `pnpm install --frozen-lockfile` 与 `pnpm -r build` 分别打时间戳，对比改造前后同一条流水线的同一阶段。
 - 漏声明依赖：跑构建，统计模块解析失败的次数；也可用 knip，或 eslint-plugin-import 的 no-extraneous-dependencies 规则扫描。
 - node_modules 体积：`du -sh node_modules`；软链结构下 `du` 默认不跟随链接，需要 `du -shL`，或直接量 `pnpm store path` 指向的目录。
 
 **什么时候不该用**：
+
 - 只有一个应用、没有可复用的包：拆 workspace 只是多一层目录和一套构建配置。
 - 打包工具链依赖扁平 node_modules（按目录层级找模块的老打包器）：要么配 node-linker=hoisted，要么这段收益抵不过改造成本。
 - 团队还没有统一的锁文件提交规范：先解决锁文件冲突，再拆包。
@@ -536,11 +538,13 @@ pnpm install --frozen-lockfile  # 复现安装，确认 peer 冲突会直接失�
 - `pnpm why` 的输出条目从多条变成一条，就是这次改造的直接证据。
 
 **怎么度量收益**：
+
 - 实例数量：`pnpm why yjs` 打印的条目数；或构建产物 sourcemap 里同一模块文件路径出现的次数。
 - 拦截能力：故意把宿主应用的 yjs 版本改到 peer 范围外，跑 `pnpm install --frozen-lockfile`，确认安装失败并打印冲突的包名与版本范围。
 - 运行时校验：在应用启动脚本里从两个包分别 import 引擎的构造入口，做严格相等比较，值不同说明存在两份实例。
 
 **什么时候不该用**：
+
 - 只有一个包用这个引擎：加 peer 只是多一层声明，直接写 dependencies 就够。
 - 架构上每个副本必须彼此隔离（例如服务端按请求隔离实例）：单例约束会变成功能限制。
 - 上游库本身不承诺跨实例协作：先看它的文档，再决定是否收敛到一份。
@@ -570,12 +574,14 @@ RUN pnpm --filter @acme/api deploy --prod ./deploy
 - `pnpm deploy` 的参数在较新版本里有过调整，落地前需核对官方文档 deploy 页面：是否需要 --legacy，以及适用的 workspace 配置。
 
 **怎么度量收益**：
+
 - 部署目录体积：`du -sh deploy`，与直接打包整个仓库 node_modules 的结果对比。
 - 依赖条目数：`ls deploy/node_modules | wc -l`。
 - 冷启动耗时：云平台控制台里该函数的 Duration 指标，取 P50 与 P95 做改造前后对比。
 - 构建缓存：Docker 构建日志里依赖层是否显示 CACHED。
 
 **什么时候不该用**：
+
 - 单体应用只有一个部署目标：多加一层 deploy 只增加流水线步骤。
 - 依赖带原生模块或安装时下载二进制（例如浏览器内核）：离线安装会失败，需要提前把产物放进镜像。
 - 运行时要求依赖平铺在仓库根目录：先确认 deploy 产物能否满足，再决定是否采用。
@@ -609,6 +615,7 @@ RUN pnpm --filter @acme/api deploy --prod ./deploy
 目标：把一个"应用和组件混在同一个 package"的小仓库改造成 pnpm workspace，并亲眼看到幽灵依赖被拦住。
 
 步骤：
+
 1. 新建仓库，包含 `apps/web` 与 `packages/table` 两个目录，根目录写 `pnpm-workspace.yaml`，packages 字段填 `apps/*` 与 `packages/*`。
 2. 在 `apps/web/package.json` 里用 `workspace:*` 引用本地表格包，暂时不声明这个包内部用到的第三方库。
 3. 在根目录跑 `pnpm install --frozen-lockfile`，记录安装是否通过。
@@ -618,6 +625,7 @@ RUN pnpm --filter @acme/api deploy --prod ./deploy
 7. 记录 `du -sh node_modules`、`ls node_modules | wc -l`、`pnpm store path` 指向目录的体积，与改造前对比。
 
 验收标准：
+
 - 第 4 步必须失败，且报错信息里出现未声明包的名字。
 - 第 5 步之后 `pnpm install --frozen-lockfile` 与构建都通过。
 - 第 6 步必须失败在安装阶段，输出里能看到冲突的包名与版本范围。

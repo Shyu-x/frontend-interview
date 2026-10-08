@@ -89,6 +89,7 @@ const analyzeCompetitor = createSubAgent("竞品分析", async (task) => {
 ```
 
 **这段代码在做什么**
+
 - `createSubAgent` 是一个工厂函数，接收名称和业务处理函数。
 - 返回的 `run` 函数就是主 agent 将来调用的工具。
 - `task` 参数是主 agent 传给子 agent 的结构化任务。
@@ -120,6 +121,7 @@ console.log(results);
 ```
 
 **这段代码在做什么**
+
 - `Promise.all` 让三个子 agent 同时执行。
 - 每个子 agent 只接收自己的任务对象。
 - 主 agent 最终拿到一个结果数组，长度与任务数组一致。
@@ -264,6 +266,7 @@ const auditCode = createBudgetedSubAgent("代码审计", async (task) => {
 ```
 
 **这段代码在做什么**
+
 - `defaultBudget` 是该工具的默认预算，调用方也可以显式传入。
 - 预算校验放在执行前，负数或缺失立即抛错。
 - 返回对象包含 `agent` 和 `budget` 字段，方便追踪消耗。
@@ -312,6 +315,7 @@ const out = await auditCodeAgent({ task: { file: "index.js" } });
 console.log(checkResultSize(out));
 ```
 **这段代码在做什么**
+
 - 用字符长度粗略估算 token 数：每 4 个字符约 1 token。
 - 超过上限直接抛错，而不是静默截断。
 - 这一步放在主 agent 侧，防止子 agent 返回超大结果。
@@ -445,6 +449,7 @@ console.log(compressResult(raw, { confidence: 0.9 }));
 ```
 
 **这段代码在做什么**
+
 - 先按行拆分，过滤空行。
 - 取第一行作为摘要候选，截取前 80 个字符。
 - 提取前三个词作为关键词，便于主 agent 做快速匹配。
@@ -481,6 +486,7 @@ console.log(addEvidenceIndex(compressed, raw));
 ```
 
 **这段代码在做什么**
+
 - 遍历原始输出的每一行。
 - 碰到含关键字的行，记录行号和截断内容。
 - 主 agent 将来可按行号回查完整原始数据。
@@ -610,6 +616,7 @@ export class TaskGraph {
 ```
 
 **这段代码在做什么**
+
 - `tasks` 保存任务 id 到执行函数的映射。
 - `deps` 保存每个任务依赖的 id 列表。
 - `addDependency` 插入依赖前先检查两个任务都存在。
@@ -647,6 +654,7 @@ export function topologicalSort(graph) {
 ```
 
 **这段代码在做什么**
+
 - 计算每个任务的入度，也就是它依赖的任务个数。
 - 入度为零的任务先进入队列。
 - 每次从队列取出一个任务，并把依赖它的任务入度减一。
@@ -685,6 +693,7 @@ for (const id of order) {
 ```
 
 **这段代码在做什么**
+
 - 构建五节点依赖图，依赖关系与第 1 节图一致。
 - 先拓扑排序，确保每个任务执行前依赖已完成。
 - 按顺序执行每个任务并打印结果。
@@ -833,6 +842,7 @@ export class TaskScheduler {
 ```
 
 **这段代码在做什么**
+
 - `maxConcurrency` 限制同时执行的任务数。
 - `active` 记录当前正在跑的任务数量。
 - `queue` 保存等待执行的任务闭包。
@@ -877,6 +887,7 @@ console.log(await flaky());
 ```
 
 **这段代码在做什么**
+
 - `withRetry` 包装 handler，失败后自动重试。
 - 重试次数用完后仍然失败，原样抛出错误。
 - 退避时间按 100ms、200ms、400ms 递增。
@@ -1023,6 +1034,7 @@ export class BackgroundTaskManager {
 ```
 
 **这段代码在做什么**
+
 - `submit` 创建任务记录并立即开始异步执行。
 - `execute` 内部先标 running，完成后标 success 或 failed。
 - `poll` 按句柄查询当前状态和结果。
@@ -1062,6 +1074,7 @@ const handle = mgr.submit(async () => {
 console.log(await waitForTask(mgr, handle));
 ```
 **这段代码在做什么**
+
 - 循环调用 poll，间隔 100ms。
 - success 直接返回结果，failed 抛出错误。
 - 超过超时时间仍未成功则抛超时错误。
@@ -1196,6 +1209,7 @@ export class RWState {
 ```
 
 **这段代码在做什么**
+
 - `read` 返回浅拷贝，阻断外部直接修改内部数据。
 - `write` 把所有写操作串到一个 Promise 链上。
 - `previous.then(() => current)` 保证下一个写者等前一个释放。
@@ -1222,6 +1236,7 @@ console.log(s.read());
 ```
 
 **这段代码在做什么**
+
 - 两个写入同时被提交。
 - 串行机制保证第二次写看到第一次写后的 count。
 - 如果并行写不加锁，两个任务都读到 count 为 0，都写 1，最终是 1 而不是 2。
@@ -1351,6 +1366,7 @@ console.log(await waitForTask(bg, handle));
 ```
 
 **这段代码在做什么**
+
 - 任务图负责依赖关系，拓扑排序给合法顺序。
 - 调度器控制并发数，后台任务管理器提供句柄和查询。
 - 七天学的子 agent、状态管理、错误处理（前面章节）都在这条链路里。
@@ -1373,6 +1389,7 @@ console.log(await waitForTask(bg, handle));
 | 依赖调度 | 拓扑排序加并发限制 | 未公开完整调度实现 | 需核对官方文档：任务图支持度 |
 
 **这段对比在做什么**
+
 - 只有 Claude Code 的公开实现与本站架构有较高对应度。
 - 未公开的部分用“需核对官方文档”标注，不编造细节。
 - 对照的目的是定位本站内容在真实系统中的位置。

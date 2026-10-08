@@ -83,6 +83,7 @@ appendMessage({ id: 'm1', role: 'user', content: '退款怎么查' });
 ```
 
 **这段代码在做什么**
+
 - `createWriteStream` 打开文件，`flags: 'a'` 表示追加到末尾。
 - `JSON.stringify` 把消息对象压成一行。
 - `+ '\n'` 是关键，提供行结束标志。
@@ -121,6 +122,7 @@ console.log(recovered.length);
 ```
 
 **这段代码在做什么**
+
 - `readFileSync` 一次读入全部文本，适合本地中小型会话文件。
 - `split('\n')` 按行拆开。
 - 空行跳过，避免文件末尾多余换行产生空项。
@@ -205,6 +207,7 @@ stream.on('finish', () => {
 怎么借鉴到你的项目：先采用 JSONL 追加写满足本地可恢复；当出现多进程写入、随机查找时再迁到 SQLite。
 
 **小结**
+
 - JSONL 一行一条消息，追加写是最小持久化方案。
 - 重启恢复只认行尾完整、能 JSON.parse 的行。
 - 单进程顺序写是优先选择，多进程写入要另加锁。
@@ -264,6 +267,7 @@ console.log(userMsg.id.length);
 ```
 
 **这段代码在做什么**
+
 - `randomUUID` 生成 36 位字符串，冲突概率可忽略。
 - `role` 保存消息身份。
 - `ts` 保存写入时间。
@@ -292,6 +296,7 @@ console.log(session.map((m) => m.id));
 ```
 
 **这段代码在做什么**
+
 - `loadCompleteLines` 得到可恢复的消息数组。
 - `filter` 去掉没有 ID 或 role 的脏数据。
 - 先按时间戳升序排序。
@@ -370,6 +375,7 @@ console.log('验证通过：3 条消息按时间恢复，ID 不重复');
 怎么借鉴到你的项目：消息结构一开始就带 `id` 和 `ts`，不要等需要恢复时再补字段。
 
 **小结**
+
 - 每条消息必须有唯一 ID 和排序依据。
 - 恢复后按时间与 ID 排序发送。
 - ID 稳定是后续压缩、缓存、工具配对的基础。
@@ -424,6 +430,7 @@ console.log(chooseStore({ messageCount: 200, needRandomLookup: true }));
 ```
 
 **这段代码在做什么**
+
 - `messageCount` 只做粗略阈值，不是性能结论。
 - `needRandomLookup` 表示是否需要按 ID 或角色查询。
 - 小于 100000 条且顺序重放时选 JSONL。
@@ -453,6 +460,7 @@ CREATE INDEX idx_messages_session_created
 ```
 
 **这段代码在做什么**
+
 - 表结构把消息挂到 `session_id`。
 - `id` 作为主键，支持单条查询。
 - `created_at` 保留时间顺序。
@@ -521,6 +529,7 @@ console.log('验证通过：三种选择分支符合预期');
 怎么借鉴到你的项目：保留消息原始顺序，SQLite 只作为检索副本，不替代顺序回放。
 
 **小结**
+
 - JSONL 适合顺序重放，SQLite 适合随机查询。
 - 从 JSONL 迁到 SQLite 不是性能自动提升，要按查询模式判断。
 - 先保存顺序，再建索引，顺序信息不要丢。
@@ -574,6 +583,7 @@ console.log(estimateTokens({ id: 'm1', role: 'user' }));
 ```
 
 **这段代码在做什么**
+
 - 先区分中文字符和其他字符。
 - 中文按每个字计 1，作为本地工程估算。
 - 其他字符每 4 个计 1。
@@ -610,6 +620,7 @@ console.log(shouldCompress(fakeMessages));
 ```
 
 **这段代码在做什么**
+
 - `budget` 表示模型上下文上限。
 - 水线设为 80%，给压缩过程和回复预留空间。
 - `reduce` 累加每条消息结构序列化后的 token 估算。
@@ -678,6 +689,7 @@ console.log(`验证通过：估算 ${total} token，水线 ${waterline}，触发
 怎么借鉴到你的项目：先做工程估算，发现频繁误判时引入官方 tokenizer 校准。
 
 **小结**
+
 - token 估算用于水线判断，不用于内部精确计费。
 - 水线留出压缩和回复空间，通常设为预算的 80% 再实测。
 - 估算要把整条消息序列化，漏算工具字段会早爆窗口。
@@ -744,6 +756,7 @@ function findSafeCut(messages, keepLast = 8) {
 ```
 
 **这段代码在做什么**
+
 - `keepLast` 是想保留的消息条数。
 - 第一次先按条数切出候选点。
 - 每次循环只检查保留段开头到结尾的孤立 `tool_result`。
@@ -776,6 +789,7 @@ console.log(messages.slice(cut).map((m) => m.id));
 ```
 
 **这段代码在做什么**
+
 - 原始消息里 `r2`、`r3` 缺少对应 `tool_use`。
 - 候选 `cut = 3` 时保留段从 `m3` 开始。
 - 扫描保留段发现 `r2` 孤立。
@@ -866,6 +880,7 @@ console.log('验证通过：孤立 tool_result 不会单独留在保留段');
 怎么借鉴到你的项目：每次构造上下文前跑一遍 `findSafeCut`，不要等到模型报错再处理。
 
 **小结**
+
 - 压缩切点必须以工具配对为最小单位。
 - 安全切点算法反复把孤立结果后的索引向后移。
 - 嵌套工具调用需要更细的父子结构，本页线性算法先用。
@@ -919,6 +934,7 @@ function createLocalSummary(oldMessages, maxText = 300) {
 ```
 
 **这段代码在做什么**
+
 - 先取旧消息的 role 或 type。
 - `content` 可能缺失，工具消息没有该字段时回退到 id。
 - 把全部文本拼在一起。
@@ -952,6 +968,7 @@ console.log(compressBySummary(demo, 2));
 ```
 
 **这段代码在做什么**
+
 - `compressCount` 表示要压缩的最旧消息数。
 - `old` 会被替换，`recent` 继续保留。
 - 摘要消息放在最前面，充当历史背景。
@@ -1035,6 +1052,7 @@ console.log('验证通过：旧消息被摘要替换，最近消息保留');
 怎么借鉴到你的项目：先做本地截断摘要跑通链路，再接模型生成摘要，最后比较答案完整率。
 
 **小结**
+
 - 摘要压缩的目标是用一条消息替换一批旧消息。
 - 本地截断只验证数据流，不代表语义总结。
 - 摘要要放在 system 或最近消息之前，避免角色顺序错乱。
@@ -1094,6 +1112,7 @@ function cleanToolResult(msg, maxBytes = 1024) {
 ```
 
 **这段代码在做什么**
+
 - 只处理 `type` 为 `tool_result` 的消息。
 - 非字符串内容先 JSON 序列化，保证能统一按文本处理。
 - `Buffer.byteLength` 得到字节数，不是字符串长度。
@@ -1133,6 +1152,7 @@ console.log(cleanContextToolResults(sample));
 ```
 
 **这段代码在做什么**
+
 - `map` 遍历全部消息，保持顺序。
 - 只对 `tool_result` 计算清理前大小。
 - `cleanToolResult` 清理后计算后大小。
@@ -1208,6 +1228,7 @@ console.log('验证通过：大结果清理，小结果保留');
 怎么借鉴到你的项目：先对超过 1024 字节的结果清理，再用任务成功率决定是否调高阈值。
 
 **小结**
+
 - 工具结果清理要保留 tool_use 与 tool_result 配对。
 - 清理后内容包含字节数、哈希和片首，方便追回原文。
 - 哈希不可逆，原始结果需要外部存储或日志兜底。
@@ -1261,6 +1282,7 @@ console.log(keyA === keyB);
 ```
 
 **这段代码在做什么**
+
 - `model` 和 `systemVersion` 进入 cache key。
 - 消息数组经过完整 JSON 序列化，顺序变化会影响 key。
 - SHA-256 输出固定长度哈希。
@@ -1300,6 +1322,7 @@ console.log(first.hit, second.hit);
 ```
 
 **这段代码在做什么**
+
 - `contextCache` 是进程内 Map，键为哈希。
 - 首次拼装后写入缓存。
 - 第二次相同输入直接返回缓存。
@@ -1379,6 +1402,7 @@ console.log('验证通过：相同输入命中缓存，变化输入重新拼装'
 怎么借鉴到你的项目：先在客户端做本地缓存，再与模型服务端缓存配合，避免重复拼装和重复计费。
 
 **小结**
+
 - 缓存键包含模型、系统版本和消息数组。
 - 本地 Map 缓存只做拼装复用。
 - 缓存命中不代表模型服务端一定缓存命中，需分开验证。
@@ -1400,12 +1424,14 @@ console.log('验证通过：相同输入命中缓存，变化输入重新拼装'
 
 目标：写一个 CLI 会话管理器，能追加消息、崩溃恢复、触发压缩、复用缓存。  
 步骤：
+
 1. 用 `createWriteStream` 追加写 JSONL，消息带 `id`、`role`、`content`、`ts`。
 2. 读取时跳过不完整行，按 `ts` 排序。
 3. 当 `estimateTokens` 超过预算 80% 时，对最旧 20% 消息做摘要压缩。
 4. 用 `contextCacheKey` 做上下文本地缓存。
 
 验收标准：
+
 - 运行 `node session-manager.js append user 你好` 后，文件新增一行完整 JSON。
 - 手动在文件末尾写入半行 JSON 后，恢复函数只返回完整消息。
 - 构造 30 条长消息后，压缩函数返回的系统摘要消息在数组第一位，且数组条数减少 20%。

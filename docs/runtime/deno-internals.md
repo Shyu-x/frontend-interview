@@ -1110,6 +1110,7 @@ deno run \
 指标是 CI 日志里权限拒绝的次数、脚本中读取环境变量的处数。测量方法：把 Deno 的 stderr 收进 CI 日志，按错误类型聚合；用 `grep -rc "PermissionDenied" ./ci-logs` 统计。
 
 **什么时候不该用**
+
 - 脚本要写回文件做自动修复时，只给 --allow-read 会让任务失败，得按目录加 --allow-write。
 - 脚本是原生二进制或依赖 .node 插件，权限白名单管不住它，需要换成容器隔离。
 - 一旦授予 --allow-ffi，脚本能调系统库读写任意文件，沙箱在这条路径上不生效。
@@ -1154,6 +1155,7 @@ Deno.serve({ hostname: "0.0.0.0", port: 8000 }, (req) => {
 指标是同房间广播的 p95 延迟、单进程并发连接数、常驻内存增长。测量方法：用 k6 的 WebSocket 场景脚本压测，读它输出的 `ws_msgs_received` 与自定义 Trend；内存用定时打印 `Deno.memoryUsage()` 画 heapUsed 曲线。
 
 **什么时候不该用**
+
 - 要开多实例时内存里的 rooms 不共享，必须接 Redis 之类的 pub/sub。
 - 需要回放历史笔画做持久化，只给 --allow-net 不够，要加数据库域名白名单。
 - 客户端是弱网低端安卓，重连风暴会顶满单进程连接数，前面得加限流网关。
@@ -1190,6 +1192,7 @@ Deno.serve({ hostname: "0.0.0.0", port: 8000 }, (req) => {
 指标是 CI 测试任务耗时、依赖树条数、因 Node 版本不一致导致的失败次数。测量方法：用 `npm ls --all --parseable | wc -l` 数依赖条数，同一分支切换前后各记一次。
 
 **什么时候不该用**
+
 - 包里有原生插件（.node）或依赖 node-gyp 编译，兼容层覆盖不到，迁移会卡住。
 - 代码依赖安装期的生命周期脚本生成产物，需核对官方文档：Deno 执行 postinstall 的条件与开关名称。
 - 需要调本地 C 库时要用 FFI，进程能绕出权限模型，必须靠容器补边界。
@@ -1224,6 +1227,7 @@ workflow 或 job 里写 permissions: contents: read，默认令牌权限可在�
 写一个带房间的聊天服务，用 Deno.serve 与 WebSocket 广播，并且只用一条网络权限启动，同时证明它读不到环境变量。
 
 **步骤**
+
 1. 新建目录，写 deno.json，声明 imports 里的 @std/assert 与 tasks 里的 start、test。
 2. 写 server.ts，用 Deno.serve 加 Deno.upgradeWebSocket 实现按 room 广播。
 3. 把启动命令固定成 deno run --allow-net=0.0.0.0:8000 server.ts，写进 tasks.start。
@@ -1233,6 +1237,7 @@ workflow 或 job 里写 permissions: contents: read，默认令牌权限可在�
 7. 把全部命令与权限参数记进 README，逐个原样复制验证一遍。
 
 **验收标准**
+
 - deno task test 全部通过，测试文件里不出现 -A。
 - 启动命令只有 --allow-net=0.0.0.0:8000 一个权限参数。
 - probe.ts 不加 --allow-env 时退出码非 0，stderr 含权限名。

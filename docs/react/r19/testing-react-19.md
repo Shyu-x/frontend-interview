@@ -1332,6 +1332,7 @@ describe("AsyncList", () => {
 ??? question "1. 为什么组件测试不建议直接断言 useState 的值？"
 
 答案要点：
+
 - useState 是组件内部实现。
 - 重构状态变量名或类型时测试会失败。
 - 用户无法看见 state，只能看见渲染结果。
@@ -1340,6 +1341,7 @@ describe("AsyncList", () => {
 ??? question "2. Testing Library 的查询优先级中，哪种查询应该最先使用？"
 
 答案要点：
+
 - 最先使用 `getByRole`。
 - 它根据可访问角色和名称查询。
 - 其次可用 `getByLabelText` 和 `getByText`。
@@ -1348,6 +1350,7 @@ describe("AsyncList", () => {
 ??? question "3. `findByRole` 和 `getByRole` 有什么区别？"
 
 答案要点：
+
 - `getByRole` 立即查询，找不到会抛错。
 - `findByRole` 返回 Promise，会重试直到超时。
 - 异步更新后的元素应使用 `findByRole`。
@@ -1356,6 +1359,7 @@ describe("AsyncList", () => {
 ??? question "4. 如何测试 React 19 的 Actions 提交中状态？"
 
 答案要点：
+
 - 使用可控的异步 action mock。
 - 点击提交后立即查找“提交中”按钮。
 - 用 `findByRole` 等待 pending 状态。
@@ -1365,6 +1369,7 @@ describe("AsyncList", () => {
 ??? question "5. Server Components 能在 jsdom 中直接渲染吗？"
 
 答案要点：
+
 - 通常不能。
 - Server Components 依赖服务端环境。
 - 应拆出数据访问函数在 Node 中测试。
@@ -1374,6 +1379,7 @@ describe("AsyncList", () => {
 ??? question "6. mock 应该用于哪些依赖？"
 
 答案要点：
+
 - 数据库、网络 API、第三方服务等外部边界。
 - 运行慢或不可控的模块。
 - 不应该 mock 组件自身逻辑。
@@ -1382,6 +1388,7 @@ describe("AsyncList", () => {
 ??? question "7. Vitest 浏览器模式解决了 jsdom 的什么限制？"
 
 答案要点：
+
 - jsdom 不实现布局引擎。
 - `offsetHeight` 等属性在 jsdom 中为 0。
 - 浏览器模式运行真实内核。
@@ -1391,6 +1398,7 @@ describe("AsyncList", () => {
 ??? question "8. 列出两个常见脆弱测试模式及其修复方式。"
 
 答案要点：
+
 - 固定时间等待，改为 `findBy*` 或 `waitFor`。
 - 依赖测试执行顺序，增加测试隔离和清理。
 - 断言内部状态，改为断言可见内容。

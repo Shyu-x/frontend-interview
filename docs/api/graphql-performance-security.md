@@ -98,6 +98,7 @@ console.log("执行结束");
 ```
 
 **这段代码在做什么**
+
 - 这段代码不依赖 graphql-js，用手动递归扮演引擎，打印真实的调用顺序。
 - `view` 模拟一台解析器：打印字段名和父对象 id，再返回字段值。
 - 外层先调用 `authors`，打印出父对象 id 为"根"。
@@ -153,6 +154,7 @@ console.log("预期输出：调用顺序 authors name posts title tags");
 | 父对象传进子解析器是 undefined | 上一级解析器忘了 return 对象 | 检查父字段解析器是否返回了对象 |
 
 **小结**
+
 - GraphQL 执行是深度优先递归下降，遇到字段就调用它的解析器。
 - 响应结构和查询结构一致，但内部调用路径是一条先下后回的线。
 - 理解这一点，才能定位后面 N+1 与批处理为什么有效。
@@ -221,6 +223,7 @@ function findPosts(pId) {
 ```
 
 **这段代码在做什么**
+
 - `db` 模拟作者表与文章表，作者和文章用 `pId` 关联。
 - `findAuthors` 和 `findPosts` 每次调用都让 `queryCount` 加 1。
 - 测试结束时读 `queryCount`，就能数出逻辑上访问了几次数据库。
@@ -243,6 +246,7 @@ console.log(out.length, "个作者，共查询", queryCount, "次");
 ```
 
 **这段代码在做什么**
+
 - `resolveAuthorsNPlusOne` 先查列表，这是 GraphQL `authors` 字段的逻辑。
 - `map` 回调里对每个作者调用一次 `findPosts`，相当于逐个子字段解析器。
 - 3 个作者让 `findPosts` 被调用 3 次。
@@ -286,6 +290,7 @@ console.log("预期输出：查询次数 4");
 | 列表为空时详情查询为 0 次 | 空列表不会进入 map 回调 | 正常行为，但复杂度预算要按查询文本而非结果算 |
 
 **小结**
+
 - N+1 的根因是列表字段逐个进入子解析器，子解析器逐个查库。
 - 1 次列表加 N 次详情，N 等于列表元素个数，是可复现的计数结论。
 - 修复方向是让相邻的详情请求共享一次批量查询，下一节动手写。
@@ -364,6 +369,7 @@ class MiniLoader {
 ```
 
 **这段代码在做什么**
+
 - `load(key)` 先查缓存，同一请求里重复 key 只进队一次。
 - 没命中就创建 Promise，把 key 和 resolve、reject 一起推进 `queue`。
 - 每个请求周期里只有第一次 `load` 排定微任务，后续 load 只入队。
@@ -383,6 +389,7 @@ async function batchFindPosts(userIds) {
 ```
 
 **这段代码在做什么**
+
 - `batchFindPosts` 接收 key 数组，返回与 key 数组等长的结果数组。
 - 内部只让 `queryCalls` 加 1，对应一条 SQL 的 `IN` 批量查询。
 - 返回顺序必须与 `userIds` 相同，所以用 map 保序。
@@ -408,6 +415,7 @@ resolveAuthorsWithLoader("").then((out) => {
 ```
 
 **这段代码在做什么**
+
 - 列表部分仍然只查一次，这是 DataLoader 不负责的部分。
 - 每个作者调用 `loader.load(a.id)`，在 await 前同步排队。
 - 同步阶段结束，微任务触发 dispatch，把所有 id 一次交给批处理函数。
@@ -479,6 +487,7 @@ console.log("预期输出：批处理调用次数 1");
 | 同步读不到 load 的结果 | load 返回 Promise | 用 await 或 then 读取结果 |
 
 **小结**
+
 - DataLoader 用队列加微任务，把同轮同步 load 合并成一次批处理。
 - 请求级缓存让相同 key 在一个请求里只加载一次。
 - 批处理函数必须保持结果数组与 key 数组顺序一致。
@@ -538,6 +547,7 @@ console.log(doc.definitions[0].kind);
 ```
 
 **这段代码在做什么**
+
 - 从 graphql 包引入 `parse`，这是 graphql-js 的公开 API。
 - 模板字符串里是两层嵌套：authors 一层，posts 一层。
 - `parse(query)` 返回 DocumentNode，里面是描述查询结构的 AST 树。
@@ -579,6 +589,7 @@ function analyze(query, { maxDepth = 5, costBudget = 30 } = {}) {
 ```
 
 **这段代码在做什么**
+
 - `visit` 提供 `Field` 访问器，引擎进出一个字段节点时调用 `enter` 与 `leave`。
 - `depth` 随 `enter` 加一、`leave` 减一，记录当前嵌套层数。
 - `maxSeen` 保存遍历过程中出现过的最大深度。
@@ -597,6 +608,7 @@ console.log(report);
 ```
 
 **这段代码在做什么**
+
 - `deepQuery` 有 a1 到 a4 再 name，共 5 层，超过 maxDepth 4。
 - `analyze` 沿字段树进进出出，`maxSeen` 累计到 5。
 - 总成本同为 5，没有超过 30，但深度已超限。
@@ -654,6 +666,7 @@ console.log("预期输出：normal 最大深度 3");
 | fragment 的深度少算了 | 遍历时未展开片段 | 对 fragment 节点做同样深度累计，或引入 graphql-depth-limit 规则 |
 
 **小结**
+
 - 深度限制按嵌套层数拦截，复杂度限制按字段成本总和拦截。
 - 两者都发生在执行前，输入是 parse 后的 AST，不碰数据库。
 - 列表字段应给更高权重，因为它的成本随父级元素数量放大。
@@ -722,6 +735,7 @@ function registerQuery(queryText, schema) {
 ```
 
 **这段代码在做什么**
+
 - `registerQuery` 接收查询文本与 schema，在注册阶段完成 parse 和 validate。
 - 哈希使用 `crypto.createHash('sha256')`，这是 Node 20 内置 API。
 - 校验失败的查询在注册时被拒绝，不会进入线上执行。
@@ -743,6 +757,7 @@ console.log(executeById("not-registered", {}).doc);
 ```
 
 **这段代码在做什么**
+
 - `executeById` 的签名里没有 query 参数，只接受 queryId 和变量。
 - 用 `queryStore.get` 查找预登记文档，查不到抛出"未注册"错误。
 - 找到的文档已通过校验，线上阶段无需重新 parse。
@@ -764,6 +779,7 @@ console.log(id1 === id2, id1 === id3);
 ```
 
 **这段代码在做什么**
+
 - schema 声明 hello 与 world 两个字段，保证两条查询都能过校验。
 - 两次注册相同文本，`id1` 与 `id2` 相等，证明哈希是确定性的。
 - `id3` 来自不同文本，与 `id1` 完全不同。
@@ -812,6 +828,7 @@ console.log("预期输出：queryId 前 12 个字符，一段十六进制");
 | 相同查询算出不同 ID | 哈希前文本未规范化，空行注释不同 | 注册与请求两端使用同一个规范化查询字符串 |
 
 **小结**
+
 - 持久化查询把动态 query 变为提前注册的固定 ID，省传输与 parse 成本。
 - 注册阶段完成 parse 与 validate，线上阶段免做这两步。
 - 未注册的 ID 应被拒绝，不应退回执行任意 query。
@@ -868,6 +885,7 @@ query ProductDetail($id: ID!) {
 ```
 
 **这段代码在做什么**
+
 - 查询里 `title` 与 `price` 是快字段，`reviews` 是慢字段。
 - `@defer` 标在 `reviews` 上，表示它不在第一批响应里。
 - 服务端先返回 title 和 price，reviews 数据到达后再补发。
@@ -886,6 +904,7 @@ query Feed($first: Int!) {
 ```
 
 **这段代码在做什么**
+
 - `@stream(initialCount: 2)` 表示先下发前 2 个元素。
 - 后续元素按服务端分批大小继续以补丁下发。
 - 与 @defer 不同，@stream 针对列表元素，并非延后整个字段。
@@ -914,6 +933,7 @@ console.log(JSON.stringify(result, null, 2));
 ```
 
 **这段代码在做什么**
+
 - `simulatedIncremental` 把一批块拆成 `initial` 和 `patches` 两部分。
 - 每个 patch 携带 `path`，指出该数据应合并到响应树的什么位置。
 - `hasNext` 标记是否还有后续补丁，客户端据此判断是否收完。
@@ -966,6 +986,7 @@ console.log("预期输出：补丁路径 docs reviews 0，docs reviews 1");
 | 多段响应无法用 JSON.parse 一次解析 | 块与块之间有协议分隔 | 使用协议规定的增量解析器逐块读取 |
 
 **小结**
+
 - @defer 把慢字段延后下发，@stream 把长列表分批下发。
 - 两者都是增量交付草案，需要客户端与服务端共同支持。
 - 加 @defer 不减少总耗时，只改变响应到达顺序，让首屏先有内容。
@@ -1025,6 +1046,7 @@ console.log(key1 === key2, key1 === key3);
 ```
 
 **这段代码在做什么**
+
 - `cacheKey` 把查询文本与变量 JSON 序列化后一起做哈希。
 - 变量键顺序不同会导致 key 不同，生产实现需先排序变量键。
 - `slice(0, 16)` 缩短 key 长度，方便日志观察。
@@ -1055,6 +1077,7 @@ console.log(table.get("User:1").name);
 ```
 
 **这段代码在做什么**
+
 - `__typename` 加 id 组成实体键，这是 Apollo 客户端等方案的共同思路。
 - `table` 用 Map 存实体键到实体的映射。
 - 之后任何查询只要引用 `User:1` 命中，可复用该对象。
@@ -1072,6 +1095,7 @@ console.log(keyOf(q1) === keyOf(q2));
 ```
 
 **这段代码在做什么**
+
 - q1 只有 name 字段，q2 只有 posts 字段，响应形状不同。
 - `keyOf` 只取类型加 ID，不受字段形状影响。
 - 两者 `keyOf` 相同，说明实体层可以命中同一个缓存项。
@@ -1126,6 +1150,7 @@ console.log("预期输出：实体键 User:1 User:2");
 | 大响应缓存后内存上涨 | 原样缓存整棵响应树 | 归一化去重，设置实体级 TTL |
 
 **小结**
+
 - URL 不能当 GraphQL 的缓存键，键必须覆盖查询文本与变量。
 - 归一化按 `类型:ID` 扁平存实体，查询形状变化仍可复用。
 - 写操作后要让所有引用被改实体的查询缓存失效。
@@ -1187,6 +1212,7 @@ function verifyToken(token) {
 ```
 
 **这段代码在做什么**
+
 - `authMiddleware` 从 HTTP 头取 `authorization` 令牌。
 - `verifyToken` 模拟令牌校验，真实实现用 JWT 校验库并核对签名。
 - 身份无效返回 401，请求不会进入 GraphQL 执行阶段。
@@ -1207,6 +1233,7 @@ console.log(canViewField(staff, "salary", rules));
 ```
 
 **这段代码在做什么**
+
 - `rules` 集中声明字段到允许角色的映射。
 - `canViewField` 查角色列表，得出是否允许。
 - staff 角色不在 salary 允许列表里，返回 false。
@@ -1229,6 +1256,7 @@ console.log(handle(req));
 ```
 
 **这段代码在做什么**
+
 - `handle` 先跑传输层，401 时直接返回，不进入字段判断。
 - 通过后才按字段规则检查 salary 权限。
 - staff 无权时返回 null，且没有执行查库取 9000 的步骤。
@@ -1273,6 +1301,7 @@ console.log("预期输出：staff 是否可看 salary false");
 | 每个解析器重复写角色判断 | 权限逻辑没有集中 | 提炼 canViewField，在需要处调用 |
 
 **小结**
+
 - 身份认证放传输层，拿到 context 里的 user；字段权限放授权函数。
 - 字段级授权应在读取敏感数据之前判定，无权就不查库。
 - 权限逻辑集中成规则表，解析器只调用一个判断函数。
@@ -1342,6 +1371,7 @@ export function assertWithinBudget(query, { maxDepth = 8, maxCost = 400 } = {}) 
 **怎么度量收益**：看被拒查询占比、单查询最大深度分布、数据库连接占用时长的 P95。记录方式是在 Apollo Server 插件回调里打点，用 Prometheus 收集、Grafana 看分位线；压测用 k6 回放同一批查询，对比开拦截前后的连接占用。
 
 **什么时候不该用**：
+
 - 内部数据迁移脚本走数据库直连，不经过 GraphQL，把成本规则套上去没有意义。
 - 首屏三条固定查询已经进了持久化白名单，再加一层动态成本计算只增加延迟。
 
@@ -1379,6 +1409,7 @@ const res = await fetch('/graphql', {
 **怎么度量收益**：看 LCP、INP 和首屏请求字节数。工具用 Lighthouse 移动端预设、Chrome DevTools Performance 面板、WebPageTest；采样时固定 CPU 降速倍数与网络档位，前后各跑同一组机型档位。
 
 **什么时候不该用**：
+
 - 服务端对增量交付的支持情况需核对官方文档：你所用服务器是否支持 `@defer`、开启方式、以及不支持时的降级行为。
 - 次要字段和首屏字段来自同一次数据库查询时，拆成两段只多一次往返。
 
@@ -1416,6 +1447,7 @@ const resolvers = {
 **怎么度量收益**：看越权拒绝次数按错误码的分布、被拒请求的字段路径。用 OpenTelemetry 给 span 加字段路径属性，在 Grafana 看趋势；回归用带访客身份的集成测试跑固定清单。
 
 **什么时候不该用**：
+
 - 整个对象对特定角色都不可见时，在父级 resolver 判一次就够，逐字段包装属于重复劳动。
 - 判断逻辑依赖跨服务调用时，先确认延迟预算，否则每个字段都拖一次远程调用。
 
@@ -1448,6 +1480,7 @@ const resolvers = {
 **目标**：给一个最小 GraphQL 服务补上 DataLoader、成本校验与字段级授权，用测试证明 N+1 消失、超限查询被拦、越权访问被拒。
 
 **步骤**：
+
 1. 用 graphql-js 起一个内存数据服务，类型包含 Order、User、Item，数据源换成会记录调用次数的假函数。
 2. 执行查询 `orders { user { name } items { title } }`，断言数据源调用次数等于订单数加上物品查询数，先复现 N+1。
 3. 手写带批处理与请求级缓存的 loader，挂进请求上下文，用 node:assert 断言调用次数降到 2。
@@ -1456,6 +1489,7 @@ const resolvers = {
 6. 把这四组测试接进 `npm test`，并在 CI 配置里让它对每次提交运行。
 
 **验收标准**：
+
 - 有 loader 时数据源调用次数为 2，注释掉 loader 后该数字随订单数增长。
 - 超限查询在执行前被拒绝，返回的错误对象里带 `QUERY_TOO_COMPLEX` 错误码。
 - 访客身份访问敏感字段返回 FORBIDDEN，编辑身份返回数据。

@@ -37,6 +37,7 @@ el.textContent  // "hiddenvisible"  (包含隐藏内容，原样输出所有文�
 | 相对速度 | 最慢 | 中等 | 最快（无额外计算） |
 
 **性能实测规律（Chrome DevTools Performance 面板）：**
+
 - `textContent` 写入：O(n)，纯文本拼接，无 DOM 解析
 - `innerText` 读取：O(n) + 样式计算，每次触发 `getComputedStyle`
 - `innerHTML` 写入：O(n) + HTML 解析器 + DOM 构建，大文档下慢 5-10x
@@ -194,6 +195,7 @@ wrapper.innerHTML = '<button onclick="fn()">click</button>';
 ### 7.1 Q1: 如果一个 div 里有 `<span style="display:none">foo</span>bar`，三个属性的返回值分别是什么？为什么？
 
 **答案：**
+
 - `innerHTML` 返回完整 HTML 字符串：`<span style="display:none">foo</span>bar`
 - `innerText` 返回可见文本（排除 hidden 内容）：`bar`
 - `textContent` 返回所有文本节点：`foobar`
@@ -225,6 +227,7 @@ const SafeContent = ({ html }: { html: string }) => (
 
 **答案：**
 `innerHTML` 每次写入都需要：
+
 1. 字符串解析为 tokens
 2. 构建临时 DOM 树
 3. 计算样式（CSSOM）
@@ -318,6 +321,7 @@ function renderRows(tbody, rows) {
 **怎么度量收益**：在 Chrome DevTools 的 Performance 面板录制一次筛选动作，看 Scripting 时长和 Layout 次数。用 `PerformanceObserver` 监听 `longtask`，统计超过 50ms 的任务数量。同一数据集连测三次，取中位数比较改造前后。
 
 **什么时候不该用**：
+
 - 表格只有几十行、每次整块替换时，节点复用代码的维护成本高于收益，直接用模板生成更省事。
 - 切换列结构需要整体重排时，逐格更新反而要写更多的映射逻辑。
 - 单元格内挂的是带自身状态的子组件时，直接把值改到 textContent 会丢掉组件状态。
@@ -350,6 +354,7 @@ list.replaceChildren(frag);           // 一次替换，代替 list.innerHTML = 
 **怎么度量收益**：用 Lighthouse 看 LCP 和 TBT，用 web-vitals 库在真机上报 LCP、INP。测量时在 DevTools 里开 Slow 4G 网络与 CPU 4 倍节流，跑五次取中位数。Performance 面板里再核对主线程上 `Parse HTML` 与 `Recalculate Style` 的占比。
 
 **什么时候不该用**：
+
 - 首屏节点由服务端渲染输出、并且已经绑定了事件时，用 `replaceChildren` 清空会切断绑定。
 - 列表项本身含加粗、链接这类富文本标记时，textContent 会把标签当普通字符显示出来。
 
@@ -385,6 +390,7 @@ function renderPlain(el, text) {
 **怎么度量收益**：开启 CSP 的 `report-to` 收集违规上报，统计 Trusted Types 与脚本相关的违规条数。在测试环境提交固定用例，例如 `<img src=x onerror=alert(1)>`，确认不弹窗、且以文本形式展示。补一条统计：清洗后被移除的标签数量，用来观察输入来源的变化。
 
 **什么时候不该用**：
+
 - 需求要求原样保留用户排版（自定义字体、颜色）时，白名单会过滤掉这些属性，应改用受控的编辑器数据结构。
 - 页面已经用框架的模板插值（React JSX、Vue 模板）输出内容时，不需要再手动调用 innerHTML。
 
@@ -433,6 +439,7 @@ Vue 的 v-html 指令附带安全警告（出处：Vue 官方文档）
 **目标**：做一个"评论墙"小页面，把本页三个属性的差异用可测量的方式展示出来。
 
 **步骤**：
+
 1. 搭一个页面，包含一个输入框、一个类型选择（纯文本 / 富文本）、一个提交按钮和一块渲染区域。
 2. 纯文本路径用 `textContent` 输出，先提交 `<b>粗体</b>` 观察显示结果。
 3. 富文本路径接入 DOMPurify，白名单只留 `b`、`i`、`a`、`p`、`br`，再赋给 `innerHTML`。
@@ -442,6 +449,7 @@ Vue 的 v-html 指令附带安全警告（出处：Vue 官方文档）
 7. 把测量结果和结论写进 README，注明设备与节流设置。
 
 **验收标准**：
+
 - 纯文本路径提交 `<b>粗体</b>` 后，页面原样显示这段字符，不出现加粗效果。
 - 提交 `<img src=x onerror=alert(1)>` 时不弹窗，且该输入不出现在 DOM 的元素属性里。
 - 两次渲染的时间与长任务数量都记录在 README 中，并写明测量时的设备与节流参数。

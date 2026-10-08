@@ -996,6 +996,7 @@ function Table({ rows, keyword, onSelect }) {
 **怎么度量收益**：用 React DevTools Profiler 录制同一次输入，看每次 commit 的 actual duration（提交耗时）和参与渲染的组件数。再用 Chrome DevTools Performance 面板看 Scripting 时间与 Long Task 数量，用 PerformanceObserver 订阅 `event` 类型的 duration 取输入事件 P95。测量方法是固定一万条数据、连续输入 10 个字符、重复 5 次取中位数。
 
 **什么时候不该用**：
+
 - 行数在几百以内且单行结构简单时，memo 的浅比较开销可能超过渲染开销。
 - 勾选状态要跨行频繁联动（例如全选后逐行改写）时，row 对象引用反复变化，memo 命中率接近零，此时应把状态外置或改用虚拟滚动。
 
@@ -1036,6 +1037,7 @@ function useUser(id) {
 **怎么度量收益**：跑 Lighthouse 移动端预设，记录 LCP 与 TBT（Total Blocking Time）；用 Chrome DevTools Performance 面板看 Long Task 的起始时间与数量。测量条件是同一台设备开 CPU 6 倍降速、Slow 4G，重复 5 次取中位数。
 
 **什么时候不该用**：
+
 - 首屏数据本来就随 HTML 一起下发时，把渲染推迟到 Effect 只会让内容出现得更晚。
 - 服务端渲染场景下用惰性初始化读 localStorage，服务端取不到值、客户端取到值，会触发水合不一致。
 
@@ -1074,6 +1076,7 @@ function useCollab(roomId, onRemoteDraw) {
 **怎么度量收益**：Chrome DevTools Network 面板的 WS 标签，看连接建立次数与消息帧数量，切一次房间应当只出现一次连接。Performance 面板看 Long Task，确认解析大消息没有造成明显卡顿。自建指标用 `performance.now()` 在发送处打时间戳、收到对端确认后相减，取往返时延 P95。
 
 **什么时候不该用**：
+
 - 单机使用、没有并发编辑需求时引入协同库只增加包体积和调试复杂度。
 - 需要强一致、可审计的操作日志时，客户端同步方案不能替代服务端校验与权限控制。
 
@@ -1097,6 +1100,7 @@ function useCollab(roomId, onRemoteDraw) {
 **目标**：做一个"可搜索、可勾选、可清理"的万行列表，把 useState、useEffect、useRef、useMemo、useCallback 与自定义 Hook 串起来，并用工具量化每一步改动的效果。
 
 **步骤**：
+
 1. 用 Array.from 生成 10000 条 `{ id, name, done }` 数据，固定随机种子，保证每次运行的数据一致。
 2. 写"朴素版"：useState 保存全量数据与搜索词，渲染时直接 filter 再 map，不加 memo。
 3. 用 React DevTools Profiler 录制从空输入连续敲 10 个字符的过程，导出该段的提交耗时与渲染组件数，作为基线。
@@ -1106,6 +1110,7 @@ function useCollab(roomId, onRemoteDraw) {
 7. 写一份说明：列出哪些改动带来了可测量的差异、哪些改动测不出差异，并附测量方式。
 
 **验收标准**：
+
 - 同样输入 10 个字符，改动后单次提交渲染的组件数少于改动前，且能贴出两次录制的数据或截图。
 - 全仓库运行 eslint 后，exhaustive-deps 的报错数量为 0。
 - 列表页卸载后，Performance 面板中不再有持续的过滤计算或未移除的事件监听。

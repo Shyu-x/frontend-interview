@@ -625,6 +625,7 @@ export async function POST(request: Request) {
 | 308 | 永久 | 严格保持原方法 | 标准永久重定向 |
 
 **实际建议：**
+
 - 永久重定向：308（标准）/ 301（兼容旧浏览器）
 - 临时重定向：307（标准）/ 302（兼容旧浏览器）
 - POST 处理后重定向：303（强制 GET）
@@ -1005,6 +1006,7 @@ app.get('/api/rows', async (req, res) => {
 在 Chrome DevTools 的 Network 面板看同一列表第二次请求的 Status 是否为 304、Transfer Size 是否只剩响应头大小。服务端统计 Nginx access log 中 $status 为 304 的请求占比，或采集 Prometheus 的 nginx_http_requests_total{status="304"}。前端用 PerformanceResourceTiming 的 transferSize 字段上报，对比加 ETag 前后的分位数。
 
 **什么时候不该用**
+
 - 实时日志流页面每次内容都在变，304 命中率接近 0，只会多一次校验往返。
 - 单条详情响应只有几百字节，算 ETag 的开销与节省的体积接近，直接返回即可。
 
@@ -1041,6 +1043,7 @@ app.put('/api/boards/:id', async (req, res) => {
 服务端统计 409 响应数与 PUT 请求总数的比值，按画布维度打标签。前端记录收到 409 后合并重试的次数与重试成功率。日终脚本统计保存后版本号跳变的次数，确认没有静默覆盖。
 
 **什么时候不该用**
+
 - 只有单人编辑的个人白板，加 If-Match 只会多一条 409 分支。
 - 冲突后无法自动合并的内容（例如一整段富文本），409 会把合并工作推给用户，应改成按操作序列合并或采用 CRDT。
 
@@ -1078,6 +1081,7 @@ app.post('/webhooks/pay', async (req, res) => {
 统计唯一索引冲突次数与回调总数的比值，作为去重命中率。每天跑对账脚本比对订单表、积分流水表与事件表。监控同一事件 ID 的处理次数，出现大于 1 就告警。
 
 **什么时候不该用**
+
 - 平台不提供稳定事件 ID 时只能对请求体做哈希，字段顺序变化会让哈希漂移，应先推动平台补齐事件 ID。
 - 写操作本身没有业务唯一键（例如按比例调整余额），去重表替代不了业务唯一键，要先设计它。
 
@@ -1117,6 +1121,7 @@ POST/Redirect/GET 与 303 See Other（出处：RFC 9110 HTTP Semantics）
 **目标**：给一个订单服务加上 ETag 缓存、303 表单跳转与幂等创建接口，用真实响应状态码验证效果。
 
 **步骤**
+
 1. 起一个最小服务，提供 GET /orders、POST /orders、PUT /orders/:id、POST /orders/form 四个端点，数据放 SQLite。
 2. 给 GET /orders 生成 ETag 并处理 If-None-Match，命中时返回 304 且不写响应体。
 3. 用 curl -i 连发两次相同请求，把两次响应头分别存成文件。
@@ -1126,6 +1131,7 @@ POST/Redirect/GET 与 303 See Other（出处：RFC 9110 HTTP Semantics）
 7. 写一个测试脚本，覆盖 200、304、303、409 四种状态码并断言响应体。
 
 **验收标准**
+
 - 第二次 GET /orders 返回 304，响应体长度为 0，响应头里带 ETag。
 - 同一 Idempotency-Key 的两次 POST 返回相同状态码与相同响应体，数据库里只有一行订单。
 - POST /orders/form 返回 303，Location 指向详情页，用 curl -L 跟随能得到 200。

@@ -208,6 +208,7 @@ function cleanup() {
 ```
 
 **img srcset vs picture：**
+
 - `img srcset`：在单个 img 元素内指定多个图片源
 - `picture`：用 media 查询或 type 判断选择不同图片（适合 art direction 或格式协商）
 

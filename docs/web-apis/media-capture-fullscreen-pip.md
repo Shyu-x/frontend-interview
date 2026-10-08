@@ -1292,6 +1292,7 @@ openCamera();
 **怎么度量收益**：看两个指标，一是打开成功率，二是首帧耗时。在 getUserMedia 前后各打一个 performance.mark，用 DevTools Performance 面板读差值；失败率在 catch 里按 err.name 打点。
 
 **什么时候不该用**：
+
 - 页面只播放预录视频时，直接用 video 的 src，不要申请摄像头权限。
 - 用户只用语音沟通的场景，只请求 audio: true，不要顺带请求 video。
 - 首屏要求零权限弹窗时，把 getUserMedia 挪到用户点击"开始面试"之后。
@@ -1326,6 +1327,7 @@ rec.start();          // state: inactive → recording
 **怎么度量收益**：看回放需重录的比例和单条备注时长。用 AnalyserNode 读时域数据，峰值到 1.0 说明削波；用 dataavailable 里的 blob.size 除以 interval 估算码率。
 
 **什么时候不该用**：
+
 - 服务端已有语音转写与降噪时，本地再叠增益会二次削波，优先把原始音频交给服务端。
 - 只是把麦克风传给对端通话时，不要串一长串 Web Audio 节点，多一层处理就多一层延迟。
 - 留证类录音要求保存原始信号，此时不得改动电平，应直接录麦克风轨道。
@@ -1367,6 +1369,7 @@ document.addEventListener('fullscreenchange', () => {  // 用户按 Esc 也会�
 **怎么度量收益**：看画中画失败率和全屏退出后的状态错位次数。在 catch 里按 err.name 打点上报，用 console.time 记录两次切换的耗时，重复"进入到 Esc 退出到再进入"10 次统计错位次数。
 
 **什么时候不该用**：
+
 - 页面嵌在 iframe 里且上层没给 allow="fullscreen" 时，请求会被拒，应改成在顶层窗口打开。
 - 视频只是背景装饰、没有观看需求时，画中画会留下一个空窗，用户还得手动关掉。
 - 移动端浏览器上视频全屏由系统播放器接管，不要把 requestFullscreen 当播放开关。
@@ -1403,6 +1406,7 @@ AudioContext 可能在 suspended 状态下创建，需要用用户手势后的 r
 **目标**：做一个单页 demo，能开摄像头、把麦克风经增益后录成 webm、切换全屏与画中画，并覆盖权限三条分支。
 
 **步骤**：
+
 1. 建 index.html，放一个 video、一个 audio、一个提示区，以及打开摄像头、开始、暂停、停止、全屏、画中画六个按钮。
 2. 写 openCamera()，用 err.name 分出允许、拒绝、无设备三条分支，拒绝分支渲染"重新授权"按钮。
 3. 用 enumerateDevices 填充摄像头下拉，切换时先 stop 旧轨，再按 deviceId 重新调用 getUserMedia。
@@ -1412,6 +1416,7 @@ AudioContext 可能在 suspended 状态下创建，需要用用户手势后的 r
 7. 关页面时对全部轨道调 stop()，并打印剩余轨道数量，确认摄像头指示灯熄灭。
 
 **验收标准**：
+
 1. 允许分支：点击按钮后 1 秒内 video 有画面，videoWidth 大于 0。
 2. 拒绝分支：在站点设置里把摄像头设为"阻止"，刷新后提示区出现对应文案，且不再自动弹权限框。
 3. 设备缺失分支：用一个不存在的 deviceId 调用 getUserMedia，提示区出现 NotFoundError 对应文案。

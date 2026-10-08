@@ -73,6 +73,7 @@ console.log(blob.type); // text/plain
 ```
 
 **这段代码在做什么**
+
 - TextEncoder 把 "hello " 编码为 6 个字节的 Uint8Array。
 - new Blob 接受片段数组，把 Uint8Array 和字符串按顺序拼接。
 - 第二个参数 type 只贴标签，不改变实际字节。
@@ -89,6 +90,7 @@ console.log(text); // hello world
 ```
 
 **这段代码在做什么**
+
 - blob.text() 返回 Promise，适合 await。
 - 解码使用 UTF 8 编码，与 TextEncoder 一致。
 - 结果为 "hello world"，证明两段数据按序拼接成功。
@@ -131,6 +133,7 @@ console.log("全部断言通过：size、type、内容均符合预期");
 | 想修改 Blob 内容失败 | Blob 只读 | 用 arrayBuffer 取回字节，改完再构造新 Blob |
 
 **小结**
+
 - Blob 是只读字节容器，只有 size 与 type 两个属性。
 - 构造 Blob 是拼接操作，不产生可写缓冲区。
 - blob.text() 能按 UTF 8 取回完整字符串。
@@ -184,6 +187,7 @@ console.log(file instanceof Blob); // true
 ```
 
 **这段代码在做什么**
+
 - 先构造 Blob 作为字节来源。
 - new File 接受片段数组、文件名、可选配置。
 - lastModified 缺省时浏览器使用当前时间。
@@ -207,6 +211,7 @@ console.log(file instanceof Blob); // true
 ```
 
 **这段代码在做什么**
+
 - input type=file 是浏览器提供的文件选择控件。
 - files 是 FileList，索引 0 取第一个 File。
 - 属性值来自磁盘元数据，不经过网络。
@@ -244,6 +249,7 @@ console.log("全部断言通过：File 是带着 name 与 type 的 Blob");
 | 修改 File 属性失败 | File 字段只读 | 构造新 File 对象替换 |
 
 **小结**
+
 - File 继承 Blob，多出 name 与 lastModified。
 - input 元素的 files 列表提供用户选择的 File。
 - File 可直接用于 FormData 上传，不需要额外转换。
@@ -290,6 +296,7 @@ console.log(new TextDecoder().decode(buffer)); // ABCD
 ```
 
 **这段代码在做什么**
+
 - new ArrayBuffer(4) 分配一块 4 字节内存，初始全为 0。
 - Uint8Array 视图按字节下标访问同一块内存。
 - 四个赋值分别写入 A B C D 的 UTF 8 编码。
@@ -315,6 +322,7 @@ console.log(await blob.text()); // 仍是 hello
 ```
 
 **这段代码在做什么**
+
 - blob.arrayBuffer() 返回新 ArrayBuffer，内容是 Blob 字节的副本。
 - 修改副本不影响原 Blob，证明 Blob 只读。
 - 输出两次内容，第二次证明原 Blob 没变。
@@ -361,6 +369,7 @@ console.log("全部断言通过：ArrayBuffer 可写，Blob 不因副本受影�
 | 跨端读错多字节数 | 网络协议常规定大端，本地 CPU 通常小端 | 跨端传输用 DataView 显式指定字节序 |
 
 **小结**
+
 - ArrayBuffer 是定长可写内存，Blob 是只读容器。
 - TypedArray 是 ArrayBuffer 的固定步长视图。
 - blob.arrayBuffer() 返回副本，修改副本不影响原 Blob。
@@ -448,6 +457,7 @@ console.log(preview.src); // 输出预览地址
 ```
 
 **这段代码在做什么**
+
 - onload 在读取成功时触发，result 可用。
 - event.target.result 是完整的 data URL，以 data: 开头。
 - onerror 在文件不可读时触发，reader.error 携带原因。
@@ -472,6 +482,7 @@ async function fileHash(file) {
 ```
 
 **这段代码在做什么**
+
 - Promise 包装 FileReader 回调，把事件风格转成 await 风格。
 - readAsArrayBuffer 得到 ArrayBuffer 结果。
 - crypto.subtle.digest 是全异步的哈希计算接口。
@@ -492,6 +503,7 @@ async function readByStream(blob) {
 ```
 
 **这段代码在做什么**
+
 - blob.stream() 是异步可迭代对象。
 - for await 内部完成 read 循环与背压等待。
 - 收集块后重建 Blob，复用 text 方法解码。
@@ -531,6 +543,7 @@ console.log("断言通过：两路读取结果一致，块均为 Uint8Array");
 | stream 多字节字符乱码 | 块边界把一个字符切成两半 | 用 TextDecoder 传 stream 参数，或收集后整体解码 |
 
 **小结**
+
 - FileReader 靠事件回调异步读取，结果一次性交付。
 - blob.stream() 靠异步迭代逐块拉取，适合大文件。
 - 用 Promise 包装 FileReader 后，可配合 await 写线性代码。
@@ -586,6 +599,7 @@ canvas.toBlob((blob) => {
 ```
 
 **这段代码在做什么**
+
 - toBlob 把画布内容导出为图片 Blob。
 - createObjectURL 返回短地址，不复制字节。
 - img.src 加载完触发 onload。
@@ -607,6 +621,7 @@ function downloadBlob(blob, filename) {
 ```
 
 **这段代码在做什么**
+
 - a.download 让浏览器下载而非导航。
 - click 触发下载，随后延时释放地址。
 - 延时 1000 毫秒是给浏览器建立下载任务的窗口，不是精确契约。
@@ -643,6 +658,7 @@ console.log("断言通过：地址指回的字节与原 Blob 一致");
 | 下载文件名不生效 | 跨源时部分浏览器忽略 download | 同源部署或改用服务端 Content-Disposition |
 
 **小结**
+
 - createObjectURL 生成内存 Blob 的 blob: 地址。
 - 用途是 img、video、下载链接的临时引用。
 - 用完必须 revokeObjectURL 释放映射。
@@ -696,6 +712,7 @@ const response = await fetch("https://example.com/upload", {
 ```
 
 **这段代码在做什么**
+
 - append 的第一个参数是字段名，第二个是值。
 - 值为 File 时，fetch 读取 name 与 type 写入该节头部。
 - 传入 FormData 时不要手动设置 Content-Type，fetch 会追加 boundary。
@@ -719,6 +736,7 @@ Content-Type: image/png
 ```
 
 **这段代码在做什么**
+
 - 每节以 --boundary 开始，最后以 --boundary-- 结束。
 - 节内第一行是 Content-Disposition，说明字段名。
 - 文件节多出 filename 与 Content-Type 两行。
@@ -769,6 +787,7 @@ console.log("断言通过：Content-Type 带 boundary，请求体含两节字段
 | 大文件整包进内存 | FormData 串行化时整包驻留内存 | 换分片上传或流式请求体 |
 
 **小结**
+
 - FormData 同时携带文字字段与 File。
 - fetch 自动完成 multipart 编码与 boundary 生成。
 - 原始请求体由多节组成，节间用 boundary 分隔。
@@ -821,6 +840,7 @@ function sliceFile(file) {
 ```
 
 **这段代码在做什么**
+
 - CHUNK_SIZE 是固定块大小，按字节数算。
 - slice 的 start 与 end 均按字节偏移。
 - 最后一块的 end 收窄到 file.size。
@@ -845,6 +865,7 @@ async function uploadChunks(file, uploadId) {
 ```
 
 **这段代码在做什么**
+
 - uploadId 由客户端或服务端生成，标识同一文件。
 - index 从 0 开始，total 告知服务端何时能合并。
 - 每块用独立 fetch，await 保证顺序提交。
@@ -867,6 +888,7 @@ function isDone(uploadId, index) {
 ```
 
 **这段代码在做什么**
+
 - 每个 uploadId 对应一个 Set，存已完成块号。
 - mark 在服务端确认块成功后调用。
 - isDone 在逐块循环前判断是否需要重传。
@@ -892,6 +914,7 @@ async function uploadWithResume(file, uploadId) {
 ```
 
 **这段代码在做什么**
+
 - 循环开始先查 isDone。
 - 已传的块 continue 跳过，未传的块照常上传。
 - 成功后立即 mark，缩短中断丢记录窗口。
@@ -956,6 +979,7 @@ function check() {
 | 刷新后记录丢失 | 记录只在内存 | 持久化到 localStorage 或服务端接口 |
 
 **小结**
+
 - slice 按字节偏移切块，不修改原文件。
 - 每块上传携带 uploadId、index、total 三个元信息。
 - 服务端按 index 排序合并，客户端按记录跳过已传块。
@@ -1005,6 +1029,7 @@ function parseMultipart(body, boundary) {
 ```
 
 **这段代码在做什么**
+
 - boundary 来自 Content-Type 头部的 boundary= 参数。
 - split 后首尾出现空串或 --，需过滤。
 - trim 去掉节前节后的换行，便于头部解析。
@@ -1030,6 +1055,7 @@ function parsePart(part) {
 ```
 
 **这段代码在做什么**
+
 - CRLF 加 CRLF 是 HTTP 头与体的分隔符。
 - 正则按引号提取 name 与 filename。
 - body 从分隔符后开始，到节尾原样保留。
@@ -1051,6 +1077,7 @@ function parse(body, boundary) {
 ```
 
 **这段代码在做什么**
+
 - 遍历每节并解析成 info。
 - Map 以字段名做键。
 - 值包含 filename 与内容，文字字段的 filename 为空串。
@@ -1118,6 +1145,7 @@ console.log("断言通过：解析出字段昵称与头像文件名及内容");
 | 字段值本身含 boundary 字样 | 边界与内容撞串 | 边界用随机长串，生产实现按字节流扫描 |
 
 **小结**
+
 - 解析 multipart 分两步：按 boundary 切节，节内按空行分头体。
 - 头部用正则提取 name 与 filename。
 - 生产解析器要按字节处理，不能对二进制内容做 trim。
@@ -1282,6 +1310,7 @@ form.addEventListener('paste', async (ev) => {
 **目标**：做一个支持断点续传的小型文件上传页，并能在服务端还原出完整文件。
 
 **步骤**：
+
 1. 写一个只接收分片、按片号落盘的服务端接口，并在响应里回传当前已收到的片号列表。
 2. 前端用 `file.slice` 按固定字节数切片，每片用 FormData 发送，字段名与服务端约定一致。
 3. 把已完成片号写入 `localStorage`，进入页面时先向服务端查询已收片号，取交集作为续传起点。
@@ -1291,6 +1320,7 @@ form.addEventListener('paste', async (ev) => {
 7. 用 DevTools 的 Network 面板导出一次完整上传的请求记录，标注每个分片的序号与大小。
 
 **验收标准**：
+
 1. 断开网络再恢复，刷新页面后请求记录里不出现已成功分片的重复上传。
 2. 服务端合并出的文件与源文件字节数一致，哈希值相同。
 3. 上传过程中切换页面再返回，进度从服务端记录的位置继续。

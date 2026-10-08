@@ -708,6 +708,7 @@ RowTitle(raw);
 **怎么度量收益**：CI 中 `tsc --noEmit` 的报错计数，目标为 0。浏览器端用 Sentry 统计 TypeError 事件数与受影响会话数。渲染耗时用 PerformanceObserver 采 `longtask` 并按页面分组。
 
 **什么时候不该用**：
+
 - 上游字段不超过十个且短期不改，引入判别联合与映射类型会增加阅读成本。
 - 数据来自用户自由填写的 JSON 文本框，编译期类型无法约束运行期输入，应先用运行时 schema 校验。
 
@@ -746,6 +747,7 @@ function handle(m: Msg) {
 **怎么度量收益**：编译期看 `tsc --noEmit` 报错数。运行期在 default 分支加计数上报，看每千次会话的未知消息次数。连接质量看服务端 WebSocket 网关的连接时长分布与断连码分布。
 
 **什么时候不该用**：
+
 - 消息格式由外部第三方定义且先于客户端升级，never 兜底会让旧客户端抛错，应改为记录并忽略。
 - 只发不收的单向埋点通道，判别联合与载荷抽取的收益低于固定字段类型。
 
@@ -784,6 +786,7 @@ Card({ title: "t", cover: "c" }); // 报错：cover 不在 CardView 里
 **怎么度量收益**：首屏 JS 体积用 webpack-bundle-analyzer 或 rollup-plugin-visualizer 观看。接口响应字节数看网关访问日志里的 response size 分位值。首屏时间用 PerformanceObserver 采 `first-contentful-paint` 并按设备型号分组。
 
 **什么时候不该用**：
+
 - 只在内网高速网络使用的系统，字段裁剪省下的字节无法抵消多套类型的维护成本。
 - 服务端不支持按字段筛选的接口，前端裁剪只省内存不省流量，应先改接口再改类型。
 
@@ -814,6 +817,7 @@ Card({ title: "t", cover: "c" }); // 报错：cover 不在 CardView 里
 **目标**：写一个类型安全的事件总线，让"事件名与载荷不匹配"在编译期失败。
 
 **步骤**：
+
 1. 定义 Events 映射表，包含至少 3 个事件，每个事件的载荷是不同形状的对象。
 2. 用映射类型从 Events 派生 on 与 emit 的签名，emit 的第一个参数是事件名，第二个参数是对应载荷。
 3. 用条件类型实现 Payload<E, K>，从事件表取出某个事件的载荷。
@@ -823,6 +827,7 @@ Card({ title: "t", cover: "c" }); // 报错：cover 不在 CardView 里
 7. 配置 tsconfig 与 npm script，执行 `tsc --noEmit`。
 
 **验收标准**：
+
 - `tsc --noEmit` 退出码为 0。
 - 删除事件表中的一个事件后，对应 emit 调用处出现至少 1 条报错。
 - 载荷少一个必填字段时报错；多一个字段直传时报错，经变量中转后不报错。

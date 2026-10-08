@@ -328,6 +328,7 @@ function attachMeta(tr, meta) {
 **怎么度量收益**：DevTools 的 Memory 面板取 Heap snapshot，看 `Detached` 节点计数与 `JS heap size`；Performance 面板录制 30 秒滚动，看 GC 触发次数和最长任务时长；`performance.memory.usedJSHeapSize` 只在 Chrome 可用，属于非标准接口。
 
 **什么时候不该用**：
+
 - 总行数在 300 以内时，窗口化会让浏览器原生查找（Ctrl+F）定位不到未渲染的行，收益抵不上实现成本。
 - 需要整表打印、导出 DOM 快照或依赖真实节点做整页截图时，未渲染行会直接缺失。
 
@@ -363,6 +364,7 @@ requestIdleCallback(() => parseRemainingInChunks(rawList));
 **怎么度量收益**：真机用 `chrome://inspect` 远程调试，在 Memory 面板看 `JS heap size` 峰值与 DOM 节点数；Performance 面板看首屏期间的 Minor GC 次数与长任务；Lighthouse 看 `First Contentful Paint` 与 `Total Blocking Time`。
 
 **什么时候不该用**：
+
 - 需要跨页面或跨路由保留的配置数据不要放 `WeakMap`，键被回收后数据就取不到了，语义上也不该用弱引用。
 - 首屏本来只渲染几十张卡片时，加窗口化和弱缓存只会增加分支路径，维护成本上升。
 
@@ -405,6 +407,7 @@ function frame(shapes) {
 **怎么度量收益**：Performance 面板录制 30 秒连续拖动，看 Minor GC 触发次数与最长任务；Memory 面板在 200 次绘制操作后对比 `JS heap size` 与 `undoStack.length`；`performance.measureUserAgentSpecificMemory()` 需要跨源隔离上下文，可用性要按目标浏览器核对。
 
 **什么时候不该用**：
+
 - 图元总数在几百且操作低频时，整份快照实现直接、回放简单，改命令模式反而增加出错面。
 - 需要与 CRDT 或 OT 协同层对齐，或者要支持任意时间点回放时，撤销结构必须和协同方案一起设计。
 
@@ -428,6 +431,7 @@ function frame(shapes) {
 **目标**：给一个万行表格页建立内存基线，完成一次窗口化改造，产出前后对比报告。
 
 **步骤**：
+
 1. 用固定随机种子生成 50000 行数据，字段为 `id`、`title`、`status`、`updatedAt`，页面初始一次性渲染 200 行。
 2. 打开 DevTools 的 Memory 面板取 Heap snapshot，记录 `JS heap size` 与 DOM 节点数；在 Performance monitor 打开 `JS heap size` 与 `DOM Nodes` 两项。
 3. 用 Performance 面板录制 30 秒持续滚动，记录 Minor GC 与 Major GC 触发次数、最长任务时长。
@@ -437,6 +441,7 @@ function frame(shapes) {
 7. 重跑步骤 2 与步骤 3，把前后数据写进一份 Markdown 报告，注明设备、浏览器版本与供电状态。
 
 **验收标准**：
+
 - 滚动 30 秒后 Detached DOM 节点计数为 0。
 - 三次 Heap snapshot 的 `JS heap size` 中位数低于改造前，原始数据在报告中可复现。
 - 持续滚动期间不出现超过 50 ms 的长任务，或长任务数量低于改造前。

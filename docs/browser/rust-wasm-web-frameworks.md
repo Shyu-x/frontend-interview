@@ -1013,6 +1013,7 @@ fn Table(rows: ReadSignal<Vec<Row>>) -> impl IntoView {
 **怎么度量收益**：看两个指标，一次按键到文本变化的耗时，以及 Memo 重算次数。测量方法是在过滤闭包里自增计数器并打到 console，再用 Chrome DevTools Performance 录制输入过程，读 scripting 时长与长任务数量。
 
 **什么时候不该用**：
+
 - 行数在几百以内且过滤条件固定，直接绑定 `Vec` 下标即可，多一层 Memo 只增加维护点。
 - 过滤结果要跨路由共享时，放进 Context 或 Store；组件内 Memo 会随组件卸载一起丢失。
 
@@ -1050,6 +1051,7 @@ fn Page() -> impl IntoView {
 **怎么度量收益**：指标是 LCP、FCP、总阻塞时间、主线程 scripting 时长。测量方法是用 Lighthouse 与 Performance 面板在 CPU 降速 4 倍、Slow 4G 下各跑三次，比较整页 hydrate 与局部 hydrate 的差距。
 
 **什么时候不该用**：
+
 - 页面完全在登录墙后、不需要 HTML 被爬虫读取，纯客户端渲染可以省掉服务端运行成本。
 - 应用内部的页面间跳转走客户端渲染，每次跳转都回服务端取 HTML 会把网络延迟叠进交互。
 
@@ -1089,6 +1091,7 @@ console.log(runs, label.text);            // 期望输出 2 B
 **怎么度量收益**：指标是每帧绑定执行次数、长任务数量、掉帧计数。测量方法是用 Performance 面板录 10 秒拖动，读 Frames 与 Long Tasks 轨道，同时统计每秒 `runs` 的增量。
 
 **什么时候不该用**：
+
 - 图形数量在几十个以内、整层重绘已经够用，把每个属性拆成信号会让依赖图难以追踪。
 - 冲突合并要按 OT 或 CRDT 的顺序处理，信号只负责渲染；把合并逻辑写进 Effect 会让回放顺序不可控。
 

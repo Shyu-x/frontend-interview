@@ -1507,11 +1507,13 @@ function sendStroke(points) {
 - `dc.readyState` 检查避免在通道 open 之前 `send` 抛异常。
 
 **怎么度量收益**：
+
 - 指标：从 `mousedown` 到远端渲染出该笔画的延迟。
 - 测量方法：用 `performance.now()` 在发送端和接收端打时间戳，信令服务记录 Offer/Answer/candidate 消息时间。
 - 对比：与 HTTP 轮询方案在相同 3 人、同一画布脚本下各测 10 次，比较 P95 延迟。
 
 **什么时候不该用**：
+
 - 参与方超过 5 人且每个人都要看到所有笔画时，网状 DataChannel 会变成 N×(N-1)/2 条链路，带宽和连接数上升。
 - 需要完整操作回放和审计时，纯 DataChannel 不落服务器，单端离线后缺少历史记录。
 - 白板内容必须严格一致且需要服务器仲裁时，分布式增量合并容易产生冲突。
@@ -1548,12 +1550,14 @@ console.log(order); // ["host", "srflx", "relay"]
 - 解析 `a=candidate` 时抓取 `typ host/srflx/relay`，不要只按候选出现顺序选择。
 
 **怎么度量收益**：
+
 - 指标：首帧时间，从 getUserMedia 到远端出帧。
 - 指标：通话 5 分钟内的码率、帧率、丢包率和候选类型。
 - 测量方法：`chrome://webrtc-internals` 查看 `InboundRTP`/`OutboundRTP` 和 ICE 状态。
 - 对比：同样网络下分别使用 host-only 与 host+relay 配置各测试 5 次，比较首帧时间和卡顿次数。
 
 **什么时候不该用**：
+
 - 如果业务只是单向观看，不需要双向音视频，使用播放方案即可，不需要 P2P。
 - 如果通话必须录制并用于合规审计，P2P 直连不经服务器，录制需要另一端推流到服务器。
 - 如果同时在线客服数超过数千，逐对 P2P 会带来 TURN 并发压力，需要引入 SFU 或 MCU。
@@ -1593,12 +1597,14 @@ async function sendChunks() {
 - 接收端用 `crypto.subtle.digest("SHA-256", buffer)` 校验源文件与接收文件一致。
 
 **怎么度量收益**：
+
 - 指标：传输完成时间、重传次数、峰值 JS heap。
 - 指标：接收端 Blob 的 SHA-256 是否与源文件一致。
 - 测量方法：发送前后用 `performance.now()` 打点；在 `chrome://webrtc-internals` 查看 DataChannel 字节数；用 Chrome DevTools Memory 录制发送期间 heap。
 - 对比：相同文件分别用 DataChannel 和 HTTP 上传到内网服务器，比较完成时间和服务器出口流量。
 
 **什么时候不该用**：
+
 - 文件需要在多个接收端下载，用服务器或 CDN 更合适，P2P 只能服务少数对端。
 - 发送端或接收端不在线时不能传输，需要断点续传，DataChannel 本身不提供持久化。
 - 公网跨 NAT 需要 TURN 时，100 MB 文件会占用 TURN 带宽，成本高于内网 HTTP。

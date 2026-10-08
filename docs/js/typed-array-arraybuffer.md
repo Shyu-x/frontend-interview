@@ -2022,6 +2022,7 @@ order.sort((a, b) => price[a] - price[b]);
 **怎么度量收益**：用 Chrome DevTools Performance 录「点表头排序 + 快速滚动」，看 Main 轨道最长任务时长与 Scripting 合计。内存看 Memory 面板的 heap snapshot 大小，两种实现各拍一次做对比。可复现做法：同一份 100 万行数据，两种实现各排序 10 次，取 `performance.now()` 差值。
 
 **什么时候不该用**：
+
 - 列里是字符串或混合类型，TypedArray 装不下，用普通数组更省事。
 - 数据只有几千行，建对象与列存的时间差落在噪声里，改动不值得。
 
@@ -2058,6 +2059,7 @@ function decode(buf) {
 **怎么度量收益**：在解析函数里用 `performance.now()` 记时间，统计 1 万个事件的总解析耗时。DevTools Performance 里看 WebSocket 消息触发的任务时长与长任务条数。压测时用脚本把每帧随机切成两到三段投喂，统计解析失败次数。
 
 **什么时候不该用**：
+
 - 消息全部定长且很短，直接按固定偏移读，不必上长度头加变长体。
 - 两端都在传 JSON 且带宽不是瓶颈，改二进制带来的双端改造量盖过收益。
 
@@ -2090,6 +2092,7 @@ self.onmessage = ({ data }) => {
 **怎么度量收益**：用 DevTools Performance 录首屏，看 Main 轨道最长任务时长和长任务条数。Worker 内用 `performance.now()` 记分片解析耗时。对比移交与克隆两种做法时，看 Memory 面板的峰值是否随分片数量上升。
 
 **什么时候不该用**：
+
 - 包只有几百 KB，复制一次的代价小于启动一个 Worker 的代价。
 - 解析结果只是几个数字（比如只读文件头），没必要把整包交出去。
 
@@ -2120,6 +2123,7 @@ self.onmessage = ({ data }) => {
 **目标**：实现一套「设备上报帧」的二进制编解码器，外加一个能处理半包的流式解析器。
 
 **步骤**：
+
 1. 写协议文档：magic（4 字节，big-endian）、版本（1 字节）、状态位图（1 字节）、时间戳（varint + zigzag）、载荷长度（2 字节，big-endian）、载荷。
 2. 用 `DataView` 实现 `encode(record)`，返回 ArrayBuffer，每个字段的偏移量在注释里标出来。
 3. 用 `DataView` 实现 `decode(buf)`，字段不齐时返回 `{ need }`，齐了返回 `{ value, rest }`。
@@ -2129,6 +2133,7 @@ self.onmessage = ({ data }) => {
 7. 把解析放进 Worker，用 transfer 移交 buffer，主线程打印移交后的 `byteLength`。
 
 **验收标准**：
+
 - 第 5 步的随机切分测试跑 100 轮，解出的记录条数与每个字段值全部一致。
 - `decode` 对任意长度的前缀输入都不抛异常，只返回 need。
 - 第 6 步的字节数表在测试输出里可见，并能指出变长编码在哪种数据分布下更省字节。

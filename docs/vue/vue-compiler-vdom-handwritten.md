@@ -97,6 +97,7 @@ function parse(template) {                                  // 输入一段模�
 ```
 
 **这段代码在做什么**
+
 - 正则有两组捕获：`m[1]` 是标签名，`m[2]` 是插值里的变量名。
 - 栈保存从根到当前节点的路径，`stack[stack.length - 1]` 是当前父节点。
 - 开始标签压栈，结束标签弹栈，插值直接挂到当前父节点。
@@ -120,6 +121,7 @@ console.log([...transform(ast)]);                           // 打印依赖变�
 ```
 
 **这段代码在做什么**
+
 - 集合用 Set 而不是数组，同一个变量写两次只出现一次。
 - 递归顺序是从上到下，父节点先处理，再处理子节点。
 - 返回值向外传递，调用方拿到整棵树的依赖。
@@ -145,6 +147,7 @@ console.log(code);
 ```
 
 **这段代码在做什么**
+
 - 元素节点生成 `_h` 调用，标签名直接写进字符串。
 - 插值节点生成 `_ctx.变量名`，运行时从组件上下文取值。
 - Root 节点没有标签，只把子节点的表达式拼起来。
@@ -217,6 +220,7 @@ console.log('断言通过');
 | new Function 直接报错 | 生成字符串拼错 | 先打印 code，再求值 |
 
 **小结**
+
 - parse 产出树，transform 给树加信息，generate 把树变回字符串。
 - 依赖收集发生在 transform，数据读取发生在 render 执行时。
 - new Function 是教学手段，生产环境用官方编译器与打包工具。
@@ -272,6 +276,7 @@ console.log(TEXT_AND_PROPS, hasText(9), hasProps(9));
 ```
 
 **这段代码在做什么**
+
 - 二进制位互不重叠，一个整数能同时表达多种变化。
 - `|` 负责合并标记，`&` 负责检查某一位是否打开。
 - 检查结果是数字，和 0 比较后得到布尔值。
@@ -299,6 +304,7 @@ function createElementBlock(tag, props, children) {
 ```
 
 **这段代码在做什么**
+
 - currentBlock 是模块级变量，模拟编译后代码里的收集上下文。
 - flag 大于 0 的节点才进入数组，静态节点 flag 为 0。
 - block 根节点自身不进入清单，它只持有清单。
@@ -324,6 +330,7 @@ console.log('patchCalls', patchCalls);
 ```
 
 **这段代码在做什么**
+
 - openBlock 在创建子节点之前调用，才能收到子节点。
 - 静态 span 的 flag 为 0，没有被推进清单。
 - patchBlock 读清单，不会遍历 block.children 里的静态节点。
@@ -386,6 +393,7 @@ patch img
 | 静态节点也被 patch | 静态节点被错误标了 flag | 编译期只给含动态绑定的节点打 flag |
 
 **小结**
+
 - patchFlag 用二进制位表达变化类型，按位与判断，按位或合并。
 - dynamicChildren 是 block 根节点持有的动态节点清单。
 - patch 只走清单，静态节点不再参与对比。
@@ -445,6 +453,7 @@ console.log(a === b, renderHoisted().children[0] === hoisted);
 ```
 
 **这段代码在做什么**
+
 - 未提升版本在函数体内写对象字面量，每次调用都新建。
 - 提升版本把对象字面量放到函数外，函数体只保留引用。
 - 引用相等为 true 表示没有新分配。
@@ -470,6 +479,7 @@ console.log(v1.on.click === v2.on.click);
 ```
 
 **这段代码在做什么**
+
 - cache 数组在包装函数外创建，生命周期跨多次渲染。
 - 槽位下标由编译器在编译期固定，运行时按位取用。
 - 第一次渲染创建函数，后续渲染读取同一引用。
@@ -527,6 +537,7 @@ console.log('断言通过');
 | 列表内联事件读到旧值 | 函数被缓存，闭包停在首次渲染 | 这类函数不要缓存，改用方法名引用 |
 
 **小结**
+
 - 静态提升把不变的对象分配移到 render 函数外。
 - 事件缓存把内联函数按固定索引存起来，引用保持稳定。
 - 缓存函数不能依赖每次渲染都变的变量，否则会读到旧值。
@@ -580,6 +591,7 @@ console.log(JSON.stringify(render({ ok: false }, h)));
 ```
 
 **这段代码在做什么**
+
 - v-if 没有专属运行时函数，它是纯编译期改写。
 - 没有 else 分支时，假分支写成 null。
 - 生成的表达式可以被 new Function 直接求值。
@@ -607,6 +619,7 @@ console.log(countdown);
 ```
 
 **这段代码在做什么**
+
 - renderList 把不同来源统一成数组遍历。
 - 回调第二个参数是索引，数组与数字来源都提供。
 - 返回结果是 vnode 数组，交给 Fragment 包裹。
@@ -628,6 +641,7 @@ console.log(compilePriority('_ctx.ok', 'item'));    // 条件用外层变量
 ```
 
 **这段代码在做什么**
+
 - Vue 3 中 v-if 的优先级高于 v-for。
 - 同节点上 v-if 先求值，此时循环变量还没有定义。
 - 修法是把 v-if 移到内层元素，或改用计算属性先过滤。
@@ -682,6 +696,7 @@ console.log('断言通过');
 | v-for 遍历对象顺序与预期不同 | 走 Object.keys 顺序 | 需要顺序时先转数组 |
 
 **小结**
+
 - v-if 编译成三元表达式，没有 else 时假分支为 null。
 - v-for 编译成 renderList 调用，结果数组由 Fragment 包住。
 - 同节点上 v-if 优先级更高，要用外层变量做条件。
@@ -761,6 +776,7 @@ function trigger(target, key) {
 ```
 
 **这段代码在做什么**
+
 - targetMap 用 WeakMap，键是响应式对象，不阻止对象被回收。
 - 依赖表是两层结构：对象 → 属性 → effect 集合。
 - 只有 activeEffect 存在时才收集，普通读取不建立依赖。
@@ -784,6 +800,7 @@ function effect(fn, scheduler) {
 ```
 
 **这段代码在做什么**
+
 - Proxy 的 get 拦截所有属性读取，包含数组下标与 length。
 - set 先写值再通知，保证 effect 重新读取时拿到新值。
 - effect 首次立即执行，这一步叫首次依赖收集。
@@ -810,6 +827,7 @@ function flushJobs() {
 ```
 
 **这段代码在做什么**
+
 - Set 的成员唯一，同一函数多次排队只保留一份。
 - flushing 标记防止重复注册微任务。
 - 微任务在当前同步代码结束后执行，因此三次修改只刷新一次。
@@ -892,6 +910,7 @@ render 3
 | effect 没收到依赖 | 执行时没有读取响应式属性 | 保证 get 被调用，不要提前缓存值 |
 
 **小结**
+
 - effect 执行时读取的属性会成为它的依赖。
 - 渲染 effect 用 scheduler 把更新交给队列。
 - queueJob 用 Set 去重，用微任务批量刷新。
@@ -962,6 +981,7 @@ function parse(template) {
 ```
 
 **这段代码在做什么**
+
 - parseAttrs 同时处理静态属性、冒号绑定与 at 事件。
 - `m[0][1] === '/'` 判断片段第二个字符，区分开始与结束标签。
 - 栈保证节点挂在正确的父节点下。
@@ -996,6 +1016,7 @@ function genProps(node, scope) {
 ```
 
 **这段代码在做什么**
+
 - resolve 判断根标识符是否在局部作用域里。
 - 在作用域里保持原名，不在作用域里加 `_ctx.` 前缀。
 - 文本按插值切分，插值段变成取值表达式，其他段变成字符串字面量。
@@ -1033,6 +1054,7 @@ function compile(template) {
 ```
 
 **这段代码在做什么**
+
 - v-for 生成展开运算符加 renderList，结果数组会被父节点的 children 数组接住。
 - v-for 的别名加入作用域，子节点里的插值就能解析成局部变量。
 - v-if 生成三元表达式，假分支返回 null。
@@ -1150,6 +1172,7 @@ console.log(JSON.stringify(vnode));
 | 事件绑定了却没有触发 | 假对象没有事件系统 | 直接调用 handler，或换到真实 DOM 环境测试 |
 
 **小结**
+
 - 迷你编译器由 parse、resolve、generate、new Function 四段组成。
 - v-for 用展开运算符把数组接到 children 里，v-if 用三元表达式。
 - 作用域数组决定插值解析成局部变量还是 `_ctx` 属性。
@@ -1216,6 +1239,7 @@ console.log(code)
 **怎么度量收益**：看 Performance 面板里的 Scripting 与 Rendering 时间，以及 Vue Devtools 里该组件的 update 次数。测量方法：固定同一份数据，录制 10 秒滚动，比较改动前后的帧耗时分布中位数。
 
 **什么时候不该用**：
+
 - 每行都有多个动态单元格，动态节点数与总行数同量级时，收窄 patchFlag 的收益被滚动本身吃掉。
 - 行高不固定又强制虚拟滚动，会出现滚动跳动，此时先解决布局测量再谈编译优化。
 
@@ -1251,6 +1275,7 @@ console.log(on.code)     // 关注 _hoisted_ 前缀的常量声明
 **怎么度量收益**：看 Lighthouse 的 Total Blocking Time 与 First Contentful Paint，真机上用 Chrome 远程调试的 Performance 面板记录首次挂载耗时。固定网络与设备档位，重复 5 次取中位数。
 
 **什么时候不该用**：
+
 - 静态内容在长列表里逐项渲染，提升后的常量常驻内存，先测内存占用再决定。
 - 需要服务端渲染时，提升的节点仍要参与水合，收益集中在客户端二次渲染。
 
@@ -1288,6 +1313,7 @@ async function onMessage(ops) {
 **怎么度量收益**：看 Performance 面板的长任务数量与每帧 Scripting 时间，以及 Vue Devtools 里该组件的 update 次数。测量方法：脚本固定注入每秒 60 批、每批 20 个操作，对比改动前后的 update 次数与掉帧数。
 
 **什么时候不该用**：
+
 - 某次操作必须立刻读到更新后的 DOM，批量提交会读到旧值，要改成显式 flush。
 - 状态需要深层响应式才能驱动子组件时，`shallowRef` 会让子组件不更新，改用 `ref` 或手动传值。
 
@@ -1320,6 +1346,7 @@ async function onMessage(ops) {
 目标：给一个列表页做编译产物审计与 patch 收窄，并用实验数据说明收益。
 
 步骤：
+
 1. 写一个 200 行的列表模板，包含插值、动态 class、v-if、v-for、@click。
 2. 用 `@vue/compiler-dom` 的 `compile` 打印产物，记录每个 patchFlag 的数值并做位运算解读。
 3. 分别用 `hoistStatic` 的 true 与 false、`cacheHandlers` 的 true 与 false 编译，保存四份产物。
@@ -1329,6 +1356,7 @@ async function onMessage(ops) {
 7. 写一页结论，列出哪些动态节点能从 block 里移除，以及对应的模板改法。
 
 验收标准：
+
 - 能对产物里出现的每个 patchFlag 用位运算说明它表示哪类更新。
 - 同一 tick 改三次状态，patch 次数为 1。
 - 四份产物中能指出 `_hoisted_` 与 `_cache` 出现位置的差异。

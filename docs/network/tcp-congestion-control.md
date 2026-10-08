@@ -256,6 +256,7 @@ async function warmUpConnection(apiBase: string) {
 ```
 
 **流量控制 vs 拥塞控制：**
+
 - 流量控制：防止发送方超过接收方的处理能力（工具：rwnd）
 - 拥塞控制：防止发送方超过网络的承载能力（工具：cwnd）
 - 发送窗口 = min(rwnd, cwnd)

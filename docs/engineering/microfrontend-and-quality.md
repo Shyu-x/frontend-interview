@@ -31,6 +31,7 @@ description: qiankun、Module Federation、ESLint、husky 与 Monorepo 工具
 | 子应用 3 | React |
 
 **隔离机制：**
+
 - qiankun 沙箱（JS 隔离）
 - Shadow DOM（样式隔离）
 
@@ -133,6 +134,7 @@ flowchart LR
 | 单例模式 | 版本一致时共享，版本不一致时单例 |
 
 **vs qiankun：**
+
 - qiankun：运行在主应用框架内，需要注册子应用，框架无关但需要适配
 - MF：webpack 原生支持，无需框架适配，直接 import 远程模块
 - qiankun：运行在主应用框架内，需要注册子应用，框架无关但需要适配

@@ -85,6 +85,7 @@ export function buildTask(input) {
 ```
 
 **这段代码在做什么**
+
 1. `stepsKnown` 表示任务能否拆成固定子步骤，例如批量导入的“读取、校验、入库”。
 2. `canBranch` 表示子任务之间是否无依赖，例如多来源检索可以并行。
 3. `sharedWrite` 表示是否多人写同一份文件或状态，例如两个 Agent 改同一份代码。
@@ -106,6 +107,7 @@ export function classify(input) {
 ```
 
 **这段代码在做什么**
+
 1. `stepsKnown` 为真时直接返回固定 Workflow，不进入 Agent 分支。
 2. `sharedWrite` 为真时强制回到单 Agent，这是 Cognition 写操作原则的工程表达。
 3. `canBranch` 为真且基线不超过 45% 才考虑多 Agent，阈值来自 Google/MIT 论文。
@@ -171,12 +173,14 @@ verify-classify 断言通过
 **用在哪里**
 
 **场景一：内容平台的推荐链路重构**
+
 - 业务背景：推荐链路包含召回、粗排、精排、重排，步骤预先已知。
 - 知识怎么用：`stepsKnown` 为真，直接选 Workflow，不用自主 Agent。
 - 收益指标：上线后看推荐接口 P99 延迟与人工运维工单数量。
 - 何时不该用：排序策略需要动态探索时，再评估是否引入 Agent。
 
 **场景二：客服工单路由**
+
 - 业务背景：用户问题类型差异大，需要先分类再分发给不同处理策略。
 - 知识怎么用：这是 Routing Workflow，按输入类别分发，不是多 Agent。
 - 收益指标：分类准确率、首次响应时间。
@@ -249,6 +253,7 @@ export function estimateTokens(plan, baseChatTokens = 20000) {
 ```
 
 **这段代码在做什么**
+
 1. `buildResearchPlan` 按复杂度给出 Agent 数量与人均工具调用次数，对应 Anthropic 投入规模规则。
 2. 简单查询 1 个 Agent、直接对比 2 到 4 个 Subagent、复杂研究 10 个以上，这里取 1、3、10 三档。
 3. `estimateTokens` 把 token 消耗近似为“Agent 数 × 人均调用 × 单次 chat token”。
@@ -269,6 +274,7 @@ export async function dispatchLead(plan, subagentWork) {
 ```
 
 **这段代码在做什么**
+
 1. `Promise.all` 并行启动多个 Subagent，对应 Anthropic 的并行派发。
 2. 每个 Subagent 拿到“研究方向 + 原始 query”，但彼此不共享对方调用过程。
 3. `results.join` 之前 Lead Agent 处于同步等待，这是 Anthropic 文中点名的信息流瓶颈。
@@ -300,6 +306,7 @@ console.log({ serialMs, parallelMs });
 ```
 
 这段代码在做什么
+
 1. 串行三次各等 100ms，总耗时约 300ms。
 2. 并行走 `Promise.all`，总耗时约 100ms。
 3. 差值来自等待时间，但真实检索的 token 成本并不因并行而减少。
@@ -342,12 +349,14 @@ verify-research 断言通过
 **用在哪里**
 
 **场景一：投资研究类的多源资料检索**
+
 - 业务背景：需要同时查财报、公告、行业报告、公司新闻，来源互相独立。
 - 知识怎么用：用 orchestrator-worker 并行派发，每个 Subagent 负责一侧检索并返回摘要。
 - 收益指标：答案覆盖率、引用准确率、端到端研究时间。
 - 何时不该用：任务只需要查一个固定数据源时，15x token 不划算。
 
 **场景二：前端监控告警的原因排查**
+
 - 业务背景：一个页面错误可能来自接口、CDN、资源加载、用户环境等多个方向。
 - 知识怎么用：并行派发多路检索搜集线索，再用 Lead 汇总判断最可能原因。
 - 收益指标：MTTD 即平均发现时间、排障过程中的工具调用次数。
@@ -417,6 +426,7 @@ export function checkOwnership(writes) {
 ```
 
 **这段代码在做什么**
+
 1. 输入是写入清单，每条包含路径与写入方名称。
 2. `Map` 记录每个路径的单一所有者。
 3. 同一路径出现第二个不同所有者时立即返回冲突。
@@ -447,6 +457,7 @@ console.log(checkOwnership(writes));
 ```
 
 **这段代码在做什么**
+
 1. `src/style.css` 被两个 Agent 写入。
 2. `checkOwnership` 在提交前发现冲突。
 3. 真实系统不只要检测路径，还要检测语义冲突，例如两个组件改同一逻辑但路径不同。
@@ -491,12 +502,14 @@ verify-ownership 断言通过
 **用在哪里**
 
 **场景一：多人协作的代码评审编排**
+
 - 业务背景：一个改动涉及多个模块，但同一目录不允许两个 Agent 同时落盘。
 - 知识怎么用：用所有权检查限制一个目录只有一个写 Agent，评审 Agent 只读。
 - 收益指标：冲突次数、合并冲突解决耗时、PR 通过率。
 - 何时不该用：仓库结构清晰且历来无冲突，直接单 Agent 改更快。
 
 **场景二：设计系统文档生成**
+
 - 业务背景：多个 Agent 分别生成按钮规范、表单规范、颜色规范，都写入文档站点。
 - 知识怎么用：每个文档目录归属一个 Agent，共享索引由主 Agent 统一写。
 - 收益指标：文档一致性评分、发布后人工修订次数。
@@ -564,6 +577,7 @@ export const mastFailures = [
 ```
 
 **这段代码在做什么**
+
 1. 每条失败模式包含编号、名称、类别与百分比。
 2. 百分比来自 MAST 论文，分母是被标注的失败，不是整体失败率。
 3. 这里列出了 7 种代表模式，MAST 原文共 14 种。
@@ -585,6 +599,7 @@ export function sumByCategory(failures) {
 ```
 
 **这段代码在做什么**
+
 1. 遍历失败模式，按类别累加百分比。
 2. 输出对象以类别为键，占比为值。
 3. 这里只统计了 7 条代表数据，所以类别和与原文 41.77%、36.94%、21.30% 不完全相等。
@@ -624,12 +639,14 @@ verify-mast 断言通过
 **用在哪里**
 
 **场景一：Agent 平台的可观测性建设**
+
 - 业务背景：平台上跑着多个 Agent 任务，失败率统计不区分原因。
 - 知识怎么用：按 MAST 三类失败模式打标，优先治理步骤重复与验证失败。
 - 收益指标：失败模式分布报告、每类失败率的周趋势。
 - 何时不该用：trace 数量不足以支撑分类时，先用人工复盘补齐样本。
 
 **场景二：内部研发助手的终止策略**
+
 - 业务背景：研发助手常重复执行同一类检索，不知道何时收手。
 - 知识怎么用：设置 maxTurns 与终止条件，并在 prompt 中写入完成标准。
 - 收益指标：单任务平均工具调用次数、步骤重复率。
@@ -698,6 +715,7 @@ export async function parallelSearch(sources) {
 ```
 
 **这段代码在做什么**
+
 1. `searchSource` 模拟一次独立检索，固定耗时 120ms。
 2. `parallelSearch` 用 `Promise.all` 同时触发所有检索。
 3. 输出结果与总耗时，总耗时接近单次耗时而非各源累加。
@@ -725,6 +743,7 @@ console.log({ parallelMs: p.elapsedMs, serialMs, ratio: (serialMs / p.elapsedMs)
 ```
 
 这段代码在做什么
+
 1. 五个独立来源，串行约 600ms，并行约 120ms 到一个计时波动区间。
 2. `ratio` 近似展示并行收益，真实减少幅度取决于源数量。
 3. Anthropic 公开数据是复杂查询研究时间最多缩短 90%，来源『Anthropic 研究系统文章』，以原文为准。
@@ -762,12 +781,14 @@ verify-parallel 断言通过
 **用在哪里**
 
 **场景一：竞品分析报告生成**
+
 - 业务背景：需要搜集竞品官网、应用商店、用户评价、行业新闻四类信息。
 - 知识怎么用：四类源互不依赖，并行派发检索，Lead 按来源合成。
 - 收益指标：报告生成时间、来源覆盖率、单份报告 token 成本。
 - 何时不该用：只分析一个竞品且数据量很小，单 Agent 足够。
 
 **场景二：代码库安全核查**
+
 - 业务背景：要查依赖漏洞、硬编码密钥、权限配置三项，各自独立。
 - 知识怎么用：三个 Subagent 分别扫描不同维度，只返回问题摘要。
 - 收益指标：扫描覆盖项数、漏检率、扫描墙钟时间。
@@ -828,6 +849,7 @@ export function canParallelWrite(writes) {
 ```
 
 **这段代码在做什么**
+
 1. 收集所有写操作的路径。
 2. 用 Set 去重，比较去重前后数量。
 3. 路径不重复才允许并行，重复则返回重复数。
@@ -844,6 +866,7 @@ export function buildWriteQueue(writes) {
 ```
 
 **这段代码在做什么**
+
 1. 按路径排序后串行执行写操作。
 2. 每个写操作得到唯一 step 序号。
 3. 排序保证同一路径相邻，便于人工检查。
@@ -911,12 +934,14 @@ verify-write 断言通过
 **用在哪里**
 
 **场景一：多 Agent 代码生成工具**
+
 - 业务背景：前端工具可能同时改 CSS、组件、测试文件，但同一文件只能一个 Agent 写。
 - 知识怎么用：写操作走队列或 worktree 隔离，评审 Agent 只读。
 - 收益指标：合并冲突率、单 PR 的返工次数。
 - 何时不该用：单人小改动用多 Agent 写不划算。
 
 **场景二：配置中心的多 Agent 改配置**
+
 - 业务背景：多个 Agent 可能同时改同一命名空间下的配置项。
 - 知识怎么用：每个命名空间分配一个 Owner，写入前检查所有权。
 - 收益指标：配置冲突次数、配置生效后的回滚次数。
@@ -986,6 +1011,7 @@ export function decideMultiAgent(input) {
 ```
 
 **这段代码在做什么**
+
 1. 输入字段对应决策清单的前七项。
 2. 每个 if 返回具体理由，不输出笼统结论。
 3. 45% 阈值来自 Google/MIT 论文，15x 来自 Anthropic 研究系统文章。
@@ -1053,12 +1079,14 @@ verify-decisions 断言通过
 **用在哪里**
 
 **场景一：新项目的 Agent 方案评审**
+
 - 业务背景：团队要决定一个需求是否引入多 Agent，评审会上需要统一判断标准。
 - 知识怎么用：把决策清单放进评审模板，每个人按顺序打分。
 - 收益指标：方案评审时长、项目返工次数。
 - 何时不该用：试验性项目可以人为豁免部分条件，但要写清豁免理由。
 
 **场景二：外部客户的技术方案说明**
+
 - 业务背景：客户要求“用多 Agent”，但实际任务简单。
 - 知识怎么用：用决策清单逐条解释为什么单 Agent 更合适，并用 15x 成本做支撑。
 - 收益指标：方案说服力、客户采纳率、项目上线后的实际成本。
@@ -1124,6 +1152,7 @@ export function validateLaunch(config) {
 ```
 
 **这段代码在做什么**
+
 1. 检查 tracing、maxTurns、tokenBudget、checkpoint、sandbox、evalSet 六项。
 2. evalSet 最少 20 条来自 Anthropic 研究系统文章的评测起步建议。
 3. 返回 pass 与缺失列表，不抛出异常，便于上层处理。
@@ -1194,12 +1223,14 @@ verify-launch 断言通过
 **用在哪里**
 
 **场景一：企业内部 Agent 平台的上线卡点**
+
 - 业务背景：多个业务线提交 Agent 任务，平台需要统一上线前校验。
 - 知识怎么用：把 validateLaunch 变成 CI 卡点，缺一项直接拒绝发布。
 - 收益指标：上线后事故数、线上回滚次数。
 - 何时不该用：一次性离线脚本不需要全套护栏，但沙箱仍建议保留。
 
 **场景二：面向外部客户的部署交付**
+
 - 业务背景：客户私有化部署多 Agent，要求可监控、可回滚。
 - 知识怎么用：交付物附带 tracing、checkpoint、渐进式发布配置。
 - 收益指标：客户环境故障恢复时间、部署成功率。
@@ -1235,6 +1266,7 @@ verify-launch 断言通过
 **目标**：写一个 Node 20 命令行工具 `agent-decider`，输入任务特征，输出 `single-agent`、`fixed-workflow` 或 `multi-agent`，并打印三条理由。
 
 **步骤**：
+
 1. 创建单文件 `agent-decider.mjs`，不安装第三方依赖。
 2. 用 `process.argv` 读取命令行参数，例如 `--canBranch true`。
 3. 实现第 7 节的 `decideMultiAgent` 决策函数。
@@ -1242,6 +1274,7 @@ verify-launch 断言通过
 5. 至少覆盖 6 种输入组合，每种组合写一个断言。
 
 **验收标准**：
+
 - 命令 `node agent-decider.mjs --singleAgentEnough false --stepsKnown false --canBranch true --worth15x true --baselineScore 0.3 --parallelWrite false` 输出 `decision: "multi-agent"`。
 - 命令 `node agent-decider.mjs --stepsKnown true` 输出 `decision: "fixed-workflow"`。
 - 运行内部断言全部通过，控制台打印 `all assertions passed`。

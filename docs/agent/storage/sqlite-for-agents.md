@@ -80,6 +80,7 @@ db.close();
 ```
 
 **这段代码在做什么**
+
 - 从 `node:sqlite` 导入 `DatabaseSync`，这是 Node 内置的同步 SQLite 接口。
 - 打开或创建 `./agent-state.sqlite` 文件。
 - 执行 `PRAGMA journal_mode = WAL`，把日志模式切到 WAL。
@@ -170,6 +171,7 @@ CREATE TABLE messages (
 ```
 
 **这段代码在做什么**
+
 - `sessions` 表以 `id` 为主键，存创建时间和更新时间。
 - `messages` 表通过 `session_id` 外键关联会话。
 - `ON DELETE CASCADE` 表示删除 session 时自动删除该 session 下的全部 message。
@@ -196,6 +198,7 @@ try {
 ```
 
 **这段代码在做什么**
+
 - `PRAGMA foreign_keys = ON` 让外键约束生效。
 - `BEGIN IMMEDIATE` 立即获取写锁，避免事务执行到一半才升级锁。
 - 三次 `INSERT` 都发生在同一个事务里。
@@ -309,6 +312,7 @@ db.exec('PRAGMA busy_timeout = 5000');
 ```
 
 **这段代码在做什么**
+
 - `PRAGMA journal_mode = WAL` 切换到 WAL 模式。
 - `PRAGMA synchronous = NORMAL` 在 WAL 模式下允许部分同步，写入通过 WAL 保证一致性。
 - `PRAGMA busy_timeout = 5000` 表示拿不到锁时最多等 5000 毫秒再报 `SQLITE_BUSY`。
@@ -331,6 +335,7 @@ console.log(row);
 ```
 
 **这段代码在做什么**
+
 - 创建 `writer` 和 `reader` 两个独立连接，指向同一个数据库文件。
 - `writer` 写入并提交后，`reader` 立即可看到已提交的新行。
 - WAL 模式下读者不会阻止写者，写者也不会阻塞读者读旧快照。
@@ -435,6 +440,7 @@ CREATE VIRTUAL TABLE messages_fts USING fts5(
 ```
 
 **这段代码在做什么**
+
 - `CREATE VIRTUAL TABLE ... USING fts5` 创建 FTS5 索引表。
 - 使用 `content='messages'` 声明外部内容表，FTS 只存索引，正文仍在 `messages`。
 - `content_rowid='id'` 表示 FTS 内部的 rowid 与 `messages.id` 对应。
@@ -453,6 +459,7 @@ END;
 ```
 
 **这段代码在做什么**
+
 - `AFTER INSERT` 触发器把新增消息的内容写进 FTS5 索引。
 - `AFTER DELETE` 触发器用 `'delete'` 命令从 FTS5 中删除对应 rowid 的索引项。
 - 更新场景可再加 `AFTER UPDATE` 触发器，或先删后插。
@@ -559,6 +566,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 ```
 
 **这段代码在做什么**
+
 - `schema_migrations` 表每个迁移只对应一行，`version` 是主键。
 - `applied_at` 记录应用时间，方便调试。
 - 幂等建表使用 `IF NOT EXISTS`，首次启动不会因表已存在而失败。
@@ -595,6 +603,7 @@ for (const m of migrations) {
 ```
 
 **这段代码在做什么**
+
 - `migrations` 数组按版本号升序排列，每个元素含 SQL 语句。
 - 先查询已应用版本，跳过已经跑过的迁移。
 - 对未应用迁移，用 `BEGIN IMMEDIATE` 拿写锁并包裹迁移 SQL 与版本号写入。
@@ -700,6 +709,7 @@ CREATE TABLE sessions (
 ```
 
 **这段代码在做什么**
+
 - `relative_file_path` 存相对项目根目录的路径。
 - `project_root` 存项目根目录，可以由运行时配置重建。
 - 搬家后更新 `project_root` 即可恢复索引。
@@ -716,6 +726,7 @@ console.log(fullPath);
 ```
 
 **这段代码在做什么**
+
 - 从环境变量读取当前项目的根目录。
 - 只从库中取出相对路径。
 - 在内存中拼接出完整路径，库里不存完整路径。
@@ -820,6 +831,7 @@ db.exec('PRAGMA foreign_keys = ON');
 ```
 
 **这段代码在做什么**
+
 - `node:sqlite` 是 Node 22.5.0 起加入的实验模块，需要安装对应版本（需核对官方文档）。
 - 数据库文件放在系统临时目录，文件名带时间戳，避免多次运行冲突。
 - 连接选项 `timeout: 5000` 设置锁等待，和 PRAGMA busy_timeout 一致。
@@ -854,6 +866,7 @@ END;
 ```
 
 **这段代码在做什么**
+
 - sessions 表主键为 TEXT，messages 表通过 `session_id` 外键关联。
 - `messages.id` 是自增整数，作为 FTS 的外部 rowid。
 - FTS5 表只存指向 `messages` 的索引，不重复存正文。
@@ -880,6 +893,7 @@ assert.equal(db.prepare('SELECT COUNT(*) AS c FROM messages').get().c, 2);
 ```
 
 **这段代码在做什么**
+
 - 使用 `BEGIN IMMEDIATE` 抢写锁，保证事务期间没有其他写者插入。
 - 插入 1 条 session 和 2 条 message，均在同一事务。
 - 失败回滚保证不会只留半截会话。
@@ -901,6 +915,7 @@ db.close();
 ```
 
 **这段代码在做什么**
+
 - `reader` 是第二个连接，指向同一个数据库文件。
 - 先查 sessions 验证 WAL 模式下已提交数据可见。
 - 再查 FTS5，`MATCH '重命名'` 只应命中用户消息一条。
@@ -964,6 +979,7 @@ FTS5 命中条数： 1
 目标：为你的 CLI agent 写一个本地存储模块，使用 SQLite 存 sessions 和 messages，并用 FTS5 支持关键词搜索。
 
 步骤：
+
 1. 用 Node 22.5.0 或更高版本新建项目，添加 `node:sqlite` 存储模块。
 2. 在模块里实现 `initDb(filePath)`，创建 sessions、messages、FTS5 表和触发器。
 3. 实现 `createSessionWithMessages(sessionId, messages)`，内部使用 `BEGIN IMMEDIATE` 事务。
@@ -971,6 +987,7 @@ FTS5 命中条数： 1
 5. 写一个测试脚本，调用以上函数并验证空库、写入回滚、WAL 并发读、FTS 关键字命中。
 
 验收标准：
+
 - 测试脚本运行时使用临时数据库文件，不留下测试产物。
 - 事务写入一条 session 和 3 条 messages 后，跳过 commit 直接 `ROLLBACK`，查询结果为 0 行。
 - 第二条连接在第一条提交后能读到 session 行。

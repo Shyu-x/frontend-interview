@@ -87,6 +87,7 @@ console.log(index.get(2));
 ```
 
 **这段代码在做什么**
+
 - 用 `appendFileSync` 模拟追加写，避免覆盖已有内容。
 - 每行一个 JSON 对象，符合 JSONL 约定。
 - 重建逻辑只是最简单投影，真实产品会生成 SQLite 表。
@@ -121,15 +122,18 @@ console.log('ok: JSONL 追加写与读取一致');
 | 索引和 JSONL 不一致 | 索引是派生结构，回填失败 | 增加 backfill 状态与 read-repair |
 
 **用在哪里**
+
 - 业务背景：单机 CLI 的会话恢复。知识怎么用：保留 JSONL 作为事实源，按需重建索引。衡量指标：恢复成功率、启动时索引重建耗时。什么时候不该用：需要多进程高频跨会话查询的桌面端，仍只靠 JSONL 会让列表页扫描多个 GB 文件。
 - 业务背景：日志审计与回溯。知识怎么用：追加写保证历史事件不可变，审计端按行扫描。衡量指标：审计覆盖率、故障回放时间。什么时候不该用：需要按用户 ID 或 token 用量做实时聚合，纯 JSONL 没有索引，查询过慢。
 
 **行业实践**
+
 - Codex 源码在 `search.rs` 用 `rg` 搜索 rollout，而不是 FTS5。怎么借鉴到你的项目：日志检索先考虑系统级 grep，等真实查询超过秒级再上索引。
 - Claude Code 官方文档说明 JSONL 条目格式随版本变化。怎么借鉴到你的项目：提供导出 API，而不是让用户手工解析内部文件。
 - DeepSeek harness 文档用格式版本与指纹拒绝未来格式。怎么借鉴到你的项目：读取文件时先读版本头，不认识就拒绝，不做猜测迁移。
 
 **小结**
+
 1. JSONL 是事实源，SQLite 是可重建索引，二者分层共存。
 2. 如果 SQLite 索引损坏，可从 JSONL 回填；JSONL 丢失则无法恢复。
 3. 多进程写 JSONL 必须额外加锁，否则行会交错。
@@ -187,6 +191,7 @@ for (const [name, store, path, src] of products) {
 ```
 
 **这段代码在做什么**
+
 - 用数组记录存储类型与路径来源，避免把未验证条目写成事实。
 - Cursor 一行显式标出“需核对”，对应资料中的论坛来源而非官方文档。
 - 名称与路径均来自调研资料，不新增未验证信息。
@@ -221,15 +226,18 @@ console.log('ok: 存储阵营数量与调研一致');
 | 说“OpenCode 一直是 SQLite” | OpenCode 有旧 JSON 文件存储并迁移 | 说“从 JSON 文件迁移到 SQLite” |
 
 **用在哪里**
+
 - 业务背景：你接手一个多产品兼容的会话管理工具。知识怎么用：按各产品实际存储位置做导入器。衡量指标：识别准确率、导入成功率。什么时候不该用：只服务单一产品时，不需要维护九套适配器。
 - 业务背景：面试官问“你为什么觉得 SQLite 不是唯一答案”。知识怎么用：列出文件阵营与 SQLite 阵营并存。衡量指标：回答是否给出来源。什么时候不该用：面试时间不足时，不必展开迁移细节。
 
 **行业实践**
+
 - OpenCode 源码显示旧 JSON 文件存储作为迁移源进入 SQLite。怎么借鉴：你的项目迁移时保留旧数据读取器，先测导入再删除旧格式。
 - Goose 源码用 `BEGIN IMMEDIATE` 创建 schema，防止多进程首跑竞争。怎么借鉴：初始化数据库时用事务包裹 DDL 与版本行。
 - LangGraph 官方文档提供 `SqliteSaver` 与 `PostgresSaver` 同一保存器接口。怎么借鉴：把后端切换藏在接口后，单进程用 SQLite，多租户换 Postgres。
 
 **小结**
+
 1. 文件阵营与 SQLite 阵营并存，Codex 是混合。
 2. 引用产品存储细节时必须区分官方文档、源码、论坛与未验证。
 3. Aider 的 Markdown 日志不是可恢复会话状态的主存储。
@@ -284,6 +292,7 @@ console.log(ok.length);
 ```
 
 **这段代码在做什么**
+
 - 手动构造一个不完整的尾部行。
 - 逐行解析，遇到失败立即停止。
 - 保留已解析成功的整行。
@@ -305,6 +314,7 @@ console.log(events.filter(e => e.parentId === 'n1').map(e => e.id).join(','));
 ```
 
 **这段代码在做什么**
+
 - 每个事件记录父节点 id。
 - 可以从 `n1` 分出多个孩子，形成树而不是线性日志。
 - 分支不复制已有行，只是追加新节点并指向旧节点。
@@ -338,15 +348,18 @@ console.log('ok: 破损尾部不影响前面完整行');
 | 文件版本变旧后无法读取 | 无版本头 | 头部加 version，只做显式迁移 |
 
 **用在哪里**
+
 - 业务背景：本地 CLI 的会话恢复。知识怎么用：启动时检测尾部半行，安全丢弃并继续。衡量指标：崩溃恢复成功率、启动耗时。什么时候不该用：需要频繁跨会话分页查询，不要只靠 JSONL 顺序扫。
 - 业务背景：会话分支的交互设计。知识怎么用：用 `parentId` 树形节点实现同一文件分支，避免整段复制。衡量指标：分支创建延迟、存储空间增长。什么时候不该用：模型需要看到合并后的全局历史时，纯树形分支会让活动分支选择变复杂。
 
 **行业实践**
+
 - DeepSeek harness 文档写“checksummed concatenated Zstandard frames”和“torn-tail truncation”。怎么借鉴：冷日志压缩时加校验和，恢复时先截断尾部。
 - pi 本地文档写 v3 头部携带格式版本，旧格式加载时显式迁移。怎么借鉴：永远写版本号，不隐式猜格式。
 - Claude Code 官方文档提到未调试时在两条终端恢复同一会话会交错写入。怎么借鉴：文档明确警告多终端并写，不如加单写者锁。
 
 **小结**
+
 1. JSONL 恢复必须能容忍破损尾部。
 2. 树形分支用 `id` 与 `parentId`，不复制已有行。
 3. 版本头与显式迁移是长期维护的关键。
@@ -401,6 +414,7 @@ db.prepare('INSERT OR IGNORE INTO sessions VALUES (?, ?)').run('s1', 0);
 ```
 
 **这段代码在做什么**
+
 - `DatabaseSync` 是 Node 20 内置 SQLite API。
 - 打开 WAL 让读不阻塞写。
 - `busy_timeout = 5000` 存毫秒级等待，避免立刻报 `SQLITE_BUSY`。
@@ -418,6 +432,7 @@ db.exec('COMMIT');
 ```
 
 **这段代码在做什么**
+
 - `BEGIN IMMEDIATE` 在事务开始时获取写锁，串行化多进程初始化。
 - `IF NOT EXISTS` 与 `INSERT OR IGNORE` 双保险。
 - 避免先检查再创建产生的“table already exists”竞争。
@@ -454,15 +469,18 @@ db.close();
 | 每次打开都执行 `journal_mode=WAL` 引发竞争 | 连接池内重复 PRAGMA | 只执行一次或拆出初始化路径 |
 
 **用在哪里**
+
 - 业务背景：桌面端会话列表与用量统计。知识怎么用：SQLite 索引支持分页与聚合。衡量指标：首页查询延迟、索引大小。什么时候不该用：多个服务实例共享同一网络盘，单文件 SQLite 会撞锁。
 - 业务背景：CLI 的跨进程 session 恢复。知识怎么用：WAL 加 `busy_timeout` 支持 CLI 与后台进程并发读。衡量指标：锁等待次数、恢复失败率。什么时候不该用：单用户纯追加日志，直接 JSONL 更易调试。
 
 **行业实践**
+
 - OpenCode 源码设置 `PRAGMA journal_mode = WAL`、`synchronous = NORMAL`、`busy_timeout = 5000`。怎么借鉴：新项目粘贴这三行并放进初始化函数。
 - Goose 源码注释解释 schema 创建跑 `BEGIN IMMEDIATE` 是为了“SQLite serializes writers across processes”。怎么借鉴：把首跑初始化当成并发场景处理。
 - LangGraph 官方文档建议 `thread_id` 小于 255 字符，避免 Postgres 列溢出。怎么借鉴：对外 API 校验 `thread_id` 长度。
 
 **小结**
+
 1. WAL 允许读与写同时进行，但同一时间只有一个写者。
 2. 迁移和初始化要幂等，并用 `BEGIN IMMEDIATE` 串行化。
 3. 不要在网络文件系统上使用 WAL。
@@ -517,6 +535,7 @@ console.log(rows[0].text);
 ```
 
 **这段代码在做什么**
+
 - 用 `thread_items` 模拟 Codex 的投影表。
 - 数据可由 JSONL 重建，这里直接插入代替回填。
 - 查询按 `thread_id` 与 `seq` 取最近两条，避免读完整份 JSONL。
@@ -538,6 +557,7 @@ console.log(logsDb.prepare('SELECT COUNT(*) AS c FROM logs').get().c);
 ```
 
 **这段代码在做什么**
+
 - 两个独立数据库文件，写噪声日志不阻塞线程状态。
 - 与 Codex 将高 churn 日志拆成单独 DB 的设计对齐。
 - 可以为 logs 库设置独立保留策略。
@@ -576,15 +596,18 @@ db.close();
 | 回填失败后脏索引 | 无读修复 | 每次读取校验索引与事实源一致 |
 
 **用在哪里**
+
 - 业务背景：构建生产级 coding agent 的会话恢复层。知识怎么用：JSONL 为事实源，SQLite 为投影。衡量指标：恢复耗时、事实源损坏恢复能力。什么时候不该用：只做单机 demo，不需要复杂投影，直接 JSONL 足够。
 - 业务背景：多个 UI 端共享同一个 home 目录的状态。知识怎么用：线程状态库集中，日志库拆开避免影响 UI 查询。衡量指标：UI 列表加载时间、日志写入延迟。什么时候不该用：部署在 NFS 共享盘上，SQLite WAL 会异常。
 
 **行业实践**
+
 - Codex 源码显示 `auto_vacuum = INCREMENTAL` 只在空库上设置，并运行回收 worker。怎么借鉴：初始化阶段设置该 PRAGMA，后续避免在已填充库上切换。
 - Codex 源码 pin SQLite >= 3.51.3 以获 WAL-reset 修复，并跑 `quick_check` 预算 100 ms。怎么借鉴：写启动健康检查，限制 `quick_check` 耗时。
 - Codex 源码包含 `writer_lock.rs` 作为每会话跨进程写锁。怎么借鉴：包装所有 JSONL 追加路径，不信任单进程模型。
 
 **小结**
+
 1. Codex 是“JSONL 事实源 + 多个 SQLite 镜像与状态库”的混合方案。
 2. 高写入日志要拆库，避免单写者阻塞线程状态。
 3. 索引是派生结构，必要时可回填重建。
@@ -634,6 +657,7 @@ db.prepare('DELETE FROM stage1_outputs WHERE status = ?').run('polluted');
 ```
 
 **这段代码在做什么**
+
 - 候选先进入 DB 表，带有状态列。
 - “外部网页内容片段”被标为 polluted 并删除。
 - 最后只剩通过筛选的候选，可写入 Markdown。
@@ -669,15 +693,18 @@ db.close();
 | 记忆文件写失败后 DB 已删候选 | 先删后写 | 先写文件，再更新 DB 状态 |
 
 **用在哪里**
+
 - 业务背景：coding agent 的用户偏好记忆。知识怎么用：DB 做候选池，Markdown 做长期产物。衡量指标：下次会话偏好命中率、污染率。什么时候不该用：临时项目指令不要进长期记忆，直接放 CLAUDE.md 或 AGENTS.md。
 - 业务背景：多轮 agent 任务里的中间产物回收。知识怎么用：任务租约存 DB，产物存文件。衡量指标：租约超时率、重复计算次数。什么时候不该用：无并发的单次 agent，不需要租约层。
 
 **行业实践**
+
 - Claude Code 官方文档写自动记忆 `MEMORY.md` 前 200 行或 25KB 先加载，主题文件按需读取。怎么借鉴：把记忆索引限制在固定预算内，避免启动膨胀。
 - Codex 源码显示记忆候选通过 DB 行与 job 租约协调，并含 secret redaction。怎么借鉴：涉及密钥的候选在写文件前脱敏。
 - LangGraph 官方文档把短期 thread 状态与长期跨线程 Store 分两个概念。怎么借鉴：API 设计时不要把转录与长期记忆放在同一张表。
 
 **小结**
+
 1. 记忆层与转化层分离，候选先池子后产物。
 2. 索引预算和污染标记是长期记忆的两道闸。
 3. DB 负责协调，文件负责给模型读与人审。
@@ -730,6 +757,7 @@ console.log(chooseStore({ users: 'server', processes: 8, tenants: 20 }));
 ```
 
 **这段代码在做什么**
+
 - 用分支函数固化决策顺序。
 - 单租户多 UI 但多进程走 SQLite。
 - 多租户服务端走 Postgres 保存器。
@@ -749,6 +777,7 @@ for (const [p, m] of searchFacts) console.log(`${p}: ${m}`);
 ```
 
 **这段代码在做什么**
+
 - 将搜索实现写入可核验的数据。
 - Codex 条目依据源码中出现 `rg` 的 `search.rs`。
 - Goose 条目依据 `chat_history_search.rs` 中的 `json_extract` 与 `LIKE`。
@@ -784,15 +813,18 @@ console.log('ok: 选型路线符合访问模式');
 | 以为 Goose 用 FTS5 | `chat_history_search.rs` 用 LIKE 加 json_extract | 回答“LIKE 加 json_extract，无 FTS5” |
 
 **用在哪里**
+
 - 业务背景：规划新 agent 存储架构。知识怎么用：先判断用户与租户规模，再做选型。衡量指标：选型评审是否可复现。什么时候不该用：过早优化为 Postgres，单机本地开发用 SQLite 更快。
 - 业务背景：搜索历史功能改造。知识怎么用：先确认现有产品是 `rg` 还是 LIKE，不要默认 FTS5。衡量指标：搜索延迟、结果相关性。什么时候不该用：数据量不足 GB 级，直接 `rg` 或 grep 成本更低。
 
 **行业实践**
+
 - SQLite 官方文档指出 WAL 只能有一个写者，且不支持网络文件系统。怎么借鉴：部署前检查磁盘类型与并发写人数。
 - LangGraph 官方文档提供 `PostgresSaver` 并建议保留与 pruning。怎么借鉴：服务端落地时把 pruning 写进任务。
 - Codex 源码中出现 `rg` 搜索 rollouts，未见 FTS5。怎么借鉴：先测量真实检索延迟，再决定是否加 FTS5。
 
 **小结**
+
 1. 按访问模式选型：单用户用文件，单机多进程用 SQLite，多租户用 Postgres。
 2. Redis 用于缓存、锁、限流与流，不是默认系统记录。
 3. 会话搜索中 Codex 用 rg，Goose 用 LIKE 加 json_extract，未见到 FTS5。
@@ -814,6 +846,7 @@ console.log('ok: 选型路线符合访问模式');
 **目标**：实现一个最小 hybrid 会话存储原型。
 
 **步骤**：
+
 1. 用 Node 20 新建项目，实现 `appendEvent(sessionId, event)` 写入 `sessions/<sessionId>.jsonl`。
 2. 实现容错读取 `readEvents(sessionId)`，能丢弃尾部半行。
 3. 用 `node:sqlite` 建 `thread_items` 表，从 JSONL 投影写入索引。
@@ -821,6 +854,7 @@ console.log('ok: 选型路线符合访问模式');
 5. 加入 `node:assert` 断言：追加两个事件后分页能取到最新一条，破损尾部不影响前面完整行。
 
 **验收标准**：
+
 - 运行 `node index.js` 输出 `ok: hybrid storage works`。
 - 删除 SQLite 文件后，能仅从 JSONL 重建出相同查询结果。
 - 每个关键行有中文注释。

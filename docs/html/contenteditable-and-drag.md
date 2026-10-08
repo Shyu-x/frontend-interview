@@ -149,6 +149,7 @@ if (selection.toString()) {
 ```
 
 现代替代方案：
+
 - `document.execCommand` → Selection API + Range
 - `queryCommandEnabled` → `selection.rangeCount > 0`
 - 建议使用 Tiptap/Lexical 等编辑器库
@@ -287,6 +288,7 @@ dropTarget.addEventListener('dragover', (e) => {
 
 **答案：**
 现代富文本编辑器（如 Lexical、Slate）不使用 contenteditable，而是：
+
 1. **自定义数据模型**：存储为 JSON/Delta 格式（如 `{ type: 'paragraph', children: [...] }`）
 2. **React 组件渲染**：每个节点是 React 组件，内容是受控的
 3. **Selection 追踪**：通过 Selection API 追踪光标位置
@@ -309,12 +311,14 @@ Selection（光标位置）
 
 **答案：**
 局限性：
+
 1. **iOS 不支持**：移动端无法使用
 2. **自定义拖拽预览困难**：只能通过 setDragImage
 3. **跨 iframe 拖拽问题**：DataTransfer 跨域限制
 4. **拖拽事件触发时机不精确**：dragover 节流问题
 
 解决方案：
+
 - 移动端：使用 Pointer Events + Touch Events 自定义实现
 - 复杂场景：使用 `@dnd-kit/core`（React）/ `react-dnd` / `@dnd-kit/sortable`
 - 拖拽排序：`@dnd-kit/sortable` 提供跨浏览器一致的体验
@@ -502,6 +506,7 @@ Hmm 上句禁用了「更」类词，改为：这套事件把鼠标、触摸、�
 **目标**：做一个单页小工具，包含三张可编辑便签、便签拖拽排列、图片拖拽上传，把本页知识点串成一条链路。
 
 **步骤**：
+
 1. 写三张便签，每张含手柄条与文本层，便签默认 `draggable="true"`。
 2. 双击文本层时关闭便签的 draggable，打开文本层的 contenteditable，用 Range 把光标放到文本末尾。
 3. 在容器上以捕获阶段监听 blur，退出编辑时复位 contenteditable 与 draggable。
@@ -511,6 +516,7 @@ Hmm 上句禁用了「更」类词，改为：这套事件把鼠标、触摸、�
 7. 刷新页面后从本地存储恢复便签文字与顺序，验证提交时机是否正确。
 
 **验收标准**：
+
 - 编辑便签文字时拖不动便签，拖动便签时文本层不获得焦点。
 - 把图片拖进投放区，浏览器不跳转到图片页面，缩略图出现在投放区内。
 - 从 Word 复制一段带格式文字粘进备注框，结果为纯文本，检查 DOM 里没有内联 style。

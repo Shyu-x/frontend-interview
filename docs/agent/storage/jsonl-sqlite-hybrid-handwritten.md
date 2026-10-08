@@ -83,6 +83,7 @@ appendRecord('./session.jsonl', { type: 'message', id: 2, text: '学混合存储
 ```
 
 **这段代码在做什么**
+
 - `JSON.stringify(record)` 把对象转成一行文本。
 - 手动加 `'\n'` 保证每行边界明确。
 - `appendFileSync` 以追加模式写下整行。
@@ -112,6 +113,7 @@ console.log(db.prepare('SELECT title FROM threads WHERE id = ?').get('s1'));
 ```
 
 **这段代码在做什么**
+
 - `:memory:` 创建不落盘的 SQLite 库，适合本节演示。
 - `threads` 表只保存查询字段，不保存完整会话正文。
 - `INSERT` 写入一行摘要。
@@ -175,6 +177,7 @@ console.log('PASS 1: JSONL 追加与 SQLite 索引正常');
 - 怎么借鉴到你的项目：先写 JSONL，再把列表字段镜像进 SQLite；重建函数永远保留，索引坏了就重放。
 
 **小结**
+
 - JSONL 是原始流水，SQLite 是可重建目录。
 - 列表查询走 SQLite 索引，会话正文留在 JSONL。
 - 写 JSONL 必须保证一行一 JSON 且有换行。
@@ -233,6 +236,7 @@ appendLine('./s.jsonl', { type: 'm', id: 1 });
 ```
 
 **这段代码在做什么**
+
 - `openSync(file, 'a')` 以追加模式取得文件描述符。
 - 追加模式下即使多个进程打开，写入都到文件尾。
 - `writeSync(fd, line)` 一次调用写入整行。
@@ -261,6 +265,7 @@ recoverJsonl('./s.jsonl');
 ```
 
 **这段代码在做什么**
+
 - `lastIndexOf('\n')` 找到最后一个完整行边界。
 - 如果文件里没有换行，说明没有完整行，清空文件。
 - 如果有换行，保留从文件开头到最后一个换行的内容。
@@ -315,6 +320,7 @@ console.log('PASS 2: 半行恢复截断正确');
 - 怎么借鉴到你的项目：所有 JSONL 写入都走一个 `appendLine` 函数，启动时统一调恢复函数。
 
 **小结**
+
 - 一条 JSON 一行，行末必须有换行。
 - 恢复就是找到最后一个换行并截掉之后内容。
 - 单次 `writeSync` 追加整行可降低部分写入风险。
@@ -373,6 +379,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS backfill_state (
 ```
 
 **这段代码在做什么**
+
 - `threads` 保存 JSONL 中提取出的会话摘要。
 - `id` 与 JSONL 文件名中的会话 id 一致。
 - `backfill_state` 只有一行，记录扫描到哪个文件。
@@ -405,6 +412,7 @@ function backfillFile(db, path) {
 ```
 
 **这段代码在做什么**
+
 - 读取文件并按换行切成行数组。
 - 每行解析后取 `ts` 最大值与最后出现的 `title`。
 - `ON CONFLICT(id) DO UPDATE` 让同一文件重复 backfill 不产生重复行。
@@ -438,6 +446,7 @@ db.prepare(`INSERT OR IGNORE INTO backfill_state (id, status, last_watermark)
             VALUES (1, 'pending', NULL)`).run();
 ```
 **这段代码在做什么**
+
 - `INSERT OR IGNORE` 保证 `id=1` 行存在。
 - `markWatermark` 记录最新完成文件路径。
 - 后续 backfill 可跳过小于等于 watermark 的文件。
@@ -492,6 +501,7 @@ console.log('PASS 3: backfill 单文件成功');
 - 怎么借鉴到你的项目：把 backfill 分成扫描、提取、UPSERT、写水位四步，任何一步失败都可安全重试。
 
 **小结**
+
 - backfill 只依赖 JSONL，不依赖旧索引。
 - 幂等写入使用 UPSERT，水位记录扫描进度。
 - SQLite 中只保存可派生字段，避免持有第二份真相。
@@ -548,6 +558,7 @@ function diffIndexFile(db, files) {
 ```
 
 **这段代码在做什么**
+
 - 用 SQL 查询现有索引的所有 id 与路径。
 - `missingInIndex` 表示文件存在但索引缺行。
 - `staleInIndex` 表示索引指向的文件已经不存在。
@@ -571,6 +582,7 @@ function readRepair(db, files) {
 ```
 
 **这段代码在做什么**
+
 - 对 `missingInIndex` 补录，修复索引缺行。
 - 对 `staleInIndex` 做占位更新，保留行但该行仍可被上层过滤。
 - `backfillFile` 来自第 3 节，负责 UPSERT。
@@ -591,6 +603,7 @@ function repairPaths(db, realPathById) {
 ```
 
 **这段代码在做什么**
+
 - `realPathById` 是由文件系统扫描得到的 id 与真实路径。
 - 条件里带 `rollout_path != ?`，避免无变化时更新。
 - 路径修复只改索引，不移动 JSONL 文件。
@@ -647,6 +660,7 @@ console.log('PASS 4: read-repair 补录与路径检查完成');
 - 怎么借鉴到你的项目：把“列出文件、列出索引、求差、修复”四步独立成函数，修复函数只改索引不改原始文件。
 
 **小结**
+
 - read-repair 以 JSONL 文件列表为基线。
 - 缺行补录、过期跳过、路径修复是三类基本修复。
 - 索引修复不能替代 JSONL 恢复，索引坏可重建，正文坏则不可。
@@ -699,6 +713,7 @@ function ensureBackfillState(db) {
 ```
 
 **这段代码在做什么**
+
 - `id=1` 是单行约束，保证全局只有一个 backfill 状态。
 - `INSERT OR IGNORE` 在已有行时安全跳过。
 - `updated_at` 用于计算租约是否超时。
@@ -721,6 +736,7 @@ function tryClaimBackfill(db, now, leaseMs = 5000) {
 ```
 
 **这段代码在做什么**
+
 - `WHERE status != 'complete' OR updated_at <= ?` 允许待办、运行中且超时、已完成但再次要求重建时抢到租约。
 - 条件 `updated_at <= now - leaseMs` 让死掉的 worker 租约过期。
 - `SET updated_at = now` 在抢到后刷新租约。
@@ -741,6 +757,7 @@ function completeBackfill(db, watermark, now) {
 ```
 
 **这段代码在做什么**
+
 - 把租约状态归位为 `complete`。
 - `last_watermark` 记录完成点，后续可跳过。
 - `updated_at` 标记释放时间。
@@ -801,6 +818,7 @@ console.log('PASS 5: CAS 租约与超时接管正确');
 - 怎么借鉴到你的项目：把租约状态表固定为单行，抢租约、写水位、释放租约拆成三个 SQL 函数。
 
 **小结**
+
 - CAS 租约是一条条件 `UPDATE` 加 `changes` 判断。
 - 超时条件让崩溃进程的租约可被接管。
 - 抢到租约的进程才可 backfill，其他进程等待或退出。
@@ -858,6 +876,7 @@ function forkSession(parentFile, forkFile, parentLineCount) {
 ```
 
 **这段代码在做什么**
+
 - `appendLine` 来自第 2 节，保证一条 JSON 一行。
 - `history_base` 保存父路径与父行数。
 - 父行数是 fork 时通过读取父文件确认的边界。
@@ -877,6 +896,7 @@ function readPrefix(parentFile, lineCount) {
 ```
 
 **这段代码在做什么**
+
 - 读整个父文件并按行分割。
 - `slice(0, lineCount)` 只取 fork 边界之前的行。
 - 父文件可能还有 fork 之后新增的行，这里不会误读。
@@ -906,6 +926,7 @@ function replay(files, readFile = readFileSync) {
 ```
 
 **这段代码在做什么**
+
 - 遍历子文件每一行。
 - 遇到 `session_meta` 且有 `history_base`，先合并父前缀。
 - 其他行正常加入输出。
@@ -961,6 +982,7 @@ console.log('PASS 6: fork 前缀不复制，重放合并正确');
 - 怎么借鉴到你的项目：fork 时只写父 id、父截止行号、子起始序号三个引用字段，不复制正文。
 
 **小结**
+
 - fork 前缀引用可用三字段表达：父文件、父行数、子起始序号。
 - 重放时按 meta 先父后子，不破坏原始顺序。
 - 父文件删除会破坏 fork，归档前需要先处理依赖。
@@ -1022,6 +1044,7 @@ function recoverJsonl(file) {
 ```
 
 **这段代码在做什么**
+
 - `import` 一次性引入文件系统、SQLite、断言模块。
 - `appendLine` 是这一页所有 JSONL 写入的唯一入口。
 - `recoverJsonl` 用最后一个换行恢复半行。
@@ -1056,6 +1079,7 @@ function readRepair(db, files) {
 ```
 
 **这段代码在做什么**
+
 - `backfillFile` 把文件摘要写入 SQLite 表并保存路径。
 - `readRepair` 比照传入文件清单，发现缺行就补。
 - 两个函数同源，保证测试时共享状态定义。
@@ -1101,6 +1125,7 @@ function replay(files) {
 ```
 
 **这段代码在做什么**
+
 - `ensureLease` 保证租约单行存在。
 - `tryClaim` 返回布尔值，避免每次 backfill 都手工读 `changes`。
 - `createFork` 只写入父前缀引用。
@@ -1121,6 +1146,7 @@ function cleanAll(tableName) {
 ```
 
 **这段代码在做什么**
+
 - 列举测试产生的文件列表。
 - `rmSync` 用 `force: true` 忽略不存在路径。
 - 同时删除 SQLite 的 `-wal` 与 `-shm` sidecar。
@@ -1159,6 +1185,7 @@ function testBase() {
 testBase();
 ```
 **这段代码在做什么**
+
 - `appendLine` 写入两条完整行，再追加半行。
 - `recoverJsonl` 后断言文本只剩 1 行。
 - `backfillFile` 后查询索引标题可回读。
@@ -1216,6 +1243,7 @@ testIndexAndLease();
 ```
 
 **这段代码在做什么**
+
 - `tryClaim(db1)` 抢到，`tryClaim(db2)` 抢不到。
 - 7 秒后 `db2` 可以到期接管。
 - `rmSync` 删除索引后，`readRepair` 重新从 JSONL 重建 1 行。
@@ -1303,6 +1331,7 @@ function testFullMatrix() {
 testFullMatrix();
 ```
 **这段代码在做什么**
+
 - 用例 1-5 验证正常写入与文件存在性。
 - 用例 6-8 验证半行截断到空文件与完整行加半行两种。
 - 用例 9-11 验证索引删除后可按 JSONL 重建。
@@ -1359,6 +1388,7 @@ PASS full matrix
 - 怎么借鉴到你的项目：把重置、写入、查询、断言四步结构化，每个用例只差数据不差流程。
 
 **小结**
+
 - 存储层自测必须覆盖写入、恢复、重建、竞态、fork。
 - 用 `cleanAll` 与 `assert` 把测试变可重复。
 - 把完整脚本拆成“工具函数”和“测试函数”两层，便于维护。
@@ -1410,6 +1440,7 @@ function recordToHistory(record) {
 ```
 
 **这段代码在做什么**
+
 - `history` 保留 Day4 原有内存数组，改动最小。
 - `appendLine` 是第 2 节实现的单行写入。
 - 一次调用同时更新内存和落盘。
@@ -1432,6 +1463,7 @@ function loadHistoryFromFile(file) {
 ```
 
 **这段代码在做什么**
+
 - `existsSync` 避免首次启动时出错。
 - `recoverJsonl` 先修剪崩溃半行。
 - 逐行解析 JSON 并放入原数组。
@@ -1451,6 +1483,7 @@ readRepair(db, ['day4-session.jsonl']);
 ```
 
 **这段代码在做什么**
+
 - 创建 `threads` 索引表。
 - 用第 4 节 `readRepair` 补录 JSONL 文件。
 - 启动后列表查询读 SQLite。
@@ -1504,6 +1537,7 @@ console.log('PASS 8: Day4 会话记录可重启加载');
 - 怎么借鉴到你的项目：让课程项目保留自我可解释性，一行记录既是内存事件，也是持久化证据。
 
 **小结**
+
 - Day4 改成落盘只需抽一个统一写入入口。
 - 启动加载先检查文件，再恢复半行，最后逐行解析。
 - 索引表只服务列表，不进入 Day4 单会话内存层。
@@ -1525,17 +1559,20 @@ console.log('PASS 8: Day4 会话记录可重启加载');
 
 **目标**
 实现一个 `mini-session-store` 文件夹，内有两个入口文件与一个测试文件：
+
 - `store.mjs` 导出 `appendLine`、`recoverJsonl`、`backfillFile`、`readRepair`、`tryClaim`、`createFork`、`replay`。
 - `index.mjs` 提供简单命令行，输入 `--list` 列出 JSONL 会话，输入 `--fork <parent> <new>` 创建 fork。
 - `test.mjs` 跑至少 20 条断言，覆盖半行、重建、CAS、fork。
 
 **步骤**
+
 - 第一步：新建目录并初始化 npm 项目，安装 `better-sqlite3`。
 - 第二步：从第 7 节复制工具函数到 `store.mjs`，并导出。
 - 第三步：在 `index.mjs` 中读取 `process.argv[2]`，实现 `--list` 和 `--fork`。
 - 第四步：在 `test.mjs` 中列出 20 条显式断言，确保 `npm test` 全绿。
 
 **验收标准**
+
 - `npm test` 输出 3 条 `PASS` 并且退出码为 0。
 - 手动执行 `node --experimental-default-type=module index.mjs --list` 能看到至少一个标题。
 - 执行 `--fork` 后新会话历史长度等于父前缀长度加 1。

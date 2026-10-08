@@ -1213,6 +1213,7 @@ console.log('存活行数', queryObjects(RowModel).length);
 **怎么度量收益**：看强制 GC 后的 `usedJSHeapSize` 与基线之差，以及 `queryObjects(RowModel).length` 与表格可视行数之差。测量方法是用 DevTools Memory 面板拍三张快照，在 Comparison 视图看 `# New` 与 `Size Delta`。
 
 **什么时候不该用**：
+
 - 表格数据本身要求常驻（离线编辑草稿），引用不释放是功能需求，方向应该是按需重建而不是找泄漏。
 - 只在开发机上观察，没在目标低内存机型复现，读数差异不能代表线上表现。
 - 单次操作的增量落在 GC 噪声内，小于一次新生代回收量，继续查的收益低。
@@ -1252,6 +1253,7 @@ setInterval(() => {
 **怎么度量收益**：看 `process.memoryUsage().heapUsed`、`rss` 和 `v8.getHeapSpaceStatistics()` 中 `old_space.space_used_size` 的每小时斜率，以及快照 Comparison 视图里的 retained size 增量。测量方法是用 `node --inspect` 接 DevTools，生产上用 `--heapsnapshot-signal` 触发落盘后离线分析，配合 `--trace-gc` 看回收频率。
 
 **什么时候不该用**：
+
 - 服务依赖 OOM 重启做兜底，且重启周期远大于排障周期时，先解决稳定性再谈泄漏。
 - 内存增长来自业务量增长（缓存条目随活跃用户线性增加），这时要调容量模型，不是找泄漏。
 - 增长来自原生插件持有的堆外内存时，堆快照看不到这部分。
@@ -1286,6 +1288,7 @@ console.log('存活 canvas', queryObjects(HTMLCanvasElement).length);
 **怎么度量收益**：看 `queryObjects(Stroke).length` 与房间内实际笔迹数之差，以及 Performance 面板录制里的 JS Heap 曲线和 FPS。测量方法是把“移动鼠标绘制 10 秒”作为固定动作，比较两次录制中的分配总量。
 
 **什么时候不该用**：
+
 - 笔迹数据要整段保留用于回放，对象必须常驻，方向是压缩存储与分页加载。
 - 只在一台高配机器上录制，内存和帧率都健康，不能据此认为低端设备没问题。
 - 卡顿来自 Canvas 重绘量而不是内存压力时，先看绘制次数。
@@ -1322,6 +1325,7 @@ Node 内置的快照写入接口，可以在阈值触发或信号触发时落盘
 **目标**：写一个能复现并定位一次泄漏的 Node 小项目，全程只用 Node 内置模块。
 
 **步骤**：
+
 1. 写一个 HTTP 服务，用一个全局数组缓存每次请求结果，不设上限。
 2. 加入每分钟一次的 `process.memoryUsage()` 与 `v8.getHeapSpaceStatistics()` 采样日志，只打堆内已用、老生代已用、RSS。
 3. 用压测工具（`autocannon` 或 `ab`）持续发 10 分钟请求，保存日志。
@@ -1331,6 +1335,7 @@ Node 内置的快照写入接口，可以在阈值触发或信号触发时落盘
 7. 把修复前后两次的日志曲线放进同一份报告。
 
 **验收标准**：
+
 - 修复前的日志里，`old_space.space_used_size` 随时间单调上升。
 - 两份快照的 Comparison 视图能指出至少一个持续增长的构造函数，并能说出它的保留路径。
 - 修复后的日志里老生代在高水位附近波动，压测结束后回落到接近基线的位置。

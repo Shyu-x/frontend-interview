@@ -854,6 +854,7 @@ const columns: ColumnOf<Row>[] = [
 **怎么度量收益**：指标是列 key 相关的运行时错误数与类型检查耗时。测量方法：CI 跑 `tsc --noEmit`，用 `--extendedDiagnostics` 记录 Check time 与 Instantiations。错误数按错误监控分组中属性访问为 undefined 的条数统计，先记录一周基线再改。
 
 **什么时候不该用**：
+
 - 列配置由后端下发 JSON，键在运行时才确定，类型层约束不到。
 - 表格只有两三列且行类型是 any，先修数据源类型再谈列类型。
 - 列里有计算字段（两列相除），这些字段不在行类型里，硬塞进映射会逼出断言。
@@ -894,6 +895,7 @@ type Safe<T> = [T] extends [never] ? "empty" : T extends string ? T : never;
 **怎么度量收益**：指标是新增消息时漏改分支的缺陷数与协议类型的编译开销。测量方法：用 `node:assert` 把未知消息喂给解码函数，断言落入错误分支；用 `tsc --extendedDiagnostics` 对比消息条数翻倍前后的 Instantiations，判断增长是否线性。
 
 **什么时候不该用**：
+
 - 消息来自不可控第三方且字段随时变，先做运行时校验再补类型。
 - 协议只有一种消息且短期不变，写联合与 handler 表的成本高于收益。
 - 需要在运行时枚举全部消息类型（如注册表），类型层联合不产生值，得另建常量表。
@@ -931,6 +933,7 @@ get("/users/:id/posts/:postId", { id: "1", postId: "2" });
 **怎么度量收益**：指标是参数缺失导致的 4xx 请求占比与类型检查耗时。测量方法：服务端日志按参数校验失败分组统计 400 与 404。本地跑 `tsc --noEmit --extendedDiagnostics` 记录 Types 与 Instantiations，再用 `--generateTrace` 配合 `@typescript/analyze-trace` 看热点是否落在路径解析上。
 
 **什么时候不该用**：
+
 - 路径由配置文件在运行时拼接，类型层拿不到字面量，推导退化为 string。
 - 参数名可能含中文或已编码字符，模板字面量匹配会失效。
 - 用类型校验替代服务端校验，参数格式（如 UUID）仍需运行时检查。
@@ -959,6 +962,7 @@ get("/users/:id/posts/:postId", { id: "1", postId: "2" });
 **目标**：给一个打字化事件总线库写类型层，覆盖事件名解析、emit 与 on 的类型安全，以及错误信息可读性。
 
 **步骤**：
+
 1. 定义 EventMap：键是事件名，值是 payload 类型，其中至少一个事件名带命名空间（形如 `user:login`）。
 2. 写 `Emit<E, K>` 与 `On<E, K>`，用映射类型约束 K 必须取自 EventMap 的键。
 3. 用模板字面量与 infer 解析命名空间，导出 `NamespaceOf<E, K>` 类型。
@@ -968,6 +972,7 @@ get("/users/:id/posts/:postId", { id: "1", postId: "2" });
 7. 在 README 贴出三条错误信息原文，并标注触发它们的调用。
 
 **验收标准**：
+
 - `tsc --noEmit` 通过，类型测试命令（`vitest --typecheck` 或等价命令）通过。
 - 删除任意一条 `@ts-expect-error` 后，重跑类型检查返回非零退出码。
 - 事件条数翻倍后，Instantiations 不超过基线的两倍，Check time 不超过仓库设定的阈值。

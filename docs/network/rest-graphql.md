@@ -434,6 +434,7 @@ query OrderTable($page: Int!, $size: Int!, $status: OrderStatus) {
 **怎么度量收益**：看响应体字节数（Chrome DevTools Network 面板的 Size 列）、列表接口 P95 延迟（服务端 Micrometer 的 `http.server.requests`）、表格可交互时间（Performance 面板）。测量时固定一份数据快照和同一个账号，勾选 Disable cache，各刷新 10 次取中位数。
 
 **什么时候不该用**：
+
 - CSV 导出接口要全量列，逐字段声明没有收益。
 - 公开只读接口可以靠 GET URL 加 ETag 命中 CDN 缓存，改成 POST 查询会丢掉这层缓存。
 
@@ -471,6 +472,7 @@ query HomeFirstScreen($first: Int!) {
 **怎么度量收益**：看首屏请求数（OkHttp EventListener 计数）、首屏渲染时间（Android Studio Profiler 或 Macrobenchmark 的 startupTimingMetric）、请求体字节数。在模拟器限速档和一台低端真机上各跑 10 次，记录中位数与最差值。
 
 **什么时候不该用**：
+
 - 首页只有一块内容、只调一个接口时，接入 GraphQL 客户端只增加包体积。
 - 需要按 HTTP 状态码做 CDN 缓存的静态资源接口，用 GET 资源 URL 即可。
 
@@ -501,6 +503,7 @@ subscription OnBoardChange($boardId: ID!) {
 **怎么度量收益**：看 WebSocket 每帧字节数（DevTools 的 WS 面板 Length 列）、端到端同步延迟（客户端给操作打时间戳，对端渲染时再打一次，差值上报）、断线重连后的状态一致率。用两台设备在同一白板轮流拖拽，记录 100 次操作的延迟分布。
 
 **什么时候不该用**：
+
 - 只需要服务端单向推送、客户端不挑字段时，用 SSE 就能满足。
 - 每秒数十次的拖拽采样上报，改走二进制帧可以省掉文本解析开销。
 
@@ -540,6 +543,7 @@ subscription OnBoardChange($boardId: ID!) {
 **目标**：给一个已有的 REST 商品列表接口套一层 GraphQL，让客户端按需取字段，并用测量数据说明收益。
 
 **步骤**：
+
 1. 选一个只读的 REST 列表接口，记录当前响应体大小与 P95 延迟，跑 10 次取中位数。
 2. 写 GraphQL schema，把列表和单条详情做成两类字段，并加上分页参数。
 3. 字段解析器内部调用原来的 REST 接口，业务逻辑保持不变。
@@ -549,6 +553,7 @@ subscription OnBoardChange($boardId: ID!) {
 7. 给 schema 加上查询深度与复杂度上限，并测一次超限查询。
 
 **验收标准**：
+
 - 客户端没有声明的字段不出现在响应体中。
 - 同一请求内 N 条详情只触发 1 次上游批量调用，调用次数可在上游日志中数出。
 - 固定数据快照、禁用缓存下各跑 10 次，能给出响应体字节数与 P95 的两次中位数。

@@ -238,6 +238,7 @@ app.directive('permission', permission)
 | src/assets/ | 静态资源 |
 
 **状态管理分层：**
+
 - 页面级状态：组件内 `useState`
 - 跨页面共享：Pinia store
 - 服务端数据：loadData / route params

@@ -785,6 +785,7 @@ async function exportOrders(req, res) {
 **怎么度量收益**：看 `process.memoryUsage().rss` 峰值与首字节时间。用 autocannon 固定并发和时长打两个版本，再给进程加 `--max-old-space-size` 限制跑同一压测，观察是否出现 OOM。
 
 **什么时候不该用**：
+
 - 结果只有几千行，且下游只能接收 JSON 数组，流式 CSV 反而增加解析成本。
 - 接口契约要求返回可排序、可过滤的完整结果集，客户端需要服务端二次计算。
 
@@ -822,6 +823,7 @@ async function renderHome(req, res) {
 **怎么度量收益**：客户端看 Lighthouse 的 LCP 与 TTFB，配合 Chrome DevTools Network 面板看 HTML 到达时间。服务端用 `performance.now()` 记录 `renderHome` 的耗时分布，按 p50 与 p99 分别观察。
 
 **什么时候不该用**：
+
 - 三个依赖有严格先后关系，后一个请求的入参依赖前一个的返回值。
 - 页面必须拿到完整数据才允许渲染，缺任意一块都算业务错误。
 
@@ -857,6 +859,7 @@ function renderSnapshot(snapshot) {
 **怎么度量收益**：用 `perf_hooks.monitorEventLoopDelay()` 看事件循环延迟的 p99，用 `performance.eventLoopUtilization()` 看主线程占用。客户端在消息里带发送时间戳，统计广播到达的时间差分布。
 
 **什么时候不该用**：
+
 - 房间内同时在线低于 5 人且没有实时同步要求，轮询拉取即可。
 - 预览图生成耗时低于 5ms，引入线程只增加调试成本。
 
@@ -880,6 +883,7 @@ function renderSnapshot(snapshot) {
 **目标**：用 Node 内置模块写两个接口，一个导出 CSV，一个聚合三个模拟下游，并用压测对照两种写法的资源占用。
 
 **步骤**：
+
 1. 用 `node:http` 建服务，写 `/export`，先把整个结果集拼成字符串再返回，并打印 `process.memoryUsage().rss`。
 2. 把 `/export` 改成游标分页加 `Readable.from` 加 `pipeline` 的流式实现，打印同一指标。
 3. 写 `/home`，用三个返回 Promise 的 `setTimeout` 模拟下游，按顺序 await。
@@ -889,6 +893,7 @@ function renderSnapshot(snapshot) {
 7. 写 README，列出每条命令与对应输出。
 
 **验收标准**：
+
 - 流式版本在 `--max-old-space-size` 限制下完成同一压测且不 OOM。
 - 串行 `/home` 的耗时接近三个下游之和，并行版本接近最慢的那个。
 - 事件循环延迟 p99 在两次压测中都有输出，且数据可对照。

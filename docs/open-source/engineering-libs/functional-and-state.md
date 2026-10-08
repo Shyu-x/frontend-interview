@@ -1959,6 +1959,7 @@ export function useRows() {
 **怎么度量收益**：React DevTools Profiler 录制一次翻页，记录 commit 次数与参与渲染的组件数。Chrome DevTools Network 面板统计一分钟内行数据接口的请求数。用 web-vitals 采集筛选输入框上的 INP。TanStack Query Devtools 观察切页后 query 的 fresh 与 stale 状态。
 
 **什么时候不该用**：
+
 - 表格总量只有几十行、一次请求就能全部返回时，组件内 useState 就够，硬拆两层会抬高阅读成本。
 - 页面需要把筛选条件写进 URL 供分享时，直接用路由 search params 当唯一数据源，再叠一份 Zustand 会出现两份真相。
 
@@ -1999,6 +2000,7 @@ export default function Page({ state }: { state: DehydratedState }) {
 **怎么度量收益**：用 web-vitals 采集 LCP 与 INP，按机型分组分别看 P75。Chrome DevTools Network 面板统计首屏请求数，以及最后一个阻塞渲染的请求完成时刻。Lighthouse 移动端模式下看 First Contentful Paint 与 Total Blocking Time。
 
 **什么时候不该用**：
+
 - 首屏内容是登录后可见的个性化数据且不能跨用户复用时，往 HTML 注水会涉及代理缓存与数据隔离，需要另外设计。
 - 应用本身没有服务端渲染层，属于纯客户端本地工具，为了预取去改造架构，成本与收益对不上。
 
@@ -2035,6 +2037,7 @@ export const shapes$ = socket$.pipe(
 **怎么度量收益**：在事件里带上服务端发送时间戳，客户端收到后与 `performance.now()` 相减，统计 P50 与 P95。Chrome DevTools Performance 面板录制 10 秒拖动，观察主线程长任务。用 requestAnimationFrame 计数换算实际帧率。
 
 **什么时候不该用**：
+
 - 房间同时在线人数在个位数、操作频率低时，轮询或单次请求同步就能满足，引入事件流会多出一层调试成本。
 - 需求是多人编辑同一段富文本时，用 Yjs 这类 CRDT 库管理文档，比手写 scan 合并的出错面小。
 
@@ -2074,6 +2077,7 @@ Pinia 文档说明，直接从 store 解构 state 会丢失响应性，需要用
 **目标**：给一个带筛选、分页、多选的列表页做状态分层改造，并交出一份可复现的测量报告。
 
 **步骤**：
+
 1. 选定页面，记录基线：用 Chrome DevTools Network 面板统计连续翻页 10 次产生的请求数，用 React DevTools Profiler 记录其中一次翻页的 commit 数与渲染组件数。
 2. 清点页面状态，列一张表，把每个状态标为「来自服务端」或「UI 本地」。
 3. 把服务端状态迁到 TanStack Query，queryKey 带上全部筛选参数，并为列表设置 staleTime。
@@ -2083,6 +2087,7 @@ Pinia 文档说明，直接从 store 解构 state 会丢失响应性，需要用
 7. 写 README：状态清单、改动点、前后对比、复现命令。
 
 **验收标准**：
+
 - README 里每个数字都附带测量工具与操作步骤，他人照做能复现。
 - 翻页过程中列表区域不出现空态。
 - 在 staleTime 内回到已访问过的 queryKey，Network 面板没有新增请求。

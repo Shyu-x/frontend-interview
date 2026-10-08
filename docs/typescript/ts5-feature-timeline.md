@@ -1118,6 +1118,7 @@ async function joinRoom(roomId: string) {
 **目标**：做一个迷你表格列定义库，配一条 Node 侧的可擦除脚本，把本页的类型特性用起来。
 
 **步骤**：
+
 1. 新建包，打开 strict、verbatimModuleSyntax、erasableSyntaxOnly。
 2. 用 const 类型参数实现 defineColumns，输入字面量数组，返回同长度元组。
 3. 用 NoInfer 实现 withFallback，让兜底列名不参与推断。
@@ -1127,6 +1128,7 @@ async function joinRoom(roomId: string) {
 7. 记录两条命令的耗时，写进包内 README。
 
 **验收标准**：
+
 - defineColumns(['id','title']) 的推导类型是 readonly ['id','title']。
 - withFallback 传入不存在的列名时编译报错，报错位置在调用行。
 - filterOwned 的结果类型里 owner 为必备字段。

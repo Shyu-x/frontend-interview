@@ -94,6 +94,7 @@ Promise.then
 两者都属于微任务，**queueMicrotask 先于 Promise.then 执行**。
 
 微任务队列内部顺序：
+
 1. 先入先出 (FIFO)
 2. queueMicrotask 回调先被加入队列
 3. Promise.then 回调后加入
@@ -216,6 +217,7 @@ async end
 **解析：**
 
 `async` 函数执行过程：
+
 1. `asyncFn()` 调用是同步的，函数体立即执行
 2. `await` 关键字后的表达式**同步执行**
 3. `await` 下面的代码作为微任务执行
@@ -480,6 +482,7 @@ flowchart TD
 ```
 
 **关键区别：**
+
 - `process.nextTick()` 的回调会在**当前操作完成后、下一个微任务之前**立即执行
 - `setImmediate()` 在 I/O 回调之后执行，与 `setTimeout(fn, 0)` 不同
 
@@ -551,6 +554,7 @@ flowchart TD
 ```
 
 **结论：**
+
 - 在**文件 I/O 回调后**，通常 `setImmediate` **先于** `setTimeout` 执行
 - 因为 I/O 完成后进入 `check` 阶段，而 `setTimeout` 在下一轮的 `timers` 阶段
 - 但如果事件循环已经进入 `timers` 阶段，则 `setTimeout` 先执行

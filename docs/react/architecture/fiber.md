@@ -746,6 +746,7 @@ function DataTable({ rows }) {
 在 Chrome DevTools 的 Performance 面板录制"输入 10 个字符"这一段，看 Long Tasks 的数量与最长任务时长。在 React DevTools 的 Profiler 里看每次 commit 的耗时和 commit 次数。在真实用户侧用 web-vitals 上报 INP（Interaction to Next Paint）。三组数据按同一操作脚本采集。
 
 **什么时候不该用**
+
 - 表格只有几十行，降级带来的额外一次渲染比直接渲染还贵。
 - 表单需要逐字校验并即时给出错误提示，降级会让提示滞后于输入。
 
@@ -786,6 +787,7 @@ function App() {
 用 Lighthouse 的移动端预设（开启 CPU 与网络节流）看 TBT（Total Blocking Time）与 FCP。用 Chrome DevTools 的 Performance 面板确认主线程长任务的位置。用真机开 CPU 4x 节流复现一次，对照拆包前后的水瀑图。
 
 **什么时候不该用**
+
 - 首屏只有一个体量很小的页面，多拆一个包带来的额外往返会抵消收益，需要先测量。
 - 需要在 hydration 之前就保证完全可交互的静态营销页，直接输出静态 HTML 即可。
 
@@ -827,6 +829,7 @@ socket.onmessage = e => {
 用 Chrome DevTools 的 Performance 面板看帧率与长任务分布。用 React DevTools 的 Profiler 看每秒 commit 次数与每次 commit 时长。另加一个自定义计数：每秒收到的推送条数与每秒 commit 次数之比，理想情况接近"每帧一次"。
 
 **什么时候不该用**
+
 - 白板只有本地绘制、没有远端推送，不需要引入外部 store。
 - 需要亚帧级实时反馈的辅助线吸附提示，直接把计算与绘制放到 Canvas 或 WebGL，不经过 React。
 
@@ -860,6 +863,7 @@ Profiler 记录每次提交里各组件的耗时，并把渲染与提交分开�
 做一个 1 万行数据的筛选表格，用同一操作脚本对比三种实现的提交耗时：直接渲染、加 `useDeferredValue`、加降级再加虚拟滚动。
 
 **步骤**
+
 1. 用你熟悉的构建工具建一个 React 项目，确认用 `createRoot` 挂载根节点。
 2. 生成 1 万行模拟数据，每行 8 个字段，其中一个是名称字段。
 3. 写一个受控输入框加一张普通表格，记录基线数据。
@@ -869,6 +873,7 @@ Profiler 记录每次提交里各组件的耗时，并把渲染与提交分开�
 7. 每次都在 React DevTools Profiler 里录制，并把结果填进一张对比表。
 
 **验收标准**
+
 - 对比表包含三组数据，每组都有 commit 次数、commit 总时长、最长任务时长。
 - 连续输入 10 个字符时，输入框显示的字与按键一致，不出现丢字。
 - 虚拟滚动版本在第 5000 行位置触发筛选后，滚动条能回到顶部且不出现空白区。

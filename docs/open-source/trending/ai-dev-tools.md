@@ -158,6 +158,7 @@ npx cursor@latest init my-project
 ```
 
 **参考链接**:
+
 - [Cursor 官网](https://cursor.sh)
 - [Cursor 3 发布说明](https://cursor.sh/blog/cursor-3)
 - [Composer API](https://cursor.sh/context/composer)
@@ -239,6 +240,7 @@ git worktree remove ../fix-branch
 ```
 
 **参考链接**:
+
 - [Claude Code 官网](https://claude.ai/code)
 - [Claude Code 文档](https://docs.anthropic.com/)
 - [Anthropic API](https://docs.anthropic.com/claude/reference)
@@ -273,6 +275,7 @@ windsurf --agents 3
 ```
 
 **参考链接**:
+
 - [Anti-Gravity](https://www.antigravity.dev)
 
 ## 3. AI 原生应用构建
@@ -474,6 +477,7 @@ export function TextGenerator() {
 ```
 
 **参考链接**:
+
 - [Vercel AI SDK](https://sdk.vercel.ai)
 - [GitHub](https://github.com/vercel/ai)
 
@@ -608,6 +612,7 @@ flowchart TB
 | @modelcontextprotocol/server-slack | Slack 消息 | 中 |
 
 **参考链接**:
+
 - [MCP 官方文档](https://modelcontextprotocol.io)
 - [MCP GitHub](https://github.com/modelcontextprotocol)
 
@@ -686,6 +691,7 @@ async function executeTask(page, task) {
 ```
 
 **参考链接**:
+
 - [Playwright 官网](https://playwright.dev)
 - [Playwright GitHub](https://github.com/microsoft/playwright)
 

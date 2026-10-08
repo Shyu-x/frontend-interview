@@ -459,6 +459,7 @@ form.addEventListener('submit', (e) => {
 ### 9.4 Q4: 表单的原生验证 `checkValidity()` 和 `reportValidity()` 有什么区别？在 React 中如何使用？
 
 **答案：**
+
 - `checkValidity()`：仅检查，返回 boolean，不显示错误提示
 - `reportValidity()`：检查并显示浏览器原生错误气泡
 

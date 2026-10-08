@@ -12,6 +12,7 @@ description: meta 标签体系、字符编码、robots、Open Graph，以及移�
 `<meta>` 标签位于 `<head>` 中，提供关于 HTML 文档的元数据，不会显示在页面上，但机器（浏览器、爬虫、社交平台）可读取。
 
 **核心原理：**
+
 - meta 标签是**声明性元数据**，不是文档内容
 - 浏览器、搜索引擎、社交平台爬虫都会解析 `<head>` 中的 meta
 - 错误的 meta 设置可能导致：乱码、布局错乱、SEO 降权、社交分享失败
@@ -27,11 +28,13 @@ description: meta 标签体系、字符编码、robots、Open Graph，以及移�
 ```
 
 **为什么必须放在 `<head>` 最前面（前 1024 字节）？**
+
 - 浏览器以此编码来解析**整个文档**，包括 `<title>` 和其他 meta
 - 若放在 `<title>` 之后，浏览器会用默认编码（Latin-1）先解析一遍，发现 charset 后再回退重解析——导致乱码或重复解析
 - 浏览器在解析前 1024 字节时就必须知道编码，所以 `<meta charset>` 必须在最前面
 
 **UTF-8 vs UTF-16：**
+
 - UTF-8：变长编码（1~4 字节），ASCII 兼容，网络传输体积小，**Web 默认**
 - UTF-16：定长 2 字节，中文效率高，但 ASCII 文件体积翻倍，且网络传输时字节序（Endianness）问题复杂——**仅在有大量 CJK 字符的专业场景使用**
 
@@ -56,6 +59,7 @@ viewport 标签是移动端适配的基石，详见本页第 2 章「viewport �
 | `nosnippet` | SERP 不显示描述片段 |
 
 **与 HTTP Equiv 的关系：**
+
 - `<meta name="robots">` 是页面级别的控制
 - `X-Robots-Tag` HTTP header 是**请求级别**的控制，优先级更高（用于 PDF、图片等非 HTML 资源）
 - `robots.txt` 的 `Disallow` 是爬虫**主动遵守的规则**，技术上无法强制（恶意爬虫不遵守）
@@ -83,6 +87,7 @@ Open Graph Protocol 由 Facebook 2010 年发布，已被微信、Twitter、Linke
 | 格式 | JPG/PNG/WebP，**避免 GIF**（静态平台不支持） |
 
 **og:url 与 canonical 的关系：**
+
 - `og:url` 声明该内容在社交平台上的"规范 URL"
 - 社交平台爬虫会参考 `og:url` 作为分享链接的规范化地址
 - 建议与 `<link rel="canonical">` **保持一致**，避免重复内容问题
@@ -220,11 +225,13 @@ flowchart TB
 ### 2.2 产生背景：为什么移动端需要 viewport
 
 **桌面网页入侵移动端（2007 年 iPhone）：**
+
 - 早期智能手机 Safari 将桌面网页缩放为 980px 宽的"虚拟画布"
 - 用户看到的是一个微缩的整页，必须双击或缩放才能阅读
 - Apple 引入了 `<meta name="viewport">` 解决此问题
 
 **DPR 的出现（iPhone 4，2010）：**
+
 - Retina 屏幕：DPR=2（1 CSS px = 2×2 物理像素）
 - 导致 `border: 1px` 在 Retina 屏上渲染为 2px 物理像素，边框视觉上偏粗
 

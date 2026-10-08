@@ -154,12 +154,14 @@ export default function NewPost() {
 | 缓存策略 | 灵活 | 更细粒度 |
 
 **生态统计**:
+
 - 125K+ GitHub stars
 - 35M+ 周下载量
 - 最大的 React 生态框架
 - Vercel 官方维护
 
 **参考链接**:
+
 - [Next.js 官网](https://nextjs.org)
 - [Next.js GitHub](https://github.com/vercel/next.js)
 
@@ -245,6 +247,7 @@ const { Content } = await post.render()
 ```
 
 **参考链接**:
+
 - [Astro 官网](https://astro.build)
 - [Astro GitHub](https://github.com/withastro/astro)
 
@@ -329,6 +332,7 @@ export default function PostPage() {
 }
 ```
 **参考链接**:
+
 - [Remix 官网](https://remix.run)
 - [Remix GitHub](https://github.com/remix-run/remix)
 
@@ -373,6 +377,7 @@ function UserPage() {
 ```
 
 **参考链接**:
+
 - [React Router 官网](https://reactrouter.com)
 - [React Router v7 发布说明](https://remix.run/blog/react-router-v7)
 
@@ -468,6 +473,7 @@ const user = await trpc.user.getById.query({ id: '123' })
 | 适用场景 | TS 全栈 | 多客户端 | 通用 |
 
 **参考链接**:
+
 - [tRPC 官网](https://trpc.io)
 - [tRPC GitHub](https://github.com/trpc/trpc)
 
@@ -718,11 +724,13 @@ export class UsersModule {}
 | 适用场景 | 企业级 | 轻量 API | 高性能 API |
 
 **生态统计**:
+
 - 60K+ GitHub stars
 - 3M+ 周下载量
 - 企业级应用首选
 
 **参考链接**:
+
 - [NestJS 官网](https://nestjs.com)
 - [NestJS GitHub](https://github.com/nestjs/nest)
 
@@ -848,6 +856,7 @@ const result = await postRepo
 ```
 
 **参考链接**:
+
 - [TypeORM 官网](https://typeorm.io)
 - [TypeORM GitHub](https://github.com/typeorm/typeorm)
 
@@ -980,11 +989,13 @@ await prisma.user.update({
 | 适用场景 | 新项目 | 已有项目 |
 
 **生态统计**:
+
 - 34K+ GitHub stars
 - 15M+ 周下载量
 - 持续活跃开发
 
 **参考链接**:
+
 - [Prisma 官网](https://prisma.io)
 - [Prisma GitHub](https://github.com/prisma/prisma)
 
@@ -1092,11 +1103,13 @@ const userWithPosts = await db
 | 适用场景 | 性能敏感 | 快速开发 |
 
 **生态统计**:
+
 - 17K+ GitHub stars
 - 2M+ 周下载量
 - 快速增长
 
 **参考链接**:
+
 - [Drizzle 官网](https://orm.drizzle.team)
 - [Drizzle GitHub](https://github.com/drizzle-team/drizzle-orm)
 
@@ -1185,6 +1198,7 @@ start()
 | Koa | 40,000+ | 5ms |
 
 **参考链接**:
+
 - [Fastify 官网](https://fastify.io)
 - [Fastify GitHub](https://github.com/fastify/fastify)
 
@@ -1288,6 +1302,7 @@ setState('name', 'SolidJS') // 嵌套更新
 ```
 
 **参考链接**:
+
 - [Solid.js 官网](https://solidjs.com)
 - [Solid.js GitHub](https://github.com/solidjs/solid)
 - [SolidStart](https://start.solidjs.com)
@@ -1373,6 +1388,7 @@ export const Counter = component$(() => {
 ```
 
 **参考链接**:
+
 - [Qwik 官网](https://qwik.dev)
 - [Qwik GitHub](https://github.com/QwikDev/qwik)
 
@@ -1451,6 +1467,7 @@ export const MyComponent = (props) => {
 ```
 
 **参考链接**:
+
 - [Svelte 官网](https://svelte.dev)
 - [Svelte 5 发布说明](https://svelte.dev/blog/svelte-5)
 - [SvelteKit](https://kit.svelte.dev)
@@ -1552,11 +1569,13 @@ const infiniteTodos = useInfiniteQuery({
 ```
 
 **统计**:
+
 - 20亿+ npm 下载
 - 50,000+ GitHub stars
 - 500+ 贡献者
 
 **参考链接**:
+
 - [TanStack Query](https://tanstack.com/query)
 - [GitHub](https://github.com/TanStack/query)
 
@@ -1641,6 +1660,7 @@ function load(next) {
 **怎么度量收益**：用 Performance 面板录制同一段输入，统计 Scripting 段总时长与超过 50ms 的长任务条数。用 `PerformanceObserver` 订阅 `longtask` 做线上采集，用 `performance.measure()` 记录「按键到下一帧绘制」的耗时。对比时必须固定数据量、输入字符数与设备档位。
 
 **什么时候不该用**：
+
 - 表格行数在两百以内且不做实时刷新，受控组件配 `useMemo` 已经够用，此时引入第二套响应式模型会多出一个状态来源。
 - 组件库（例如 Ant Design 的 Table）已经接管行选中与排序状态，再挂一层信号会让选中态出现两份真相。
 
@@ -1680,6 +1700,7 @@ async function Reviews({ id }) {
 **怎么度量收益**：用 Lighthouse 的移动端预设读 LCP 与 TBT，用 `web-vitals` 上报 LCP、INP。用 Network 面板看首份 HTML 到达时间与传输的 JS 体积。对比时固定节流档位与采样次数。
 
 **什么时候不该用**：
+
 - 页面内容随登录用户强变化且命中不了缓存，服务端渲染把首字节推后，直接读数据库先出标题再补数据反而合适。
 - 营销落地页只含静态内容，用静态导出分发到 CDN 即可，不需要常驻的服务端运行时。
 
@@ -1721,6 +1742,7 @@ app.get("/board/:id", { websocket: true }, (socket, req) => {
 **怎么度量收益**：客户端用 `performance.now()` 在发送与收到回显处打点，统计往返延迟的 p50 与 p95。服务端用 `process.hrtime.bigint()` 统计一次广播的耗时。用 `--cpu-prof` 或 clinic.js 看主线程占用，观察 `bufferedAmount` 的分布。
 
 **什么时候不该用**：
+
 - 同一白板同时在线只有两三人，短轮询就能满足，维护长连接与心跳的复杂度划不来。
 - 需要离线编辑与逐版本回放，先把 CRDT 库与持久化存储接上，再谈广播层。
 - 部署在只支持请求-响应计费的函数平台上，长连接会被平台超时掐断。
@@ -1752,6 +1774,7 @@ app.get("/board/:id", { websocket: true }, (socket, req) => {
 **目标**：做一个团队看板，左侧是五千行订单的筛选列表，右侧是流式渲染的订单详情，底部是一条 WebSocket 实时消息条。
 
 **步骤**：
+
 1. 用 Fastify 起服务，`/orders` 返回五千行假数据，并给该路由声明响应 JSON Schema。
 2. 前端用信号库保存 `rows` 与 `keyword`，用 `createMemo` 派生可见行与总数，不要每次输入都请求接口。
 3. 加一个详情路由，把评价区块包进 `Suspense`，fallback 用宽高接近真实内容的骨架。
@@ -1761,6 +1784,7 @@ app.get("/board/:id", { websocket: true }, (socket, req) => {
 7. 把两次测量结果写进 README，注明数据量、节流档位与样本数。
 
 **验收标准**：
+
 - 连续输入 20 个字符的录制里，超过 50ms 的长任务条数有记录，且 `PerformanceObserver` 的 `longtask` 采集结果与录制一致。
 - 在 CPU 6x 加 Slow 4G 下，详情的标题出现在评价数据返回之前。
 - 20 条连接的压测中，p95 往返延迟有数值，且没有连接被服务端主动断开。

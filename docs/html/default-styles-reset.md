@@ -119,6 +119,7 @@ input, textarea, select {
 ### 4.1 Q1: CSS Reset 和 normalize.css 各自适合什么场景？
 
 **答案：**
+
 - **CSS Reset**：适合完全自定义 UI 的项目（如设计系统、组件库），需要从零构建所有样式。缺点是会丢失浏览器原生的 button/input 样式，需要自己实现。
 - **normalize.css**：适合需要保留部分原生行为但消除浏览器差异的项目（如内容型网站、CMS），或依赖浏览器原生表单控件的场景。
 

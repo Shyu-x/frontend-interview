@@ -1039,6 +1039,7 @@ export function drawCursor(user) {
 **目标**：做一个按需加载的 Markdown 预览器，用原生 ESM 加 Vite，把解析库放进动态 import()，再用 import.meta.url 启动一个 Worker。
 
 **步骤**：
+
 1. 建 Vite 项目，入口 HTML 用 `<script type="module" src="/src/main.js"></script>`。
 2. 写 `src/editor.js`，导出 `getText()` 与 `setPreview(html)`，在 main.js 里静态 import。
 3. 写 `src/parse.js`，导出 `parse(md)`，内部静态 import 一个 Markdown 解析库。
@@ -1048,6 +1049,7 @@ export function drawCursor(user) {
 7. 执行构建，检查 dist 目录里的 chunk 划分与 HTML 中的引用。
 
 **验收标准**：
+
 - 构建产物中解析库不在入口 chunk 的静态依赖里。
 - 页面刚加载完时，Network 面板里没有解析库的请求，第一次输入后才出现。
 - Worker 收到消息并返回 HTML，Performance 面板记录不到超过 50ms 的长任务。

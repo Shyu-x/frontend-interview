@@ -1330,6 +1330,7 @@ async function chunkDigests(blob) {
 **怎么度量收益**：用 performance.now() 包住 chunkDigests 记录总耗时。用 Chrome DevTools 的 Performance 面板录制，看 Main 轨道上 Long Tasks 的条数与总时长。指标名：Long Tasks 数量、单次导出总耗时、校验失败次数。
 
 **什么时候不该用**：
+
 - 文件小于 1 MiB 时一次 digest 就够，分片只多出分支。
 - 服务端已经返回 ETag 且响应体完整下载时，浏览器端不必再算一遍。
 - 目标是防篡改而不是防传输损坏时，摘要不够，要换成带密钥的 HMAC。
@@ -1361,6 +1362,7 @@ const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, msgKey, enc.enco
 **怎么度量收益**：用 performance.now() 在收到密文与画面更新完成之间打点，统计端到端延迟中位数。用 DevTools Performance 面板确认加解密没有挤进 Long Task。指标名：单条消息加解密耗时、解密失败次数、端到端延迟中位数。
 
 **什么时候不该用**：
+
 - 服务端要对消息做全文检索或内容审核时，端到端加密会直接挡死需求。
 - 新成员要读历史消息又不想重新分发历史密钥时，别用一次性会话密钥硬扛。
 - 两个标签页已经走 WSS 直连时，应用层加密不能替代 WSS 本身。
@@ -1395,6 +1397,7 @@ const ok = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pub, s
 **怎么度量收益**：用 performance.now() 包住 deriveKey，记录派生耗时随迭代次数的变化。统计 decrypt 抛错次数与导入成功率。指标名：派生耗时、验签失败次数、导入成功率。
 
 **什么时候不该用**：
+
 - 备份包体积超过可用内存时，别一次性读成 ArrayBuffer，要分块处理。
 - 用户口令是 6 位数字时，迭代次数再高也挡不住离线穷举。
 - 只有一台设备、文件不出本机时，验签只增加流程，不降低实际风险。
@@ -1428,6 +1431,7 @@ TLS 1.3 用 HKDF-Expand-Label 从主密钥派生出各方向、各阶段的流�
 **目标**：做一个单页工具，把本地文件加密导出成包，再在另一个浏览器 profile 里导入还原。
 
 **步骤**：
+
 1. 建 index.html 与 main.js，页面放文件选择框、口令输入框、摘要显示区和耗时表格。
 2. 用 crypto.subtle.digest 算文件 SHA-256 并转十六进制，与控制台 `shasum -a 256 文件名` 的输出比对。
 3. 用 PBKDF2 从口令派生 AES-GCM 密钥，salt 与 iterations 显示在页面上并写进导出包。
@@ -1437,6 +1441,7 @@ TLS 1.3 用 HKDF-Expand-Label 从主密钥派生出各方向、各阶段的流�
 7. 新开一个 profile 导入包，用 SPKI 验签、PBKDF2 复算密钥、解密后比对摘要。
 
 **验收标准**：
+
 - 同一个文件，页面显示的 SHA-256 与 `shasum -a 256` 输出一致。
 - 把密文改掉一个字节，解密抛错，页面显示认证失败。
 - 新 profile 里 SPKI 验签通过；把 iterations 改掉一位后验签失败。
