@@ -51,6 +51,9 @@ jobs:
           npm ci --prefix book
           node book/scripts/sync-fonts.mjs
 
+      - name: Check Markdown tables render
+        run: python3 scripts/check-tables.py
+
       - name: Parse every Mermaid diagram (real parser)
         run: CHROME_PATH="$(which google-chrome)" node book/scripts/check-mermaid.mjs
 

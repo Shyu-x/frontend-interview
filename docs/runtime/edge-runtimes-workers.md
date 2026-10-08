@@ -620,6 +620,7 @@ async function main() {
 ```
 
 预期输出：
+
 | (index) | name | type |
 | --- | --- | --- |
 | 0 | 'fetch' | 'function' |

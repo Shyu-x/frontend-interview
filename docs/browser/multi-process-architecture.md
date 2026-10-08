@@ -348,6 +348,7 @@ function getX(obj) {
 ### 应用场景地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
 | 后台管理的万行表格筛选与滚动 | V8 JIT、对象形状稳定、去优化控制 | React/Vue 固定字段对象；Web Worker 排序 | 热路径内不动态增删字段 |
 | 多人协作白板嵌入多来源插件 | 多进程隔离、沙箱、站点隔离 | iframe sandbox + postMessage 心跳 | 及时校验 origin；插件多会增加内存 |
 | 低端安卓 WebView 首屏加载 | V8 分层编译、多进程内存开销 | 路由级拆包；requestIdleCallback | 首屏避免多个跨源 iframe |

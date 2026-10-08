@@ -645,6 +645,7 @@ const server = Bun.serve({
 ### 应用场景地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
 | 后台管理的万行表格 | 内置 SQLite、HTTP 服务 | Bun.serve + bun:sqlite，前端虚拟滚动 | 大页码用游标替代 OFFSET |
 | 低端安卓的首屏加载 | 打包器、文件操作与 IO | Bun.build 代码分割 + 静态托管 | 确认目标浏览器的语法支持范围 |
 | 多人协作白板 | HTTP 服务、内置 SQLite | Bun.serve WebSocket + SQLite 落盘 | 广播限于单进程，跨进程要外部 pub/sub |

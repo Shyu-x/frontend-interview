@@ -195,6 +195,7 @@ pending 序列: true -> false
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | await 之后设置状态没有进入 transition | 官方文档写明 await 之后的状态更新目前需要再包一层 startTransition | 在 await 之后再调用一次 `startTransition` |
 | 输入框文字被刷新覆盖 | transition 更新会被其他更新打断，且不能用来控制文本输入 | 输入框的值用 useState 直接控制 |
 | pending 一直不结束 | 状态更新写在 setTimeout 里，不会被标记为 transition | 把更新放回 Action 的同步执行部分 |
@@ -363,6 +364,7 @@ main().catch((e) => { console.error(e); process.exit(1); });
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | Action 函数收到的是字符串地址 | 你给 action 传了 URL 字符串 | 传函数才会走 Action，两种语义不同 |
 | 提交后字段没被清空 | 自动重置针对非受控组件，受控字段的值来自 state | 受控字段在 Action 成功后自行更新 state |
 | 字段取不到值 | 输入框没有 name 属性 | 给需要读取的输入框加上 name |
@@ -541,6 +543,7 @@ main().catch((e) => { console.error(e); process.exit(1); });
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 开发模式提示 dispatchAction 不在 Action 内 | 这个函数必须在 Action 中调用 | 用 startTransition 包住，或作为 action 属性传下去 |
 | state 类型与 initialState 对不上 | reducerAction 的返回类型必须与 initialState 一致 | 显式标注状态类型 |
 | 一个 Action 抛错后，排队中的调用都没执行 | React 会取消所有排队的 Action 并显示最近的 Error Boundary | 把可预期的失败在 Action 内转成返回值 |
@@ -706,6 +709,7 @@ console.log('同组件读到:', readStatus(0, true));
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | pending 永远是 false | 组件没有渲染在 form 内部 | 把按钮拆成子组件，放进 form 里 |
 | 表单提交时读不到状态 | form 由当前组件自己渲染 | 把 form 与读取状态的组件拆成两个组件 |
 | action 字段是 null | 父表单传的是 URL 字符串或没写 action | 传函数才能读到 action 引用 |
@@ -871,6 +875,7 @@ console.log('乐观值演示通过');
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 控制台警告乐观更新发生在 Action 之外 | set 函数必须在 Action 内调用 | 用 startTransition 包住，或放进 form action |
 | 乐观值一直显示旧值 | Action 已经结束，乐观状态不再渲染 | 结束后显示的是 value，需要更新真实状态 |
 | 请求成功后界面闪回旧值 | 真实状态没有更新，value 仍是旧值 | 在 Action 成功后更新真实状态 |
@@ -1051,6 +1056,7 @@ main().catch((e) => { console.error(e); process.exit(1); });
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 自写的版本并发执行了多个任务 | 直接把任务放进 Promise.all | 用一条 Promise 链串起来 |
 | previousState 读到旧值 | 闭包里的 state 没有随渲染更新 | 用 ref 保存最新状态 |
 | 抛错后 pending 一直为 true | 没有用 finally 收尾 | 把计数减一放进 finally |
@@ -1201,6 +1207,7 @@ JS 加载后执行 Action 次数: 1
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 提交后跳到了当前页地址 | permalink 没配或配成了当前地址 | 传入表单真正要修改的目标页地址 |
 | 目标页拿不到状态 | 目标页渲染的表单组件与来源页不同 | 保证同一组件、同一 reducerAction、同一 permalink |
 | 服务端报参数不可序列化 | initialState 或 actionPayload 含不可序列化的值 | 只传普通对象、数组、字符串与数字 |
@@ -1225,6 +1232,7 @@ JS 加载后执行 Action 次数: 1
 ## 应用地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
 | 后台管理的批量导入表单 | form 的 action 属性、useActionState | React 19 与 react-dom 的 form action | 失败时要保留用户已填字段 |
 | 设计系统里的提交按钮 | useFormStatus | react-dom 的 useFormStatus | 按钮必须渲染在 form 内部 |
 | 点赞与收藏按钮 | useOptimistic | React 的 useOptimistic 与 startTransition | 乐观值只做视觉反馈 |
@@ -1257,6 +1265,7 @@ JS 加载后执行 Action 次数: 1
 ## 综合对比
 
 | 维度 | useActionState | useFormStatus | useOptimistic |
+|---|---|---|---|
 | 来自哪个包 | react | react-dom | react |
 | 解决的问题 | 把 Action 包成带状态与 pending | 读取父表单的提交状态 | 提供只在 Action 期间出现的临时值 |
 | 输入 | reducerAction、initialState、可选 permalink | 无参数 | value、可选 reducer |

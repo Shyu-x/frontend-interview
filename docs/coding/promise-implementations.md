@@ -511,6 +511,7 @@ limitConcurrency(tasks, 3).then(results => {
 ### 应用场景地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
 | 后台管理的万行表格导出补全 | 手写并发控制、Promise.allSettled、Promise.retry | 自写队列或 p-limit | 后端已有批量接口时优先走服务端 |
 | 低端安卓首屏加载非关键接口 | Promise.all、Promise.allSettled、并发控制 | 原生 Promise 加自写 runWithLimit | 非关键接口失败必须可以降级 |
 | 多人协作白板断网恢复后的操作同步 | 手写 Promise.retry、串行队列 | 自写串行队列或 async.queue | 必须保序，否则操作乱序 |

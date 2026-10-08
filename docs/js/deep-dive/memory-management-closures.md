@@ -36,8 +36,8 @@ flowchart TD
 
 各语言的显式程度对比：
 
-|:--|:--|:--|
 | 阶段 | 低层语言（例如 C） | JavaScript |
+|:--|:--|:--|
 | 分配 | 显式，需要调用分配原语 | 隐式，声明值时就分配 |
 | 使用 | 显式读写 | 显式读写 |
 | 释放 | 显式，需要手动判定并释放 | 隐式，由 GC 负责 |
@@ -1008,8 +1008,8 @@ node --expose-gc --inspect leak-detector.mjs
 
 ## 8. 对比表汇总
 
-|:--|:--|:--|
 | 维度 | 引用计数 Reference-counting | 标记清除 Mark-and-sweep |
+|:--|:--|:--|
 | 判定标准 | 指向对象的引用数为零 | 从根出发不可达 |
 | 循环引用 | 无法回收，是常见泄漏原因 | 可以回收，不成问题 |
 | 现代引擎使用情况 | 已无现代 JavaScript 引擎使用 | 所有现代引擎都使用 |
@@ -1018,8 +1018,8 @@ node --expose-gc --inspect leak-detector.mjs
 | 后续演进 | 无 | generational / incremental / concurrent / parallel 均为其实现改进 |
 | 能否手动干预 | 不能 | 不能，但可让对象显式不可达 |
 
-|:--|:--|:--|
 | 维度 | Map / Set | WeakMap / WeakSet |
+|:--|:--|:--|
 | 可存的键或值 | 任意值 | 只能是对象或 symbol |
 | 持有强度 | 强持有 | 弱持有 |
 | 是否可迭代 | 可以 | 不可以 |
@@ -1028,8 +1028,8 @@ node --expose-gc --inspect leak-detector.mjs
 | 键被回收后 | 不会发生，键被容器锁住 | 整条条目可被回收 |
 | 能否观测存活 | 可以 | 不可以 |
 
-|:--|:--|:--|
 | 特性 | WeakMap / WeakSet | WeakRef / FinalizationRegistry |
+|:--|:--|:--|
 | 定位 | 常规数据结构，弱语义由 engine 内建 | 对 GC 机制的直接内省 |
 | 运行时语义保证 | 有明确的语言语义 | 几乎完全无保证 |
 | 官方建议 | 正常使用 | 尽量避免使用 |

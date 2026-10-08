@@ -14,6 +14,7 @@
 make build                                   # 无链接警告
 python3 scripts/seo-check.py site            # 0 错误
 node book/scripts/check-mermaid.mjs          # 每张 Mermaid 图都能解析
+python3 scripts/check-tables.py              # 表格都能渲染（加 --fix 自动修复）
 ```
 
 ## 提交

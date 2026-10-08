@@ -1341,6 +1341,7 @@ const assert = require('node:assert');
 ### 应用场景地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
 | 后台管理导出 30 万行订单 CSV | 对象模式 Readable、`write()` 返回值、`pipeline` | `Readable.from` + `Transform` + `stream.pipeline` | 游标分页要有稳定排序，否则导出结果会跳行 |
 | 低端安卓手机打开首屏 SSR 页面 | Readable 的 flowing 模式、Writable 背压 | React `renderToPipeableStream` 接到 `res` | 响应头发出后无法改状态码，错误要在发头前兜住 |
 | 多人协作白板把操作事件写本地日志 | 对象模式 Writable、`drain` 事件 | `fs.createWriteStream` + 自写 Writable | 进程崩溃会丢缓冲区内容，先确认可接受的丢失窗口 |

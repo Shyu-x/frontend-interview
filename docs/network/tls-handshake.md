@@ -629,6 +629,7 @@ const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 20
 ### 应用场景地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
 | 后台管理的万行表格分批拉取 | 会话恢复、连接复用 | nginx + 带连接池的客户端 | 连接池上限小于并发数时请求会排队 |
 | 低端安卓机的首屏加载 | TLS 1.3 的 1-RTT、密钥交换与证书链 | ECDSA 证书、X25519、OCSP Stapling | 老机型不支持 1.3 时要保留 1.2 |
 | 多人协作白板的实时通道 | 会话恢复、TLS 终止点位置 | WebSocket over TLS、边缘终止 | 0-RTT 写入会被重放，画布重复落笔 |

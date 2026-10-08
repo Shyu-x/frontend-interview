@@ -397,6 +397,7 @@ export const libValue = value || 'default';
 ### 应用场景地图
 
 | 场景 | 用到本页哪个知识点 | 典型技术选型 | 注意事项 |
+|---|---|---|---|
 |-|-|-|-|
 | 后台管理的万行表格，导出与列配置按需打开 | 动态 import、代码切分 | React.lazy 加打包器的 import() | 每个 import() 生成独立 chunk，首屏请求数上升，要确认拆出的块不反向引用主模块 |
 | 低端安卓机上的活动页首屏 | Tree Shaking 条件、sideEffects 字段 | Rollup 或 webpack 生产构建加 ESM 输出 | 包作者漏标 sideEffects 会挡住摇树；误标为 false 会删掉 CSS 与 polyfill |

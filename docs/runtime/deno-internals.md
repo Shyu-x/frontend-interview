@@ -130,6 +130,7 @@ console.log("预期输出: 两类函数都出现在配置里");
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 配置报告行号对不上源码 | V8 分析的是转译后的 JavaScript | 注意报告行号指向转译代码，不是 .ts 源码 |
 | 默认采样太粗看不到短函数 | 默认间隔 1000 微秒 | 用 --cpu-prof-interval 调小，如 100 |
 
@@ -251,6 +252,7 @@ console.log("预期输出: fetch ok");
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 运行时报 net access 错误 | 启动没带 --allow-net | 加 --allow-net 或写进 deno.json |
 | 一个脚本要文件又要网络 | 每条能力各自授权 | 逐项加参数，-A 全放行会撤掉默认拒绝保护 |
 | 在 CI 里反复写参数 | 每次运行重复授权 | 把权限与任务一起写进 deno.json |
@@ -384,6 +386,7 @@ console.log("预期输出: 错误分类与权限判定都通过");
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 报 Could not open library | 相对路径按进程目录解析 | 用 new URL 配 import.meta.url |
 | 报 Failed to register symbol | 声明的函数名不在库里 | 核对库的导出符号名 |
 | 编译后二进制找不到库 | 动态库没打包进可执行文件 | deno compile 时加 --include |
@@ -519,6 +522,7 @@ console.log("预期输出: 五类说明符全部判定正确");
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 裸名找不到模块 | 没有对应 imports 映射 | 在 deno.json 的 imports 里加映射 |
 | package.json 依赖不可用 | 没跑 deno install | 执行 deno install 安装 |
 | 版本漂移 | 不同包想要不同版本 | 用 lockfile 锁版本，细节需核对官方文档 |
@@ -663,6 +667,7 @@ console.log("预期输出: 依赖与脚本取 package.json，工具配置取 den
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 在子目录跑命令配置没生效 | deno.json 在父目录，查找会向上 | 确认文件放在项目根或所在目录 |
 | 想同时换格式化与 lint | 两者是不同字段 | 在 deno.json 里分开写 fmt 与 lint |
 | package.json 改不了 Deno 工具 | Deno 工具配置只读 deno.json | 把 fmt、lint 等写进 deno.json |
@@ -818,6 +823,7 @@ console.log("预期输出: 路由与一次真实请求都通过");
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 访问被拒 | 没带 --allow-net | deno run 加 --allow-net |
 | 端口被占用 | 默认 8000 已有进程 | 传 options 换 port |
 | 断开后内存涨 | 流未处理 cancel | 在 ReadableStream 写 cancel 清理 |
@@ -916,6 +922,7 @@ console.log("预期输出: 成员匹配与未匹配都判定正确");
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 成员配置没生效 | deno.json 不在成员目录或其父目录 | 检查查找路径 |
 | 想统一公共配置又保留成员差异 | 根与成员配置并存 | 根配公共项，成员只写差异 |
 | workspace 声明不识别 | 字段名或格式不对 | 需核对官方文档：工作区章节 |
@@ -1035,6 +1042,7 @@ console.log("预期输出: node: 前缀被兼容层映射");
 **常见坑**
 
 | 现象 | 原因 | 怎么修 |
+|---|---|---|
 | 某个 Node API 报不支持 | 兼容层未实现该接口 | 查官方 Node 兼容性页面找替代 |
 | 调试口连不上 | inspector.open 要网络权限 | 加 --allow-net |
 | 短进程来不及调试 | 程序先跑完 | 用 --inspect-wait 或 --inspect-brk |
@@ -1048,6 +1056,7 @@ console.log("预期输出: node: 前缀被兼容层映射");
 ## 综合对比
 
 | 维度 | Deno | Node.js |
+|---|---|---|
 | 配置文件 | 读取 package.json 与 deno.json | package.json 为主 |
 | 权限模型 | 默认拒绝，启动时显式授权 | 默认授权为准，细节需核对官方文档 |
 | HTTP 服务器 | Deno.serve 内置，支持 HTTP/1.1 与 HTTP/2 | node:http 模块 |

@@ -26,6 +26,7 @@ TC39 的提案流程大致是：Stage 0 strawman、Stage 1 proposal、Stage 2 dr
 下表中的"规范归属"是我的判断；凡是需要以 TC39 官方 finished-proposals 列表复核的，都标了"需核对"。
 
 | 特性 | 规范归属 | 备注 |
+|---|---|---|
 | Array.prototype.findLast / findLastIndex | ES2023 | |
 | Array 只读变换：toReversed / toSorted / toSpliced / with | ES2023 | 常被合称 Change Array by copy |
 | Hashbang Grammar、Symbols as WeakMap keys | ES2023 | 前者只影响源码文本解析 |
@@ -177,6 +178,7 @@ console.log('set ops ok');
 惰性的关键是"消费方驱动"：每个 helper 返回一个新的迭代器，只有被 `next()` 拉动时才向上游要一个元素。因此中间不产生数组，也不会预先算完整条链。
 
 | 维度 | Array.prototype.map / filter | Iterator.prototype.map / filter |
+|---|---|---|
 | 求值时机 | 立即，返回新数组 | 惰性，返回迭代器 |
 | 中间结果 | 每一步都物化一个完整数组 | 无中间数组，逐项传递 |
 | 无限序列 | 不可用，会 OOM | 可用，配合 take 截断 |
