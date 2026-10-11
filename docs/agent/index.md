@@ -1,94 +1,79 @@
 ---
-title: AI Agent 概览
-description: 从 pi 式最小内核到企业级应用的 AI Agent 工程课程：agent loop、上下文压缩、记忆系统、RAG 与 pgvector、权限与沙箱、多 Agent 的取舍、评测与运维，附手写实现与行业实践。
+title: AI Agent 课程总览
+date: 2026-10-11
+description: 面向前端工程师的 AI Agent 课程入口：面试速通、七天从零构建 MiniCode、生产工程，以及按需查阅的版本化百科参考。
 tags:
   - ai-agent
 ---
 
 # AI Agent 概览
 
-这一篇把 Agent 当成一个**工程系统**来讲，而不是一组提示词技巧。主线只有一条：从 pi 那样只有几百行的最小内核出发，逐级补上生产环境真正会遇到的能力，直到企业级应用。
+这里把 Agent 当成工程系统，而不是提示词技巧。先按目标选一条路线，其他文章作为需要时查阅的参考，不把大量百科资料当成必修长廊。
 
 !!! abstract "学完这一篇你能"
-    - 画出一个 agent 系统的七个层次，并说出自己的项目目前处在哪一级、下一级要补什么。
-    - 手写一个能跑通工具调用的最小 harness，并解释它和 pi、DeepSeek Harness 的差异。
-    - 解释上下文为什么会膨胀、几种压缩方案各自的代价，以及什么时候该让小模型来做这件事。
-    - 在“文件记忆、向量检索、知识图”之间做选型，并用 pgvector 搭出一个可评测的检索系统。
-    - 设计一套从“零权限”到“沙箱加审批加审计”的权限体系，并说明提示注入为什么没有银弹。
-    - 判断一个任务该用单 Agent 还是多 Agent，并说出多 Agent 最常见的失败方式。
-    - 说清生产级编码 agent 如何存会话与记忆（例如 Codex 的 JSONL 加 SQLite 混合方案），并手写一个。
-    - 跟着七天课程，从零写出一个能读写文件、执行命令、带权限与压缩的编码智能体。
+    - 根据面试、动手构建或上线目标，选对入口而非从长目录硬读。
+    - 说明每条路线的前置、产出、验收和预计时间，并按验收推进。
+    - 区分必修课程、可运行项目和版本敏感的百科/案例资料。
 
-## 0. 学习路径图
+## 0. 三条路线，一处参考
 
 ```mermaid
-flowchart TD
-  A["第 1 部分 全局观"] --> B["第 2 部分 最简内核 pi"]
-  B --> C["第 3 部分 另一种设计 DeepSeek Harness"]
-  B --> D["第 4 部分 上下文与压缩"]
-  D --> E["第 5 部分 记忆系统"]
-  E --> E2["第 5.5 部分 会话与记忆的存储"]
-  E2 --> F["第 6 部分 RAG 与向量检索"]
-  B --> G["第 7 部分 权限 沙箱 安全"]
-  B --> H["第 8 部分 推理 规划 工具"]
-  D --> I["第 9 部分 多 Agent"]
-  G --> I
-  I --> J["第 10 部分 评测 成本 运维"]
-  H --> K["第 11 部分 架构与框架参考"]
-  J --> L["第 12 部分 案例研究"]
-  B --> M["第 13 部分 七天手写 MiniCode"]
-  L --> M
+flowchart LR
+  A["你的目标"] --> B["面试速通\n3–4 小时"]
+  A --> C["从零构建 MiniCode\n7 天"]
+  A --> D["生产工程\n4–6 天"]
+  B --> E["30 秒 / 2 分钟回答"]
+  C --> F["可运行的离线 Agent 骨架"]
+  D --> G["安全、评测与发布门禁"]
+  E --> H["百科与参考：按需查阅"]
+  F --> H
+  G --> H
 ```
 
-**怎么读这张图**：
+图中三条支线各自以可检查的结果结束，再汇入参考资料；参考资料不是第四条必修路线。
 
-- 先走最左边一条：第 1、2、4、7 部分，是所有 agent 系统都绕不开的主干。
-- 第 5、6 部分（记忆与 RAG）在你的 agent 需要“记住很多东西”时再读。
-- 第 9 部分（多 Agent）放在后面，是因为它依赖前面所有内容，而且很多场景根本不需要它。
-- 第 11、12 部分是参考资料，需要时查阅。
+## 1. 选择入口
 
-## 1. 各部分分别解决什么问题
+| 路线 | 前置 | 产出 | 验收 | 预计时间 | 起点 |
+|---|---|---|---|---|---|
+| 面试速通 | JavaScript 异步、HTTP 基础 | 一页架构图、10 个问答 | 30 秒说清 loop/工具/上下文/权限/评测；2 分钟解释单、多 Agent 取舍 | 3–4 小时 | [路线 A](learning-paths.md#路线-a面试速通) |
+| 从零构建 MiniCode | Node.js 22.18+、TypeScript、命令行 | 可运行的离线 Agent 教学骨架 | `npm ci && npm run verify` 通过；能演示 loop、会话恢复、路径权限、记忆与子任务 | 7 天，每天 1.5–2 小时 | [课程总览](../minicode/index.md) |
+| 生产工程 | 已有单 Agent 原型，理解会话、工具和权限 | 威胁模型、评测集、trace 与发布检查清单 | 用固定任务集复跑；能从 trace 定位失败；明确高风险工具的策略和回滚方式 | 4–6 天 | [路线 C](learning-paths.md#路线-c生产工程) |
 
-| 部分 | 解决的问题 | 起点页面 |
+!!! warning "先有单 Agent 基线，再拆多 Agent"
+    子 Agent 必须继承明确的任务契约，并有独立预算、取消传播和证据回传。没有这些条件时，多 Agent 只会掩盖原型的问题。
+
+## 2. 默认主线：七天 MiniCode
+
+没有明确面试期限时，默认从 [MiniCode](../minicode/index.md) 开始。课程按模型调用 → 单次 Agent → loop 与工具 → 会话/压缩 → 权限边界 → 记忆 → 子 Agent 逐步展开。伴随项目实现并验证其中的稳定子集；教学页里的技能、待办、沙箱进程和持久后台任务等扩展设计不等于伴随项目已有功能。Day 5 与 Day 7 是必修学习节点，但验收范围以伴随项目 README 明列的能力为准。
+
+| 节点 | 产出 | 真实验收 |
 |---|---|---|
-| 1. 先建立全局观 | agent 系统由哪些层组成，成熟度怎么分级 | [Agent 工程体系总览](system/agent-engineering-map.md) |
-| 2. 最简内核：从 pi 开始 | 一个 agent loop 最少需要什么，怎么手写 | [Agent Harness 全景](harness/harness-overview.md) |
-| 3. 另一种设计：DeepSeek Harness | 同样的问题，插件化的设计怎么做 | [DeepSeek Harness 架构](harness/deepseek-harness-architecture.md) |
-| 4. 上下文工程与压缩 | 窗口有限、越长越笨，怎么办 | [上下文膨胀](context/context-bloat-and-rot.md) |
-| 5. 记忆系统 | 跨会话怎么记住该记住的 | [Agent 记忆全景](memory/memory-taxonomy.md) |
-| 5.5 会话与记忆的存储 | 会话和记忆真正存在哪：JSONL、SQLite 还是两者结合 | [会话与记忆存储全景](storage/session-storage-overview.md) |
-| 6. RAG 与向量检索 | 知识太多放不进上下文，怎么检索 | [pgvector 从零开始](rag/pgvector-from-zero.md) |
-| 7. 权限、沙箱与安全 | agent 能做事，就能做坏事 | [权限模型光谱](security/permission-models-spectrum.md) |
-| 8. 推理、规划与工具 | 怎么让 agent 想得清楚、用得对工具 | [ReAct 模式](reasoning/react-pattern.md) |
-| 9. 多 Agent | 什么时候值得拆，拆了会出什么问题 | [单 Agent 还是多 Agent](multi/single-vs-multi-agent.md) |
-| 10. 评测、成本与运维 | 怎么知道它变好了，花了多少钱 | [Agent 评测从零搭建](ops/agent-evals-from-scratch.md) |
-| 11. 架构与框架参考 | 分层架构、LangChain、LangGraph 等怎么选 | [分层架构总览](architecture/layered-architecture.md) |
-| 12. 案例研究 | 真实产品的架构怎么做的 | [Claude Code 源码剖析](case-studies/claude-code-analysis.md) |
-| 13. 七天手写 MiniCode | 动手从零做一个 Claude Code 式编码智能体 | [课程总览](../minicode/index.md) |
+| Day 3 | loop 与工具注册表 | 工具结果回灌模型，错误不会丢失会话 |
+| Day 4 | 会话与压缩 | 重启后可恢复，关键约束仍在 |
+| Day 5 | 权限与沙箱 | 越界路径和逃逸符号链接被拒绝；执行与网络请求需要审批 |
+| Day 6 | 记忆 | 可测试记忆记录的来源、更新与检索；技能和待办是课程扩展设计 |
+| Day 7 | 子 Agent | 子任务有契约、独立预算、取消传播、写入所有权和证据指标；持久后台队列属于扩展设计 |
 
-## 2. 每一页的固定结构
+## 3. 百科与参考
 
-每个新页面都按同样的顺序组织，读起来不会迷路：
+左侧“百科与参考”保留了全部既有文章，但不是必读清单。先完成路线 A/B/C 中与你目标对应的 canonical 页面，再沿着下面的主题入口按问题深入；框架、DeepSeek Harness、RAG 专题和产品案例用于比较方案或查证细节。版本敏感内容先确认 `verified_at`、`source_commit` 与来源，再把设计取舍带回项目。
 
-1. **学完能做什么**：4 条可检验的能力。
-2. **知识地图**：一张图说明本页概念之间的关系。
-3. **每一节**：先想一个问题，再给心智模型、图解、分步讲解、可运行的完整脚本与验证用例、常见坑。
-4. **用在哪里**与**行业实践**：真实场景、怎么度量收益、什么时候不该用，以及公开可查的做法。
-5. **应用地图与动手作业**，**自测题**，以及**深入阅读与参考**。
-
-## 3. 关于数据与来源的说明
-
-!!! warning "数字请以原文为准"
-    调研类页面引用了公开文章、论文和官方文档里的数字（例如压缩阈值、成本倍数、失败模式占比）。
-    每个数字旁都标明了来源名称，并注明“以原文为准”。
-    凡是没能在一手来源核对到的说法，会写成“有说法认为，需核对”，不会当作事实陈述。
-    产品行为会随版本变化，落地前请对照对应官方文档。
-
-## 4. 页面一览
-
-按上面的 12 个部分，左侧导航里的分组与之一一对应。每个部分里的页面顺序就是推荐的阅读顺序。
+逐页顺序、前置、产出、命令和估时见 [路线与验收表](learning-paths.md)。新增或实质更新文章还必须遵守 [教程写作规范](../design/writing-standard.md) 的验证与源码关联要求。
 
 ## 深入阅读与参考
+
+### Canonical 主线与深入参考
+
+| 主题 | Canonical（先读） | 深入参考（遇到具体问题再读） |
+|---|---|---|
+| 核心循环与 Harness | [工程体系总览](system/agent-engineering-map.md)、[Harness 全景](harness/harness-overview.md)、[Agent Loop 解剖](harness/agent-loop-anatomy.md) | 工具协议、steering/abort、Harness 对比与源码案例 |
+| 上下文与会话 | [上下文膨胀](context/context-bloat-and-rot.md)、[会话存储总览](storage/session-storage-overview.md) | 压缩策略比较、KV cache、JSONL/SQLite 设计与故障模式 |
+| 安全 | [权限模型](security/permission-models-spectrum.md)、[提示注入防护](security/prompt-injection-defense.md) | 沙箱技术、企业治理、MCP 配置安全与权限门禁实现 |
+| 检索与记忆 | [Agentic RAG 与 grep](rag/agentic-rag-vs-grep-search.md)、[记忆全景](memory/memory-taxonomy.md) | 混合检索、向量库、记忆读写流水线与安全评估 |
+| 多 Agent 与评测 | [单/多 Agent 决策](multi/single-vs-multi-agent.md)、[评测从零搭建](ops/agent-evals-from-scratch.md) | 编排模式、上下文隔离、失败模式、可观测与成本预算 |
+
+主线页面提供足以形成工程判断的共同词汇；深入参考按需回答实现、框架或案例层面的后续问题。不要把表中右列当作路线的额外必修阅读。
 
 !!! tip "怎么用这些资料"
     先读「官方文档与规范」建立准确的概念，再读「源码与示例」核对细节，最后用「教程、书籍与视频」换一种讲法加深理解。每条都写明了读哪一节、带着什么问题读。
@@ -120,4 +105,3 @@ flowchart TD
 | [LLM Powered Autonomous Agents（Lilian Weng）](https://lilianweng.github.io/posts/2023-06-23-agent/) | 经典长文，规划、记忆、工具三部分讲得透彻。 | 精读三部分，各写一段理解，并对照自己的 Agent 找差距。 |
 | [Agents（Chip Huyen）](https://huyenchip.com/2025/01/07/agents.html) | Chip Huyen 从工程视角讲 Agent 的工具与规划，接地气。 | 读工具与规划章节，列出你 Agent 缺失的环节并排优先级。 |
 | [Hugging Face Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction) | 免费动手课程，从零搭 Agent 并提交 Space，反馈快。 | 完成 Unit 1，边做边改参数，最后提交一个小 Agent 到 Space。 |
-
