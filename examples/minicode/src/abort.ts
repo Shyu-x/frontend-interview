@@ -11,7 +11,10 @@ export async function abortable<T>(
   });
   try {
     const result = await Promise.race([
-      Promise.resolve().then(operation),
+      Promise.resolve().then(() => {
+        signal?.throwIfAborted();
+        return operation();
+      }),
       cancelled,
     ]);
     signal?.throwIfAborted();

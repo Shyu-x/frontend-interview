@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AgentLoop } from "../src/agent.ts";
+import { abortable } from "../src/abort.ts";
 import { FakeModel } from "../src/fake-model.ts";
 import {
   SubagentOrchestrator,
@@ -23,6 +24,18 @@ const worker: Worker = async (contract) => ({
   summary: "ok",
   evidence: [{ uri: "test:a", summary: "assertion" }],
   usage: { steps: 1, tokens: 1 },
+});
+
+test("调用后同步取消不启动尚未执行的 operation", async () => {
+  const controller = new AbortController();
+  let started = false;
+  const pending = abortable(async () => {
+    started = true;
+    return "done";
+  }, controller.signal);
+  controller.abort(new Error("cancel before microtask"));
+  await assert.rejects(() => pending, /cancel before microtask/);
+  assert.equal(started, false);
 });
 
 test("合同边界拒绝空目标、非法预算与错误数组", async () => {
