@@ -1,0 +1,35 @@
+name: MiniCode executable examples
+
+on:
+  pull_request:
+    paths:
+      - "examples/minicode/**"
+      - "docs/minicode/**"
+      - ".github/workflows/minicode-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "examples/minicode/**"
+      - "docs/minicode/**"
+      - ".github/workflows/minicode-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: examples/minicode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.18"
+          cache: npm
+          cache-dependency-path: examples/minicode/package-lock.json
+      - run: npm ci
+      - run: npm run verify

@@ -1,0 +1,20 @@
+{
+  "name": "@frontend-interview/minicode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI Agent 教程的可运行 TypeScript 伴随项目",
+  "scripts": {
+    "demo": "node src/demo.ts",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}
