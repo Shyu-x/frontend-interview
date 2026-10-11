@@ -1,6 +1,6 @@
 ---
 title: 元框架：Next.js、Remix、Nuxt
-description: 调研 Next.js 15、Remix 与 Nuxt 三个主流全栈元框架。
+description: 对比 Next.js 16.x、Remix 与 Nuxt 的核心架构、路由和数据处理方式、渲染与缓存模型及适用场景，帮助 React 与 Vue 团队按运行环境、内容形态和数据更新需求选择全栈元框架，并链接到 Next.js App Router 的版本化详解。
 tags:
   - open-source
   - framework
@@ -11,23 +11,33 @@ date: 2026-05-17
 
 > 本文是「前端框架」系列第 1 篇（共 3 篇）。下一篇：[新范式：Astro、Svelte、Solid、Qwik](rendering-paradigms.md)
 
-> 调研日期：2026-05-16
-> 覆盖范围：主流前端框架/运行时 8+，2500+ 行内容
+> 元框架系列调研日期：2026-05-16；Next.js 章节版本更新：2026-10-11
+> 覆盖范围：Next.js、Remix 与 Nuxt 的核心架构、路由与数据流、渲染和缓存机制及选型边界
 
-## 1. Next.js 15
+## 1. Next.js 16.x
 
 ### 1.1 简介
 
-Next.js 是由 Vercel 开发的 React 全栈框架，是目前最流行的 React 元框架（Meta-Framework）。Next.js 15 正式支持 React 19，带来 Turbopack 开发环境稳定版、异步 Request API、改进的缓存语义等重大更新。
+Next.js 是由 Vercel 维护的 React 全栈框架。以下按 2026-10-11 的稳定版 16.4.0 概括 16.x 的演进；主章集中讲 App Router、请求与缓存机制。
+
+| 版本 | 交叉章节需要记住的变化 |
+|---|---|
+| [16.0](https://nextjs.org/blog/next-16) | Turbopack 在 dev/build 稳定并默认启用；Cache Components 初始需显式 opt in；React Compiler 集成稳定但仍需启用。 |
+| [16.1](https://nextjs.org/blog/next-16-1) | Turbopack 开发文件系统缓存稳定并默认启用。 |
+| [16.2](https://nextjs.org/blog/next-16-2) | 文档 bundled 到项目本地，供开发者与 coding agents 查阅。 |
+| [16.3](https://nextjs.org/blog/next-16-3) | `partialPrefetching` 可通过顶层配置显式启用；dev 可维护 `AGENTS.md` 中的 agent 说明块，其标题为 “This is NOT the Next.js you know”。 |
+| [16.4](https://nextjs.org/blog/next-16-4) | 新建项目的 `create-next-app` 默认启用 Cache Components；既有应用以配置为准。 |
+
+Next.js 16 要求异步访问 `params`、`searchParams`、`cookies()`、`headers()` 与 `draftMode()`；默认请求代理文件为 Node.js 运行时的 `proxy.ts`。16.4 使用 React 19.3。详见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
 ### 1.2 技术栈
 
 | 类别 | 技术 |
 |------|------|
-| 核心框架 | React 19 + Next.js 15 |
+| 核心框架 | Next.js 16.0 集成 React 19.2；16.4 集成 React 19.3 |
 | 语言 | TypeScript / JavaScript |
-| 渲染模式 | SSR / SSG / ISR / PPR |
-| 构建工具 | Turbopack (dev stable) / Webpack (production) |
+| 渲染模式 | 静态预渲染 / 请求时渲染 / 按需重验证 / Cache Components（PPR） |
+| 构建工具 | Turbopack（dev/build 默认稳定）或显式选择 Webpack |
 | 样式方案 | CSS Modules / Tailwind / Styled Components |
 
 ### 1.3 核心架构
@@ -86,282 +96,34 @@ flowchart LR
 
 #### 1.4.1 React 19 集成特性
 
-Next.js 15 与 React 19 深度集成，带来以下核心能力：
-
-**1. Server Components（服务端组件）**
-
-服务端组件默认使用，无需额外配置。它们在服务器端渲染，不向客户端发送 JavaScript 代码。
-
-```typescript
-// app/users/page.tsx - 服务端组件（默认）
-import { cookies } from 'next/headers';
-import { db } from '@/lib/db';
-
-async function getUsers() {
-  'use server';
-  const response = await fetch('https://api.example.com/users');
-  return response.json();
-}
-
-export default async function UsersPage() {
-  // 直接在服务端访问数据库
-  const users = await db.user.findMany();
-  const cookieStore = await cookies();
-  const token = cookieStore.get('token');
-  
-  return (
-    <div>
-      <h1>Users ({users.length})</h1>
-      <ul>
-        {users.map(user => (
-          <li key={user.id}>{user.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-```
-
-**2. Actions（服务端操作）**
-
-允许在客户端调用服务端函数，简化表单处理和数据 mutations。
-
-```typescript
-// app/actions.ts
-'use server';
-
-import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
-
-export async function updateUser(userId: string, formData: FormData) {
-  const name = formData.get('name') as string;
-  
-  // 直接在服务端执行数据库操作
-  await db.user.update({
-    where: { id: userId },
-    data: { name }
-  });
-  
-  // 清除缓存并重定向
-  revalidatePath('/users');
-  redirect('/users');
-}
-
-export async function deleteUser(userId: string) {
-  await db.user.delete({ where: { id: userId } });
-  revalidatePath('/users');
-}
-```
-
-```tsx
-// app/user/[id]/edit.tsx
-'use client';
-import { updateUser } from '@/app/actions';
-
-export function UserEditForm({ userId, currentName }: { 
-  userId: string;
-  currentName: string;
-}) {
-  return (
-    <form action={updateUser.bind(null, userId)}>
-      <input 
-        name="name" 
-        defaultValue={currentName}
-        placeholder="Enter new name"
-      />
-      <button type="submit">Update User</button>
-    </form>
-  );
-}
-```
-
-**3. use() Hook**
-
-React 19 引入的 `use()` 允许在组件中调用 Promise，支持更灵活的数据获取模式。
-
-```tsx
-// app/posts/page.tsx
-import { use } from 'react';
-
-async function getPosts() {
-  const res = await fetch('https://api.example.com/posts');
-  return res.json();
-}
-
-export default function PostsPage({ params }: { params: Promise<{ page: string }> }) {
-  // use() 可以等待 Promise
-  const { page } = use(params);
-  const posts = use(getPosts());
-  
-  return (
-    <div>
-      <h1>Page {page}</h1>
-      {posts.map(post => (
-        <article key={post.id}>{post.title}</article>
-      ))}
-    </div>
-  );
-}
-```
+App Router 用 Server Components 承担默认的服务端组件树，用 `use client` 标出需要浏览器交互的边界；Server Actions 用于由用户触发的服务端 mutation。React Compiler 集成稳定但仍需在配置中显式启用。[Next.js 16.0 说明](https://nextjs.org/blog/next-16) · [16.4 的 React 19.3 说明](https://nextjs.org/blog/next-16-4)。异步请求 API、组件边界与 Actions 的完整示例见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
 #### 1.4.2 Turbopack 构建系统
 
-Turbopack 是 Next.js 15 的新一代构建工具，基于 Rust 实现，相比 Webpack 有显著性能提升。
-
-| 指标 | Webpack | Turbopack | 提升 |
-|------|---------|-----------|------|
-| 冷启动 | 30s+ | <3s | 10x |
-| 热更新 | 2-5s | <50ms | 50x+ |
-| 内存占用 | 高 | 低 | 50% |
-| 生产构建 | 90s+ | 45s | 2x |
-
-```typescript
-// next.config.ts
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
-  // Turbopack 相关配置
-  experimental: {
-    // 启用 Turbopack（开发环境默认启用）
-    turbopack: true,
-    // 优化包分析
-    bundlePagesRouterDependencies: true,
-  },
-  // 生产环境仍然使用 Webpack（稳定）
-  webpack: (config) => {
-    // 自定义 webpack 配置
-    return config;
-  },
-};
-
-export default nextConfig;
-```
+Next.js 16 将 Turbopack 设为 `next dev` 与 `next build` 的默认稳定打包器；需要 Webpack 时可分别传入 `--webpack`。16.1 起，开发文件系统缓存默认开启，跨重启复用编译产物。官方给出的基准属于其测试环境，不能直接当作项目耗时保证；应在目标仓库、机器与依赖上实测。[16.0 发布说明](https://nextjs.org/blog/next-16) · [16.1 发布说明](https://nextjs.org/blog/next-16-1)
 
 #### 1.4.3 Partial Prerendering (PPR)
 
-部分预渲染结合了静态生成的快速和动态服务端渲染的灵活性。
-
-```tsx
-// app/product/[id]/page.tsx
-import { Suspense } from 'react';
-
-// 静态部分立即可用
-const StaticHeader = () => (
-  <header>
-    <h1>Product Details</h1>
-  </header>
-);
-
-// 动态部分使用 Suspense
-async function DynamicPricing({ productId }: { productId: string }) {
-  const price = await getRealtimePrice(productId);
-  return <span className="text-red-500 font-bold">${price}</span>;
-}
-
-async function DynamicStock({ productId }: { productId: string }) {
-  const stock = await getStockLevel(productId);
-  return <span>{stock > 0 ? 'In Stock' : 'Out of Stock'}</span>;
-}
-
-export default async function ProductPage({ 
-  params 
-}: { 
-  params: Promise<{ id: string }> 
-}) {
-  const { id } = await params;
-  
-  return (
-    <div>
-      <StaticHeader />
-      <Suspense fallback={<div className="skeleton h-8 w-32"></div>}>
-        <DynamicPricing productId={id} />
-      </Suspense>
-      <Suspense fallback={<div>Loading stock...</div>}>
-        <DynamicStock productId={id} />
-      </Suspense>
-    </div>
-  );
-}
-```
+在 Next.js 16 中，PPR 是 Cache Components 模型的一部分：静态 shell 可与由 `Suspense` 包裹的动态内容组合。启用 `cacheComponents` 后，通过 `use cache`、`cacheLife` 与 `cacheTag` 显式定义缓存；不要把此模型与未启用 Cache Components 的旧缓存默认值混写。配置与边界见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
 ### 1.5 渲染模式详解
 
-| 模式 | 说明 | 适用场景 | TTFB | TTI |
-|------|------|---------|------|-----|
-| SSG | 构建时生成静态 HTML | 博客、文档 | 极快 | 快 |
-| ISR | 按需重新验证缓存 | 内容频繁更新 | 快 | 快 |
-| SSR | 请求时服务端渲染 | 个性化内容 | 中等 | 中等 |
-| PPR | 部分静态+部分动态 | 电商产品页 | 极快 | 极快 |
+| 模式 | 说明 | 适用场景 |
+|------|------|---------|
+| 静态预渲染 | 构建阶段生成可复用输出 | 内容稳定、可提前生成的页面 |
+| 按需重验证 | 命中缓存，并按时间或 tag 更新 | 可容忍短暂旧数据的目录与内容页 |
+| 请求时渲染 | 请求时读取个性化或动态数据 | 与会话、请求参数相关的页面 |
+| Cache Components / PPR | 缓存稳定部分，流式呈现动态边界 | 同页兼有公共内容与个性化区块 |
 
-```typescript
-// 静态生成 (SSG)
-export async function generateStaticParams() {
-  const posts = await db.post.findMany();
-  return posts.map(post => ({ id: post.id }));
-}
-
-// 增量静态再生 (ISR)
-export const revalidate = 3600; // 每小时重新验证
-
-// 服务端渲染 (SSR)
-export const dynamic = 'force-dynamic';
-
-// 部分预渲染 (PPR)
-export const experimental_ppr = true;
-```
+这些是渲染决策，不是从“静态到 SSR”的性能等级；选型要看数据新鲜度、个性化边界、首屏要求与部署运行时。Next.js 16 已移除旧的 `experimental_ppr` 路由开关，PPR 通过 Cache Components 配置表达。详见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
 ### 1.6 缓存语义
 
-Next.js 15 改进了缓存机制，提供更细粒度的控制：
+Next.js 16 有两种需分清的 App Router 缓存模型：启用 `cacheComponents` 时使用 `use cache`、`cacheLife` 与 `cacheTag`；未启用时按旧模型配置 fetch、路由与数据缓存。不要将一种模型的默认值或示例套入另一种。写入后，`revalidateTag(tag, 'max')` 采用 stale-while-revalidate；`updateTag(tag)` 仅能在 Server Actions 中调用并提供 read-your-writes；`refresh()` 刷新未缓存数据，不清除缓存。[Cache Components 指南](https://nextjs.org/docs/app/getting-started/caching) · [旧缓存模型指南](https://nextjs.org/docs/app/guides/caching-without-cache-components)
 
-```typescript
-// app/api/data/route.ts
-import { NextResponse } from 'next/server';
+### 1.7 优缺点分析
 
-export async function GET() {
-  return NextResponse.json(
-    { data: 'cached' },
-    {
-      headers: {
-        // 缓存控制
-        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
-      },
-    }
-  );
-}
-```
-
-```typescript
-// 静态资源缓存
-// next.config.ts
-{
-  headers: async () => [
-    {
-      source: '/assets/:path*',
-      headers: [
-        {
-          key: 'Cache-Control',
-          value: 'public, max-age=31536000, immutable',
-        },
-      ],
-    },
-  ],
-}
-```
-
-### 1.7 性能基准数据
-
-| 指标 | Next.js 15 | Create React App | Gatsby |
-|------|------------|------------------|--------|
-| 首屏加载 (3G) | 1.8s | 3.2s | 2.5s |
-| Time to Interactive | 2.1s | 4.5s | 3.2s |
-| Lighthouse 性能 | 95+ | 75 | 85 |
-| Bundle Size (默认) | 85KB | 42KB + 150KB | 120KB |
-| 热更新时间 | <50ms | 2-5s | 1-3s |
-
-### 1.8 优缺点分析
-
-#### 1.8.1 优势
+#### 1.7.1 优势
 
 1. **完善的生态系统** - Vercel 维护，丰富的插件和集成
 2. **React 19 一等支持** - Server Components、Actions 等新特性
@@ -370,16 +132,16 @@ export async function GET() {
 5. **优秀的开发者体验** - 清晰的文档和错误提示
 6. **部署便利** - Vercel 零配置部署
 
-#### 1.8.2 劣势
+#### 1.7.2 劣势
 
 1. **复杂度较高** - 学习曲线陡峭，配置项繁多
 2. **厂商锁定** - Vercel 平台特性可能在其他平台受限
-3. **体积较大** - 相比轻量框架包体积更大
-4. **过度工程** - 小项目可能不需要这么多功能
+3. **缓存心智模型较复杂** - 需识别项目是否启用了 Cache Components，并按对应模型设计与验证
+4. **小项目未必需要全栈能力** - 若只需静态内容或轻量 SPA，可选结构更简单的工具
 
-### 1.9 选择理由
+### 1.8 选择理由
 
-- **为什么选 Next.js 15？**
+- **为什么选 Next.js 16.x？**
   - 需要 React 生态的完整功能
   - 需要多种渲染模式混合使用
   - 需要优秀的 SEO 和性能
@@ -390,122 +152,28 @@ export async function GET() {
   - 需要最小化 JS 的场景（Astro 更优）
   - 团队不熟悉 React
 
-### 1.10 使用场景
+### 1.9 使用场景
 
 - 企业级应用（电商、SaaS、企业门户）
 - 内容驱动的网站（博客、文档、新闻）
 - 全栈应用（API Routes + 数据库）
 - 需要 SEO 的应用
 
-### 1.11 快速开始
+### 1.10 学习路径
 
-**JavaScript 版本：**
+从官方文档的[创建项目指南](https://nextjs.org/docs/app/getting-started/installation)开始，按项目实际配置决定是否采用 Cache Components；异步请求 API 与 Server Actions 的完整例子见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
-```javascript
-// app/page.jsx
-export default function HomePage() {
-  return (
-    <main>
-      <h1>Welcome to Next.js 15</h1>
-      <p>Get started by editing app/page.jsx</p>
-    </main>
-  );
-}
-```
+### 1.11 官方示例
 
-**TypeScript 版本：**
+| 官方示例 | 用于观察的内容 | 入口 |
+|---|---|---|
+| Next.js Commerce | 电商路由、商品与购买流程示例 | [Vercel Commerce 仓库](https://github.com/vercel/commerce) |
+| Next.js Examples | 按功能拆分的 App Router 与集成示例 | [Next.js 官方示例目录](https://github.com/vercel/next.js/tree/canary/examples) |
 
-```typescript
-// next.config.ts
-import type { NextConfig } from 'next';
+### 1.12 参考链接
 
-const nextConfig: NextConfig = {
-  experimental: {
-    after: true,
-  },
-};
-export default nextConfig;
-
-// app/layout.tsx
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-```
-
-**App Router 服务器组件：**
-
-```typescript
-// app/users/page.tsx
-import { cookies } from 'next/headers';
-
-async function getUsers() {
-  const response = await fetch('https://api.example.com/users');
-  return response.json();
-}
-
-export default async function UsersPage() {
-  const users = await getUsers();
-  const cookieStore = await cookies();
-  const token = cookieStore.get('token');
-  
-  return (
-    <div>
-      <h1>Users ({users.length})</h1>
-      <ul>
-        {users.map(user => (
-          <li key={user.id}>{user.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-```
-
-**Server Actions：**
-
-```typescript
-// app/actions.ts
-'use server';
-
-export async function updateUser(formData: FormData) {
-  const name = formData.get('name');
-  // 更新数据库
-  await db.user.update({ name });
-}
-```
-
-```tsx
-// app/form.tsx
-'use client';
-import { updateUser } from './actions';
-
-export function UserForm() {
-  return (
-    <form action={updateUser}>
-      <input name="name" type="text" />
-      <button type="submit">Update</button>
-    </form>
-  );
-}
-```
-
-### 1.12 真实应用案例
-
-| 公司/项目 | 使用场景 | 规模 |
-|-----------|---------|------|
-| Vercel 官网 | 文档、定价、博客 | 大型 |
-| Hulu | 视频流媒体平台 | 超大型 |
-| Twitch | 直播平台 | 超大型 |
-| Notion | 协作工具 | 超大型 |
-| TikTok Marketing | 营销网站 | 中型 |
-
-### 1.13 参考链接
-
-- [Next.js 15 官方博客](https://nextjs.org/blog/next-15)
+- [Next.js 16.4 官方博客](https://nextjs.org/blog/next-16-4)
+- [Next.js App Router 主章](../../frameworks/nextjs-app-router.md)
 - [Next.js 文档](https://nextjs.org/docs)
 - [Next.js GitHub](https://github.com/vercel/next.js)
 - [React 19 Upgrade Guide](https://react.dev/blog/2024/04/25/react-19-upgrade-guide)
@@ -1737,7 +1405,7 @@ const counter = useCounterStore();
 | 报名与下单的多步表单 | action 处理提交、渐进增强 | Remix Form + action 校验 | 校验失败的报错要在同一次 action 返回，别跳转丢状态 |
 | 内容站的多语言 SEO | 服务端渲染 + 语言前缀路由 + 预渲染 | Nuxt i18n + prerender | 语言切换放服务端，避免客户端切完再渲染一遍 |
 | 图表密集的运营看板 | 客户端组件下沉、动态导入 | next/dynamic + 客户端图表库 | 水合期间图表容器留固定高度，防止布局位移 |
-| 内部工具的权限页 | 服务端会话校验 + 路由段配置 | Next.js middleware（需核对官方文档：middleware 与数据层的鉴权职责边界） | 数据层要再校验一次，中间件不能当唯一防线 |
+| 内部工具的权限页 | 服务端会话校验 + 路由段配置 | Next.js `proxy.ts` + 数据层授权 | Proxy 可在请求入口做快速检查；读取或修改数据前仍须由数据层按当前用户授权 |
 | 外勤打卡的弱网首屏 | SSR 首屏 + 客户端缓存 | Remix + Service Worker（需核对官方文档：当前推荐的缓存策略写法） | loader 不要阻塞首屏可交互时间 |
 
 ### 三个场景拆解
@@ -1866,8 +1534,8 @@ export default function Board() {
 **真实用户指标采集用 web-vitals（出处：开源项目 web-vitals）**
 在浏览器里采集 LCP、INP、CLS 并按机型与网络分桶上报。它把实验室数据换成真实分布，避免只盯着一台测试机。借鉴方式：先在关键路由接入上报，再拿分桶结果决定优化顺序。
 
-**服务端组件缓存的细粒度控制（需核对官方文档：Next.js 15 中 fetch 默认缓存行为与 `use cache` 指令的稳定性状态）**
-缓存默认值在版本间发生过变化，配置写法也随版本调整。核对清楚当前版本的默认行为，再决定哪些请求显式声明缓存。
+**按项目启用状态选择 Next.js 缓存模型（出处：[Cache Components 指南](https://nextjs.org/docs/app/getting-started/caching)；[旧模型指南](https://nextjs.org/docs/app/guides/caching-without-cache-components)）**
+启用 Cache Components 时用 `use cache`、`cacheLife` 与 `cacheTag` 声明缓存边界；未启用时依照旧模型配置。写入路径需要 SWR 时用 `revalidateTag(tag, 'max')`；Server Action 中需要 read-your-writes 时用 `updateTag(tag)`；`refresh()` 刷新未缓存数据，不使缓存失效。不要混用两种模型的示例或默认值。[Next.js 16 缓存指南](https://nextjs.org/docs/app/getting-started/caching) · [旧缓存模型指南](https://nextjs.org/docs/app/guides/caching-without-cache-components)
 
 ### 从学到用：落地路线
 

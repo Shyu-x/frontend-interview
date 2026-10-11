@@ -13,157 +13,27 @@ date: 2026-05-17
 
 ## 1. React 全栈框架
 
-### 1.1 Next.js 15/16
+### 1.1 Next.js 16.x
 
-**核心创新点**:
+Next.js 16.4.0（截至 2026-10-11）适合希望在 React 项目中组合文件路由、服务端组件、表单 mutation、流式 UI 与不同渲染策略的团队。它不是所有 React 全栈项目的默认答案：团队应按运行环境、数据新鲜度、页面个性化边界和缓存迁移成本选择。版本与 App Router 机制见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
-Next.js 已成为 React 全栈的标准答案：
+| 版本 | 交叉章节应注意的变化 |
+|---|---|
+| 16.0 | Turbopack 在开发和生产构建中稳定并默认启用；Cache Components 起初需 opt in；Request APIs 改为异步。 |
+| 16.1 | Turbopack 开发文件系统缓存稳定并默认启用。 |
+| 16.2 | 文档随包提供；Agent 可从项目本地文档读取当前版本说明。 |
+| 16.3 | `partialPrefetching` 可显式配置；dev 自动维护 `AGENTS.md` 的 agent 说明块，标题为 “This is NOT the Next.js you know”。 |
+| 16.4 | `create-next-app` 新项目默认启用 Cache Components；既有项目要检查 `next.config`。 |
 
-1. **App Router**: 文件系统路由 + 服务端组件 (RSC)
-2. **React Server Components**: 服务端数据获取，零客户端 JS
-3. **Server Actions**: 表单处理和 mutations 的新方式
-4. **Streaming SSR**: 流式 HTML，边加载边显示
-5. **Turbopack 集成**: 开发环境 10x 提速
+来源：[16.0](https://nextjs.org/blog/next-16)、[16.1](https://nextjs.org/blog/next-16-1)、[16.2](https://nextjs.org/blog/next-16-2)、[16.3](https://nextjs.org/blog/next-16-3)、[16.3 Agent 改进](https://nextjs.org/blog/next-16-3-ai-improvements)、[16.4](https://nextjs.org/blog/next-16-4)。
 
-**技术架构图**:
+选型时还要看部署与运行时：`proxy.ts` 默认运行在 Node.js；异步 `params`、`searchParams`、`cookies()`、`headers()` 与 `draftMode()` 是 16.x 的请求 API 形态。Cache Components 开启时用 `use cache`、`cacheLife` 与 `cacheTag` 表达缓存；未开启时沿用旧缓存模型。`revalidateTag(tag, 'max')` 用于 stale-while-revalidate，`updateTag(tag)` 仅限 Server Actions 并保证 read-your-writes，`refresh()` 只刷新未缓存数据。
 
-```mermaid
-flowchart TB
-    subgraph 请求["HTTP 请求"]
-        R[Request]
-    end
+| 倾向 Next.js | 同时评估其他方案 |
+|---|---|
+| React 团队需要路由、渲染、数据读取与写入集成在一套框架内；页面需要 SEO、公开内容与个性化区域并存。 | 内容站以静态输出为主时比较 Astro；偏 Web 标准与表单渐进增强时比较 React Router；Vue 团队比较 Nuxt；只需客户端 SPA 时用 Vite + React 可减少服务端运行时与缓存决策。 |
 
-    subgraph 服务端["服务端"]
-        SSR[Server Components]
-        ACT[Server Actions]
-        CACHE[缓存层]
-    end
-
-    subgraph 客户端["客户端"]
-        CSR[Client Components]
-        HY[Hybrid 渲染]
-    end
-
-    subgraph 资源["资源"]
-        STATIC[静态资源]
-        EDGE[Edge Runtime]
-    end
-
-    R --> SSR & ACT
-    SSR --> CACHE & STATIC
-    ACT --> HY
-    HY --> CSR
-```
-
-**竞品对比**:
-
-| 维度 | Next.js | Remix | Astro | Nuxt |
-|------|---------|-------|-------|------|
-| GitHub Stars | 125K+ | 32K+ | 44K+ | 55K+ |
-| 周下载量 | 35M+ | 2M+ | 3M+ | 5M+ |
-| 渲染模式 | SSR/SSG/ISR | SSR | MPA/Islands | SSR/SSG |
-| 服务端 | Node.js/Edge | 任意 | 任意 | Node.js |
-| 数据获取 | RSC/Actions | loader | 静态/SSR | useAsyncData |
-| 学习曲线 | 中等 | 低 | 低 | 中等 |
-| 适用场景 | 企业应用 | 内容站 | 内容站 | 通用 |
-
-**快速开始**:
-
-```bash
-npx create-next-app@latest my-app --typescript --tailwind --eslint
-cd my-app
-npm run dev
-```
-
-**App Router 示例**:
-
-```typescript
-// app/users/[id]/page.tsx
-// 这个组件在服务端渲染
-import { notFound } from 'next/navigation'
-
-interface Props {
-  params: { id: string }
-}
-
-// 服务端组件 - 直接访问数据库
-async function getUser(id: string) {
-  const res = await fetch(`https://api.example.com/users/${id}`, {
-    next: { revalidate: 3600 } // 1小时缓存
-  })
-  if (!res.ok) return null
-  return res.json()
-}
-
-export default async function UserPage({ params }: Props) {
-  const user = await getUser(params.id)
-
-  if (!user) {
-    notFound()
-  }
-
-  return (
-    <div>
-      <h1>{user.name}</h1>
-      <p>{user.email}</p>
-    </div>
-  )
-}
-```
-
-**Server Actions 示例**:
-
-```typescript
-// app/actions.ts
-'use server'
-
-import { revalidatePath } from 'next/cache'
-
-export async function createPost(formData: FormData) {
-  const title = formData.get('title') as string
-  const content = formData.get('content') as string
-
-  await db.post.create({ data: { title, content } })
-
-  revalidatePath('/posts')
-}
-```
-
-```tsx
-// app/new-post/page.tsx
-import { createPost } from '../actions'
-
-export default function NewPost() {
-  return (
-    <form action={createPost}>
-      <input name="title" placeholder="标题" />
-      <textarea name="content" placeholder="内容" />
-      <button type="submit">发布</button>
-    </form>
-  )
-}
-```
-
-**性能对比**:
-
-| 指标 | Pages Router | App Router |
-|------|--------------|------------|
-| 首屏加载 | 基准 | 30%+ 提升 |
-| JS Bundle | 较大 | 更小 (RSC) |
-| 数据获取 | getServerSideProps | 直接 async/await |
-| 缓存策略 | 灵活 | 更细粒度 |
-
-**生态统计**:
-
-- 125K+ GitHub stars
-- 35M+ 周下载量
-- 最大的 React 生态框架
-- Vercel 官方维护
-
-**参考链接**:
-
-- [Next.js 官网](https://nextjs.org)
-- [Next.js GitHub](https://github.com/vercel/next.js)
+版本化细节与迁移边界集中见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
 ---
 

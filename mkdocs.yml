@@ -393,7 +393,7 @@ nav:
   - 框架生态:
     - 心智模型与全栈框架:
       - 主流前端框架的心智模型：React、Vue、Svelte、Solid、Angular: frameworks/framework-mental-models.md
-      - Next.js App Router：服务端组件、缓存与路由: frameworks/nextjs-app-router.md
+      - 'Next.js 16 App Router：组件边界与缓存': frameworks/nextjs-app-router.md
       - Nuxt：Vue 的全栈框架: frameworks/nuxt-vue-ssr.md
       - Svelte 与 Solid：编译期与细粒度响应式: frameworks/svelte-solid-compile-time.md
       - 现代 Angular：Signals、独立组件与依赖注入: frameworks/angular-modern.md

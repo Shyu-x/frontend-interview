@@ -1,9 +1,12 @@
 ---
 title: "渲染策略：CSR、SSR、SSG、ISR 与水合"
-description: "渲染策略的时序、缓存与选型"
+description: "从 HTML 生成时机、数据新鲜度和客户端交互成本理解 CSR、SSR、SSG、ISR 与水合，结合请求时序和 Node 教学实验比较渲染策略，并说明 Next.js 16.4 中 RSC、Cache Components 与上一代缓存模型的边界。"
 ---
 
 # 渲染策略：CSR、SSR、SSG、ISR 与水合
+
+!!! note "Next.js 16.4 的边界"
+    本章 CSR、SSR、SSG、ISR 是通用渲染术语，不能直接当作 Next.js App Router API 名称。Next.js 16.4 App Router 的 RSC、HTML 预渲染与 hydration 是不同层次：首访 Client Components 也可进入服务端生成的 HTML，浏览器之后仍要水合这些客户端边界。Pages Router 的 `getStaticProps` / `getServerSideProps` 与 ISR 示例仅适用于 `pages/`。Cache Components 启用时用 `'use cache'`、`cacheLife`、`cacheTag` 显式描述缓存；未启用时按上一代缓存模型阅读，Next.js 16 `fetch` 默认不缓存。[Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components) · [Caching](https://nextjs.org/docs/app/getting-started/caching) · [Previous Model](https://nextjs.org/docs/app/guides/caching-without-cache-components)
 
 !!! abstract "学完这一页你能"
     - 说出 CSR、SSR、SSG、ISR 四种策略里，HTML 在什么时刻、由哪台机器生成。

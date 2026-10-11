@@ -24,7 +24,7 @@ date: 2026-05-17
 
 | 页面 | 你将学到 | 难度 |
 |------|----------|------|
-| [元框架](frontend-frameworks/meta-frameworks.md) | Next.js 15、Remix、Nuxt 的架构与适用场景 | 进阶 |
+| [元框架](frontend-frameworks/meta-frameworks.md) | Next.js 16.4、Remix、Nuxt 的架构与适用场景；[Next.js App Router 详解](../frameworks/nextjs-app-router.md) | 进阶 |
 | [新范式](frontend-frameworks/rendering-paradigms.md) | Astro 岛屿架构、Svelte 5 Runes、SolidJS 细粒度响应式、Qwik 可恢复性 | 进阶 |
 | [Bun 运行时与框架选型](frontend-frameworks/runtime-and-selection.md) | Bun 运行时与框架横向对比、选型决策树 | 基础 |
 | [主流打包器](build-tools/mainstream-bundlers.md) | Vite、Rollup、Webpack 5、Parcel 的原理与配置 | 基础 |
