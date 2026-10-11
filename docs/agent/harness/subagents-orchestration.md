@@ -9,12 +9,12 @@ prerequisites:
   - TypeScript 与 Promise
 runnable: false
 verified_at: 2026-10-11
-source_commit: f7525abd111f84a86a51b6a9113460ba0573fbb3
+source_commit: 4da5f302ef0ac69069e17543d795d82da3a42faa
 ---
 
 # 子 Agent 编排：并发、预算与失败恢复
 
-本文是三篇中的实现主线：前一篇定义是否采用多 Agent，另一篇定义交接合同；这里关注调度器怎样执行、怎样在失败时给出可复核结果。可运行实现位于 [`examples/minicode/src/subagents.ts`](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/src/subagents.ts)，对应测试为 [`examples/minicode/tests/subagents.test.ts`](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/subagents.test.ts)。页面没有复制一套无法独立运行的伪实现。
+本文是三篇中的实现主线：前一篇定义是否采用多 Agent，另一篇定义交接合同；这里关注调度器怎样执行、怎样在失败时给出可复核结果。可运行实现位于 [`examples/minicode/src/subagents.ts`](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/src/subagents.ts)，对应测试为 [`examples/minicode/tests/subagents.test.ts`](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/subagents.test.ts)。页面没有复制一套无法独立运行的伪实现。
 
 ## 从输入到验收
 
@@ -72,7 +72,7 @@ npm ci
 npm run verify
 ```
 
-`verify` 运行类型检查和 Node 测试，本次集成已在 Node.js 22.18.0 执行并通过全部 33 项测试。若失败，检查测试名称对应的行为和报告中的 `status`、`error`、`usage`。本页的调度 trace 是教学走读，不是实际模型评测结果。
+`verify` 运行类型检查和 Node 测试，本次集成已在 Node.js 22.18.0 执行并通过全部 34 项测试。若失败，检查测试名称对应的行为和报告中的 `status`、`error`、`usage`。本页的调度 trace 是教学走读，不是实际模型评测结果。
 
 ## 前端落地示例
 
@@ -189,7 +189,7 @@ npm run verify
 
 ## 深入阅读
 
-- [实现源码](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/src/subagents.ts)：调度器、所有权检查与指标计算。
-- [实现测试](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/subagents.test.ts)：测试输入顺序、部分失败、预算、所有权和取消。
-- [回归测试](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/regressions.test.ts)：测试规范化路径、超时、预取消、证据、meter 和并发峰值。
+- [实现源码](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/src/subagents.ts)：调度器、所有权检查与指标计算。
+- [实现测试](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/subagents.test.ts)：测试输入顺序、部分失败、预算、所有权和取消。
+- [回归测试](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/regressions.test.ts)：测试规范化路径、超时、预取消、证据、meter 和并发峰值。
 - [子 Agent 上下文隔离](../multi/subagents-context-isolation.md)：交接时的数据和权限边界。

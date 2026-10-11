@@ -9,7 +9,7 @@ prerequisites:
   - minicode/day3-agent-loop-and-tools.md
 runnable: false
 verified_at: 2026-10-12
-source_commit: Shyu-x/frontend-interview@f7525abd111f84a86a51b6a9113460ba0573fbb3
+source_commit: Shyu-x/frontend-interview@4da5f302ef0ac69069e17543d795d82da3a42faa
 ---
 
 # Claude Code 风格的 Agent 架构教学：区分行为与实现

@@ -8,7 +8,7 @@ prerequisites:
   - agent/multi/single-vs-multi-agent.md
 runnable: false
 verified_at: 2026-10-11
-source_commit: f7525abd111f84a86a51b6a9113460ba0573fbb3
+source_commit: 4da5f302ef0ac69069e17543d795d82da3a42faa
 ---
 
 # 子 Agent 上下文隔离：定义可靠的交接边界

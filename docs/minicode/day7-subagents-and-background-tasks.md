@@ -6,7 +6,7 @@ level: intermediate
 runnable: true
 tested_with: [node@22.18.0, typescript@5.9.3]
 verified_at: 2026-10-12
-source_commit: Shyu-x/frontend-interview@f7525abd111f84a86a51b6a9113460ba0573fbb3
+source_commit: Shyu-x/frontend-interview@4da5f302ef0ac69069e17543d795d82da3a42faa
 description: "用明确的任务边界委派工作，并检查预算、取消、写入冲突和结果质量"
 ---
 

@@ -10,7 +10,7 @@ prerequisites:
   - 能运行 Node.js 22.18+ 项目的测试脚本
 runnable: false
 verified_at: 2026-10-11
-source_commit: f7525abd111f84a86a51b6a9113460ba0573fbb3
+source_commit: 4da5f302ef0ac69069e17543d795d82da3a42faa
 ---
 
 # Agent 前端运行面板：事件流、幂等状态与审批边界
@@ -45,7 +45,7 @@ flowchart LR
 
 客户端断线重连时，服务端可能重放最近几条事件。网络或应用层重试也可能让某个事件被处理两次。另一方面，用户已经切换到新运行时，旧连接仍可能送来旧运行事件。
 
-在 [MiniCode 的 UI 状态测试](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/ui-state.test.ts) 中，事件信封包含 `runId` 和 `sequence`。同一序号重放会返回原状态；旧 `runId` 事件被忽略；跳过序号会报出缺口；运行结束后晚到事件不改变终态。这些不是“流式文本”的特殊规则，而是有序事件投影的基本约束。
+在 [MiniCode 的 UI 状态测试](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/ui-state.test.ts) 中，事件信封包含 `runId` 和 `sequence`。同一序号重放会返回原状态；旧 `runId` 事件被忽略；跳过序号会报出缺口；运行结束后晚到事件不改变终态。这些不是“流式文本”的特殊规则，而是有序事件投影的基本约束。
 
 | 到达情况 | 客户端处理 | 为什么 |
 |---|---|---|
@@ -61,11 +61,11 @@ flowchart LR
 
 工具调用和权限请求各自有稳定标识。工具事件通过 `callId` 更新对应工具记录；权限决策通过 `requestId` 更新原审批请求。卡片渲染可以依赖这些 ID 作为列表 key，但不能用 key 代替权限校验。
 
-这种关联方式也约束事件合法性：工具结束必须对应正在运行的 `tool:start`；审批决策必须对应存在且仍为 `pending` 的请求；重复 ID 和重复审批应被拒绝或作为协议错误上报。MiniCode 的 reducer 在 [ui-state.ts](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/src/ui-state.ts) 中实现这些检查，并用 `Object.hasOwn` 和显式属性定义处理诸如 `__proto__` 这样的对象键，避免把外部 ID 当成普通原型属性。
+这种关联方式也约束事件合法性：工具结束必须对应正在运行的 `tool:start`；审批决策必须对应存在且仍为 `pending` 的请求；重复 ID 和重复审批应被拒绝或作为协议错误上报。MiniCode 的 reducer 在 [ui-state.ts](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/src/ui-state.ts) 中实现这些检查，并用 `Object.hasOwn` 和显式属性定义处理诸如 `__proto__` 这样的对象键，避免把外部 ID 当成普通原型属性。
 
 ## 3. 机制：用纯 reducer 管理视图状态
 
-下面是读代码用的框架无关逻辑草图，不是可直接运行的实现。完整的 TypeScript 类型、状态复制、事件校验和错误消息见 [项目 reducer](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/src/ui-state.ts)；请以该文件为准，不要把草图复制成第二份实现。
+下面是读代码用的框架无关逻辑草图，不是可直接运行的实现。完整的 TypeScript 类型、状态复制、事件校验和错误消息见 [项目 reducer](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/src/ui-state.ts)；请以该文件为准，不要把草图复制成第二份实现。
 
 ```text
 示意逻辑（runnable: false）：
@@ -118,7 +118,7 @@ reduce(state, envelope):
 
 ### 现有失败测试究竟拦住什么
 
-项目的 [ui-state.test.ts](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/ui-state.test.ts) 已有四组自动测试。它们分别验证状态投影的不变量，不代表浏览器传输或服务端协议也已经通过测试。
+项目的 [ui-state.test.ts](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/ui-state.test.ts) 已有四组自动测试。它们分别验证状态投影的不变量，不代表浏览器传输或服务端协议也已经通过测试。
 
 | 测试输入 | 当前断言 | 若回归，能观察到的失败 |
 |---|---|---|
@@ -197,7 +197,7 @@ snapshot 至少需要包含 `runId`、序号、运行状态、文本投影、工
 
 **30 秒回答：** Agent 运行 UI 是带版本的服务端事件流在浏览器里的投影。我按 `runId` 隔离运行、按连续 `sequence` 做幂等 reducer，并用 `callId` 和 `requestId` 更新工具及审批卡；断线后补放事件或用带水位序号的 snapshot 恢复。取消按钮仅表示请求，是否取消由服务端确认，审批也必须由后端再次校验。
 
-**2 分钟回答：** 我不会把每条 token 事件直接追加进组件状态，因为重连重放会产生重复，旧连接也可能覆盖用户刚切换的新运行。我把事件封装成 `runId + sequence + event`：旧运行忽略，已经应用的序号视为幂等重复，连续序号交给 reducer，遇到缺口则暂停并请求 replay，无法补放时用带水位序号的完整 snapshot 替换状态。工具开始/结束按 `callId` 配对，审批请求和决定按 `requestId` 配对，非法迁移进入协议错误与观测日志。取消请求和取消结果分开显示；后端才知道模型、子任务及工具是否真正停止。文本按文本节点渲染只能降低直接 HTML 注入风险，Markdown、链接和插件还要单独审查；审批操作始终由后端重新验证。MiniCode 中可用 [四类 reducer 测试](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/ui-state.test.ts) 验证重放、缺口、ID 和终态，但该伴随工程没有交付 SSE 服务端或 snapshot/replay API，因此恢复协议仍是生产设计要求，不是已运行能力。
+**2 分钟回答：** 我不会把每条 token 事件直接追加进组件状态，因为重连重放会产生重复，旧连接也可能覆盖用户刚切换的新运行。我把事件封装成 `runId + sequence + event`：旧运行忽略，已经应用的序号视为幂等重复，连续序号交给 reducer，遇到缺口则暂停并请求 replay，无法补放时用带水位序号的完整 snapshot 替换状态。工具开始/结束按 `callId` 配对，审批请求和决定按 `requestId` 配对，非法迁移进入协议错误与观测日志。取消请求和取消结果分开显示；后端才知道模型、子任务及工具是否真正停止。文本按文本节点渲染只能降低直接 HTML 注入风险，Markdown、链接和插件还要单独审查；审批操作始终由后端重新验证。MiniCode 中可用 [四类 reducer 测试](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/ui-state.test.ts) 验证重放、缺口、ID 和终态，但该伴随工程没有交付 SSE 服务端或 snapshot/replay API，因此恢复协议仍是生产设计要求，不是已运行能力。
 
 ## 生产差距清单
 
@@ -223,6 +223,6 @@ snapshot 至少需要包含 `runId`、序号、运行状态、文本投影、工
 
 ## 深入阅读
 
-- [MiniCode UI 状态 reducer](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/src/ui-state.ts)：逐行看事件类型、连续性校验、工具/审批状态迁移以及安全对象键处理。
-- [MiniCode UI 状态测试](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/ui-state.test.ts)：观察测试如何把重放、旧运行、缺口、原型键和非法迁移变成可执行约束。
-- [MiniCode README](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/README.md)：确认伴随工程当前交付范围，区分项目已有能力与本文提出的前端/传输层扩展。
+- [MiniCode UI 状态 reducer](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/src/ui-state.ts)：逐行看事件类型、连续性校验、工具/审批状态迁移以及安全对象键处理。
+- [MiniCode UI 状态测试](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/ui-state.test.ts)：观察测试如何把重放、旧运行、缺口、原型键和非法迁移变成可执行约束。
+- [MiniCode README](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/README.md)：确认伴随工程当前交付范围，区分项目已有能力与本文提出的前端/传输层扩展。

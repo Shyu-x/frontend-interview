@@ -8,7 +8,7 @@ prerequisites:
   - agent/harness/agent-loop-anatomy.md
 runnable: false
 verified_at: 2026-10-11
-source_commit: f7525abd111f84a86a51b6a9113460ba0573fbb3
+source_commit: 4da5f302ef0ac69069e17543d795d82da3a42faa
 ---
 
 # 单 Agent 还是多 Agent：如何用证据做选择
@@ -89,4 +89,4 @@ flowchart TD
 
 - [子 Agent 上下文隔离](subagents-context-isolation.md)：任务输入、输出和隔离边界。
 - [子 Agent 编排](../harness/subagents-orchestration.md)：并发、预算、取消、失败与自动验收。
-- [MiniCode 回归测试](https://github.com/Shyu-x/frontend-interview/blob/f7525abd111f84a86a51b6a9113460ba0573fbb3/examples/minicode/tests/regressions.test.ts)：查看路径冲突、取消边界和并发上限的可执行检查。
+- [MiniCode 回归测试](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/regressions.test.ts)：查看路径冲突、取消边界和并发上限的可执行检查。
