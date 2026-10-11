@@ -103,13 +103,29 @@ date: 2026-05-17
 
 </div>
 
-### 1.5 AI 与拓展
+### 1.5 AI Agent：按目标选择入口
 
 <div class="grid cards" markdown>
 
-- **[AI Agent](agent/index.md)**
+- **[AI Agent 课程总览](agent/index.md)**
 
-    Agent 架构、工具系统、MCP 与流式交互。
+    先按目标选择路线，不必从百科目录开始。
+
+- **[面试速通](agent/learning-paths.md#路线-a面试速通)**
+
+    3–4 小时建立 loop、工具、上下文、安全、评测和单/多 Agent 的回答框架。
+
+- **[从零构建 MiniCode](agent/learning-paths.md#路线-b从零构建-minicode)**
+
+    7 天递增实现同一个编码 Agent，Day 5 权限/沙箱与 Day 7 子 Agent 都是必修闭环。
+
+- **[生产工程](agent/learning-paths.md#路线-c生产工程)**
+
+    把原型补成可审计的系统：存储、安全、评测、trace、成本和部署。
+
+- **[Agent 百科与参考](agent/index.md#3-百科与参考)**
+
+    框架、源码案例、RAG 旧版与深挖专题按需查阅，不和必修路线混排。
 
 - **[开源项目](open-source/index.md)**
 

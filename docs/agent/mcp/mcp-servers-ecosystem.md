@@ -1,6 +1,12 @@
 ---
 title: "MCP 服务器生态与开发"
+tags: [ai-agent, tutorial]
+date: 2026-10-11
 description: "MCP 服务器生态概览、官方与第三方服务器、安装配置与自定义服务器开发。"
+level: intermediate
+tested_with:
+  mcp_spec: "2025-06-18"
+verified_at: "2026-10-11"
 ---
 
 # MCP 服务器生态与开发
@@ -22,7 +28,7 @@ flowchart TB
     A["MCP 客户端"] --> B["JSON-RPC 2.0 消息"]
     B --> C["传输层"]
     C --> D["stdio 本地子进程"]
-    C --> E["HTTP 与 SSE 远程服务"]
+    C --> E["Streamable HTTP 远程服务"]
     D --> F["MCP 服务器"]
     E --> F
     F --> G["官方服务器"]
@@ -225,7 +231,7 @@ console.log('通过: 四类判定与预期一致');
 2. 判定要落到字段：goal、dataScope、existingSystem、writeOperation 四个字段决定走哪条路。
 3. 分类结果只是一个入口，配置块的写法统一，差异体现在 command、args、env 上。
 
-## 2. 传输模式：stdio 与 HTTP 加 SSE
+## 2. 传输模式：stdio 与 Streamable HTTP
 
 **先想一个问题**
 
@@ -240,7 +246,7 @@ console.log('通过: 四类判定与预期一致');
 !!! tip "心智模型"
     - 一句话模型：传输层负责把 JSON 消息搬到对端，服务器逻辑不关心走哪条管道。
     - 日常类比：像两个人沟通，面对面说话用声波，异地沟通用电话线路，说的话本身不变。
-    - 类比不成立的地方：电话是双向实时通道，而 SSE 只做服务器到客户端的单向推送，客户端到服务器仍要新发一次 HTTP 请求。
+    - 类比不成立的地方：Streamable HTTP 的客户端消息使用 POST，服务端既可以返回普通 JSON，也可以使用 SSE 流式返回；GET 还可选地建立服务端通知流，它不是“只有一条 SSE 长连接”。
 
 **图解**
 
@@ -296,8 +302,9 @@ process.stdin.on('data', (chunk) => {
 # 远程模式：用一次 POST 发送 initialize 请求
 curl -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}'
-# 示例来自本页旧版内容，端点路径与协议版本需核对官方文档
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}'
+# 本页锁定 MCP 规范 2025-06-18；实现其他版本时必须重新核对协商规则
 ```
 
 **这段代码在做什么**
@@ -311,8 +318,8 @@ curl -X POST http://localhost:8080/mcp \
 
 ```text
 本地文件系统、子进程工具  -> stdio
-跨机器、多客户端共享      -> HTTP 加 SSE
-需要浏览器直接接入        -> HTTP 加 SSE
+跨机器、多客户端共享      -> Streamable HTTP
+需要浏览器直接接入        -> Streamable HTTP
 密钥不允许离开本机        -> stdio
 ```
 
@@ -341,10 +348,10 @@ if (process.argv[2] === 'child') {
     const req = JSON.parse(line);
     if (req.method === 'initialize') {
       send({ jsonrpc: '2.0', id: req.id,
-        result: { protocolVersion: '2024-11-05', capabilities: { tools: {} } } });
+        result: { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'teaching-echo', version: '1.0.0' } } });
     } else if (req.method === 'tools/list') {
       send({ jsonrpc: '2.0', id: req.id,
-        result: { tools: [{ name: 'echo', description: '回显输入' }] } });
+        result: { tools: [{ name: 'echo', description: '回显输入', inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } }] } });
     }
   });
 } else {
@@ -365,9 +372,10 @@ if (process.argv[2] === 'child') {
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
   });
 
-  const init = await call('initialize', { protocolVersion: '2024-11-05' });
-  assert.equal(init.protocolVersion, '2024-11-05');
-  assertEquals(capabilitiesHasTools(init), true);
+  const init = await call('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'teaching-client', version: '1.0.0' } });
+  assert.equal(init.protocolVersion, '2025-06-18');
+  assert.equal(capabilitiesHasTools(init), true);
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
 
   const list = await call('tools/list');
   assert.equal(list.tools.length, 1);
@@ -387,7 +395,7 @@ function capabilitiesHasTools(result) {
 
 ```text
 通过: stdio 通道完成 initialize 与 tools/list 两次往返
-协议版本: 2024-11-05
+协议版本: 2025-06-18
 ```
 
 **常见坑**
@@ -396,7 +404,7 @@ function capabilitiesHasTools(result) {
 | :--- | :--- | :--- |
 | 子进程日志混进响应流 | 业务日志写到了 stdout | 日志改走 stderr，stdout 只放 JSON-RPC 消息 |
 | 大响应被截断 | 按固定字节数读取，没按换行分帧 | 用 buffer 累积并按 `\n` 切分 |
-| HTTP 模式收不到推送 | 只发了 POST，没监听 SSE 通道 | 客户端需单独建立 SSE 连接接收服务端消息 |
+| 把 Streamable HTTP 当成旧 HTTP+SSE | 仍连接旧的独立 SSE 与 POST 端点 | 新实现使用单一 MCP endpoint；仅兼容旧服务器时回退旧传输 |
 
 **用在哪里**
 
@@ -408,13 +416,13 @@ function capabilitiesHasTools(result) {
 
 2. 团队共享的检索服务
    - 业务背景：十个前端同学共用一个搜索服务，密钥只配一次。
-   - 本节知识怎么用：选 HTTP 加 SSE，服务端集中持有 API key。
+   - 本节知识怎么用：选 Streamable HTTP，服务端集中持有 API key。
    - 用什么指标衡量收益：密钥配置份数从每人一份降到服务端一份。
-   - 什么时候不该用：搜索服务本身不支持长连接时，SSE 通道建不起来。
+   - 什么时候不该用：数据不能出网、只需要本地父子进程通信时优先 stdio。
 
 3. 浏览器内嵌的 AI 面板
    - 业务背景：管理后台里嵌一个问答面板。
-   - 本节知识怎么用：浏览器无法拉子进程，只能走 HTTP 加 SSE 连远程服务。
+   - 本节知识怎么用：浏览器无法拉子进程，使用带鉴权、Origin 校验的 Streamable HTTP 连接远程服务。
    - 用什么指标衡量收益：面板首字节时间与连接复用率。
    - 什么时候不该用：需要操作本机文件时，浏览器环境拿不到文件系统权限。
 
@@ -422,13 +430,13 @@ function capabilitiesHasTools(result) {
 
 - MCP 官方文档的 Transports 章节区分 stdio 与 HTTP 两类传输，并说明各自的适用场景。借鉴到你的项目：把传输选择写进设计文档，而不是留给实现者临场决定。
 - modelcontextprotocol/servers 仓库里的参考服务器大多以 stdio 启动，README 给出对应的 command 与 args。借鉴到你的项目：自建服务器默认支持 stdio，需要远程时再加 HTTP 入口。
-- 需核对官方文档：当前版本推荐的远程传输是否为 Streamable HTTP，以及它与 SSE 的关系。
+- MCP 规范 2025-06-18 的 Transports 章节把标准传输定义为 stdio 与 Streamable HTTP；后者取代 2024-11-05 的 HTTP+SSE，并要求远程实现校验 Origin、优先绑定 localhost、配置鉴权。
 
 **小结**
 
 1. 传输层只搬消息、不改语义，同一份请求在两种模式下字段一致。
 2. stdio 靠换行分帧，日志必须走 stderr，否则响应流被污染。
-3. 传输选择由数据边界和运行环境决定，不由个人偏好决定。
+3. Streamable HTTP 可以返回 JSON 或 SSE；旧 HTTP+SSE 只用于向后兼容，不能再作为新实现的默认方案。
 
 ## 3. 官方 MCP 服务器：filesystem、GitHub、Brave Search、Git
 
@@ -1335,27 +1343,31 @@ flowchart TB
 
 **一步一步来**
 
-第 1 步：记下协议版本矩阵，用版本号判断资料新旧。下表来自本页旧版内容，需核对官方文档。
+第 1 步：记录本文实际核验过的规范快照。版本字符串是日期，不要在代码里把某个日期永久命名为 `current`。
 
 ```text
-2024-11-05   当前版本，完整功能集
-2024-10-07   旧版，基础功能
-2024-09-03   已废弃，早期实现
-以上状态来自本页旧版内容，以原文为准，需核对官方文档
+2025-06-18   本文核验快照：stdio + Streamable HTTP
+2025-03-26   缺少 MCP-Protocol-Version 请求头时的兼容假设版本
+2024-11-05   旧 HTTP+SSE 传输；只用于向后兼容
+发布或升级前仍需检查 MCP 官方规范索引
 ```
 
 **这段代码在做什么**
 
 - 第一列是协议版本字符串，出现在 initialize 的响应里。
-- 第二列是当时的维护状态，当前版本功能最全。
-- 第三列标记已废弃，看到这类版本号说明资料过期。
-- 状态会随官方发布变化，使用前需重新核对。
+- 第二列说明本文为何记录该版本，而不是声称它永远最新。
+- 2024-11-05 仍可能出现在旧服务器中，但它的 HTTP+SSE 不是新实现默认方案。
+- 规范会继续发布新日期版本，升级时要重新跑握手与传输兼容测试。
 
 第 2 步：把版本判断写成可执行检查，避免靠肉眼比对。
 
 ```js
 // 从 initialize 响应里读协议版本，与已知列表比对
-const KNOWN = { '2024-11-05': 'current', '2024-10-07': 'legacy', '2024-09-03': 'deprecated' };
+const KNOWN = {
+  '2025-06-18': 'verified-snapshot',
+  '2025-03-26': 'compatibility-fallback',
+  '2024-11-05': 'legacy-http-sse',
+};
 function describe(version) {
   const status = KNOWN[version];
   if (!status) return '未知版本，需核对官方文档';
@@ -1395,11 +1407,10 @@ function describe(version) {
 import assert from 'node:assert/strict';
 
 const KNOWN = {
-  '2024-11-05': 'current',
-  '2024-10-07': 'legacy',
-  '2024-09-03': 'deprecated',
+  '2025-06-18': 'verified-snapshot',
+  '2025-03-26': 'compatibility-fallback',
+  '2024-11-05': 'legacy-http-sse',
 };
-// 状态来自本页旧版内容，以原文为准，需核对官方文档
 
 function describe(version) {
   if (!version) return '缺少 protocolVersion 字段';
@@ -1407,14 +1418,14 @@ function describe(version) {
   return status ? status : '未知版本，需核对官方文档';
 }
 
-assert.equal(describe('2024-11-05'), 'current');
-assert.equal(describe('2024-09-03'), 'deprecated');
+assert.equal(describe('2025-06-18'), 'verified-snapshot');
+assert.equal(describe('2024-11-05'), 'legacy-http-sse');
 assert.equal(describe('2099-01-01'), '未知版本，需核对官方文档');
 assert.equal(describe(undefined), '缺少 protocolVersion 字段');
 
 const responses = [
-  { server: 'filesystem', protocolVersion: '2024-11-05' },
-  { server: 'legacy-tool', protocolVersion: '2024-09-03' },
+  { server: 'filesystem', protocolVersion: '2025-06-18' },
+  { server: 'legacy-tool', protocolVersion: '2024-11-05' },
   { server: 'new-tool', protocolVersion: '2099-01-01' },
 ];
 
@@ -1428,8 +1439,8 @@ console.log('通过: 版本判定与未知版本提示都符合预期');
 运行结果：
 
 ```text
-filesystem: 2024-11-05 -> current
-legacy-tool: 2024-09-03 -> deprecated
+filesystem: 2025-06-18 -> verified-snapshot
+legacy-tool: 2024-11-05 -> legacy-http-sse
 new-tool: 2099-01-01 -> 未知版本，需核对官方文档
 通过: 版本判定与未知版本提示都符合预期
 ```
@@ -1734,8 +1745,8 @@ console.log('通过: 清单检查结果与预期一致');
 ??? question "MCP 生态里的四类服务器分别由谁维护"
     官方服务器由 Anthropic 官方维护，覆盖文件系统、GitHub、搜索、Git 等高频场景。第三方服务器由社区开发者发布，通常会打包到 npm 或开源在 GitHub。企业自建服务器由公司内部团队维护，用于内网系统。完全自定义服务器由你所在团队从零开发，用于能力特殊的场景。
 
-??? question "stdio 和 HTTP 加 SSE 两种传输该怎么选"
-    stdio 走父子进程管道，适合本地工具与含密钥的场景，密钥与文件都留在本机。HTTP 加 SSE 走网络，适合多客户端共享与浏览器接入。判断顺序是：数据是否允许出网，其次是有无多个客户端复用。远程传输当前推荐的具体方案需核对官方文档。
+??? question "stdio 和 Streamable HTTP 两种传输该怎么选"
+    stdio 走父子进程管道，适合本地工具与含密钥的场景，密钥与文件都留在本机。Streamable HTTP 适合远程、多客户端或浏览器接入；请求用 POST，响应可以是 JSON 或 SSE，还可用 GET 建立服务端通知流。旧 HTTP+SSE 仅用于兼容 2024-11-05 服务器。判断顺序是：数据是否允许出网，其次是是否需要跨进程或多客户端复用。
 
 ??? question "文件系统服务器的白名单为什么必须配置"
     旧版内容记录默认禁止所有目录访问，且不支持符号链接遍历。不配白名单会直接读取失败，而不是读到多余文件。配置时把允许目录写进 env 或启动参数，多个目录用冒号分隔。含密钥的目录要从白名单中排除。

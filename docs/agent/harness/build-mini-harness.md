@@ -1,5 +1,7 @@
 ---
 title: "手写 Harness：200 行跑通 Agent Loop"
+tags: [ai-agent, tutorial]
+date: 2026-10-11
 description: "可运行的最小 harness，含假模型测试"
 ---
 
@@ -303,7 +305,7 @@ const response = await model.chat([{ role: 'user', content: '计算' }]);
 assert.deepStrictEqual(response, final);
 assert.equal(model.requests.length, 1);
 assert.equal(model.calls.length, 1);
-assert.throws(() => model.chat([]), /队列已耗尽/);
+await assert.rejects(() => model.chat([]), /队列已耗尽/);
 console.log('FakeModel 测试通过');
 ```
 
@@ -1784,7 +1786,7 @@ loop.steer('不要动 public 导出，只改内部调用点');
 
 ??? question "5. steering 队列和直接改消息历史有什么不同？"
     - steering 在每轮模型调用前集中注入，不打断正在进行的调用。  
-    - 队列保持后进后出。  
+    - 当前实现用 `push()` 入队、`shift()` 出队，因此保持先进先出；多条纠偏指令按到达顺序生效。
     - 循环结束后不能再 steer，避免错乱。  
     - 直接改历史可能被覆盖，或让并发调用看到不稳定状态。
 
