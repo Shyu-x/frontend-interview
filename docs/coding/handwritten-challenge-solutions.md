@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-12
-source_commit: 84bf0f53f02065bdcc27cadb30d4c0e1569798d9
+source_commit: cb0ff08cb866221416d0625e7235d372c258059a
 ---
 
 # 三道挑战题完整解答：拆帧、版本 CAS 与代次句柄
@@ -32,7 +32,7 @@ flowchart LR
 
 拆帧检查的是消息边界，CAS 检查的是更新前提，句柄检查的是资源身份。这些检查不能因为“调用者大概不会传错”而省略。
 
-完整实现见[models.mjs](https://github.com/Shyu-x/frontend-interview/blob/docs/frontend-systems-deep-expansion/scripts/content-labs/challenges/models.mjs)，测试见[models.test.mjs](https://github.com/Shyu-x/frontend-interview/blob/docs/frontend-systems-deep-expansion/scripts/content-labs/challenges/models.test.mjs)。frontmatter 的提交号记录扩展前基线；本轮新增实现以源码文件与 PR 提交追踪，不声称旧提交已有这些文件。本站源码分支合并后应改用主分支入口。
+完整实现见[models.mjs](https://github.com/Shyu-x/frontend-interview/blob/cb0ff08cb866221416d0625e7235d372c258059a/scripts/content-labs/challenges/models.mjs)，测试见[models.test.mjs](https://github.com/Shyu-x/frontend-interview/blob/cb0ff08cb866221416d0625e7235d372c258059a/scripts/content-labs/challenges/models.test.mjs)。frontmatter 与两个源码链接固定同一个实现快照；分支合并并清理后链接仍可追溯，不随后续主分支更新而改变本页验收所指的代码。
 
 ## H283：四字节长度前缀增量拆帧
 
