@@ -26,7 +26,7 @@ flowchart LR
   B --> C[按解码顺序提交 chunks]
   C --> D[VideoDecoder 或 AudioDecoder]
   D --> E[带 PTS 的帧或音频块]
-  E --> F[预览 丢旧帧] 
+  E --> F[预览 丢旧帧]
   E --> G[导出 等待背压]
   G --> H[Encoder]
   H --> I[Muxer 写回容器]
