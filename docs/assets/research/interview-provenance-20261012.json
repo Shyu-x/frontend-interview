@@ -322,8 +322,11 @@
   ],
   "unverified_lead": {
     "claim": "PDD 秋招第一场考过简易动画引擎",
+    "user_reported_year": 2026,
+    "year_evidence_type": "user_report_only",
+    "user_clarified_at": "2026-10-12",
     "status": "unverified",
-    "notes": "截至 2026-10-12 对公开牛客页面进行精确检索，未找到能支持这条说法的原始面经正文；因此不作为真实考题引用。"
+    "notes": "用户补充为 2026 年秋招；截至 2026-10-12 的公开检索未找到能独立支持这条说法的原始面经正文，日期、场次及完整题面仍未知，不把用户线索当作公开核实的考题证据。"
   },
   "copyright_and_privacy": {
     "paraphrase_only": true,

@@ -124,13 +124,13 @@ flowchart TD
 ### 路线 E：实际面试题、秋招笔试与手写实现
 
 1. [真实题目出处](real-interview-question-bank.md)：18 组有出处的题目记录，区分亲历回忆、汇总转述和未知字段，不把发布时间当毕业届别。
-2. [48 道手写练习](../coding/handwritten-question-catalog.md)：输入输出、约束、不变量、易错测试和练习路径齐全；不是声明所有题都已实现或实跑。
+2. [360 道前端与全栈手写练习](../coding/handwritten-practice-360.md)：原有 48 题加 12 题册的 312 题，新增题提供接口、不变量、两个具体用例、机制提示与追问；不是声明所有题都已实现或实跑。
 3. [数值动画引擎](../coding/animation-engine-handwritten.md)：统一帧调度、时间映射、状态、缓动、异常与回调重入。
 4. [倒计时与打字机](../coding/deadline-clock-and-typewriter.md)：截止时间、后台跳时、暂停和 Unicode 字素，不用固定 tick 伪造真实时间。
 5. [笔试算法与版本协议](../coding/autumn-exam-algorithms.md)：明确派生题合同、独立穷举差分和严格解析边界。
 6. [7 类真实场景扩展](../coding/real-interview-scenarios.md)：竞态、图片超时、分页、SSR、Canvas、任务池与协同，以来源、约束、追问和故障验收连接底层路线。
 
-验收产物：57 个 Node 自动测试、异步代次与并发池的 48 项行为断言，另有 1093 个窗口输入在一个差分测试内逐项比对。它们不证明真实浏览器绘制或未知 OJ 隐藏协议。PDD“秋招第一场动画引擎”目前只有用户线索，年份、轮次与完整题面未独立核实；教学实现明确标为作者派生练习。
+验收产物：此前 57 个 Node 自动测试、异步代次与并发池的 48 项行为断言，另有 1093 个窗口输入在一个差分测试内逐项比对。新增[三道挑战题解答](../coding/handwritten-challenge-solutions.md)有 21 个模型测试，题库检查器有 10 个结构与反向测试；它们不证明真实浏览器绘制、数据库隔离或未知 OJ 隐藏协议。用户补充 PDD 动画引擎为 2026 年秋招第一场，但日期、场次和完整题面仍未独立核实；教学实现明确标为作者派生练习。
 
 ## 5. 实验登记：实跑不等于全系统验证
 
@@ -171,6 +171,8 @@ node scripts/content-labs/run.mjs --integrations --interview
 应看到 Node 测试汇总 `tests 57 / pass 57 / fail 0`、`stale-generation: 48 assertions passed` 和总入口 `PASS 13 content labs on v24.16.0`。这里的 13 表示子入口数量，其中一个入口包含面试测试套件，不能把它混称为 13 道题或只有 13 个断言。
 
 ## 6. 广度继续发散，但不把计划冒充交付
+
+本轮追加的 360 题入口与 12 个前端/全栈/系统题册已经写入仓库；[来源页](../coding/handwritten-practice-sources.md)登记 34 个参考入口，[机器清单](../coding/handwritten-practice-360.md#可复现清单与真实验收)检查 ID、合同字段和索引漂移。加入新代表模型时执行 `node scripts/content-labs/run.mjs --integrations --interview --challenges`，输出应为 `PASS 14 content labs on v24.16.0`。这个数量是聚合入口，不是全部练习已解答的数量。
 
 以下是下一轮研究候选，不是本轮已完成的教程。每项明确一个机制问题和验收产物，避免“再加几十个名词”。
 

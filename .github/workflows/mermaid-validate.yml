@@ -40,5 +40,9 @@ jobs:
       - run: python3 scripts/check-tables.py
       - run: python3 scripts/fix-lists.py
       - run: node scripts/validate-mermaid.js docs --strict
+      - name: Verify handwritten question contracts and generated index
+        run: |
+          node --test scripts/check-handwritten-bank.test.mjs scripts/content-labs/challenges/models.test.mjs
+          node scripts/check-handwritten-bank.mjs --check
       - name: Build all pages and validate site links
         run: uv run mkdocs build --strict --clean

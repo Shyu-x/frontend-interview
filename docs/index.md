@@ -143,7 +143,7 @@ date: 2026-10-12
 
 ### 1.7 真实面试与手写训练
 
-先查 [真实题目出处](resources/real-interview-question-bank.md) 的公司、年份、岗位、轮次与证据性质，再进入 [48 道手写练习](coding/handwritten-question-catalog.md)。可按题目训练 [动画引擎](coding/animation-engine-handwritten.md)、[倒计时与打字机](coding/deadline-clock-and-typewriter.md)、[窗口算法与版本协议](coding/autumn-exam-algorithms.md)，或用 [7 类场景题](coding/real-interview-scenarios.md) 练约束澄清、故障分析与追问。个人回忆、作者派生练习和已验证实现分别标注。
+先查 [真实题目出处](resources/real-interview-question-bank.md) 的公司、年份、岗位、轮次与证据性质，再进入 [360 道前端与全栈手写练习](coding/handwritten-practice-360.md)。保留原有 48 题，新增 12 个题册、312 道进阶题，覆盖组件、调度、框架、编译、HTTP、事务、安全、同步、算法、协议、图形与内存。可训练 [动画引擎](coding/animation-engine-handwritten.md)、[倒计时与打字机](coding/deadline-clock-and-typewriter.md)、[窗口算法与版本协议](coding/autumn-exam-algorithms.md)及[三道挑战题完整解答](coding/handwritten-challenge-solutions.md)，或用 [7 类场景题](coding/real-interview-scenarios.md) 练故障分析。题量不等于已实现答案数量；个人回忆、自主练习和实跑实现分别标注。
 
 ## 2. 如何使用本站
 

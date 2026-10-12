@@ -514,11 +514,27 @@ nav:
   - 手写代码:
     - 概览: coding/index.md
     - 真实题目与秋招练习:
+      - 前端与全栈题库：360 道合同化挑战: coding/handwritten-practice-360.md
+      - 手写题来源与证据分级: coding/handwritten-practice-sources.md
       - 手写题目录：48 道规格与验收练习: coding/handwritten-question-catalog.md
       - 真实场景题：异步、分页、SSR、Canvas 与协同: coding/real-interview-scenarios.md
       - 简易动画引擎：时间线、状态与异常隔离: coding/animation-engine-handwritten.md
       - 倒计时与打字机：绝对时间与 Unicode 字素: coding/deadline-clock-and-typewriter.md
       - 秋招算法与协议：滑动窗口、版本与差分测试: coding/autumn-exam-algorithms.md
+      - 三道挑战题完整解答：拆帧、CAS 与代次句柄: coding/handwritten-challenge-solutions.md
+    - 前端与全栈进阶题册:
+      - H049–H074：UI 与可访问组件: coding/practice-ui-components.md
+      - H075–H100：异步编排与调度: coding/practice-async-orchestration.md
+      - H101–H126：框架与状态系统: coding/practice-framework-state.md
+      - H127–H152：编译器与工具链: coding/practice-compilers-tooling.md
+      - H153–H178：Node 与 HTTP: coding/practice-node-http.md
+      - H179–H204：数据库与事务: coding/practice-databases-transactions.md
+      - H205–H230：鉴权与安全: coding/practice-auth-security.md
+      - H231–H256：分布式同步: coding/practice-distributed-sync.md
+      - H257–H282：算法与数据结构: coding/practice-algorithms-structures.md
+      - H283–H308：解析器与协议: coding/practice-parsers-protocols.md
+      - H309–H334：图形与媒体: coding/practice-graphics-media.md
+      - H335–H360：运行时与内存: coding/practice-runtime-memory.md
     - 异步与原生方法:
       - 原生方法: coding/native-methods.md
       - Promise 与异步控制: coding/promise-implementations.md
