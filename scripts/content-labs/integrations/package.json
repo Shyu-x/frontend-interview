@@ -1,0 +1,12 @@
+{
+  "name": "frontend-interview-integration-labs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node yjs-convergence.mjs && node pglite-transactions.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "yjs": "13.6.33"
+  }
+}

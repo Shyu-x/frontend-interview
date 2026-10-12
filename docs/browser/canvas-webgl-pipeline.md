@@ -1,9 +1,13 @@
 ---
 title: "Canvas 与 WebGL：渲染管线与手写示例"
-description: "2D 绘制模型、WebGL 管线与着色器"
+description: "从 Canvas 即时绘制、状态栈与像素密度进入 WebGL 顶点、光栅化与片元管线，结合矩阵和手写示例理解 CPU 到 GPU 的数据流，再连接场景图、命中测试与资源生命周期的深入专题。"
+tags: [canvas, webgl, graphics]
+date: 2026-10-12
 ---
 
 # Canvas 与 WebGL：渲染管线与手写示例
+
+> 想继续学习交互式 Canvas 对象、DPR 与局部坐标命中，请读[Canvas 场景图与命中测试](canvas-scene-graph-hit-testing.md)；想比较 WebGL/WebGPU 资源提交和销毁，请读[GPU 资源生命周期](webgl-webgpu-resource-lifecycle.md)。
 
 !!! abstract "学完这一页你能"
 

@@ -4,7 +4,7 @@ description: 系统整理前端面试知识：从 HTML/CSS/JavaScript 基础，�
 tags:
   - docs
   - index
-date: 2026-05-17
+date: 2026-10-12
 ---
 
 # 前端面试全家桶
@@ -136,6 +136,14 @@ date: 2026-05-17
     延伸阅读与参考资料。
 
 </div>
+
+### 1.6 深入系统：从原理到可验证的证据
+
+从 [全仓内容地图与深入路线](resources/content-map-and-roadmap.md) 按目标选择：框架与编译器、V8 与运行时、Wasm 与数据库、Pretext 与图形、Web3D 与媒体、本地优先与协同。每条路线连接源码、反例和实验，不以项目热度代替机制；已实跑的 Node／库实验与未验证的浏览器、GPU、输入法和辅助技术行为分别标明。
+
+### 1.7 真实面试与手写训练
+
+先查 [真实题目出处](resources/real-interview-question-bank.md) 的公司、年份、岗位、轮次与证据性质，再进入 [360 道前端与全栈手写练习](coding/handwritten-practice-360.md)。保留原有 48 题，新增 12 个题册、312 道进阶题，覆盖组件、调度、框架、编译、HTTP、事务、安全、同步、算法、协议、图形与内存。可训练 [动画引擎](coding/animation-engine-handwritten.md)、[倒计时与打字机](coding/deadline-clock-and-typewriter.md)、[窗口算法与版本协议](coding/autumn-exam-algorithms.md)及[三道挑战题完整解答](coding/handwritten-challenge-solutions.md)，或用 [7 类场景题](coding/real-interview-scenarios.md) 练故障分析。题量不等于已实现答案数量；个人回忆、自主练习和实跑实现分别标注。
 
 ## 2. 如何使用本站
 

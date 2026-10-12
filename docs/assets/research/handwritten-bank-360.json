@@ -1,0 +1,4355 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-10-12",
+  "total": 360,
+  "legacy": 48,
+  "added": 312,
+  "boundary": "Question contracts, not 360 implemented or executed solutions. Contract hashes detect stale generated indices, not semantic correctness.",
+  "questions": [
+    {
+      "id": "H001",
+      "title": "限制并发的 Promise 池｜真实题型，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "16f719f3c225cfe9378b81524ddd61a7df94b91d7f24c25b71aae480bae6b320"
+    },
+    {
+      "id": "H002",
+      "title": "顺序执行异步任务｜真实题型，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "50e17cc0d4acbb073cdc7d05e047575c5038064b21c32dfda1386ccf3275bb2d"
+    },
+    {
+      "id": "H003",
+      "title": "带上限与退避的重试｜真实题型，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "3ce4eef213ba79d9c012e3a33d5fc0739205cdcf267980f068689d1f3e04f189"
+    },
+    {
+      "id": "H004",
+      "title": "异步搜索结果防过期｜真实题型改述，PDD 个人回忆",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "2dca8c0cfb98b3ee8f95fc617e9e275dc509dcdff27599fbcea25249ea9067a0"
+    },
+    {
+      "id": "H005",
+      "title": "首次调用包装器 once｜真实题型，字节面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "943aca9edb3637d1f8a4ef59af30fb2cc222978314eba0c2256a7bb268b9de25"
+    },
+    {
+      "id": "H006",
+      "title": "发布订阅 EventEmitter｜真实题型，字节面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "d8859784bec53dc1017fabe2d2749a0ad15e6a910f24a3933748192162aedf5b"
+    },
+    {
+      "id": "H007",
+      "title": "Promise.all 简化实现｜真实题型，PDD 与美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "799c81571d85df9a019e6d711b52ae6c94cc83d8bc4cbe058a2ccdab963b48c2"
+    },
+    {
+      "id": "H008",
+      "title": "绝对截止时间倒计时｜真实题型，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "dce7ef4bbe8073dae9590f8f8b8363cd8bcbc820488aeef02ec05c5d76229a08"
+    },
+    {
+      "id": "H009",
+      "title": "大数加法｜真实题型，腾讯面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "abedfcbd22e780672f8cf550c4679d57f46622459b8e0a4c6df4a66b1c94e919"
+    },
+    {
+      "id": "H010",
+      "title": "深拷贝与循环引用｜真实题型，阿里大文娱",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "f0e6316dbadf81eb342b0d4d5aa5e2ae0df240f6ebd6b8713cf62b5f1201446c"
+    },
+    {
+      "id": "H011",
+      "title": "带小数的千分位格式化｜真实题型，字节生活服务",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "63272191fd762859cd0274d6242b23b394ce58a2805f989d146e88ce7b412da9"
+    },
+    {
+      "id": "H012",
+      "title": "两个有序数组稳定合并｜真实题型，字节面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "43850e3eaa97f6f7fc9bd6380d597d6aaa1652a43e6e3707cd048ee8eadd8650"
+    },
+    {
+      "id": "H013",
+      "title": "有序合并后按键去重｜真实题型改述，美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "f991a1e65a507e34e7a298780d7811657bb632d7681f5cb4f1130bfe2a3baf12"
+    },
+    {
+      "id": "H014",
+      "title": "合并字符串匹配位置｜真实题型， 美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "3f9b617cbaf5da56c4521133f21c6db60daa68a62e06cc024c3dd97fd1c3c067"
+    },
+    {
+      "id": "H015",
+      "title": "单链表倒数第 K 个节点｜真实题型，美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "9dc10b6785d4f1048079ad88a3f50443f1f1e59fd20b22115585a633aa776f5e"
+    },
+    {
+      "id": "H016",
+      "title": "二叉树层序遍历｜真实题型，美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "9e09bfdaf36412f48e111145ba50b6c3621e795ec0663076171f496d4630b84e"
+    },
+    {
+      "id": "H017",
+      "title": "alpha/beta 版本比较｜真实题型，PDD 面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "8bc105fadfcc877af610bd8b77b4e7ca8f4bfa0bfcf19e86008d3d0555a787a6"
+    },
+    {
+      "id": "H018",
+      "title": "对象扁平化并保留路径｜真实题型改述，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "d3f6add1057df42d7acc61aa5f876e930e8c5c16a1384afa303763d584d6369e"
+    },
+    {
+      "id": "H019",
+      "title": "Tooltip 组件｜真实题型，PDD 面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "c4fb3a8df0e58c15c1f58a26fc42b5346461eb1abaa8b697ffcef9f6c7cede76"
+    },
+    {
+      "id": "H020",
+      "title": "Vue 通知窗口队列｜真实题型，美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "4b05572f90f467efc20e63f983d4b99d7f51fd78f4456e369744717d3b2d15dd"
+    },
+    {
+      "id": "H021",
+      "title": "Flex 骰子五点布局｜真实题型，美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "6e54727dbd8aa521fb93453f54aa9da151091a4c367db81fd96c82ad8ba70880"
+    },
+    {
+      "id": "H022",
+      "title": "水平垂直居中与等间距布局｜真实题型，美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "51d89351313a2098883c5f8c3b23144f293f8cad53c8315ddc307ddbf428000d"
+    },
+    {
+      "id": "H023",
+      "title": "React 倒计时 Hook｜真实题型改述，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "57bbdcdbb5db1cdc3fcd4951e6a7fb8cd321f0adce233fdd7555743460baec6e"
+    },
+    {
+      "id": "H024",
+      "title": "`useCallback` 与 memo 稳定子组件输入｜真实题型改述，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "2118b3ffc3ed8ab4103258b5e15acaa87682faf8c0d40a379a16a5f595e486d4"
+    },
+    {
+      "id": "H025",
+      "title": "登录表单与提交状态｜真实题型，字节面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "96de0ed0803a6304569495eeb93edb62e04634f404c7650553732c5a5f5108f5"
+    },
+    {
+      "id": "H026",
+      "title": "滚动列表分页加载｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "713af25264605362c7ce8eeebc15f0caa69911b4d63ce7051ea7c0711b3f5588"
+    },
+    {
+      "id": "H027",
+      "title": "动态高度虚拟列表｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "c1c2badfabe2d27af28239f15fc0f70a21ca9fad37ed998b88831a9d46f8159f"
+    },
+    {
+      "id": "H028",
+      "title": "Canvas 绘制与坐标映射｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "5b7b930dd19463c3a6b3278f3189a454e08f4fc9813a8d214284cceb47e0099e"
+    },
+    {
+      "id": "H029",
+      "title": "Canvas 图元命中检测｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "b8f60e5ddb871f8b96feb8f103e562ae1bdbb6e757c6ee31a7ec58364a148323"
+    },
+    {
+      "id": "H030",
+      "title": "SVG/Canvas 迷你图表选择题｜真实场景派生，阿里面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "44cac9f2fd067e183f66759a0842098a1e758c90cdf491e4d2c3718b329574b5"
+    },
+    {
+      "id": "H031",
+      "title": "拖拽排序与指针捕获｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "9dfe8e8465ce2bff8de0803abfeb289810575b2366400925fc1d02748cb560d1"
+    },
+    {
+      "id": "H032",
+      "title": "Tooltip 锚点视口翻转｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "40df5c4763a09c6284c44739877d2f58679e1d7149200b15c2a28f7cce417139"
+    },
+    {
+      "id": "H033",
+      "title": "查询参数解析与序列化｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "4fa4ffdf2e0615cd1bfcc3f8b18593506326099674c96c418e3adbef88d1f477"
+    },
+    {
+      "id": "H034",
+      "title": "路由守卫与未授权跳转｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "bad93c7761ba1c4e7551a4a224bab2be0ff40ea2146c9f65c82a4dbedb1151dd"
+    },
+    {
+      "id": "H035",
+      "title": "缓存键与过期清理｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "be6c145d236ca8daa452c94c069fd49f412c47ac2ddd06f5a3794c10805b7d58"
+    },
+    {
+      "id": "H036",
+      "title": "文件上传分片状态机｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "26fe0d3d3e67a966298883433469c531168ab5391c6918c8f7b17bbbdd1ccbe0"
+    },
+    {
+      "id": "H037",
+      "title": "HTTP 请求重试与幂等｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "070ce3be5eed6520f4337d9779654a8c9a7c8e318b98908bd891b9fb2b0432b9"
+    },
+    {
+      "id": "H038",
+      "title": "前端错误上报去重与采样｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "67b52a6d4a3b33138e0b73a3646c1dbdcbabbebf5e71b0fcfeacc3bd6c190e2f"
+    },
+    {
+      "id": "H039",
+      "title": "版本字符串排序｜真实题型，字节/ PDD 面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "30ec0c2e986bf5f8786f344b3644957a131cd2b7c043ce892b452740d53eec27"
+    },
+    {
+      "id": "H040",
+      "title": "随机金额分配约束验证｜真实题型，美团面经",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "97daac9031511d169f8f2b7b820eedab3132eb1ea411e24fa7565956c7d0e160"
+    },
+    {
+      "id": "H041",
+      "title": "翻转倒计时｜真实题型，PDD 前端笔试",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "5b7a84ee6ece2102f54c5d686fe895a8c5b07a8a1cee8952f71e57db9b5ab493"
+    },
+    {
+      "id": "H042",
+      "title": "带进度回调的并发控制｜真实题型，PDD 前端笔试",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "77c14a9262bdbbe0be76e870b41366e7de7c5d7e8396d2671f172592d748952a"
+    },
+    {
+      "id": "H043",
+      "title": "打字机文本播放与中断｜真实题型，PDD 前端笔试",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "df3be6758cfbe3414b5976ea2e32d68d551ee43357cf506b8b4d7ec30b8d6b9d"
+    },
+    {
+      "id": "H044",
+      "title": "柯里化并保留 this｜真实题型改述，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "26f969e2e2a8fd8cb616cbbb870cf62c92b76c8817d8ec4dbf73292651c878dd"
+    },
+    {
+      "id": "H045",
+      "title": "按深度拍平数组｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "c744716cea1e997ca4a45dd3fc0971027b2debf45342d6bf2f8bc92e7c0bd49d"
+    },
+    {
+      "id": "H046",
+      "title": "响应式依赖收集最小版｜真实题型改述，PDD 汇总转述",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "5d656236437a3b0e29df2558da891e11a22a8cbaec285cc1f1eb344d4591d2ee"
+    },
+    {
+      "id": "H047",
+      "title": "SVG 视口缩放与平移｜派生练习",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "2ef9fb37fd656dc9050319cff26041f287d2404c2f7b273b68ad2755221f8113"
+    },
+    {
+      "id": "H048",
+      "title": "“连续不同子数组”题型合同化练习｜PDD 笔试回忆",
+      "file": "docs/coding/handwritten-question-catalog.md",
+      "legacy": true,
+      "mechanism_sources": [],
+      "evidence": "See individual legacy entry and interview provenance",
+      "implementation_status": "consult_linked_entry",
+      "contract_sha256": "7bab6c868e0acaa703d3b9e291d0f32e2aad4f2f9e7df269051c89b033de36ea"
+    },
+    {
+      "id": "H049",
+      "title": "多层弹层的 Escape 与焦点归还协调器",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "96b960931561eaadbae1e5cb5367a11c89f07198d42544f10ef4840f79787813"
+    },
+    {
+      "id": "H050",
+      "title": "可访问的命令面板键盘路由",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "adc5c98b7a1af074bbe9965869e77b8130190ceeb3d072706bf66c2b005f5e12"
+    },
+    {
+      "id": "H051",
+      "title": "嵌套菜单的方向键与 RTL 导航",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "aede42aeedee740875a7dfc036befb98113ef1ad9889c89d66f88e175a9fa574"
+    },
+    {
+      "id": "H052",
+      "title": "组合输入安全的表单提交门控",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "96996f2b406750a9a0520fc6fdb93793c48349e27aa608ed328560d9fc5efe7e"
+    },
+    {
+      "id": "H053",
+      "title": "异步校验下的表单提交快照",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ec759f6eed5e234084e5725d42e6e787054491c591475505890da6559184b5d3"
+    },
+    {
+      "id": "H054",
+      "title": "字段错误与 aria-describedby 有序合并",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "531fcc927c1ca13afb53a18d23d8c57adfca4194df7a7cfac671ee15ef25689d"
+    },
+    {
+      "id": "H055",
+      "title": "多选列表框的锚点范围选择",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a0758e9e226fc32df69056c180ff784229f6ae489b61a634df434cec9764c238"
+    },
+    {
+      "id": "H056",
+      "title": "可编辑表格的单元格编辑事务",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ca4d62cdd10471d43baad879af629fa89f3646beb8bb69917360c8953c6e5142"
+    },
+    {
+      "id": "H057",
+      "title": "可撤销的内容编辑器选区映射",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6249ff1318d13a88ea3b21b490d4f085d147cecd897cb3a7d6b6135e8d36bbea"
+    },
+    {
+      "id": "H058",
+      "title": "Markdown 编辑器的 IME 与快捷键仲裁",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e9d688581bd2550337aba8805b195a032368a6053a2857e56f7d8a091ced55d1"
+    },
+    {
+      "id": "H059",
+      "title": "拖放排序的键盘等价操作",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "38a52b252761c6d2c38b0352bcdd96cc4bd78d18030a9c0a699a37a7073a2aaf"
+    },
+    {
+      "id": "H060",
+      "title": "菜单按钮的指针离开延迟与触摸规则",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0334361874209ab60116cb6fb6748dd9e3c75d9cdb1d7b09dcf8e1f39ffbe79c"
+    },
+    {
+      "id": "H061",
+      "title": "弹出式列表的虚拟焦点与真实焦点切换",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "45308b1896c43849b174ba1a92f34db7be86b485a23bbc0ded3a9ab2f9b94b02"
+    },
+    {
+      "id": "H062",
+      "title": "单选组的方向键与表单值同步",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e6134f328a7933cc5714d1488a758347c1a1002a3b444c8a6873fa4b17b40f79"
+    },
+    {
+      "id": "H063",
+      "title": "可取消的自定义确认对话框",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a4d02fe6751725a135146a796ca14a1b1455a7a7d7c59f221e91fb106a8e9405"
+    },
+    {
+      "id": "H064",
+      "title": "Toast 队列的读屏公告节流",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "cbebef29693ce1ceefadbaa8278dbc6606e09b75d5fdc5a0d081d05df253c496"
+    },
+    {
+      "id": "H065",
+      "title": "日期区间选择器的日历键盘模型",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "24eaf04c18f68e9eab13f6ee73197d91433d8f43cf8e7d224f17f95c6e6a9b56"
+    },
+    {
+      "id": "H066",
+      "title": "文件拖入区的键盘与粘贴统一入口",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "484cab4c308a54eedb4fd2902c3fb793b0d1bc9d20652dfc4fbc330ac00eeaff"
+    },
+    {
+      "id": "H067",
+      "title": "文件上传行的撤销与迟到响应",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f489995c293f7a7df758dd2346b1752ba000278c983e8606b7afb3d686581ff2"
+    },
+    {
+      "id": "H068",
+      "title": "筛选器面板的即时草稿与应用值",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "97e6e1f450228bad75d2f394fbb0f19391d97639df7d258236079619e85c5920"
+    },
+    {
+      "id": "H069",
+      "title": "组合框的异步结果与活动项保持",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fa0ac37eaf219f965c575c2c2aab5957ad6a12790c8b53f47329d5e265d6697a"
+    },
+    {
+      "id": "H070",
+      "title": "虚拟化树的展开、选择与焦点保留",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4312369051d5779bc3feb2be3ad9cfc874d7ec86bd65cf04f856e6f8968bd8b1"
+    },
+    {
+      "id": "H071",
+      "title": "轮播器的自动播放暂停原因计数",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s05"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4daa5d689fe335f839125d2e7a73e2b004b18237a358a9907a630b2c94ccf161"
+    },
+    {
+      "id": "H072",
+      "title": "尺寸变化下的容器多列分栏约束解算器",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "88d191ef4514dbb525be4ef36e06641e900f5dad2d6a92d510aad0192066602a"
+    },
+    {
+      "id": "H073",
+      "title": "Shadow DOM 内外事件的组件边界",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0a5bb301eedcca96f0ab14fa211a62f989d666c1c34c4626904e4e2367473d1b"
+    },
+    {
+      "id": "H074",
+      "title": "组件卸载时的监听与资源盘点",
+      "file": "docs/coding/practice-ui-components.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "7f285a9d4ee52c364034926d153bc77fb4d398cb4bdf8a41f99fe1d9cfb5b31a"
+    },
+    {
+      "id": "H075",
+      "title": "多资源页面的原子快照提交",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d60c38bf4b2c7564d953ff1b13536dc115a69fa99137490f4a75c60df2cd97eb"
+    },
+    {
+      "id": "H076",
+      "title": "大小不等请求的公平配额调度",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e7b565d48e47301e3bcdcfa1375ad35231f819dd648f52228192a0c10a72769a"
+    },
+    {
+      "id": "H077",
+      "title": "按字节预算的图片解码队列",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "188aec821cdf9ca930fee19271a82fe9616b1506a13bccc34eb6fcb697a529c5"
+    },
+    {
+      "id": "H078",
+      "title": "ReadableStream 分支的慢消费者隔离",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d40f817f6ec01d912ae9165b4f74950429ef5cab2718fe48223404fc49ea7787"
+    },
+    {
+      "id": "H079",
+      "title": "可暂停的 NDJSON 增量解析消费者",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6bbd09c0abc89bb4b90c633935ee6871efe03379c6893fa293eac716c3313fa7"
+    },
+    {
+      "id": "H080",
+      "title": "ReadableStream cancel 与 lock 的关闭协议",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e0404ecda05c0ce7594dc563ad71aa2085819f606fdcf5c6c0030bda7e38076c"
+    },
+    {
+      "id": "H081",
+      "title": "多消费者订阅的最后一个 owner 关闭源",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f5e57c291c12cea805c1deb099cde9de8e5af5c6f193faec64c23a2dda9965a1"
+    },
+    {
+      "id": "H082",
+      "title": "Promise 结果的租约与引用计数缓存",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "038437e5291cc270fc0d6a4fbbb00428e3d9c02c4b441e8a1d70d917cac7e020"
+    },
+    {
+      "id": "H083",
+      "title": "Worker RPC 的超时、取消与迟到响应",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6697b6856664cd4585c55d22401122b28e73f31572efd25f996c5e0cc39cb009"
+    },
+    {
+      "id": "H084",
+      "title": "图片资源引用计数与 object URL 回收",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "32e5b445f16548e4923d4f627fdfded09507372b47403095e22ef56319c66a29"
+    },
+    {
+      "id": "H085",
+      "title": "WebSocket 入站消息的有界批量消费",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "51f28acb5c2599d3e921a789b576b23166eb413cc91447b0a68ffc373bb4caed"
+    },
+    {
+      "id": "H086",
+      "title": "搜索预取的可撤销额度占用",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "b709352a94984283f654496437d094e0390569877427be8ae55d63404c4fc176"
+    },
+    {
+      "id": "H087",
+      "title": "标签页可见性下的任务暂停与续约",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "42831e48da84403906695774d1be90c98f39ff246c536390de1b3f34fcf9e9fc"
+    },
+    {
+      "id": "H088",
+      "title": "取消后仍需释放的异步资源工厂",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8f9a1bd3c921697ae66e56fb1c46414642aa742d8fc700b32b1258d87ab79e22"
+    },
+    {
+      "id": "H089",
+      "title": "一次性事件 Promise 的监听器竞态清理",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e446771754ba3c7eb09f736f285ad3e7893a3d33f15bf5aa5ef5783ca9a47c89"
+    },
+    {
+      "id": "H090",
+      "title": "可重入通知系统的队列化派发",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2cfff89419a546328893ddb9fa8be571eeca5fe337938426dd72550b89784f83"
+    },
+    {
+      "id": "H091",
+      "title": "AbortSignal 合并器的原因优先级",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "7b9469ba84761af46286ed613fdc176173b3338b5ac9dbd6f6801e94f719fff1"
+    },
+    {
+      "id": "H092",
+      "title": "任务队列的背压通知与等待者取消",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0cc017d85e368ce5185b5cc05db0e812bc4a167a306a3adf8a95a8a78b0112e4"
+    },
+    {
+      "id": "H093",
+      "title": "按优先级但防止低优先级饿死的调度器",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d41d43ed0e53dfe44a84bd8e2dbcb976e16a38df55452980383b4271e50867e6"
+    },
+    {
+      "id": "H094",
+      "title": "网络响应体读取的绝对字节上限",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "016fbcdcd42b72c2e7e91bdbfa538595299ea02c5cc392874d57e902061158f8"
+    },
+    {
+      "id": "H095",
+      "title": "流式上传的确认窗口与重传队列",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "229807fb38c5f589d3350cb822aa7ab7a1b1ecb1b6ded51676c664dca5052994"
+    },
+    {
+      "id": "H096",
+      "title": "Cache API 写入的取消与事务状态",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c8cddd2ed02bc0d20c3f89f790e430da506bf075a1d4d5c3543796c78c4bb468"
+    },
+    {
+      "id": "H097",
+      "title": "多路事件源的时间窗合并与水位线",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "18ad63a0bf3c8e5736f3510fdaafd838daf4e6e6df086e09e2ae6758a2d407be"
+    },
+    {
+      "id": "H098",
+      "title": "页面卸载前的并行清理预算",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "b72c0d64aa4a5f87abffb11c44faf555f8da744198157bd24aeeec0f5d14a856"
+    },
+    {
+      "id": "H099",
+      "title": "共享加载任务的优先级提升",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3236345244ba8f2cdb64626c43828c65e704925ca6ecfd7bf56df00ede93fd0b"
+    },
+    {
+      "id": "H100",
+      "title": "可观测异步流水线的资源账本",
+      "file": "docs/coding/practice-async-orchestration.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03",
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "58c5f764d37abd00b781bfdd08546ddb848d8de99322721b8c365c4fd4807c2c"
+    },
+    {
+      "id": "H101",
+      "title": "外部 store 的稳定不可变快照",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fa201b8f9c3f16e37e75c304ebdcf3dd63a2cff02cce40e039cbb3b4bcdac41e"
+    },
+    {
+      "id": "H102",
+      "title": "React 外部订阅的 render 间隙一致性",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "92e2501563cb83138d5cce416dd9e15d3939d26406baa63adb0c0613a80505e5"
+    },
+    {
+      "id": "H103",
+      "title": "按选择器订阅且防止相等比较漂移",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "b4eb6d082c149a9ae1d4720e3e7e0f733c880c718dcf825e94b79b286f31d69a"
+    },
+    {
+      "id": "H104",
+      "title": "Vue effect 的动态依赖退订",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s07"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0ed2fd7caf15cfff4c466a079ce0c664ec58bf12dded3345a20687fad134c928"
+    },
+    {
+      "id": "H105",
+      "title": "Vue effect scope 的组件 owner 释放",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s07"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9c4afda2d3b2a0d1d754e4a0c9c2975ee3749aefbe6a35823b14b887ead5926b"
+    },
+    {
+      "id": "H106",
+      "title": "跨框架 store 的 SSR 请求隔离",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "55eb7fee3fccb3a54ed19f2dc0049b21e1d2173ad535f629d75eb6b9ffcbf9a9"
+    },
+    {
+      "id": "H107",
+      "title": "Hydration 初始快照与客户端首更对齐",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ab4f89d320131335fb8526dcda499c066896203ff57d412ccdf89e16a57c87a7"
+    },
+    {
+      "id": "H108",
+      "title": "路由导航的 latest-wins 事务",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "beedd1472c7713b99c8c17182d8d69ea99ab31b02767cb4f6988899a9520efee"
+    },
+    {
+      "id": "H109",
+      "title": "路由 loader 的共享请求与导航取消",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "23d7f6250f28cfd9e2852a6477838b392472cedb8eaa05f95125d06d1fdc43eb"
+    },
+    {
+      "id": "H110",
+      "title": "嵌套路由的错误边界回滚范围",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s07"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "94c15cd05b2bc7b8900d0658bae7ce926d722ab166881cbdd8788115f536aa23"
+    },
+    {
+      "id": "H111",
+      "title": "Streaming SSR 的资源边界与尾部错误",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s04"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a3f65083f11695acd6d8b00052219b778af9ac210a4329fa33fa7e8882daa053"
+    },
+    {
+      "id": "H112",
+      "title": "React 外部 store 与 Suspense 边界的版本隔离",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d4b83360c72b27688fefd41327311d782108d843c42e622f9c8e07ed110d27c7"
+    },
+    {
+      "id": "H113",
+      "title": "Keyed 列表的最小移动 diff 计划",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s07"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0ae8614e0614a14d090c4ed7fab4ba5ab38e39c40e3674476527713a3b212be8"
+    },
+    {
+      "id": "H114",
+      "title": "缓存键的租户、权限与语言隔离",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "063ea87e9a0e023a4f0e90dc63716d6e5be01a1a6782c1f23791295a5463967d"
+    },
+    {
+      "id": "H115",
+      "title": "React provider 重挂载时的状态所有权",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a3ddb1e04651b25f68970fe6f332baf2143b22f681726070f09324ed75e6b659"
+    },
+    {
+      "id": "H116",
+      "title": "Vue computed 失效时的惰性缓存边界",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s07"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9329152ca57b4afeb7fc8fc9062926d6b4b4ea3baa8903e41195d2e35adfd5a8"
+    },
+    {
+      "id": "H117",
+      "title": "同步 store 更新的批处理与提交边界",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ae430623a2d02a671c8edc22e9ebd5a3a647dedfb91318807a412992e0437e53"
+    },
+    {
+      "id": "H118",
+      "title": "路由查询参数更新的合并导航",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "17179758dacfda40e5c499bbe809899b57b221288cb3f17010dc7e172237b817"
+    },
+    {
+      "id": "H119",
+      "title": "浏览器返回时的滚动位置 owner",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s03"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a673c53f3b27581b33fdbb66fa4ac7392302a876c060b3c0cde047e93134a338"
+    },
+    {
+      "id": "H120",
+      "title": "错误状态在 store 与 Error Boundary 间去重",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s07"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fb28c7a3a85d7f3259dfa69232df4e4e0ca31ed2f824dd8bbabcd488b48116fa"
+    },
+    {
+      "id": "H121",
+      "title": "服务端组件边界的序列化引用图",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3955b996d205c148ab2735461d898df30bff856204f9775c66d4120758e015f1"
+    },
+    {
+      "id": "H122",
+      "title": "持久化 store 的迁移与并发写入版本",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "69a3d71053c9c4b89b75cecd8741f8264e518208f10ffbd27a11639a6fac2412"
+    },
+    {
+      "id": "H123",
+      "title": "订阅快照的 SSR 序列化与脱水",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "431dcfd3626992b0a2da3079f0f7bcbcfb4bd345aa74d9d5cfc12e09b1a0baaa"
+    },
+    {
+      "id": "H124",
+      "title": "多 root 应用间的共享 store 版本屏障",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s06"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "14230294c9934ab6e74a71fda6f92dd1c448d561a40e7ca41641316f5367629f"
+    },
+    {
+      "id": "H125",
+      "title": "可中断渲染遍历的 continuation 与提交边界",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6d3dfbf49cd5a4e3455966efa6c30aac43b20c0afca96cc65ff22386bd7fbfc9"
+    },
+    {
+      "id": "H126",
+      "title": "Diamond 派生图的无毛刺版本传播",
+      "file": "docs/coding/practice-framework-state.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s07"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "7ff8a003f4c95355de8e20e4a4c293a1033d7fbd4fcf92ce02740716569faa09"
+    },
+    {
+      "id": "H127",
+      "title": "TypeScript AST 中的安全导入改写",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s08"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "608b6a236689b3fc8a1c4664f5143cb3dc2e56d947a2443509ec6bf6caf82088"
+    },
+    {
+      "id": "H128",
+      "title": "Babel parser 插件配置的语法合同",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s09"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2b8a077ae796742f9b7999a46243b1b8c66b21968ff10674f44d42e0d1c4b0ee"
+    },
+    {
+      "id": "H129",
+      "title": "JavaScript 子集的 Pratt 表达式解析器",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f222ccef69165661dcf5549cc1f834cc76d351a978d686fb581596b1639ba379"
+    },
+    {
+      "id": "H130",
+      "title": "作用域分析与 shadowed binding 解析",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c4766f93dea2f464ab6e4fefea5ed27f5bfa6203f250c4dbcb11600586a58305"
+    },
+    {
+      "id": "H131",
+      "title": "从 parser AST 到稳定规范 IR",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s08"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "1a35f07d8154d7e1653e047142e793918f572e8da0b69968631bcf06263dc11e"
+    },
+    {
+      "id": "H132",
+      "title": "按副作用标记执行安全 tree shaking",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "62889b55f75bb1f10b4feb76ab78b436cc197c7d7930bb073885764207de9156"
+    },
+    {
+      "id": "H133",
+      "title": "循环依赖的初始化顺序诊断",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "76cc45f926f48fabc72ca49746dc8e789e3b6301a47120a2eff03aae9b6ea167"
+    },
+    {
+      "id": "H134",
+      "title": "异步模块图的 chunk 边界规划",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c4dcc17d613628a59125f34f83994b30fc160d06c3430ea8bae51ba062959ea9"
+    },
+    {
+      "id": "H135",
+      "title": "Chunk 命名稳定性与内容 hash",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "28caafcb2db2f4c839259af2859d80373cb16f2dc2d07d6e36e2c96bbc410df0"
+    },
+    {
+      "id": "H136",
+      "title": "Source map 的生成列与原始列映射",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4c7459f9e910b8e9e3ed7548dc0fe47c66e19daa9b0ef1cd7e6534e75c87fa30"
+    },
+    {
+      "id": "H137",
+      "title": "转译链的 Source Map composition",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s08"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "30224db60dc5913b32cd8c54a95fe0232be2b72db117df71e5fc42c20fad6458"
+    },
+    {
+      "id": "H138",
+      "title": "Source map 与诊断位置的 UTF-16 坐标桥接",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "95abf16c642fc47671db3041c277bfd5ee5e334ce1c5154a055f721c8d1d2b20"
+    },
+    {
+      "id": "H139",
+      "title": "增量构建图的依赖闭包失效",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s09"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "400168ff03189d0143ca4bf32541113e2bc28cf8ec77334561daa15d3124bd81"
+    },
+    {
+      "id": "H140",
+      "title": "构建缓存键的完整语义输入",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s08"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a89de29b8cd8a2f6b1fd0d4719c810e92651f9cf10a8b87b2eb4404b6abe0400"
+    },
+    {
+      "id": "H141",
+      "title": "插件顺序与同名 transform 的确定性",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s09"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6f208d69aa244fccefb77c78a9beaba5632c7a9a9518e1b7f0affce25ef8beed"
+    },
+    {
+      "id": "H142",
+      "title": "HMR 更新边界查找与失效回退",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s10"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "239ab76bac70ee4aa1ffb368c4e94c42f808291f8672bed63de3188faca0cf78"
+    },
+    {
+      "id": "H143",
+      "title": "HMR dispose data 的版本迁移",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s10"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "7a574eafb091d463087c8e54a625da8f25e57ae9e6cee3e454161992552e66bf"
+    },
+    {
+      "id": "H144",
+      "title": "HMR WebSocket 更新队列的去重与重放",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s10"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a7e0c05f06d41bfa7dd1dc08465369927a8c66fd94e369453d10a2de71546d38"
+    },
+    {
+      "id": "H145",
+      "title": "CSS HMR 的副作用清理与顺序",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s10"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f1724a87b6fc1bfd254c7124c0b2e42f78f083b2c5cfb23b29b36fd7a3c7e84b"
+    },
+    {
+      "id": "H146",
+      "title": "Watcher 事件抖动与一致快照构建",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s09"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "27d3da7b6dd6d700ec31ef4eeb32590baa16928379261a0641c716fd9b5f66c2"
+    },
+    {
+      "id": "H147",
+      "title": "构建产物 manifest 的跨 chunk 校验",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "1cf4f2e62153112d0e645bcae7c4ade78186d1316a8870c8c874f4d0ae6864a9"
+    },
+    {
+      "id": "H148",
+      "title": "插件虚拟模块的稳定身份与缓存",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s08"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "bbb8284bd06a76466608f4c0630ad19773be5c8ea4e35bc13cdccd9f65bb0123"
+    },
+    {
+      "id": "H149",
+      "title": "TypeScript 增量 Program 的版本化文件缓存",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s08"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "924250e58d10c5680bcbdd00e018c084308e55269738ac2c7944e1feb63e3bdb"
+    },
+    {
+      "id": "H150",
+      "title": "编译诊断的代码帧与 source map 回溯",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s08"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "34e2f1ed93337b00dcaaf755d0a92cb64b5bc6c8775f12fa921aebd813e0e04f"
+    },
+    {
+      "id": "H151",
+      "title": "构建输出的确定性与非确定性审计",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2ff1237b92a0569c5e6507530590b326426fb582e9bb09a7589aad8c1a869495"
+    },
+    {
+      "id": "H152",
+      "title": "编译器插件的副作用事务与失败回滚",
+      "file": "docs/coding/practice-compilers-tooling.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s09",
+        "s10"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "5bd68ee568fb138ba2d0b48042045542a75b6645d56dc5c04b9c3a00bdbb1a30"
+    },
+    {
+      "id": "H153",
+      "title": "跨 chunk 解码 UTF-8 行记录",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s12"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fe1577812d881d0e188af1f633220ba5b8b1b85503823385b3033711fd376faa"
+    },
+    {
+      "id": "H154",
+      "title": "内存阈值溢写临时文件的请求体 spooler",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13",
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9a1ba8979b2b7181e90618ff51872ddf770b1190eaf1af8da82734fdf95c0dfe"
+    },
+    {
+      "id": "H155",
+      "title": "Accept-Encoding 加权协商器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s12"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8c6d78a9c09b24af6d489fd40660470a932ee90059b659b2f50fc6394c15c6a6"
+    },
+    {
+      "id": "H156",
+      "title": "代理响应的分帧冲突判定",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s16",
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2242f32f06e6cc0c341116a0fec479009d370abee5b973cb244613cf70c66792"
+    },
+    {
+      "id": "H157",
+      "title": "Range 请求单区间计算器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6fb2797b4d02792367efd6af53b3aa2bfcd86d0b62fe16949039cc618241b84a"
+    },
+    {
+      "id": "H158",
+      "title": "条件请求 ETag 决策器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9b0c9868ae7bc701808cd5cb50cfe2cf8b672a93dad15ac0e34a7fb68e9524c7"
+    },
+    {
+      "id": "H159",
+      "title": "Writable 背压下的异步复制器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s12"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "5522beae47310990c7508be68de59415212754188132e67acda81887271a1507"
+    },
+    {
+      "id": "H160",
+      "title": "Transform 有界批量聚合",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s12"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f14944ccbdaf51abd7dfcc204d045f813cc9269951be89a2faa3478e87fbfb4e"
+    },
+    {
+      "id": "H161",
+      "title": "客户端断开时关闭数据库游标",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13",
+        "s12"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6e379cda3e403a4bd63d2ec7bad29782efe2a51982532dea559dd910b407f81b"
+    },
+    {
+      "id": "H162",
+      "title": "HTTP Server 优雅关闭协调器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6321189ef8b3a0372841b35e0016a0edba088aef314cd0ec7f46f10f4fe7d891"
+    },
+    {
+      "id": "H163",
+      "title": "SSE 心跳与慢客户端隔离",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "01876193f5702f47579c134419807cd81c090c75124c199ee12234b56e52c21b"
+    },
+    {
+      "id": "H164",
+      "title": "可取消的上游代理请求",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13",
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f8b748efeff7134d3577462588c862b6848d5de52e7d6127d9a99f471e8aed22"
+    },
+    {
+      "id": "H165",
+      "title": "无歧义的路由模板匹配器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ed508f93396432fa309299aae00c6329702826b0ec05424e0bd078ae83cdbd9c"
+    },
+    {
+      "id": "H166",
+      "title": "中间件组合与 next 双调用检测",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ce15de876c4fdf448ef9938042d0506ec42e606f18b32196e7d4cc40115c4338"
+    },
+    {
+      "id": "H167",
+      "title": "HEAD、OPTIONS 与 405 判定器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d4c7194767c8819cca148467f498d5b9e938ec65aa85f3a5f874edc6768b9e37"
+    },
+    {
+      "id": "H168",
+      "title": "headersSent 边界的统一错误响应",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2a976e10b20e9398bbd1b07982dd113e2a8da01eea21ab90a6740cef6d5bef54"
+    },
+    {
+      "id": "H169",
+      "title": "HTTP 请求超时分层策略",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c2f553c8de31bb4bc22215bbabfe064dc3efb9c6e02b9c67301985f46fefadf7"
+    },
+    {
+      "id": "H170",
+      "title": "安全的响应头白名单复制",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s16",
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "383b40b917f8dc65b89e071f49ae6db6abbd50f7b5d99032f3d726a6ada0ae47"
+    },
+    {
+      "id": "H171",
+      "title": "Expect 头的早期准入",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13",
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "753edb85689b12d93bf679abe5b7f5375e9a606da500678ceb9a11ffe744062e"
+    },
+    {
+      "id": "H172",
+      "title": "请求 ID 异步上下文关联",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a207a2c2a6c4ade0c55cdbad30ca19f29e702d38f558a2b864b68f7daa176a5b"
+    },
+    {
+      "id": "H173",
+      "title": "multipart/form-data 境界扫描器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s12"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2fe6d26b8b31be166589d9f751171c129f8ec3b642e33de8047a446927901c8f"
+    },
+    {
+      "id": "H174",
+      "title": "multipart 元数据先行校验导入",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s12",
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f0d4596833c090eb6ae3f954a3090ec435b98a065e6ad3568ec55fbacf8b7db8"
+    },
+    {
+      "id": "H175",
+      "title": "GraphQL BFF 字段授权与批取",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9d395a45c748db487039d72614a5b17b97977549b18cf57dc95c21e043c185e0"
+    },
+    {
+      "id": "H176",
+      "title": "BFF 聚合总 deadline 与部分结果",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13",
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a1a2a00715a778306a39e1f5d55e20462e7fa6dbdb1d478dad900e76702c61cc"
+    },
+    {
+      "id": "H177",
+      "title": "Webhook 原始 body 签名接收器",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "585109e810f7e7247dd6597916d7f0ea4ee2d15d87cf7b536d151fd46617fc54"
+    },
+    {
+      "id": "H178",
+      "title": "HTTP 适配器协议验收桩",
+      "file": "docs/coding/practice-node-http.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s13",
+        "s12"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6297f67736ae0d95aba0c642d43c01a47ab21c9bd18080007416dc7cdf51e3ad"
+    },
+    {
+      "id": "H179",
+      "title": "单进程教学版乐观版本 CAS",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "implemented_model",
+      "contract_sha256": "4ddeb57741ad4f02232c6fa72f8ad1d701b58998cd440d81c1a540d9b9d415df"
+    },
+    {
+      "id": "H180",
+      "title": "稳定 keyset 分页与复合游标",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "338e0de5c5aa6f23cf65c8fe15e63a3a9b87c8c0e4118acd38f2f652bdf1d433"
+    },
+    {
+      "id": "H181",
+      "title": "复合索引列顺序判定",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3a39fd4b5492b1cb9c1ed196e70473409de63622d87612eae18b7dbb42b258a1"
+    },
+    {
+      "id": "H182",
+      "title": "覆盖索引与可见性边界",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15",
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a14092c455a942cdb198fbdf22b40f69058e39c38f8c463146ba452a949c6b83"
+    },
+    {
+      "id": "H183",
+      "title": "部分索引与稳定谓词",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "b42b92c6733f3be26e4c4665afabb10016de0bdaf331ad433ec4c0577562bb3d"
+    },
+    {
+      "id": "H184",
+      "title": "NULL 排序与游标完整性",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e7e9a61c57567a4fa63025598d4c025392047f707f4dcd71643f7f52aaf7a2d3"
+    },
+    {
+      "id": "H185",
+      "title": "统计分页与 COUNT 一致性合同",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14",
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4531b82349586bd235073f83b30879acd756bf985d46a903fa0f910efd8ca355"
+    },
+    {
+      "id": "H186",
+      "title": "可判定的索引计划验收器",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "52a9699027a7bda4c912302bdd2ca4e4f29a7b291e0a97149d411aa2e1f86816"
+    },
+    {
+      "id": "H187",
+      "title": "条件 UPDATE 的库存扣减",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e17c49acd4d477ca44b36a02137a414debaaf40565ea300fd1a3892e4620fe0e"
+    },
+    {
+      "id": "H188",
+      "title": "可重复读下的快照更新冲突",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "cbb4b175c67200a96117399169336168430d714cd6c90f444ccff8e4c15f8b9b"
+    },
+    {
+      "id": "H189",
+      "title": "写偏差与约束建模",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ab2e0127ac70816701c04a33a16b6a436191c9aca88445c20fd9513ab5052b9e"
+    },
+    {
+      "id": "H190",
+      "title": "SERIALIZABLE 事务重试包装",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "596027793ebf0292d7839252fb2943982c7707c5b685530cd69cea0eb74feb11"
+    },
+    {
+      "id": "H191",
+      "title": "固定顺序行锁与死锁定位",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "1fd7f3cc09a11383627799769fc8bc293c2176ab1568844e14546aa387c5b373"
+    },
+    {
+      "id": "H192",
+      "title": "SKIP LOCKED 数据库任务领取",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "df6879baa737dc47e8dff75434a6ee5e0fd62f373e3457104a627112920057be"
+    },
+    {
+      "id": "H193",
+      "title": "乐观锁 SQL 版本更新",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a3ba330acb0f79309bef92a80167cefd010c300beb9901940c53ce8a533c53a1"
+    },
+    {
+      "id": "H194",
+      "title": "UPSERT 唯一冲突裁决",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "1fb1270af1ef4d3b9337bf81577208f541fa17abdf5a5a2e61dfab318d1fd827"
+    },
+    {
+      "id": "H195",
+      "title": "部分唯一索引的活跃记录约束",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ca823948a9ce2cca476a8a3e57bf162987ba812e37161f705efa38331eeb80fd"
+    },
+    {
+      "id": "H196",
+      "title": "数据库约束与多租户复合键",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fe86830cb5b08185ada68dfa7d994b112f85f336b802dea3eb5042fcabec59da"
+    },
+    {
+      "id": "H197",
+      "title": "DEFERRABLE 唯一约束下的排序号交换",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4d9733655fc24d85be08f9319dda4f05c4f6e523ccedb1e31eb092ede610398a"
+    },
+    {
+      "id": "H198",
+      "title": "Transactional outbox 原子写入",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "774fa7645e1c7733c09ea7b4dbae530298ade7de81ed8e3b19a63e8f6d47b235"
+    },
+    {
+      "id": "H199",
+      "title": "Inbox 去重与业务写同事务",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "7ee2ceb0c6482a900cd88fc5d316ec1f0b4852c382cacc0f5dd607d1c07930fd"
+    },
+    {
+      "id": "H200",
+      "title": "可恢复的 expand-contract 字段迁移",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "00628d200e6e65c17a99bdd491d1cdc13e712682f64f79fa52d8a5ea7407b9fe"
+    },
+    {
+      "id": "H201",
+      "title": "大表索引迁移与锁风险计划",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s15"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0f9bca4b864a56463be7ae9638be88beacb9dbe8368224ae063fa75549aab89c"
+    },
+    {
+      "id": "H202",
+      "title": "事务连接亲和性包装器",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "18b9d0c998bd69b56f9b3a7eab1e18a9068420099f9dfd267483758672bc5184"
+    },
+    {
+      "id": "H203",
+      "title": "连接池排队超时与泄漏诊断",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "35e1316d826086eafe2822e1157a1626d68f7ecd707379fe73cb931ba29f0280"
+    },
+    {
+      "id": "H204",
+      "title": "Savepoint 局部失败与幂等批写",
+      "file": "docs/coding/practice-databases-transactions.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4c43bf5f66caea482bd2b4b765a00a98b5cbeefb0a99d2e71538fe6d6360652c"
+    },
+    {
+      "id": "H205",
+      "title": "Cookie 会话属性合同",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "09983f7c847fea40527d07427c549341aa1f82efa2c5a3f419808d65167d2b66"
+    },
+    {
+      "id": "H206",
+      "title": "Cookie 会话的 CSRF 双重提交校验",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18",
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "26404cf1246401ac27e54e948edabf3ee3f5722d6f7b59eb66a20b25d20953e7"
+    },
+    {
+      "id": "H207",
+      "title": "CORS 凭据响应的精确 Origin 决策",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4e2fd28f7faa553904912b1d902d0e65bfe40415974c1fb152164b16c8296e25"
+    },
+    {
+      "id": "H208",
+      "title": "OAuth 授权码回调 state 与 PKCE 绑定",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8946ef4f2f28191708cde00301efd004f6edbcd5935e0ce2332b67ed6de4a393"
+    },
+    {
+      "id": "H209",
+      "title": "OAuth redirect_uri 固定注册表",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "638b4378632a2477fca517710e84ff326bbcb37cb67891f2a4e0fcf448de3689"
+    },
+    {
+      "id": "H210",
+      "title": "JWT 声明验证器",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ab50bbccd639ca4d6a67c9220620881c58b7736053310ed46e18bde7facfdf23"
+    },
+    {
+      "id": "H211",
+      "title": "JWKS key id 解析与缓存刷新",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "90fec1c4f641ca0ed1e00081d95d34d7402f4a409a6aa57d0939e1c727968aa5"
+    },
+    {
+      "id": "H212",
+      "title": "JWKS 轮换与未知 kid 洪泛保护",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6fe2c6eff1c18fd92005f7a42daace14d15b75691f2e7e515928ace6a6f15a58"
+    },
+    {
+      "id": "H213",
+      "title": "Refresh token 轮换与重放撤销",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2fa4eecaf9f84698214f8dce67b4ed3a05562549de932aeab9a721ed901d5655"
+    },
+    {
+      "id": "H214",
+      "title": "会话固定攻击后的登录轮换",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "bb5f5bd3baac54a8cb28203e4d0318ef8d21f633b00042e68da4c834f2e3e449"
+    },
+    {
+      "id": "H215",
+      "title": "Logout 的服务端失效语义",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4bb044b70dec3c31574c1b3531d147a4a860b89bd608405de55e672c3ea212ce"
+    },
+    {
+      "id": "H216",
+      "title": "对象级授权查询",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "05d95de2a769aac62a78f375dc61c3899d16d56c699ab1c589f11c2636599106"
+    },
+    {
+      "id": "H217",
+      "title": "字段级写授权与 mass assignment 防护",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "554aed24923e3a7ef3fd63f7a3d31db64a570ec983be8c244dd11a307fd353a8"
+    },
+    {
+      "id": "H218",
+      "title": "多租户复合键与跨租户写拒绝",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "af1c6a1e68ab52e06a13338d736b18c3d1072cc66441dde4a3b3878f35318fd8"
+    },
+    {
+      "id": "H219",
+      "title": "Row-Level Security 事务上下文",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "b9e5b29c9883c162a44079c0b02347c0dd36f2640baa96d6f2f5e29ee8bb1fd9"
+    },
+    {
+      "id": "H220",
+      "title": "RBAC 与资源属性组合判定",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "45b037e0346295aad686bf79da541bd00286a361b7971151f5c377066e44c240"
+    },
+    {
+      "id": "H221",
+      "title": "权限撤销与长请求的一致性",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "5153e4e59310ce570156642781ff14d8468e71cc34c47a8a9599c26f97153cf1"
+    },
+    {
+      "id": "H222",
+      "title": "授权审计事件的最小披露",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "41dd3d65464759b80899b2ea7c5143a0bdff17986cd469c6ee10f99d2e4fc105"
+    },
+    {
+      "id": "H223",
+      "title": "URL 抓取的 SSRF 目标校验",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ae6b098dacb607fc22393bb8febd442f72484c5683599804546fe386f3481cf2"
+    },
+    {
+      "id": "H224",
+      "title": "SSRF 重定向逐跳复验",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e4cb8ec5a79c7e5dc9f4d76bc09b8b2ba7601f2735188395a360e55cbef65b42"
+    },
+    {
+      "id": "H225",
+      "title": "文件系统路径 containment",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a30e4a7c29828db7a7f12a1a66f7bd744f018f67b549e6993cc04c37f3b02c5d"
+    },
+    {
+      "id": "H226",
+      "title": "Zip 解压的路径穿越拒绝",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "60e017f043e953aa985e832fa6bd4a0860ef421e1487b8d1901f2d54c59d503a"
+    },
+    {
+      "id": "H227",
+      "title": "反序列化对象键污染防线",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "1ab6cec765446d7cbb2958c122ce49d0ccf3bd95dae1accdf8065ab16a2e8ffd"
+    },
+    {
+      "id": "H228",
+      "title": "JWT kid 到密钥映射的路径边界",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17",
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6b13a366b376234d8b55fdec7a7a5af278705f76d929df9d714f1317720e12ff"
+    },
+    {
+      "id": "H229",
+      "title": "登录失败速率限制的原子键设计",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f29ea8e859408500deb21a5b8edc3ce26b8f3226fd2a9e120c4bc76f26347080"
+    },
+    {
+      "id": "H230",
+      "title": "安全重定向与登录后返回地址",
+      "file": "docs/coding/practice-auth-security.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s17",
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2690327a059a0db7e13c4cc8320414aa252a2277ee516d36b7ebbb5a90c35887"
+    },
+    {
+      "id": "H231",
+      "title": "持久化幂等键与响应重放",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d66272c2e1137094da178f995b682c1789002e28ffc15cc6abfaab9f89802389"
+    },
+    {
+      "id": "H232",
+      "title": "Webhook 时间窗与事件重放防护",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s16"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "29b31b59b71d7c07a910d5e3dc64e8f8fbf0c2ae021743d690aba969b5b19491"
+    },
+    {
+      "id": "H233",
+      "title": "Fencing token 防止租约过期者写入",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "032850146efdc273d25012a4164978710c7b514240cb6d2a227fe6b891a76d9a"
+    },
+    {
+      "id": "H234",
+      "title": "租约续期与所有权代次",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d12867335b21c26b7d3a4d483b1e09c6d8f31387eb58908b5ba970f0099e4625"
+    },
+    {
+      "id": "H235",
+      "title": "Redis Streams 消费组的 pending 恢复",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s19"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c70843f80850baabd4c0f08395a4f462944f5bde9b0ac68a69a80cdf2cf307ba"
+    },
+    {
+      "id": "H236",
+      "title": "持久队列的领取、租约与确认",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "44c02a60c6c05851fc4ea386a13f8e45b671b0c47afad113d7ca488c3f9dec36"
+    },
+    {
+      "id": "H237",
+      "title": "延迟队列与死信转移原子性",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s19"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "5122eee77377877d5732ee4221c3789697789611980cd58fe8959560e689cfb9"
+    },
+    {
+      "id": "H238",
+      "title": "Saga 订单状态机与补偿",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "00237c88f63ce5acc4826dadbada965bcc52284b3db1f9e2e2c2611bcc595932"
+    },
+    {
+      "id": "H239",
+      "title": "Saga 超时与迟到成功竞态",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c22cf40dbcbb6fb3e14dd327481b093cf3b08c30dcc9d5e5347c132fcb69d42a"
+    },
+    {
+      "id": "H240",
+      "title": "Outbox relay 崩溃恢复与顺序游标",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a15dfab95a2bc5768118efa565bc3d31945a19e5052cf55ee3ec5044389ab036"
+    },
+    {
+      "id": "H241",
+      "title": "Webhook 单调版本更新器",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "044fd97369a147c33a5abd6d25b6cd5829627dabf7d9e72018b4988c02416d9c"
+    },
+    {
+      "id": "H242",
+      "title": "事件序列缺口缓冲与补拉",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "bdb832a2ac6ce6ae8278d729ad8c58961805f55114c4d00fe8a7133bb03bcceb"
+    },
+    {
+      "id": "H243",
+      "title": "G-Counter 单调递增合并",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a773735e061d5688fab590b37ec9c387abaa2cdb1ef81f9a562dc2fb6a66d7b6"
+    },
+    {
+      "id": "H244",
+      "title": "PN-Counter 的增减分量",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "16437fd31eb2ce10ff75902e31f1ef012e706750e05bf8cb74838983b2f0e94d"
+    },
+    {
+      "id": "H245",
+      "title": "OR-Set 并发 add/remove",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "162a643b89878356d2e26d3a33f5b30b7cee8570ef0bb3509555673b12485294"
+    },
+    {
+      "id": "H246",
+      "title": "Yjs 更新的重复与乱序应用",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a1d94ac6f2f1e882a425ce85b127abd5be772fc6848c3a98e1b4da4ce8e5e5ad"
+    },
+    {
+      "id": "H247",
+      "title": "离线操作队列与确认游标",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0a94bd874245df08e5063f6dd93a67e55c765746a6d020ab04cac882badefd56"
+    },
+    {
+      "id": "H248",
+      "title": "Snapshot 加增量日志恢复",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "32a8d61dadc413eeb799d043d36395f085edde594f29572b896d706de65ee9f8"
+    },
+    {
+      "id": "H249",
+      "title": "Vector clock 因果关系比较",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "88af0c00a469155589fd9c89b074dc55434624b849f43b108b07c5739a1d4ef2"
+    },
+    {
+      "id": "H250",
+      "title": "Last-Write-Wins 寄存器的确定打破平局",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6eb9a2c3acfaa16b6c844b21e14807c15c5fc1e0aa03b2156b6131f33cb42d6b"
+    },
+    {
+      "id": "H251",
+      "title": "协作文本更新的权限与合并分层",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20",
+        "s18"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2818a674ad43467a0dec565110e97b7400fe95f04e9d844abd9f2e299f721fa6"
+    },
+    {
+      "id": "H252",
+      "title": "服务端同步游标与快照分页",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "46115903ed96a93fb0166993c6d39b6d7cfc53d53c12529e3c1c0aa6f78a6f61"
+    },
+    {
+      "id": "H253",
+      "title": "Leader 切换后的持久写入 fencing",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fc5767e7a96ee6060f308126b12d915f3c0ce60a52a56160907b4d8ea6fc199b"
+    },
+    {
+      "id": "H254",
+      "title": "权威时钟过期与 worker 本地停工判断",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s14"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8666df73bd50932a89cd1540239e1279fc9d3d73868c0a0f72b5b10478eb4831"
+    },
+    {
+      "id": "H255",
+      "title": "Poison message 隔离与可审计重放",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s19"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "55d16cbb80abbcb6fc00277500d762b3c0bf4204d54078a1ffb0645b0c6e057b"
+    },
+    {
+      "id": "H256",
+      "title": "断线重连后的同步恢复裁决",
+      "file": "docs/coding/practice-distributed-sync.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s20"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2b4d0c2ba2cf07b8f7fb0adcfc2799534f30899c56a0c1cc564dbb135468c896"
+    },
+    {
+      "id": "H257",
+      "title": "带代价编辑距离脚本",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "df1b6f1ee50b4e3415dd15e181c46a4d13928b6a330d3018a71bc364cf0ff25c"
+    },
+    {
+      "id": "H258",
+      "title": "Myers 插删差分波前",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "57fa15ef8a1c1e160b2b6b17c1ccddede0b48abfc2c41d0c8529e2b499cd8ec2"
+    },
+    {
+      "id": "H259",
+      "title": "多模式 Aho–Corasick 扫描",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8987abec40567467f07c899be8fb49144e5c2cfc579ca0ad6dc32618658f3814"
+    },
+    {
+      "id": "H260",
+      "title": "过滤后的稳定 Top-K",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e18233845a987f3b375a4e928e5b806b4cd87875cd90abbe648ef29b676d3cde"
+    },
+    {
+      "id": "H261",
+      "title": "只缩窄的时间窗聚合器",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "5348e17f491ec2e7a59f6286105ba56bc130682e08682a153b38f43c3a4680db"
+    },
+    {
+      "id": "H262",
+      "title": "支持合法删除的区间覆盖长度树",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3e31823ef2887375aa5f51b582f2c7f1fd436d2d54fd48ce8a7f3aed09c8cfd2"
+    },
+    {
+      "id": "H263",
+      "title": "区间最小值与条件定位",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9a678accbcc0d64667cae44a89f06a95742b9f25320f456d7c7c495b6c2cdf38"
+    },
+    {
+      "id": "H264",
+      "title": "静态区间 stabbing 索引",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "57d06c513ad122d0ddf71cb52c2896d215eded09a7263d204e5aa6fc4bf8788f"
+    },
+    {
+      "id": "H265",
+      "title": "含负值的树根叶路径和",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "76dacb5d1e75cc2324c9a5a97d13589116ab9bfe51a4e5f52dbafae9c6c6a39f"
+    },
+    {
+      "id": "H266",
+      "title": "二进制提升 LCA 查询器",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "5102573918454bb4379daafc6835bcf619a13045adcdad8367a5d9133aab8be6"
+    },
+    {
+      "id": "H267",
+      "title": "有权图确定性 Dijkstra",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "bf0043c284e6ac3dc618976f9b3d73d6f0923cd7f955e9f515cb51d23f9a2b23"
+    },
+    {
+      "id": "H268",
+      "title": "Bellman–Ford 负环影响集合",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "79714a67943f4a589d08828ab1f34e2690cb584b1cdfc571fcf9c687b5a80098"
+    },
+    {
+      "id": "H269",
+      "title": "DAG 最长关键链重建",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "83ab1f4ecc2a4e385ba89a3fe678355eba9bf23521d1eadc9b5d1e425fd205bc"
+    },
+    {
+      "id": "H270",
+      "title": "依赖边增量环检测",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9b8d7f78c2305de2593ad5a1efab2627ad962d2050a48e2251358aaede04de52"
+    },
+    {
+      "id": "H271",
+      "title": "Floyd–Warshall 三态全源距离",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "44f74b990e56251c916a8f950caec2d9a7dc6de440c75a0becbae65cdc1ae63c"
+    },
+    {
+      "id": "H272",
+      "title": "Unicode Trie 删除与剪枝",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "21965a6540dc8e8990da170022d1964b75ea4c58ca81cdd49fbe9d96e363d1ea"
+    },
+    {
+      "id": "H273",
+      "title": "二维前缀和矩形索引",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8ffcfbaf8289cc02390f82f8a3dbcde6a33ae6df54368bdd37a6aa8b995db709"
+    },
+    {
+      "id": "H274",
+      "title": "稀疏坐标二维 Fenwick",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "062f714e7367bad926d47aa3ecbef710cbbe90d036ace4f6a5c75ff26c9c2e16"
+    },
+    {
+      "id": "H275",
+      "title": "LRU-K 缓存淘汰器",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s30",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c6feb4cc83b13acb218fe79e08ba6a6d1b973b7f1d8586a64c2f5fed05446b99"
+    },
+    {
+      "id": "H276",
+      "title": "带周期衰减的 LFU 缓存",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s30",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "06e5949250bea78b27632bbf65b7c5e661aee39d5ed238a95290acf85d0ddc6f"
+    },
+    {
+      "id": "H277",
+      "title": "Johnson 稀疏图全源最短路",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s30"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "34afbacee1298fd27454f59c8835a4bded3ed668f3be8a70a353e891921e104e"
+    },
+    {
+      "id": "H278",
+      "title": "B+ 树叶链与范围查询",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s30",
+        "s29"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6dd999c8d6162883657dd9c9624708ff4efa378bd5dcff44f7168d9461717bbc"
+    },
+    {
+      "id": "H279",
+      "title": "倒排索引增量删除",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s30",
+        "s29"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "740d76336a7ed6032a0c6532ab8085349281426a96f64a191edeabef45d047b6"
+    },
+    {
+      "id": "H280",
+      "title": "多字段复合游标索引",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s30",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "1b775e7df17280e14967e944d2b5fa0ed619d90539c6a588e9d6f61549858c2d"
+    },
+    {
+      "id": "H281",
+      "title": "增量维护拓扑顺序",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "eb3bb072435e04b19f5ec67528136aa9cfa0e649b3dc92bce683db226c8e5dae"
+    },
+    {
+      "id": "H282",
+      "title": "稳定句柄双向链表",
+      "file": "docs/coding/practice-algorithms-structures.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s29",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d66ad4ff894a544e9f96210295f671ece6b7eb081e984740096dbe2a132ebded"
+    },
+    {
+      "id": "H283",
+      "title": "长度前缀二进制增量解码器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s25",
+        "s26"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "implemented_model",
+      "contract_sha256": "055dda5399edb304e8d02f05dec8c5f273ce5dfdc61835ca435cd99a41279638"
+    },
+    {
+      "id": "H284",
+      "title": "分块 UTF-8 严格解码器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s25",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "1e3847f65e22293bd5c0f1a370ffad5b37215acfed24b4cfa2f7a2cc86e4ce9b"
+    },
+    {
+      "id": "H285",
+      "title": "可分块 UTF-8 编码器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s25",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9dd710706bc7e144a5ad5a05879dc352411a4e5f8c2272bb6f0c5737777b152e"
+    },
+    {
+      "id": "H286",
+      "title": "有深度与字节预算的 JSON SAX tokenizer",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6b92764ac16cd48d8f393536cb210cd1b45643fb6e96aa101e69acd551d2a217"
+    },
+    {
+      "id": "H287",
+      "title": "RFC 风格 CSV 状态机",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s25",
+        "s28"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "bebeafa6091218f4ae5c5d35d6042a537e4618d86504d50c40e53dd4f421f1e6"
+    },
+    {
+      "id": "H288",
+      "title": "并发文本编辑操作位置变换",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s29"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "248cbf75f3c2bfb456f70f450eb239d8bc03f7f47147e9e02ced4a3c973b68af"
+    },
+    {
+      "id": "H289",
+      "title": "HTTP 请求行与头部边界解析",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s28",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "c26a02ad1a9a9e0c553e00b0179f466d685c081cf4b3fd6cb3922edba36bd95e"
+    },
+    {
+      "id": "H290",
+      "title": "Protocol Buffers wire 子集解码器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s32",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "33ca4e566bec179707a56ab298c5dce0fd390e84607961772f7f43d8613ebad0"
+    },
+    {
+      "id": "H291",
+      "title": "HTTP chunked body 解码器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s25",
+        "s28"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "cfe08a7e3332d132d0a1052049a6ef6c9f93a298aa54b9139899543d77558861"
+    },
+    {
+      "id": "H292",
+      "title": "SSE 事件块解析与重连游标",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s28",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ef67c485df53e9b9e671a9d16b56954c63ff7cf80cf9a62fcb3d52125f52581f"
+    },
+    {
+      "id": "H293",
+      "title": "WebSocket frame 长度与掩码",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s26",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8927c01861aa5ea64f8e4af453290da8d86e6da03c5487364188029cba566665"
+    },
+    {
+      "id": "H294",
+      "title": "WebSocket fragment 消息重组",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s26",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6dfaf4e862d42b8f1152166c01afdf8876c6e3d743496a962c914cf4b3fe39cd"
+    },
+    {
+      "id": "H295",
+      "title": "HTTP Range 多段响应解析",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s28",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "59162b03e9eed460e40b44e55256377374185fb9ac3647d0cee174e31cef75f1"
+    },
+    {
+      "id": "H296",
+      "title": "RFC 6570 URI Template 子集展开",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s33",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f3b817964feff9d2e70d69645777d3ae0c2f40392da3e1fd582728fd37d4ba38"
+    },
+    {
+      "id": "H297",
+      "title": "URL 百分号编码的增量校验器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "237d2ac8e8d628f178c408e49bbd9169f0d09dc8d89b4727a3ddaac5cd793bd5"
+    },
+    {
+      "id": "H298",
+      "title": "结构化日志行解析器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s28"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "51f0c87d578bdddcedfd67298711855db94c0ca821c55c63658283416e0f3a3d"
+    },
+    {
+      "id": "H299",
+      "title": "多行堆栈 trace 分组器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s25",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "edd3cee48f347d67ee00b2b2768f66fae9a288a4a91c8737da126fb01324a133"
+    },
+    {
+      "id": "H300",
+      "title": "二进制 TLV 扩展字段解析",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s26",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8675deea732b9c53498b6076950735758fdf84f34654a98470bea2d486b075c7"
+    },
+    {
+      "id": "H301",
+      "title": "多字节 varint 流式解码器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s26"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d7ad425e819a894b7ff98d677d3c7d4fa4760eb6a82734b622165c4370798f49"
+    },
+    {
+      "id": "H302",
+      "title": "位字段消息头校验器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s26"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "653278e7ddf3a3e7380c25feb7da42a3e7d4bd92625530aca82368ffb97dc7e5"
+    },
+    {
+      "id": "H303",
+      "title": "增量 Base64 解码器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4f0eceb17067c1e5d246b421d841525caac30a1c6856763f59b9d4ea63be12a5"
+    },
+    {
+      "id": "H304",
+      "title": "增量 SHA-256 消息分块",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3101c27a6f72c59e3f55f6ed1cc9a1622ddfb33f780256e7309ed39cae5cd4eb"
+    },
+    {
+      "id": "H305",
+      "title": "WebSocket 握手头字段校验",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s26",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "4cf74fe3a039e5f6709ccfe16807670a7c0d5d7c7529de47431b8d5ebaf34d68"
+    },
+    {
+      "id": "H306",
+      "title": "SSE 字段序列化器与注入防护",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s28",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3c9b9290aab70e41b7e070facae99d415a899bd8caf2f14522918dc90be8140c"
+    },
+    {
+      "id": "H307",
+      "title": "RFC 8785 JSON 确定性规范化",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s34",
+        "s31"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "59f0dc1887bbfabf1d211fcdcf5cc6b3558cd35edbe117ee87b2490ab2a4170c"
+    },
+    {
+      "id": "H308",
+      "title": "ETag 条件请求解析器",
+      "file": "docs/coding/practice-parsers-protocols.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s28",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8f603059137c294c13a589432dcfc6c02e6650e78de6a9f125e7ccc31856fd47"
+    },
+    {
+      "id": "H309",
+      "title": "WebGPU 动态 vertex buffer 子分配器",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0836f8daffc5f69179970a51e4c5aab0b54ed638ec9c5c0c3b957a03298046d9"
+    },
+    {
+      "id": "H310",
+      "title": "多帧安全的 GPU ring allocator",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "9074a5e9870175660c09c7564730282f4f2fc0ae248bc3db78d6e3d7e6688251"
+    },
+    {
+      "id": "H311",
+      "title": "按预算调度纹理上传",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s22"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2fb10dcc22b4ec252d4d52a47f2179a9e6bedc4d9433637cd3e24a0a6b8522d3"
+    },
+    {
+      "id": "H312",
+      "title": "Bind group 布局兼容性缓存",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f556f9640575a1f250a4c9427f4aa144c54a0c4c8074cc192da9f773a5ee045f"
+    },
+    {
+      "id": "H313",
+      "title": "GPU 异步拾取请求序列化",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fac17aeaa3fdce11c6712bb44133091dc27b40998511dac738424d72ea4382eb"
+    },
+    {
+      "id": "H314",
+      "title": "GPU 错误作用域栈模型",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6e0a6878d84491d8aeb2fd225e0bf1bfe53817e54cd691c84686996f1498def5"
+    },
+    {
+      "id": "H315",
+      "title": "分层材质纹理的 mip 依赖图",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s22"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "655d6681a0654e94a921ab46b24da7a630c6725a6d5848308e9f76efb5d65656"
+    },
+    {
+      "id": "H316",
+      "title": "Indirect draw 参数缓冲校验",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2766f30717a263d3f0a1dccd727b67f83d7e8806a699afcf3b973452b9f36793"
+    },
+    {
+      "id": "H317",
+      "title": "动态实例批次分桶器",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s22"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "81f8d4ffbab355c7ec426d99124cf42ec5a3821bf8d44e1c1646837a0ca628a3"
+    },
+    {
+      "id": "H318",
+      "title": "动态 AABB 树空间索引",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s22",
+        "s29"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "df220c8c7a559d1ac49cc03c344bdecccbb7ed69cd2b4e188f56def0bd92974a"
+    },
+    {
+      "id": "H319",
+      "title": "BVH 射线最近命中查询",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s22",
+        "s29"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d79162d672da8860c6294ce68771547a8c6584aac4931a85a3dbed8ce6edc7bf"
+    },
+    {
+      "id": "H320",
+      "title": "视锥体层级剔除器",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s22",
+        "s21"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2e4c78bb6c89d31e256883fffa3bcc3067d5af555c08a97aaed31be22d6052af"
+    },
+    {
+      "id": "H321",
+      "title": "屏幕空间瓦片光源分桶",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s22"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "eb17d8129af5f3e1f47f5c25ec08547bfc9b5b7511f04433d2e781e4e2114f06"
+    },
+    {
+      "id": "H322",
+      "title": "glTF accessor 交错步长解包",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s22",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f1336385b86c196394d0e8c293600ac109ce84bca19b4bed1112cf7ac807c40d"
+    },
+    {
+      "id": "H323",
+      "title": "glTF sparse accessor 合并器",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s22",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ea1ba0f81558f2db90935b9695df95dc912032ecac8a33eebc0e85b4e0a4822b"
+    },
+    {
+      "id": "H324",
+      "title": "glTF scene 节点世界矩阵",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s22",
+        "s21"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0fff29b91ea413bb56be9ad89d37656faaadc8abfe5610fbc5eddd484fecacc7"
+    },
+    {
+      "id": "H325",
+      "title": "纹理块尺寸与行对齐规划",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s22"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "05805f6a53c824fa7dc4924f1af47ddec3cc9c362a95bdca22fb154d5f586ab8"
+    },
+    {
+      "id": "H326",
+      "title": "GPU 资源引用计数释放队列",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s21",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ab84d1c716b5f0dfd2996b57a7266d1945a6a8d56d273f3a7225664b084bfb51"
+    },
+    {
+      "id": "H327",
+      "title": "Watermark 驱动的帧呈现重排模型",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s23",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3036c4511711b5bf6f2cefdce4031077c1bb527c780923f1c7a60dc0f9d23d9d"
+    },
+    {
+      "id": "H328",
+      "title": "音视频主时钟同步器",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s23",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "978f23c3d003ae1ad6289d2c5e0888ecee479cda6b0aa6c80c0622f5d5cd5ac3"
+    },
+    {
+      "id": "H329",
+      "title": "WebCodecs VideoFrame 所有权队列",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s23",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "dae8def86cc61842b4bc922541f8f71def79390368d608edf5bc062e52da5668"
+    },
+    {
+      "id": "H330",
+      "title": "解码队列背压阈值控制器",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s23",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "f80c98c7b905b82015056e2afdc7740ad4a1a129ce5a0d1c8507336761f78968"
+    },
+    {
+      "id": "H331",
+      "title": "WebCodecs 配置探测缓存",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s23",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "89b015101953b0434a62f271e0abbe70f9b4c6f3f58396217a8c76536211e760"
+    },
+    {
+      "id": "H332",
+      "title": "视频片段时间范围裁剪器",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s23",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fdbeeafd56861531c699b24513fe97cb78296bcde523c2d4eea9f8baf8529111"
+    },
+    {
+      "id": "H333",
+      "title": "简单凹多边形耳切三角剖分",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s22",
+        "s29"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "0c20482fab70f8285bfb59fbaa09c2b1ec31cc63eb11ea366a9eb4d8c73f188b"
+    },
+    {
+      "id": "H334",
+      "title": "Canvas 导出像素的有界流水线",
+      "file": "docs/coding/practice-graphics-media.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s28",
+        "s23"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "995e148d07fd33fe0415a6abfa3b1445a3c29729e8c8522cdbdb7400b349dd90"
+    },
+    {
+      "id": "H335",
+      "title": "带 generation 的槽位句柄池",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s24"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "implemented_model",
+      "contract_sha256": "638d29802233d05daea41d811ad8c98f37108b3518717a5253ff6ef3c9cd1623"
+    },
+    {
+      "id": "H336",
+      "title": "对齐 arena 与嵌套 checkpoint",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d84dcb97e3f855351af8c32583525aac270c522cf44f2457e34ba06edcc78231"
+    },
+    {
+      "id": "H337",
+      "title": "固定大小对象池与析构队列",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s24"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "af5b4c5229c04dbd5c52507009147ccb5df43020f003e3030f3fc2d07e80de62"
+    },
+    {
+      "id": "H338",
+      "title": "移动堆压缩与 forwarding 指针修复",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s24"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "af799e3b4e6ce62c9cae97c4d373c76b2e3cdcbdfe006750a95ec4f6975559d4"
+    },
+    {
+      "id": "H339",
+      "title": "TypedArray 视图生命周期借用检查器",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "78aecfce624e6395ec741df057716b77cd171320f4ebc4988b7bb348b7cba353"
+    },
+    {
+      "id": "H340",
+      "title": "Buffer slab 分配与外部引用计数",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "2193d4b81dc9096df473c5f666a6030d5c92240b1113f786a2575f146813b584"
+    },
+    {
+      "id": "H341",
+      "title": "资源所有权转移审计器",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s27",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "23f4d037addfe1f98191ee4c96e2be301b41242934bd2efa3d4a542a0433600d"
+    },
+    {
+      "id": "H342",
+      "title": "带序号的有界 Worker mailbox",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s27",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6627acaae289bd650134b814e89dbcfc999ccc7e20dcaa2d51848167693cd6e1"
+    },
+    {
+      "id": "H343",
+      "title": "SharedArrayBuffer SPSC 环形队列",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d965502e645b6025212308eb6afd4b67b487bab2de7678a6403c15f6b50c0d1e"
+    },
+    {
+      "id": "H344",
+      "title": "Atomics.wait 序列号通知模型",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ce219b84b23c4f3ae2315ab2912785fa4605ba0e079fbee82f3b3a72017ec6e8"
+    },
+    {
+      "id": "H345",
+      "title": "原子门闩与超时取消",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s27",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "03e4ea7f1d9c314c240687e4fcca1bca02932c5e87babdc67f58fceec1aa55c9"
+    },
+    {
+      "id": "H346",
+      "title": "多生产者 sequence-slot 队列模型",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6a135696e37165264881db875fd824e60edd536d15d796754500e7a3814c09db"
+    },
+    {
+      "id": "H347",
+      "title": "Worker 邮箱确认与重放窗口",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s27",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "b04928cff9282663d272749ba2c05cc11dd70b711e20e0539d3236e798390e88"
+    },
+    {
+      "id": "H348",
+      "title": "Wasm linear memory bump allocator",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "8b30ab8e149d125775af0a03e8e6702e4eb675e688e8113ca5a900c20f3f30e3"
+    },
+    {
+      "id": "H349",
+      "title": "Wasm 导出函数 ABI 参数打包器",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "d349dc6294564ef477b03cfcc80a5aa2fe0349e766b12e048343777caddf19f3"
+    },
+    {
+      "id": "H350",
+      "title": "Wasm 句柄表跨边界代理",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "80bad25dbeb08361ef8c55f3b3c01e17f6272abaa7b5b21ddbb36414e51b2dfd"
+    },
+    {
+      "id": "H351",
+      "title": "Wasm 指针与长度的边界验证器",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "fac5d0bb3e1afc9fd267889caf26ee4d879d2665b6746238e7607494654cff6e"
+    },
+    {
+      "id": "H352",
+      "title": "Wasm 多值结果与错误 ABI",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s25"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "e39a5f394b17d5cc85679ebce537da69be14e7c94ae90b3860f4428a526d86b3"
+    },
+    {
+      "id": "H353",
+      "title": "Wasm memory.grow 视图刷新封装",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "3f959ead86cd431beb20b5b3b6dfa5ffee2839fa23527f3b6fc5ae1d0c5a89c8"
+    },
+    {
+      "id": "H354",
+      "title": "ABI 结构体布局与填充计算",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "135f1275132311070ff42e981a918e082c74948a0639179a05979481e465fe0a"
+    },
+    {
+      "id": "H355",
+      "title": "Wasm 导入函数能力白名单",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s24",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "153534e8d478d9b946c669531659e727e2cd8ab0e57c915dfb3d142992a17428"
+    },
+    {
+      "id": "H356",
+      "title": "教学 mark-sweep 可达性模拟器",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s24"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a593ee8dd6bd1eea7584f8fccbe0e65844b831d9c7c521a2bf66c136ebe0333a"
+    },
+    {
+      "id": "H357",
+      "title": "三色增量标记写屏障",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s24"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "97dded96a0aa3f22ca29966b3f87b853061b053301002fa326175e08350294b6"
+    },
+    {
+      "id": "H358",
+      "title": "JavaScript isolate 请求隔离模型",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s27",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "a77e521f853835f23100cd50a400a63a51104197234b1c94651a9fb710c33514"
+    },
+    {
+      "id": "H359",
+      "title": "FinalizationRegistry 延迟通知模型",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s11",
+        "s27"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "ac9ce385ac121969647b1858e37b9396375149be77afb669ee822df5ed062514"
+    },
+    {
+      "id": "H360",
+      "title": "Worker 崩溃隔离与 attempt fencing",
+      "file": "docs/coding/practice-runtime-memory.md",
+      "legacy": false,
+      "mechanism_sources": [
+        "s27",
+        "s11"
+      ],
+      "evidence": "author_designed",
+      "implementation_status": "contract_only",
+      "contract_sha256": "6e39c7564441eed5f8da5614a89f30c446eb9436513bb120770a231dc4ba9639"
+    }
+  ]
+}
