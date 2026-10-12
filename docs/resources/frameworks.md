@@ -94,6 +94,7 @@ description: React、Vue、Svelte、Solid、Angular 及元框架、状态管理�
 | 资源 | 类型 | 语言 | 适合谁与难度 | 怎么学 |
 | --- | --- | --- | --- | --- |
 | [Next.js 文档](https://nextjs.org/docs) | 官方文档 | English | 进阶 | App Router、SSR/SSG、Server Actions 的官方文档。 |
+| [Next.js App Router 主章](../frameworks/nextjs-app-router.md) | 本站教程 | 中文 | 进阶 | 先读本章建立 App Router 心智模型，再读[16.x 升级指南](https://nextjs.org/docs/app/guides/upgrading/version-16)核对破坏性变化，最后读[AI Coding Agents 指南](https://nextjs.org/docs/app/guides/ai-agents)理解 bundled docs 与 `AGENTS.md` 的版本上下文。 |
 | [Next.js App Router 文档](https://nextjs.org/docs/app) | 官方文档 | English | 进阶 | 读 Routing、Data Fetching、Caching 三部分并各做一个例子。 |
 | [Next.js Learn](https://nextjs.org/learn) | 官方教程 | English | 入门 | 完成 Dashboard 应用教程，约 6 小时。 |
 | [Nuxt 文档](https://nuxt.com/docs) | 官方文档 | English | 进阶 | Vue 生态元框架官方文档，服务端渲染与全栈能力。 |

@@ -626,7 +626,7 @@ bun test --bench
 
 | 框架 | SSR | SSG | ISR | PPR | Islands |
 |------|-----|-----|-----|-----|---------|
-| Next.js 15 | Yes | Yes | Yes | Yes | No |
+| Next.js 16.4 | Yes | Yes | Yes | Cache Components / PPR（按配置启用） | No |
 | Remix | Yes | Yes | No | No | No |
 | Astro | Yes | Yes | Yes | No | Yes |
 | Svelte 5 | Yes | Yes | Yes* | No | 需 SvelteKit |
@@ -636,17 +636,9 @@ bun test --bench
 
 *Svelte/SolidJS 的 ISR 需要额外配置
 
-### 2.2 性能对比
+### 2.2 如何比较运行时成本
 
-| 框架 | 初始 JS | Bundle | SSR 开销 | 运行时开销 |
-|------|---------|--------|----------|-----------|
-| Astro | 0KB | 极小 | 低 | 无 |
-| Qwik | ~1KB | 小 | 低 | 低 |
-| Svelte 5 | 1.5KB | 极小 | 中 | 极低 |
-| SolidJS | 7KB | 小 | 中 | 极低 |
-| Nuxt | 20KB+ | 中 | 中 | 中 |
-| Remix | 40KB+ | 中 | 中 | 中 |
-| Next.js 15 | 85KB+ | 中 | 中 | 中 |
+不列框架默认 bundle-size 数字：实际发送的 JavaScript 取决于路由、组件边界、依赖与压缩配置，脱离同一页面和构建环境的数字不可横向比较。选型验证时，用相同页面与目标设备记录初始传输量、hydration 工作、服务端计算与缓存命中率；内容站可另测静态输出比例。Next.js 的 RSC 与缓存边界详见[Next.js App Router 主章](../../frameworks/nextjs-app-router.md)。
 
 ### 2.3 开发者体验对比
 
@@ -658,14 +650,14 @@ bun test --bench
 | Qwik | 中 | 良好 | 中 | 完整 |
 | Remix | 低 | 优秀 | 高 | 完整 |
 | SolidJS | 中 | 良好 | 中 | 完整 |
-| Next.js 15 | 中 | 优秀 | 高 | 最完整 |
+| Next.js 16.4 | 中 | 优秀 | 高 | 完整 |
 | Bun | 低 | 良好 | 中 | 完整 |
 
 ### 2.4 选择建议
 
 | 场景 | 推荐框架 | 备选 |
 |------|----------|------|
-| React 全栈企业应用 | Next.js 15 | Remix |
+| React 全栈应用 | Next.js 16.4 | SEO、混合渲染与框架集成优先；表单与 Web 标准工作流优先时比较 React Router |
 | Vue 全栈应用 | Nuxt 3 | - |
 | 内容驱动静态站 | Astro | - |
 | 极致性能 SPA | Svelte 5 / SolidJS | Qwik |
@@ -684,7 +676,7 @@ flowchart TD
     D -->|Yes| E["Nuxt 3"]
     D -->|No| F{"需要极致性能?"}
     
-    C -->|企业应用| G["Next.js 15"]
+    C -->|集成渲染与数据流| G["Next.js 16.4"]
     C -->|表单优先| H["Remix"]
     
     F -->|是| I{"静态内容多?"}

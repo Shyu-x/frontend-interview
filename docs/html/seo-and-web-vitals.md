@@ -1,11 +1,13 @@
 ---
 title: SEO 与 Core Web Vitals
-description: Core Web Vitals 指标、SEO meta 标签、SSR/SSG/ISR/CSR 渲染策略与常见 SEO 陷阱。
+description: 从 Core Web Vitals 指标和 SEO metadata 理解首屏加载、交互与索引问题，结合 Next.js 16.4 的图片预加载、异步动态参数和双缓存模型说明渲染策略选择，并提供常见陷阱、测量方法与文档站落地示例。
 ---
 
 # SEO 与 Core Web Vitals
 
 > 更新日期：2026-05-10 | 版本：2.0 | 覆盖：HTML / CSS / JavaScript / TypeScript / 浏览器 / 网络 / 安全 / React / Vue / 工程化 / 性能优化
+
+> Next.js 示例更新：2026-10-11，以 16.4.0 为版本基准；Pages Router 历史示例单独标注。
 
 ---
 
@@ -47,7 +49,11 @@ Google 以 Core Web Vitals 作为页面体验（Page Experience）信号纳入�
 }
 ```
 
-#### Next.js 14 App Router 中的图片优化
+#### Next.js 16.4 App Router 中的图片优化
+
+`next/image` 的 `priority` 在 Next.js 16 已弃用，首屏关键图用 `preload` 表达预加载；不要同时给同一张图配置 `preload` 与 `loading` / `fetchPriority`。远程图片使用精确的 `remotePatterns`，不要接受任意远程来源。Next.js 16 默认允许的 `qualities` 是 `[75]`，其他质量值须在 `next.config.*` 显式加入允许列表。[Image API](https://nextjs.org/docs/app/api-reference/components/image)
+
+示意代码：未通过自动验证。
 
 ```tsx
 // app/page.tsx
@@ -55,17 +61,17 @@ import Image from 'next/image';
 
 export default function Hero() {
   return (
-    // priority=true 触发预加载，fetchpriority="high" 告知浏览器高优先级
+    // 只对确实是 LCP 的首屏图片启用 preload
     <Image
       src="/hero.webp"
       alt="产品介绍主图"
       width={1920}
       height={1080}
-      priority           // 等价于 loading="eager"，同时生成 preload hint
-      fetchPriority="high"
+      preload
       sizes="(max-width: 768px) 100vw, 50vw"
     />
   );
+}
 ```
 
 ```mermaid
@@ -146,20 +152,29 @@ export const metadata: Metadata = {
 
 ### 2.2 canonical URL（规范化链接）
 
+示意代码：未通过自动验证。根布局与动态页面分别配置，不能把所有页面的 canonical 都指向首页。
+
 ```tsx
 // app/layout.tsx - 全局设置默认 canonical
+import type { Metadata } from 'next';
 export const metadata: Metadata = {
   alternates: {
     canonical: 'https://example.com',
   },
 };
+```
 
+示意代码：未通过自动验证。
+
+```tsx
 // app/blog/[slug]/page.tsx - 动态页面覆盖
+import type { Metadata } from 'next';
+type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const post = await getPost(params.slug);
+  const { slug } = await params;
   return {
     alternates: {
-      canonical: `https://example.com/blog/${params.slug}`,
+      canonical: `https://example.com/blog/${slug}`,
     },
   };
 }
@@ -167,21 +182,38 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 **作用：** 防止 www vs 非 www、HTTP vs HTTPS、带参 URL 等导致的重复内容问题。
 
-### 2.3 完整的 SEO Metadata 配置（Next.js 14 App Router）
+### 2.3 完整的 SEO Metadata 配置（Next.js 16.4 App Router）
+
+示意代码：未通过自动验证。`getPost` 是应用的数据适配器，需自行实现；下例展示同一个页面文件的两个连续片段。
 
 ```tsx
 // app/blog/[slug]/page.tsx
-type Props = { params: { slug: string } };
+import type { Metadata } from 'next';
+import { getPost } from '@/lib/posts';
+type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const post = await getPost(params.slug);
-  const canonicalUrl = `https://example.com/blog/${params.slug}`;
+  const { slug } = await params;
+  const post = await getPost(slug);
+  const canonicalUrl = `https://example.com/blog/${slug}`;
 
   return {
     title: `${post.title} | 前端面试指南`,
     description: post.excerpt,                        // 150-160 字符
     keywords: post.tags.join(', '),                  // 次要，Google 已不再重视
     authors: [{ name: '张三', url: 'https://example.com/about' }],
+    ...socialMetadata(post, canonicalUrl),
+    alternates: { canonical: canonicalUrl },
+    robots: { index: true, follow: true },
+  };
+}
+```
+
+社交卡片字段在同一文件中抽成辅助函数。示意代码：未通过自动验证。
+
+```tsx
+function socialMetadata(post: Awaited<ReturnType<typeof getPost>>, canonicalUrl: string): Metadata {
+  return {
     openGraph: {
       title: post.title,
       description: post.excerpt,
@@ -197,11 +229,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: post.title,
       description: post.excerpt,
     },
-    alternates: { canonical: canonicalUrl },
-    robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
   };
 }
 ```
+
+`params` 在 Next.js 16 必须异步读取。可预渲染的 metadata 会进入初始 HTML；需要运行时数据的 metadata 可流式输出。启用 Cache Components 时，如果正文可预渲染、metadata 却访问未缓存数据，应缓存可复用数据或明确动态意图，不能仅靠 `async` 推断整页策略。[generateMetadata 官方参考](https://nextjs.org/docs/app/api-reference/functions/generate-metadata)
 
 ---
 
@@ -216,10 +248,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 | **SSG** | 构建时生成静态 HTML | 最快 | 是 优 | 差（纯静态） | 博客、文档、营销页 |
 | **ISR** | 增量静态，再生成 | 快 | 是 优 | 中（再生成期间旧） | 内容更新频繁的页面 |
 
-### 3.2 Next.js 14 App Router 中的渲染策略
+### 3.2 Next.js App Router 中的渲染策略（先确认缓存模型）
+
+下面只展示**未启用 Cache Components** 的 ISR 页面配置。`generateStaticParams` 选择预生成的动态路径；不要在同一个页面同时声明 ISR 与 `dynamic = 'force-dynamic'`。示意代码：未通过自动验证。
 
 ```tsx
-// SSG（构建时生成）- 静态博客列表
+// app/blog/[slug]/page.tsx：未启用 Cache Components
 export async function generateStaticParams() {
   const posts = await getAllPosts();
   return posts.map((post) => ({ slug: post.slug }));
@@ -228,12 +262,14 @@ export async function generateStaticParams() {
 // ISR（增量静态）- 内容定期更新
 export const revalidate = 3600; // 每小时重新验证
 
-// SSR（服务端渲染）- 动态数据
-export const dynamic = 'force-dynamic';
-
-// PPR（Partial Prerendering）- Next.js 15 实验特性
-// 同时流式输出静态 HTML shell + 动态 Suspense 边界
 ```
+
+| 模型 | 可复用内容 | 请求相关内容 |
+| --- | --- | --- |
+| 未启用 Cache Components | 用路由段 `revalidate`、`fetch` 缓存选项等表达 | 动态 API 或独立页面的 `force-dynamic` 配置 |
+| 启用 Cache Components | 用 `'use cache'`、`cacheLife`、`cacheTag` 表达 | 在 Suspense 内读取异步请求信息，与静态壳组合 |
+
+新模型不使用上述路由段 `revalidate` / `dynamic` 配置。完整代码见 [Next.js 16 App Router 教程](../frameworks/nextjs-app-router.md)。[当前缓存模型](https://nextjs.org/docs/app/getting-started/caching) · [未启用 Cache Components 的模型](https://nextjs.org/docs/app/guides/caching-without-cache-components)
 
 ```mermaid
 gantt
@@ -456,6 +492,8 @@ export function OrderTable({ sortedRows }) {
 
 **怎么用本页知识解决**：改成 SSG 预渲染完整 HTML，让正文和 Meta 在构建时写入文件；图片固定宽高防 CLS。
 
+下面是 **Pages Router** 的 `pages/docs/[slug].tsx` 历史 API，不适用于 App Router。示意代码：未通过自动验证；读取函数由应用提供，渲染前必须对不可信 HTML 做安全处理。
+
 ```tsx
 export async function getStaticProps({ params }) {
   const doc = await readDoc(params.slug); // 构建时读取 Markdown
@@ -489,7 +527,7 @@ export default function Doc({ doc }) {
 
 1. 首屏 LCP 图片直接用 img 标签加载，不使用 `loading="lazy"`（出处：web.dev Optimize Largest Contentful Paint）。浏览器会立即请求首屏主图，避免懒加载延迟 LCP。你的项目可把文章封面和商品首图设为 eager，只对后续图片懒加载。
 
-2. 对 LCP 资源使用 `fetchpriority="high"`（出处：MDN `fetchpriority` 属性文档）。该属性提高图片或脚本的网络优先级。你的项目可在 `preload` 之外给首图设置该属性。
+2. 对 LCP 图片评估 `fetchpriority="high"`（出处：MDN `fetchpriority` 属性文档）。它提示浏览器优先处理该资源；在 Next.js 16 的 `Image` 中按实际瓶颈选择 `fetchPriority` 或 `preload`，不要把二者同时配置在同一图片上。[Image 官方说明](https://nextjs.org/docs/app/api-reference/components/image)
 
 3. 使用 `content-visibility: auto` 减少离屏渲染（出处：web.dev content-visibility）。浏览器只渲染接近视口的区域，降低布局和绘制成本。你的项目可对长文档下方图集或列表应用该属性。
 

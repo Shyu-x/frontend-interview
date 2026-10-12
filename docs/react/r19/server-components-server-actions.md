@@ -1,9 +1,11 @@
 ---
 title: "Server Components 与 Server Actions：边界、序列化与安全"
-description: "RSC 的架构与使用边界"
+description: "从组件执行位置、模块图和序列化边界理解 React Server Components 与 Server Actions，结合 Next.js 16.4 说明首访 HTML、水合和缓存模型，练习输入校验、服务端授权与历史安全公告的版本核对方法。"
 ---
 
 # Server Components 与 Server Actions：边界、序列化与安全
+
+> 版本说明：本文涉及 Next.js 的地方按 16.4.0 App Router 语境说明；RSC 是 React 组件执行与序列化模型，不等同于 SSR。首次访问时，Next.js 可把 Client Component 与 RSC Payload 用于 HTML 预渲染，浏览器随后仍需水合 Client Components。`'use client'` 建立客户端模块边界，并不代表该组件首访只在浏览器运行。缓存语义还取决于项目是否启用 Cache Components；新建 16.4 项目默认启用，既有项目请查 `next.config.*`。[官方 RSC 指南](https://nextjs.org/docs/app/getting-started/server-and-client-components) · [Next.js 16.4 发布说明](https://nextjs.org/blog/next-16-4)
 
 !!! abstract "学完这一页你能"
     - 准确说出 `'use client'` 与 `'use server'` 各自标记的对象，以及它们在模块依赖树中产生的边界。
@@ -41,12 +43,12 @@ flowchart TD
 **心智模型**
 
 !!! tip "心智模型"
-    一句话模型：Server Components 在打包之前、在一个与客户端和 SSR 服务器都分离的环境里提前渲染。
+    一句话模型：Server Components 在服务端组件环境中执行，输出进入 RSC Payload；框架可在构建时或请求时生成 HTML。不要把组件环境、SSR 时机和水合混为一谈。
     日常类比：去餐厅吃饭，后厨把菜做好端上来，你只需要吃，不需要把灶台和菜刀搬回家。
     类比不成立的地方：不是所有菜都能提前做。需要本地交互、状态、事件处理的组件仍然要在浏览器里运行。
 
 !!! note "术语：React Server Components（RSC）"
-    一种新的组件类型，它在打包之前渲染，运行环境与客户端应用或 SSR 服务器分离。这种分离环境就是 RSC 里的"服务器"。它可以在 CI 服务器上构建时跑一次，也可以在 Web 服务器上每个请求跑一次。
+    一种组件类型，其代码在服务器组件环境中执行并输出 RSC Payload。由框架决定构建时还是请求时执行；HTML 预渲染和 Client Component 水合是相关但不同的过程。
 
 **图解**
 
@@ -1190,7 +1192,7 @@ console.log('验证通过：稳定面与底层 API 分开制定版本策略');
 - 框架负责锁定版本并封装底层协议。
 - 业务代码应通过框架使用 RSC，而不是直接实现底层集成。
 
-## 8. 2025 年底安全公告的工程启示
+## 8. 2025—2026 年安全公告的工程启示
 
 **先想一个问题**：你的应用没有显式实现 Server Function 端点，但用了支持 RSC 的框架。官方公告说你在某些版本下仍可能受影响。你该怎么确认？
 
@@ -1211,7 +1213,7 @@ flowchart TD
   A["2025-11-29 漏洞报告"] --> B["2025-12-03 官方公告"]
   B --> C["CVE-2025-55182"]
   C --> D["CVSS 10.0 未认证 RCE"]
-  D --> E["影响 19.0 至 19.2.0 的服务端包"]
+  D --> E["初始公告影响 19.0、19.1.0、19.1.1、19.2.0"]
   E --> F["修复版本 19.0.1 19.1.2 19.2.1"]
   B --> G["后续公告补充 DoS 与源码暴露"]
   G --> H["升级到官方指定补丁版本"]
@@ -1219,10 +1221,10 @@ flowchart TD
 
 1. 漏洞由 Lachlan Davidson 于 2025 年 11 月 29 日报告。
 2. React Team 于 2025 年 12 月 3 日发布公告。
-3. 分配编号 CVE-2025-55182，评级 CVSS 10.0。
+3. 分配编号 CVE-2025-55182，评级 CVSS 10.0；这是初始 RCE 公告，不代表后续 RSC 漏洞也已被这些初始补丁覆盖。
 4. 影响 `react-server-dom-webpack`、`react-server-dom-parcel`、`react-server-dom-turbopack` 的特定版本。
-5. 修复版本为 19.0.1、19.1.2、19.2.1。
-6. 公告后续还列出 DoS 与源码暴露相关的其他 CVE。
+5. 初始 RCE 的修复版本为 19.0.1、19.1.2、19.2.1。
+6. 后续公告又披露 DoS、源码暴露及额外 DoS 漏洞；React 公告于 2026-01-26 再次更新。因此面试中应说“初始 CVE 的修复版本”，而不能将它们概括为当前全部安全修复版本。
 
 **一步一步来**
 
@@ -1249,20 +1251,22 @@ const fixed = {
 - 即使应用没写 Server Function 端点，只要用了这些包且支持 RSC 就可能受影响。
 - 具体影响与框架版本对应关系在官方公告有更新说明。
 
-第 2 步：确认框架级升级操作。
+第 2 步：确认框架级升级操作。上面的版本表仅描述该历史公告的首次修复，不能代表当前全部漏洞均已修复。按当前目标支持线查阅 React 与 Next.js 官方公告，选择精确修复版本，再用包管理器更新依赖与锁文件。
+
+示意代码：未通过自动验证。以下是升级后的核对步骤，不包含可直接执行的版本占位符安装命令。
 
 ```bash
-# Next.js 示例，版本号来自官方公告，需按公告更新核对
-npm install next@15.5.10   # 用于 15.5.x
-npm install next@16.0.11   # 用于 16.0.x
-npm install next@16.1.5    # 用于 16.1.x
+# 示例流程：先从官方公告确定目标支持线的精确修复版本，再将其写入依赖并更新锁文件。
+# 不要把 next@latest 当作某一 CVE 修复的证明。
+npm ls next react react-dom
+git diff -- package.json package-lock.json
 ```
 
 **这段代码在做什么**
 
-- 官方公告列出了 Next.js 各版本线的补丁版本。
-- 不同版本线对应不同补丁包，必须按当前版本选择。
-- 这些版本号来自公告中的 Update Instructions，具体以官方最新公告为准。
+- 官方公告会针对 Next.js 支持版本线分别列出修复版本。
+- 按当前部署版本所属的支持线选择精确版本，并确认锁文件已更新、解析出的 `next` 与公告一致。
+- `npm ls` 只能核对当前安装树，仍要在 CI 使用锁文件执行干净安装和构建；版本号本身也要与处理的具体公告对应。不要把 `next@latest` 当作某一 CVE 修复证明。
 - 其他框架如 React Router、Waku、Vite 插件也有对应升级命令。
 
 **动手验证**
@@ -1322,8 +1326,8 @@ console.log('验证通过：按官方公告版本范围正确识别受影响版�
 
 **小结**
 
-- CVE-2025-55182 是 CVSS 10.0 的未认证 RCE，影响特定 RSC 服务端包版本。
-- 修复动作以官方公告版本号为准，不同框架升级路径不同。
+- CVE-2025-55182 是 CVSS 10.0 的未认证 RCE，影响特定 RSC 服务端包版本；后续 RSC 漏洞有独立修复要求。
+- 修复动作以对应 CVE 的官方公告和当前 Next.js 支持线为准，锁文件与实际安装树都要核对；不要以 `next@latest` 标签推断已修复某个具体漏洞。
 - 安全实践底线：参数不可信、端点在服务端授权、依赖版本持续跟踪。
 
 ## 应用地图
@@ -1384,6 +1388,8 @@ console.log('验证通过：按官方公告版本范围正确识别受影响版�
 | ['use client'](https://react.dev/reference/rsc/use-client) | 精确定义客户端边界在哪落地，以及重复指令等常见陷阱。 | 读用法与注意事项，问“边界落在组件树哪一层”，读完给自家组件树标注边界。 |
 | ['use server'](https://react.dev/reference/rsc/use-server) | 定义 Server Functions 的指令语义与可导出位置约束。 | 读语法、可放置位置与 caveats，再改造一个 action 文件验证约束。 |
 | [Server Functions](https://react.dev/reference/rsc/server-functions) | 讲清 Server Functions 与 Actions 的关系及调用约定。 | 重点读参数与返回值一节，列出可传类型清单，逐项核对自己的 action。 |
+| [Next.js 16.4 Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components) | 当前 App Router 对 RSC Payload、首访 HTML 与 hydration 的解释。 | 对照首次加载与后续导航，说明 Client Component 的执行位置变化。 |
+| [Next.js 16 Caching](https://nextjs.org/docs/app/getting-started/caching) 与 [Previous Model](https://nextjs.org/docs/app/guides/caching-without-cache-components) | 区分 Cache Components 与旧缓存模型。 | 在读示例前先检查项目 `cacheComponents` 配置，不混用两代缓存假设。 |
 | [Next.js 文档](https://nextjs.org/docs) | 完整实现 RSC 与 Server Actions 的框架文档，最贴近工程实践。 | 读 App Router 的 Server Actions、缓存与再验证章节，边读边跑最小示例。 |
 | [Critical Security Vulnerability in React Server Components](https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components) | 反序列化漏洞的一手公告，直观说明边界就是攻击面。 | 读漏洞成因与修复版本，问“哪一步处理了不可信输入”，随后升级依赖。 |
 | [Denial of Service and Source Code Exposure in React Server Components](https://react.dev/blog/2025/12/11/denial-of-service-and-source-code-exposure-in-react-server-components) | 补充 DoS 与源码泄露视角，说明服务端组件输出的额外风险。 | 读影响范围与缓解措施，对照检查自身框架版本与部署配置。 |
