@@ -91,7 +91,7 @@ WebGL 的 attribute 指针状态依赖当前绑定的 ARRAY_BUFFER，容易因�
 
 ## 4. 实现：最小 WebGPU 资源登记表
 
-以下为教学用伪接口，强调逻辑所有权，不是可直接粘贴的完整 WebGPU renderer。
+示意代码：未通过自动验证。以下为教学用伪接口，强调逻辑所有权，不是完整 WebGPU renderer。先登记资源和所属 scope：
 
 ```js
 class ResourceScope {
@@ -105,16 +105,21 @@ class ResourceScope {
     this.resources.add(resource);
     return resource;
   }
-  dispose() {
-    if (this.disposed) return;
-    this.disposed = true;
-    for (const resource of this.resources) resource.destroy?.();
-    this.resources.clear();
-  }
 }
 ```
 
-示意代码：未通过自动验证。真实代码还要处理共享资源引用计数、销毁顺序、设备丢失、正在提交的工作、异步 pipeline 创建失败和资源重建。
+释放时先锁定终态，再遍历登记表；这也是未运行的示意片段：
+
+```js
+ResourceScope.prototype.dispose = function () {
+  if (this.disposed) return;
+  this.disposed = true;
+  for (const resource of this.resources) resource.destroy?.();
+  this.resources.clear();
+};
+```
+
+真实代码还要处理共享资源引用计数、销毁顺序、设备丢失、正在提交的工作、异步 pipeline 创建失败和资源重建。
 
 工程资源描述一般分为两层：GPU handle 生命周期与可重建 descriptor/asset key。遇到 `device.lost`，由 renderer 进入 lost 状态，停止发命令；重新请求 adapter/device 后按 descriptor 重建 pipeline、buffer、texture，并恢复 CPU 侧最新数据。
 

@@ -513,6 +513,12 @@ nav:
 - 编程实战:
   - 手写代码:
     - 概览: coding/index.md
+    - 真实题目与秋招练习:
+      - 手写题目录：48 道规格与验收练习: coding/handwritten-question-catalog.md
+      - 真实场景题：异步、分页、SSR、Canvas 与协同: coding/real-interview-scenarios.md
+      - 简易动画引擎：时间线、状态与异常隔离: coding/animation-engine-handwritten.md
+      - 倒计时与打字机：绝对时间与 Unicode 字素: coding/deadline-clock-and-typewriter.md
+      - 秋招算法与协议：滑动窗口、版本与差分测试: coding/autumn-exam-algorithms.md
     - 异步与原生方法:
       - 原生方法: coding/native-methods.md
       - Promise 与异步控制: coding/promise-implementations.md
@@ -705,6 +711,7 @@ nav:
   - 书籍、课程与视频: resources/books-courses-videos.md
   - 源码阅读路线: resources/source-code-reading.md
   - 面试练习: resources/interview-practice.md
+  - 真实面试题出处：公司、年份与轮次: resources/real-interview-question-bank.md
   - 社区与资讯: resources/community-and-news.md
   - 在线工具: resources/tools.md
 

@@ -141,6 +141,10 @@ date: 2026-10-12
 
 从 [全仓内容地图与深入路线](resources/content-map-and-roadmap.md) 按目标选择：框架与编译器、V8 与运行时、Wasm 与数据库、Pretext 与图形、Web3D 与媒体、本地优先与协同。每条路线连接源码、反例和实验，不以项目热度代替机制；已实跑的 Node／库实验与未验证的浏览器、GPU、输入法和辅助技术行为分别标明。
 
+### 1.7 真实面试与手写训练
+
+先查 [真实题目出处](resources/real-interview-question-bank.md) 的公司、年份、岗位、轮次与证据性质，再进入 [48 道手写练习](coding/handwritten-question-catalog.md)。可按题目训练 [动画引擎](coding/animation-engine-handwritten.md)、[倒计时与打字机](coding/deadline-clock-and-typewriter.md)、[窗口算法与版本协议](coding/autumn-exam-algorithms.md)，或用 [7 类场景题](coding/real-interview-scenarios.md) 练约束澄清、故障分析与追问。个人回忆、作者派生练习和已验证实现分别标注。
+
 ## 2. 如何使用本站
 
 1. 先读各专题的概览页，了解范围、学习路径与每页难度。

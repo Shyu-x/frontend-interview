@@ -18,6 +18,9 @@ const labs = [
 if (process.argv.includes('--integrations')) {
   labs.push('integrations/yjs-convergence.mjs', 'integrations/pglite-transactions.mjs');
 }
+if (process.argv.includes('--interview')) {
+  labs.push('interview/run.mjs');
+}
 for (const lab of labs) {
   console.log(`\nLAB ${lab}`);
   const result = spawnSync(process.execPath, [join(directory, lab)], {

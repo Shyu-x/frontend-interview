@@ -20,6 +20,7 @@ date: 2026-10-12
 4. 表格中的“适合谁与难度”用于筛选，“怎么学”给出具体动作。动作做完才算学完。
 5. 学完一个主题后，用 [面试练习](interview-practice.md) 检查是否能主动回忆。
 6. 基础已掌握后，读 [全仓内容地图与深入路线](content-map-and-roadmap.md)，按机制和实验证据贯通框架、引擎、Wasm、图形、数据库、媒体与协同；区分实跑实验与未验收的浏览器／GPU 行为。
+7. 准备面试时，先核对 [真实题目出处](real-interview-question-bank.md)，再按 [48 道手写练习](../coding/handwritten-question-catalog.md) 和 [真实场景题](../coding/real-interview-scenarios.md) 做限时实现与反例验证；不要把未披露的原题约束自行补成官方标准。
 
 ## 学习目标对应页面
 

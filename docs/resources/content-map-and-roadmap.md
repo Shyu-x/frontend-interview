@@ -121,6 +121,17 @@ flowchart TD
 
 验收产物：有界队列与释放测试，以及一份可追到具体实现和反例的源码笔记；不以 README 的跑分、Star 或“一行替换”宣传作为结论。
 
+### 路线 E：实际面试题、秋招笔试与手写实现
+
+1. [真实题目出处](real-interview-question-bank.md)：18 组有出处的题目记录，区分亲历回忆、汇总转述和未知字段，不把发布时间当毕业届别。
+2. [48 道手写练习](../coding/handwritten-question-catalog.md)：输入输出、约束、不变量、易错测试和练习路径齐全；不是声明所有题都已实现或实跑。
+3. [数值动画引擎](../coding/animation-engine-handwritten.md)：统一帧调度、时间映射、状态、缓动、异常与回调重入。
+4. [倒计时与打字机](../coding/deadline-clock-and-typewriter.md)：截止时间、后台跳时、暂停和 Unicode 字素，不用固定 tick 伪造真实时间。
+5. [笔试算法与版本协议](../coding/autumn-exam-algorithms.md)：明确派生题合同、独立穷举差分和严格解析边界。
+6. [7 类真实场景扩展](../coding/real-interview-scenarios.md)：竞态、图片超时、分页、SSR、Canvas、任务池与协同，以来源、约束、追问和故障验收连接底层路线。
+
+验收产物：57 个 Node 自动测试、异步代次与并发池的 48 项行为断言，另有 1093 个窗口输入在一个差分测试内逐项比对。它们不证明真实浏览器绘制或未知 OJ 隐藏协议。PDD“秋招第一场动画引擎”目前只有用户线索，年份、轮次与完整题面未独立核实；教学实现明确标为作者派生练习。
+
 ## 5. 实验登记：实跑不等于全系统验证
 
 这些路径都位于仓库根目录的 `scripts/content-labs/`；本次基础环境为 Node `24.16.0`。实验是理解不变量的证据，不是硬件性能排行。
@@ -150,6 +161,14 @@ node scripts/content-labs/run.mjs --integrations
 ```
 
 通过阈值为全部子进程退出码 0，最后输出 `PASS 12 content labs on v24.16.0`；任何断言、依赖缺失或超时都会让总入口非零退出。失败先看标记为 `LAB` 的具体脚本和断言，不跳过失败用例。实验不写持久业务数据；数据库和 Yjs 文档由脚本关闭，安装依赖留在被 Git 忽略的实验 `node_modules`，可按需清理该精确目录。
+
+加入本轮面试手写模块的统一命令如下。新增 `interview/run.mjs` 聚合四个测试文件与异步代次脚本，失败时总入口同样非零退出：
+
+```bash
+node scripts/content-labs/run.mjs --integrations --interview
+```
+
+应看到 Node 测试汇总 `tests 57 / pass 57 / fail 0`、`stale-generation: 48 assertions passed` 和总入口 `PASS 13 content labs on v24.16.0`。这里的 13 表示子入口数量，其中一个入口包含面试测试套件，不能把它混称为 13 道题或只有 13 个断言。
 
 ## 6. 广度继续发散，但不把计划冒充交付
 

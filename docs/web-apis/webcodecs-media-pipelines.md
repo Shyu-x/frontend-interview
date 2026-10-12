@@ -77,8 +77,9 @@ timestampUs = round(ptsTicks × timebaseNumerator × 1,000,000 / timebaseDenomin
 
 高水位/低水位策略可减少频繁开关：到高水位就停 demux/read；收到 `dequeue` 后在队列回落到低水位时恢复。不能忙循环同步轮询；decode queue 的上限是应用策略，而不是跨硬件的固定最佳值。
 
+示意代码：未通过自动验证。先连接低水位通知，`decoder` 与 demux 函数由宿主提供：
+
 ```js
-// 示意代码：未通过自动验证。伪代码突出暂停输入的边界。
 const HIGH_WATER = 8;
 const LOW_WATER = 3;
 let pumping = false;
@@ -88,7 +89,11 @@ decoder.addEventListener('dequeue', () => {
     void pumpDemuxedSamples();
   }
 });
+```
 
+恢复输入时只生产到高水位；下面与上段共同组成未运行的伪代码，不是独立程序：
+
+```js
 async function pumpDemuxedSamples() {
   if (pumping) return;
   pumping = true;
