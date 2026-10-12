@@ -1,204 +1,124 @@
 ---
-title: 运行时全景图
-description: JavaScript 运行时生态三足鼎立：Node.js 稳坐江山、Bun 异军突起、Deno 另辟蹊径，解析三大运行时定位与选型指南。
-tags:
-  - runtime
-  - nodejs
-date: 2026-05-17
+title: 运行时全景图：引擎、宿主能力与兼容边界
+description: 从引擎、事件循环、模块解析、宿主 API 和权限边界理解 Node.js、Bun、Deno 与边缘运行时，修正过时的版本及兼容性结论，用明确的工作负载、资源预算和回归测试建立选型与深入学习路线。
+tags: [runtime, nodejs, bun, deno]
+date: 2026-10-12
+level: reference
+prerequisites: [ESM 与 CommonJS, Promise, 事件循环]
+runnable: false
+verified_at: 2026-10-12
+source_commit: 707ea4929bbb84c67bd637f92360b002a2b23cf7
 ---
 
-# 运行时全景图
+# 运行时全景图：引擎、宿主能力与兼容边界
 
-> JavaScript 运行时生态三足鼎立：Node.js 稳坐江山，Bun 异军突起，Deno 另辟蹊径。
+同一段业务 JavaScript 换一个运行时，语法可能不变，文件权限、模块加载、原生扩展、流和网络行为却可能变化。选型不应从“哪个更快”开始，而应先写出依赖的宿主能力和正确性条件。
 
-## 1. 本章范围
+本页为学习索引，不包含已运行的服务示例，故标为 `runnable: false`。外部产品状态核验于 2026-10-12；`source_commit` 是本次仓库研究基线，不代表三种运行时共享实现提交。API 兼容与生命周期仍需按部署版本复核。
 
-本章讲解 JavaScript 服务端运行时：先了解 Node.js、Bun、Deno 的定位与差异，再深入 Node.js 事件循环与模块系统，最后学习 Bun 与 Deno 的特性与迁移策略。
+## 1. 是什么：运行时不等于引擎
 
-## 2. 学习路径
-
-1. 阅读本页，建立整体认识
-2. [Node.js 核心原理](nodejs-core.md)：事件循环、libuv、CJS/ESM、Stream 与 Buffer
-3. [Bun 2.x 使用指南](bun-guide.md)：原生 HTTP、内置数据库、测试框架、Node.js 迁移
-4. [Deno 2.x 使用指南](deno-guide.md)：权限沙箱、内置工具链、Node.js 兼容、Deno KV
-
-## 3. 页面一览
-
-| 页面 | 你将学到 | 难度 |
-|------|----------|------|
-| [Node.js 核心原理](nodejs-core.md) | 事件循环、libuv、CJS/ESM、Stream 与 Buffer | 进阶 |
-| [Bun 2.x 使用指南](bun-guide.md) | 原生 HTTP、内置数据库、测试框架、Node.js 迁移 | 基础 |
-| [Deno 2.x 使用指南](deno-guide.md) | 权限沙箱、内置工具链、Node.js 兼容、Deno KV | 基础 |
-
----
-
-## 4. 运行时三国争霸
-
-| 运行时 | 版本 | 发布年份 | 主导公司 | 定位 |
-|--------|------|----------|----------|------|
-| **Node.js** | v20.x LTS | 2009 | OpenJS Foundation | 企业级服务端开发标准 |
-| **Bun** | v1.x | 2023 | Oven | 极速 all-in-one 运行时 |
-| **Deno** | v2.x | 2020 | Deno Land Inc | 安全优先的现代替代 |
-
-### 4.1 市场份额与生态对比
+看 JavaScript 代码分别依赖哪些层：
 
 ```mermaid
 flowchart TD
-    subgraph eco["JavaScript 运行时生态"]
-        direction LR
-        subgraph nd["Node.js"]
-            direction TB
-            nd1["npm (200k+)<br/>成熟稳定<br/>企业首选"]
-            subgraph ndf["框架"]
-                nd2["Express<br/>NestJS<br/>Next.js"]
-            end
-            nd1 --- ndf
-        end
-        subgraph bn["Bun"]
-            direction TB
-            bn1["内置兼容<br/>性能卓越<br/>新项目首选"]
-            subgraph bnf["框架"]
-                bn2["Hono<br/>Elysia<br/>Bun API"]
-            end
-            bn1 --- bnf
-        end
-        subgraph dn["Deno"]
-            direction TB
-            dn1["deno.land (3k+)<br/>安全沙箱<br/>边缘计算"]
-            subgraph dnf["框架"]
-                dn2["Fresh<br/>Aleph<br/>Deno KV"]
-            end
-            dn1 --- dnf
-        end
-    end
+  JS[业务 JavaScript] --> EN[引擎与 GC]
+  JS --> MO[模块与包解析]
+  JS --> AP[宿主 API]
+  AP --> SC[调度与 IO]
+  AP --> PE[权限与原生边界]
+  EN --> OS[操作系统资源]
+  SC --> OS
+  PE --> OS
 ```
 
----
+引擎负责语言执行和内存管理；宿主提供文件、网络、定时器、线程和其他能力。相同引擎不保证相同宿主 API；Web API 名字相同也不保证所有扩展行为相同。
 
-## 5. 各运行时定位详解
+| 层 | 需要核对的证据 | 典型失败 |
+| --- | --- | --- |
+| 语言／引擎 | 语法、GC、编译与 trace | 将启动成本误认成稳态吞吐 |
+| 模块／包 | ESM/CJS、exports、原生依赖 | 开发可运行，部署解析失败 |
+| 宿主 API | 具体方法、错误与取消语义 | 用兼容列表代替行为测试 |
+| 资源／安全 | 权限、隔离、FFI、IO | 把 Context 当安全沙箱 |
+| 交付环境 | OS、架构、部署平台、版本 | 本机支持的能力在边缘被禁止 |
 
-### 5.1 Node.js：行业标准
+## 2. 为什么：版本和宣传不能作为能力证明
 
-- **优势**：生态最完善，npm 包数量最多（200,000+），社区成熟，招聘需求大
-- **劣势**：CJS/ESM 混用复杂，部分 API 设计历史包袱
-- **适用**：企业级后端、微服务、CLI 工具
+截至核验日，官方发布表将 Node 24、22 列为 LTS，26 列为 Current，20 已 EOL。原页的“Node 20.x LTS”不能再用于新部署选择。[Node 发布状态](https://nodejs.org/en/about/previous-releases)
 
-```typescript
-// Node.js 服务端示例
-import express from 'express';
-import { createServer } from 'http';
+Bun 官方文档页面显示 1.4.3；旧文章的“Bun 2.x”标题不能证明已存在对应稳定版本。本索引使用无主版本的名称，实际命令与 API 按目标版本测试。[Bun 文档](https://bun.sh/docs/runtime/nodejs-compat)
 
-const app = express();
-const server = createServer(app);
+兼容性是多维度的：解析、导出、返回值、错误、流生命周期、原生插件和操作系统边界都需检验。Bun 官方逐项列出 Node API 差异，因此不能写“100% Node/npm 兼容”。Deno 的 Node/npm 兼容也说明它不是“ESM only”。[Deno 兼容文档](https://docs.deno.com/runtime/fundamentals/node/)
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', runtime: 'node' });
-});
+## 3. 怎么样：用能力表建立回归计划
 
-server.listen(3000, () => {
-  console.log('Node.js server running on :3000');
-});
-```
+| 问题 | Node.js | Bun | Deno |
+| --- | --- | --- | --- |
+| TypeScript 执行 | 支持可擦除语法的 type stripping；不自动类型检查或完整读取 tsconfig | 支持 TS 执行；执行与类型检查分开 | 支持 TS 执行；类型检查使用相应检查命令 |
+| 模块与包 | CJS/ESM 与 package 条件解析 | Node 兼容与自身解析行为需验证 | ESM 与 Node/npm 兼容行为需验证 |
+| 内置测试 | `node:test` | `bun test` | `deno test` |
+| 数据库能力 | 存在 `node:sqlite`；按版本核对 API 与稳定性 | SQLite、SQL 等宿主能力按版本核对 | 不把第三方 ORM 误写成内置 ORM |
+| 权限边界 | 有可启用的 permission model，不能据此视为恶意代码完整沙箱 | 默认宿主权限与 FFI 风险需设计 | 默认限制部分敏感宿主能力，显式授权也需最小化 |
+| Node API 兼容 | 自身目标版本基线 | 按官方兼容页与应用测试 | 按 Node/npm 兼容文档与应用测试 |
 
-### 5.2 Bun：性能怪兽
+这张表纠正能力分类，不承诺全版本行为一致。Node 的类型擦除不是转译、类型检查和打包的统称；“支持数据库访问”也不等于运行时内置某个 ORM。
 
-- **优势**：启动快、执行快，内置 SQLite/ORM/打包器，TypeScript 原生支持
-- **劣势**：生态相对较新，部分 npm 包兼容性待验证
-- **适用**：轻量级 API、脚本工具、原型开发
+[Node TypeScript](https://nodejs.org/docs/latest-v24.x/api/typescript.html) · [SQLite](https://nodejs.org/api/sqlite.html) · [Test runner](https://nodejs.org/api/test.html) · [Permissions](https://nodejs.org/api/permissions.html) · [Deno 安全模型](https://docs.deno.com/runtime/fundamentals/security/)
 
-```typescript
-// Bun HTTP 服务器 - 原生支持 TypeScript，无需构建
-const server = Bun.serve({
-  port: 3000,
-  fetch(req) {
-    return new Response(`Bun server running!`);
-  },
-});
+## 4. 学习路径：先边界，再实现
 
-console.log(`Bun listening on http://localhost:${server.port}`);
-```
+| 路线 | 页面 | 读完应能解释 |
+| --- | --- | --- |
+| Node 基础 | [核心原理](nodejs-core.md) | V8、libuv、模块、流与 Buffer 的分工 |
+| Node 调度 | [事件循环与 libuv](nodejs-event-loop-libuv.md) | JS 回调、IO 完成与工作线程的关系 |
+| 数据流 | [Stream 与背压](nodejs-streams-backpressure.md) | 为什么无限生产会变成内存问题 |
+| 模块 | [模块加载内部](nodejs-modules-loader.md) | 缓存、解析与执行阶段 |
+| Bun | [使用指南](bun-guide.md)／[内部原理](bun-internals.md) | JavaScriptCore 与宿主工具链的职责 |
+| Deno | [使用指南](deno-guide.md)／[内部原理](deno-internals.md) | Rust 宿主、权限与兼容层的边界 |
+| 全景 | [运行时对比](js-runtimes-comparison.md)／[Node 架构](node-architecture-overview.md) | 引擎不是整套运行时 |
+| 隔离 | [Isolate、Context、Worker 与 FFI](runtime-boundaries-isolates-ffi.md) | 谁拥有堆与句柄，什么不是安全隔离 |
+| 边缘 | [Workers 的限制](edge-runtimes-workers.md) | 与长期驻留 Node 进程不同的故障域 |
+| 引擎 | [V8 分层执行](../js/v8-execution-tiering-deopt.md) | 反馈、推测、反优化与 trace 的版本边界 |
 
-### 5.3 Deno：安全先行
+旧深度文章中仍可能存在待独立复核的版本陈述；本索引不把修正导航等同于全量迁移测试。新增 [全仓深入路线](../resources/content-map-and-roadmap.md) 将运行时连到 Wasm、数据库、图形和媒体。
 
-- **优势**：默认安全沙箱、原生 TypeScript、Web API 兼容、内置工具链
-- **劣势**：生态较小，npm 兼容模式有学习曲线
-- **适用**：边缘计算、安全敏感场景、教学学习
+## 5. 选型与工程验收
 
-```typescript
-// Deno 安全权限演示
-// 运行需要明确授权：deno run --allow-net server.ts
+这是**尚未执行的应用迁移验收协议**，不是跑分结论。先定义真实输入、目标运行时精确版本、部署 OS/架构、依赖锁文件，再做以下检查：
 
-Deno.serve({ port: 3000 }, (req) => {
-  return new Response(`Deno server running!`);
-});
-```
+| 输入与操作 | 通过阈值 | 失败证据 |
+| --- | --- | --- |
+| 固定应用回归套件 | 所有关键行为断言通过 | 模块解析、返回值和错误差异 |
+| 并发、取消、连接关闭 | 无挂起任务与遗留句柄 | 活跃连接、资源计数和退出超时 |
+| 原生依赖、文件、数据库 | 所需能力可用且权限最小 | 缺符号、拒绝权限、数据损坏 |
+| 冷启动与稳态负载分开 | 满足应用预先定义的延迟／容量预算 | 带环境的分阶段 trace 与分位数 |
+| 部署失败与恢复 | 健康检查、回滚和数据恢复可执行 | 重启后资源和状态不一致 |
 
----
+执行命令应来自应用自己的锁文件和测试脚本，不能虚构一个仓库里不存在的服务命令。清理测试创建的连接、临时数据、Worker 与原生句柄；不得通过强杀所有进程掩盖泄漏。
 
-## 6. 核心特性对比
+## 6. 面试回答与自测
 
-| 特性 | Node.js | Bun | Deno |
-|------|---------|-----|------|
-| **默认模块系统** | CJS / ESM 混用 | ESM 优先 | ESM only |
-| **TypeScript 支持** | 需 ts-node 或构建 | 原生支持 | 原生支持 |
-| **包管理器** | npm/pnpm/yarn | 内置 bun | 内置 deno |
-| **安全沙箱** | 无 | 无 | 默认启用 |
-| **内置 ORM** | 无 | Bun.sql | deno.land/x/drizzle |
-| **SQLite 支持** | 需库 | 原生支持 | 插件支持 |
-| **Web API 兼容** | 部分 | 大部分 | 高度兼容 |
-| **内置格式化** | 无 | bun fmt | deno fmt |
-| **内置测试** | Jest/Vitest | 内置 | deno test |
-| **NPM 兼容** | 原生 | 100% 兼容 | 兼容模式 |
+**30 秒：** 运行时是引擎加模块、调度和宿主能力。Node、Bun、Deno 的差异不仅是速度，还包括解析、权限、原生扩展和 API 生命周期；兼容性需要按版本和工作负载测试。
 
----
+**2 分钟：** 迁移一个 API 服务时，先列模块条件解析、数据库连接、流取消、原生依赖和部署资源约束。锁定版本后跑相同行为套件，再拆冷启动、稳态、内存与尾延迟，不能把不同环境的 README 跑分当证据。引擎 trace 只能解释某阶段，不能代替宿主边界的正确性验证；失败后需要句柄、日志与恢复路径。
 
-## 7. 面试常考点索引
+<details><summary>为什么 Node 能直接跑部分 TS 不等于能类型检查？</summary>
 
-### 7.1 必考知识点
+类型擦除移除可擦除语法，不执行类型系统，也不自动提供完整 tsconfig 转译与打包行为。
+</details>
 
-| 主题 | 相关文档 | 重要性 |
-|------|----------|--------|
-| **Node.js 事件循环** | [Node.js 核心原理](nodejs-core.md) | 高频 |
-| **libuv 工作原理** | [Node.js 核心原理](nodejs-core.md) | 高频 |
-| **CommonJS vs ESM** | [Node.js 核心原理](nodejs-core.md) | 高频 |
-| **Stream 流处理** | [Node.js 核心原理](nodejs-core.md) | 进阶 |
-| **Buffer 二进制** | [Node.js 核心原理](nodejs-core.md) | 进阶 |
+<details><summary>为什么 Node 兼容不等于某 npm 应用完全兼容？</summary>
 
-### 7.2 运行时选型
+包可能依赖特定错误、流、原生 ABI、OS 或未实现 API；需要测试实际依赖路径。
+</details>
 
-| 场景 | 推荐选择 | 理由 |
-|------|----------|------|
-| 企业级后端 | Node.js | 生态成熟，招聘容易 |
-| 高性能 API | Bun | 性能领先，开发体验好 |
-| 安全敏感场景 | Deno | 沙箱默认启用 |
-| 边缘计算 | Deno Deploy | Vercel/Cloudflare 兼容 |
-| 快速脚本 | Bun | 原生 TS，即刻运行 |
+<details><summary>为什么默认权限限制不等于任意恶意代码的完整沙箱？</summary>
 
----
+需另外分析原生调用、能力授权、宿主漏洞和资源耗尽；权限模型与进程故障隔离不是同一机制。
+</details>
 
-## 8. 学习路径建议
+## 深入阅读
 
-```
-入门路线
-├── 阶段一：Node.js 基础
-│   └── 掌握事件循环、模块系统、异步编程
-│
-├── 阶段二：Node.js 进阶
-│   └── Stream、Buffer、Cluster、Child Process
-│
-├── 阶段三：运行时对比
-│   └── 了解 Bun/Deno 的创新点与适用场景
-│
-└── 阶段四：项目实践
-    └── 根据场景选择合适运行时
-```
-
----
-
-## 9. 参考链接
-
-- [Node.js 官方文档](https://nodejs.org/docs/)
-- [Bun 官方文档](https://bun.sh/docs)
-- [Deno 官方文档](https://docs.deno.com/)
-- [libuv 文档](http://docs.libuv.org/)
-- [Node.js Event Loop 可视化](https://nodejs.org/zh-cn/docs/guides/event-loop/)
+- [Node 官方 API](https://nodejs.org/api/)：选择与部署版本对应的文档，尤其看稳定性与版本历史。
+- [Bun Node 兼容状态](https://bun.sh/docs/runtime/nodejs-compat)：核对应用实际使用的模块，而不是只看支持包名。
+- [Deno 权限模型](https://docs.deno.com/runtime/fundamentals/security/)：理解授权范围与原生扩展边界。

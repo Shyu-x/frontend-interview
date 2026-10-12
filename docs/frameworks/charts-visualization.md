@@ -1,9 +1,13 @@
 ---
 title: "数据可视化：D3、ECharts、Chart.js 与 Canvas/SVG 选择"
-description: "从数据到像素"
+description: "从数据比例尺、刻度和绑定理解图表如何变成像素，比较 D3、ECharts、Chart.js 与 Canvas/SVG 的交互和渲染边界，通过手写折线图连接场景图、命中测试与文本测量的深入原理。"
+tags: [charts, visualization, canvas, svg]
+date: 2026-10-12
 ---
 
 # 数据可视化：D3、ECharts、Chart.js 与 Canvas/SVG 选择
+
+> 若图表需要高密度 Canvas 交互，接着读[Canvas 场景图与命中测试](../browser/canvas-scene-graph-hit-testing.md)，了解对象模型和逆矩阵 hit test；如果文本标签采用自定义测量与布局，读[浏览器文本测量与 Pretext](../browser/text-layout-pretext.md)。
 
 !!! abstract "学完这一页你能"
     1. 手写一个线性比例尺，把任意数据区间映射到像素区间，并生成步长为 1、2、5、10 的好看刻度。

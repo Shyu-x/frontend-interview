@@ -104,6 +104,7 @@ nav:
     - 基础与语义化:
       - HTML5 新特性: html/html5-new-features.md
       - 语义化与无障碍: html/semantic-and-accessibility.md
+      - 非 DOM 可访问性：Canvas、Web3D 与文本输入: html/non-dom-accessibility.md
       - meta 与 viewport: html/meta-and-viewport.md
       - HTML/XML/JSON: html/xhtml-html-xml-json.md
       - 默认样式重置: html/default-styles-reset.md
@@ -192,6 +193,7 @@ nav:
       - ArrayBuffer、TypedArray 与 DataView: js/typed-array-arraybuffer.md
       - SharedArrayBuffer、Atomics 与内存模型: js/sharedarraybuffer-atomics.md
       - V8 对象模型：隐藏类、内联缓存与数组元素种类: js/v8-object-model.md
+      - V8 分层执行与反优化：反馈、编译与 trace: js/v8-execution-tiering-deopt.md
       - WeakMap、WeakRef 与内存泄漏排查: js/weakref-memory-leak.md
       - 异步编程进阶：AbortController 与 Streams API: js/async-streams-abort.md
     - 手写数据结构:
@@ -237,6 +239,7 @@ nav:
       - HTTP 缓存: browser/http-cache.md
       - Cookie 与 Web Storage: browser/storage.md
       - 跨 Tab 通信: browser/cross-tab-communication.md
+      - 浏览器数据库：查询计划、事务与持久化边界: browser/browser-databases-query-plans.md
     - 运行时与调优:
       - 事件、内存与性能: browser/events-memory-performance.md
     - 进阶专题:
@@ -247,8 +250,14 @@ nav:
       - Wasm 与 JS 互操作：线性内存、字符串与 wasm-bindgen 原理: browser/wasm-js-interop-memory.md
       - Rust 写 Web 前端：Yew、Leptos、Dioxus 是怎么实现的: browser/rust-wasm-web-frameworks.md
       - Wasm 何时比 JS 快：性能模型与真实场景: browser/wasm-when-to-use-performance.md
+      - Component Model 与 WASI：类型、ABI 与宿主能力: browser/wasm-component-model-wasi.md
+      - Wasm 性能诊断：复制、增长与分阶段测量: browser/wasm-performance-debugging.md
     - 图形与多媒体:
       - Canvas 与 WebGL：渲染管线与手写示例: browser/canvas-webgl-pipeline.md
+      - Pretext 文本测量：排版、字体与缓存: browser/text-layout-pretext.md
+      - Canvas 场景图：坐标与命中测试: browser/canvas-scene-graph-hit-testing.md
+      - WebGL/WebGPU：资源生命周期与设备恢复: browser/webgl-webgpu-resource-lifecycle.md
+      - Web3D 资产：glTF、预算与流式加载: browser/web3d-assets-gltf-streaming.md
   - 网络协议:
     - 概览: network/index.md
     - HTTP 应用层:
@@ -330,6 +339,7 @@ nav:
       - Web Crypto API：浏览器里的密码学: web-apis/web-crypto-api.md
       - WebAuthn 与 Passkeys：无密码登录: web-apis/webauthn-passkeys.md
       - WebRTC：浏览器里的点对点通信: web-apis/webrtc-p2p.md
+      - WebCodecs：时间戳、帧所有权与媒体背压: web-apis/webcodecs-media-pipelines.md
 - 框架:
   - React:
     - 概览: react/index.md
@@ -393,6 +403,7 @@ nav:
   - 框架生态:
     - 心智模型与全栈框架:
       - 主流前端框架的心智模型：React、Vue、Svelte、Solid、Angular: frameworks/framework-mental-models.md
+      - 框架运行时设计：依赖、owner 与调度边界: frameworks/framework-runtime-design.md
       - Next.js App Router：服务端组件、缓存与路由: frameworks/nextjs-app-router.md
       - Nuxt：Vue 的全栈框架: frameworks/nuxt-vue-ssr.md
       - Svelte 与 Solid：编译期与细粒度响应式: frameworks/svelte-solid-compile-time.md
@@ -421,6 +432,7 @@ nav:
       - 手写迷你打包器：模块图、运行时、Tree Shaking: engineering/mini-bundler-handwritten.md
       - Vite 底层：预构建、按需编译、HMR 与插件容器: engineering/vite-hmr-internals.md
       - Babel/AST 底层与手写迷你编译器: engineering/babel-ast-handwritten.md
+      - 编译器 IR 与增量分析：语义与失效传播: engineering/compiler-ir-incremental-analysis.md
       - Tapable 与 Webpack 插件体系手写: engineering/tapable-plugin-system.md
       - Source Map 原理：VLQ 编码与手写解析器: engineering/sourcemap-vlq.md
       - 微前端原理：沙箱、样式隔离与 Module Federation: engineering/micro-frontend-sandbox.md
@@ -445,6 +457,7 @@ nav:
       - 桌面与跨端：Electron、Tauri、React Native 与小程序的原理: engineering/cross-platform-electron-tauri.md
       - 前端工程师的后端基础：Node 服务、数据库与缓存: engineering/node-backend-for-frontend.md
       - 前端的十个心智模型: engineering/mental-models-frontend.md
+      - 本地优先与 CRDT：收敛、权限与恢复: engineering/local-first-sync-crdt.md
     - 国际化与交付:
       - 国际化工程：ICU MessageFormat、复数规则与字符串提取: engineering/i18n-icu-message-format.md
       - 前端的 CI/CD 与容器化：缓存、产物与发布策略: engineering/ci-cd-docker-frontend.md
@@ -476,6 +489,7 @@ nav:
       - Bun 内部原理：为什么快、快在哪、有哪些取舍: runtime/bun-internals.md
       - 边缘运行时：Isolate、Workers 与它们的限制: runtime/edge-runtimes-workers.md
       - Deno 内部原理：权限模型、Rust 内核与 Node 兼容: runtime/deno-internals.md
+      - 运行时边界：Isolate、Context、Worker 与 FFI: runtime/runtime-boundaries-isolates-ffi.md
   - 性能优化:
     - 概览: performance/index.md
     - 指标与诊断: performance/core-web-vitals.md
@@ -512,6 +526,7 @@ nav:
     - 系统设计与模式:
       - 前端系统设计题：虚拟列表、无限滚动、拖拽、富文本与低代码: coding/frontend-system-design.md
       - 设计模式在前端：观察者、策略、状态、装饰器、依赖注入: coding/design-patterns-frontend.md
+      - 数据所有权与背压：跨线程、Wasm、GPU 与流: coding/data-ownership-backpressure.md
   - 算法:
     - 概览: algorithm/index.md
     - 模板速查: algorithm/templates.md
@@ -659,6 +674,8 @@ nav:
     - 工程化库:
       - API 与数据层: open-source/engineering-libs/api-and-data.md
       - 函数式与状态管理: open-source/engineering-libs/functional-and-state.md
+      - 图形引擎源码地图：从资源到提交: open-source/engineering-libs/graphics-engines-source-map.md
+      - 源码阅读工作法：状态、不变量与反例: open-source/engineering-libs/source-reading-playbook.md
     - AI Agent 生态:
       - Agent 开发框架: open-source/ai-agents/agent-frameworks.md
       - Agent 工具与基础设施: open-source/ai-agents/agent-infrastructure.md
@@ -667,9 +684,11 @@ nav:
       - 全栈与后端框架: open-source/trending/fullstack-backend.md
       - 构建与工具链: open-source/trending/build-and-toolchain.md
       - 前端库与服务生态: open-source/trending/frontend-libraries.md
+      - 系统型项目深挖：机制、源码与选型代价: open-source/trending/systems-projects-deep-dive.md
 - 教学资源:
   - 概览: resources/index.md
   - 前端学习路线: resources/learning-paths.md
+  - 全仓内容地图与深入路线: resources/content-map-and-roadmap.md
   - HTML 与 CSS 资料: resources/html-css.md
   - JavaScript 与 TypeScript 资料: resources/javascript-typescript.md
   - 浏览器、网络与安全资料: resources/browser-network-security.md

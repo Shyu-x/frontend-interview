@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import * as Y from 'yjs';
+
+const base = new Y.Doc();
+base.getText('body').insert(0, 'hello');
+const initial = Y.encodeStateAsUpdate(base);
+const a = new Y.Doc(), b = new Y.Doc();
+Y.applyUpdate(a, initial); Y.applyUpdate(b, initial);
+a.getText('body').insert(5, ' A');
+b.getText('body').insert(5, ' B');
+const updateA = Y.encodeStateAsUpdate(a), updateB = Y.encodeStateAsUpdate(b);
+const left = new Y.Doc(), right = new Y.Doc();
+for (const update of [updateA, updateB, updateA]) Y.applyUpdate(left, update);
+for (const update of [updateB, updateA]) Y.applyUpdate(right, update);
+assert.equal(left.getText('body').toString(), right.getText('body').toString());
+assert.match(left.getText('body').toString(), /^hello (A B|B A)$/);
+const vector = Y.encodeStateVector(left);
+assert.equal(Y.encodeStateAsUpdate(right, vector).byteLength, 2);
+for (const doc of [base, a, b, left, right]) doc.destroy();
+console.log('Yjs 13.6.33: concurrent insert, reordered/duplicate updates, state-vector delta: PASS');
