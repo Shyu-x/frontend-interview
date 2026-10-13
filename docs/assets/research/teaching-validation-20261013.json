@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-13",
+  "source_commit": "f682da9816e3f5454a3f1d8d8cb074d0de53236b",
+  "curriculum": {
+    "existing_questions": 360,
+    "complete_workshop_exercises": 106,
+    "web": 40,
+    "node": 30,
+    "go": 36,
+    "company_topics": 19,
+    "scenario_entries": 106,
+    "counting_rule": "Count each W/N/G exercise once. QQMan and requirement variations do not add extra exercise counts. Existing H questions are practice contracts, not 360 complete solutions."
+  },
+  "checks": {
+    "node_test_cases": 209,
+    "node_failed": 0,
+    "go_test_cases": 36,
+    "go_race_failed": 0,
+    "existing_content_labs": 14,
+    "mermaid_diagrams": 2277,
+    "mermaid_failed": 0,
+    "markdown_regression_fixtures": 6,
+    "rendered_markdown_pages": 539,
+    "unparsed_prose_emphasis": 0,
+    "frontmatter_errors": 0,
+    "table_errors": 0,
+    "list_errors": 0
+  },
+  "native_browser_checks": [
+    "XHR success and real HTTP 503 response",
+    "XHR cancellation through AbortSignal",
+    "fetch success and rejection on real HTTP 404",
+    "fetch cancellation and latest query wins",
+    "delegated event handling on newly added rows",
+    "disclosure visible state and aria-expanded stay aligned",
+    "native dialog opens and restores opener focus",
+    "combobox ArrowDown selects an active descendant",
+    "IntersectionObserver updates image src",
+    "native DOM node cloning preserves the original node",
+    "navigation back button changes the nested drawer state"
+  ],
+  "viewport_checks": [
+    {"width":1440,"height":1000},
+    {"width":1024,"height":768},
+    {"width":390,"height":844},
+    {"width":320,"height":700}
+  ],
+  "layout_assertions": ["no document horizontal overflow", "visible back-header text begins beyond icon right edge", "drawer animation finishes before geometry check", "at least one visible header is inspected"],
+  "environments": {"node":"24.16.0","go":"1.27.1","browser":"Chromium"},
+  "limits": ["In-memory idempotency is not cross-process payment deduplication", "rename visibility is not crash durability without fsync", "unit tests do not verify screen-reader support or production GPU drivers", "SEO checker retains 25 baseline short-description warnings outside this change"],
+  "rerun": [
+    "node scripts/check-teaching-labs.mjs",
+    "node --test scripts/teaching-labs/web/*.test.mjs scripts/teaching-labs/node/*.test.mjs scripts/check-handwritten-bank.test.mjs scripts/content-labs/challenges/models.test.mjs scripts/content-labs/interview/*.test.mjs",
+    "cd scripts/teaching-labs/go && go test -count=1 ./... && go test -race -count=1 ./...",
+    "uv run python scripts/check-markdown-rendering.py",
+    "node scripts/teaching-labs/browser-server.mjs",
+    "node scripts/check-browser-teaching.mjs"
+  ]
+}

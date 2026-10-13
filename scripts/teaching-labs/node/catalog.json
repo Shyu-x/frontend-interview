@@ -1,0 +1,242 @@
+[
+  {
+    "id": "N001",
+    "title": "Reusable CPU worker pool",
+    "source": "labs.mjs#WorkerPool;workers/compute-worker.mjs",
+    "doc": "workshop-node-workers-streams.md#n001",
+    "scenario": "Thumbnail metadata batches dispatched to actual worker_threads with bounded waiting room",
+    "test": "labs.test.mjs#N001"
+  },
+  {
+    "id": "N002",
+    "title": "Transfer ArrayBuffer ownership",
+    "source": "labs.mjs#transferBuffer",
+    "doc": "workshop-node-workers-streams.md#n002",
+    "scenario": "Move a binary report buffer to a worker without retaining a second owner",
+    "test": "labs.test.mjs#N002"
+  },
+  {
+    "id": "N003",
+    "title": "Writable backpressure",
+    "source": "labs.mjs#writeWithBackpressure",
+    "doc": "workshop-node-workers-streams.md#n003",
+    "scenario": "Export a large order report to a slow destination without queueing every row",
+    "test": "labs.test.mjs#N003"
+  },
+  {
+    "id": "N004",
+    "title": "File pipeline with gzip",
+    "source": "labs.mjs#gzipFile",
+    "doc": "workshop-node-workers-streams.md#n004",
+    "scenario": "Compress an audit archive while propagating source and destination failures",
+    "test": "labs.test.mjs#N004"
+  },
+  {
+    "id": "N005",
+    "title": "Local JSON HTTP server",
+    "source": "labs.mjs#startJsonServer",
+    "doc": "workshop-node-http-lifecycle.md#n005",
+    "scenario": "Run a local inventory API on an ephemeral port with JSON error mapping",
+    "test": "labs.test.mjs#N005"
+  },
+  {
+    "id": "N006",
+    "title": "Async middleware composition",
+    "source": "labs.mjs#compose",
+    "doc": "workshop-node-http-lifecycle.md#n006",
+    "scenario": "Compose tenant lookup, authentication, and route handlers with onion ordering",
+    "test": "labs.test.mjs#N006"
+  },
+  {
+    "id": "N007",
+    "title": "Incremental SSE parser",
+    "source": "labs.mjs#createSseParser",
+    "doc": "workshop-node-http-lifecycle.md#n007",
+    "scenario": "Consume a live order-status feed split across arbitrary UTF-8 network chunks",
+    "test": "labs.test.mjs#N007"
+  },
+  {
+    "id": "N008",
+    "title": "Safe SSE frame formatter",
+    "source": "labs.mjs#formatSse",
+    "doc": "workshop-node-http-lifecycle.md#n008",
+    "scenario": "Publish progress notifications while rejecting newline-based event injection",
+    "test": "labs.test.mjs#N008"
+  },
+  {
+    "id": "N009",
+    "title": "Bounded JSON request body",
+    "source": "labs.mjs#readJsonBody",
+    "doc": "workshop-node-http-lifecycle.md#n009",
+    "scenario": "Accept small checkout payloads and reject malformed or oversized bodies",
+    "test": "labs.test.mjs#N009"
+  },
+  {
+    "id": "N010",
+    "title": "Request lifecycle tracking",
+    "source": "labs.mjs#trackRequestLifecycle;getTrackedSignal",
+    "doc": "workshop-node-http-lifecycle.md#n010",
+    "scenario": "Count active requests and propagate disconnect cancellation into downstream work",
+    "test": "labs.test.mjs#N010"
+  },
+  {
+    "id": "N011",
+    "title": "Atomic streaming upload",
+    "source": "labs.mjs#atomicUpload",
+    "doc": "workshop-node-upload-storage.md#n011",
+    "scenario": "Receive customer documents to a private staging file and publish only complete uploads",
+    "test": "labs.test.mjs#N011"
+  },
+  {
+    "id": "N012",
+    "title": "Per-chunk checksum ledger",
+    "source": "labs.mjs#createChunkLedger",
+    "doc": "workshop-node-upload-storage.md#n012",
+    "scenario": "Resume a large media upload after retry and validate each chunk before storing",
+    "test": "labs.test.mjs#N012"
+  },
+  {
+    "id": "N013",
+    "title": "Storage path containment",
+    "source": "labs.mjs#safeResolve",
+    "doc": "workshop-node-upload-storage.md#n013",
+    "scenario": "Map an authenticated user's relative document key beneath a storage root",
+    "test": "labs.test.mjs#N013"
+  },
+  {
+    "id": "N014",
+    "title": "Fixed-window tenant limiter",
+    "source": "labs.mjs#createRateLimiter",
+    "doc": "workshop-node-service-resilience.md#n014",
+    "scenario": "Limit login attempts independently per customer account",
+    "test": "labs.test.mjs#N014"
+  },
+  {
+    "id": "N015",
+    "title": "In-process payment idempotency",
+    "source": "labs.mjs#createIdempotencyStore",
+    "doc": "workshop-node-service-resilience.md#n015",
+    "scenario": "Coalesce same-process browser retries during the configured TTL; durable payment idempotency requires shared storage",
+    "test": "labs.test.mjs#N015"
+  },
+  {
+    "id": "N016",
+    "title": "Single-flight cache miss",
+    "source": "labs.mjs#createSingleFlightCache",
+    "doc": "workshop-node-service-resilience.md#n016",
+    "scenario": "Collapse concurrent product-catalog cache misses into one database lookup",
+    "test": "labs.test.mjs#N016"
+  },
+  {
+    "id": "N017",
+    "title": "Webhook signature and replay window",
+    "source": "labs.mjs#verifyWebhook",
+    "doc": "workshop-node-service-resilience.md#n017",
+    "scenario": "Verify signed billing webhooks while rejecting old replayed deliveries",
+    "test": "labs.test.mjs#N017"
+  },
+  {
+    "id": "N018",
+    "title": "Credential-redacting JSON logger",
+    "source": "labs.mjs#createJsonLogger",
+    "doc": "workshop-node-service-resilience.md#n018",
+    "scenario": "Emit searchable request logs without authorization tokens or cookies",
+    "test": "labs.test.mjs#N018"
+  },
+  {
+    "id": "N019",
+    "title": "Graceful HTTP shutdown",
+    "source": "labs.mjs#gracefulClose",
+    "doc": "workshop-node-http-lifecycle.md#n019",
+    "scenario": "Drain a service on deploy and close lingering connections after a deadline",
+    "test": "labs.test.mjs#N019"
+  },
+  {
+    "id": "N020",
+    "title": "Build dependency ordering",
+    "source": "labs.mjs#topologicalOrder",
+    "doc": "workshop-node-build-config.md#n020",
+    "scenario": "Order package build tasks before their app and report cycles",
+    "test": "labs.test.mjs#N020"
+  },
+  {
+    "id": "N021",
+    "title": "Conditional package exports",
+    "source": "labs.mjs#resolveExport",
+    "doc": "workshop-node-build-config.md#n021",
+    "scenario": "Choose import versus require entry points without exposing private subpaths",
+    "test": "labs.test.mjs#N021"
+  },
+  {
+    "id": "N022",
+    "title": "Environment configuration validation",
+    "source": "labs.mjs#parseServerConfig",
+    "doc": "workshop-node-build-config.md#n022",
+    "scenario": "Validate host and port before a service binds in local or container deployments",
+    "test": "labs.test.mjs#N022"
+  },
+  {
+    "id": "N023",
+    "title": "Signed pagination cursor",
+    "source": "labs.mjs#createCursorCodec",
+    "doc": "workshop-node-service-resilience.md#n023",
+    "scenario": "Prevent a client from editing tenant and sort position in a product-list cursor",
+    "test": "labs.test.mjs#N023"
+  },
+  {
+    "id": "N024",
+    "title": "Idempotent HTTP retry",
+    "source": "labs.mjs#fetchWithRetry",
+    "doc": "workshop-node-http-lifecycle.md#n024",
+    "scenario": "Retry a safe catalog GET after a transient 503 while refusing POST replay",
+    "test": "labs.test.mjs#N024"
+  },
+  {
+    "id": "N025",
+    "title": "Deadline-bound local fetch",
+    "source": "labs.mjs#fetchWithDeadline",
+    "doc": "workshop-node-http-lifecycle.md#n025",
+    "scenario": "Cancel an upstream profile lookup when its request deadline expires",
+    "test": "labs.test.mjs#N025"
+  },
+  {
+    "id": "N026",
+    "title": "ETag static file response",
+    "source": "labs.mjs#serveStaticFile",
+    "doc": "workshop-node-http-lifecycle.md#n026",
+    "scenario": "Serve versioned frontend assets with cache revalidation and path containment",
+    "test": "labs.test.mjs#N026"
+  },
+  {
+    "id": "N027",
+    "title": "Abort-aware one-shot event",
+    "source": "labs.mjs#onceEvent",
+    "doc": "workshop-node-http-lifecycle.md#n027",
+    "scenario": "Wait for a socket or worker lifecycle event and remove listeners on cancellation",
+    "test": "labs.test.mjs#N027"
+  },
+  {
+    "id": "N028",
+    "title": "Bounded cancellable work queue",
+    "source": "labs.mjs#createBoundedQueue",
+    "doc": "workshop-node-service-resilience.md#n028",
+    "scenario": "Cap concurrent thumbnail jobs and reject excess queued work before memory grows",
+    "test": "labs.test.mjs#N028"
+  },
+  {
+    "id": "N029",
+    "title": "Atomic JSON state replacement",
+    "source": "labs.mjs#atomicWriteJson",
+    "doc": "workshop-node-upload-storage.md#n029",
+    "scenario": "Persist a local job checkpoint without leaving a half-written JSON file",
+    "test": "labs.test.mjs#N029"
+  },
+  {
+    "id": "N030",
+    "title": "Verified chunk assembly",
+    "source": "labs.mjs#assembleChunks",
+    "doc": "workshop-node-upload-storage.md#n030",
+    "scenario": "Finalize a resumable video upload only when the assembled digest matches",
+    "test": "labs.test.mjs#N030"
+  }
+]

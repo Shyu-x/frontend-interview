@@ -27,6 +27,19 @@ jobs:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen
+      - name: Check actual Markdown rendering across all pages
+        run: uv run python scripts/check-markdown-rendering.py
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: scripts/teaching-labs/go/go.mod
+          cache: false
+      - name: Run complete teaching examples and coverage checks
+        run: |
+          node scripts/check-teaching-labs.mjs
+          node --test scripts/teaching-labs/web/*.test.mjs scripts/teaching-labs/node/*.test.mjs
+          cd scripts/teaching-labs/go
+          go test ./...
+          go test -race ./...
       - name: Metadata gate for new and modified pages
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}

@@ -1,0 +1,322 @@
+[
+  {
+    "id": "W001",
+    "title": "自动启动的 LazyMan 与 QQMan 队列变式",
+    "source": "core.mjs#lazyMan;core.mjs#qqMan",
+    "doc": "docs/coding/workshop-web-javascript.md#w001",
+    "scenario": "登记用户动作、优先等待、自动启动并保持单次运行",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W002",
+    "title": "保序 Promise.all",
+    "source": "core.mjs#promiseAll",
+    "doc": "docs/coding/workshop-web-javascript.md#w002",
+    "scenario": "并发加载仪表盘用户与购物车卡片",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W003",
+    "title": "循环引用深拷贝",
+    "source": "core.mjs#deepClone",
+    "doc": "docs/coding/workshop-web-javascript.md#w003",
+    "scenario": "复制离线表单草稿的日期、共享引用与循环关系",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W004",
+    "title": "按元数累积参数的 curry",
+    "source": "core.mjs#curry",
+    "doc": "docs/coding/workshop-web-javascript.md#w004",
+    "scenario": "分步配置表单字段校验规则",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W005",
+    "title": "at-most-once 包装器",
+    "source": "core.mjs#once",
+    "doc": "docs/coding/workshop-web-javascript.md#w005",
+    "scenario": "付款按钮最多触发一次支付适配器",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W006",
+    "title": "身份安全的多参数 memoize",
+    "source": "core.mjs#memoize",
+    "doc": "docs/coding/workshop-web-javascript.md#w006",
+    "scenario": "缓存相同查询对象的昂贵本地筛选结果",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W007",
+    "title": "快照语义 EventBus",
+    "source": "core.mjs#EventBus",
+    "doc": "docs/coding/workshop-web-javascript.md#w007",
+    "scenario": "订单支付事件通知角标与埋点订阅者",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W008",
+    "title": "保序迭代 flatten",
+    "source": "core.mjs#flatten",
+    "doc": "docs/coding/workshop-web-javascript.md#w008",
+    "scenario": "展平树形菜单路径数据并限制深度",
+    "test": "core.test.mjs"
+  },
+  {
+    "id": "W009",
+    "title": "XHR Promise adapter",
+    "source": "async.mjs#xhrRequest",
+    "doc": "docs/coding/workshop-web-async.md#w009",
+    "scenario": "将旧上传组件的事件请求包装为 Promise",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W010",
+    "title": "Fetch JSON HTTP 状态检查",
+    "source": "async.mjs#fetchJson",
+    "doc": "docs/coding/workshop-web-async.md#w010",
+    "scenario": "商品详情 API 处理成功 JSON 与 503",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W011",
+    "title": "Latest-wins 可取消搜索",
+    "source": "async.mjs#createLatestSearch",
+    "doc": "docs/coding/workshop-web-async.md#w011",
+    "scenario": "搜索旧响应不能覆盖用户最新查询",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W012",
+    "title": "按错误类别退避重试",
+    "source": "async.mjs#retry",
+    "doc": "docs/coding/workshop-web-async.md#w012",
+    "scenario": "报表下载重试 503 但不重试 400",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W013",
+    "title": "有限并发 map",
+    "source": "async.mjs#mapLimit",
+    "doc": "docs/coding/workshop-web-async.md#w013",
+    "scenario": "商品列表请求最多四并发且维持显示顺序",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W014",
+    "title": "超时并取消底层操作",
+    "source": "async.mjs#withTimeout",
+    "doc": "docs/coding/workshop-web-async.md#w014",
+    "scenario": "预览生成 800ms 无结果时 abort fetch",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W015",
+    "title": "UTF-8 流式按行读取",
+    "source": "async.mjs#readLines",
+    "doc": "docs/coding/workshop-web-async.md#w015",
+    "scenario": "读取分块中文日志与 CRLF 行记录",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W016",
+    "title": "XHR 上传进度模型",
+    "source": "async.mjs#watchUpload",
+    "doc": "docs/coding/workshop-web-async.md#w016",
+    "scenario": "上传器区分已知总字节和不可计算总量",
+    "test": "async.test.mjs"
+  },
+  {
+    "id": "W017",
+    "title": "整数分购物车计价",
+    "source": "business.mjs#cartTotal",
+    "doc": "docs/coding/workshop-web-business.md#w017",
+    "scenario": "商品数量、优惠券与安全整数溢出",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W018",
+    "title": "带 revision 的乐观收藏回滚",
+    "source": "business.mjs#optimisticToggle",
+    "doc": "docs/coding/workshop-web-business.md#w018",
+    "scenario": "收藏接口乱序失败不覆盖用户新一次点击",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W019",
+    "title": "Token refresh single-flight",
+    "source": "business.mjs#createTokenRefresher",
+    "doc": "docs/coding/workshop-web-business.md#w019",
+    "scenario": "头像订单通知同时遇 401 只刷新一次",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W020",
+    "title": "防旧响应污染的分页器",
+    "source": "business.mjs#createPager",
+    "doc": "docs/coding/workshop-web-business.md#w020",
+    "scenario": "图书分页慢响应晚于音乐筛选切换",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W021",
+    "title": "带版本冲突的 autosave",
+    "source": "business.mjs#saveDraft",
+    "doc": "docs/coding/workshop-web-business.md#w021",
+    "scenario": "If-Match 版本冲突保留本地并展示远端稿",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W022",
+    "title": "Checkout 状态转移",
+    "source": "business.mjs#transitionCheckout",
+    "doc": "docs/coding/workshop-web-business.md#w022",
+    "scenario": "支付失败后重试且阻止重复成功回调",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W023",
+    "title": "按字段时间合并草稿",
+    "source": "business.mjs#mergeDraft",
+    "doc": "docs/coding/workshop-web-business.md#w023",
+    "scenario": "离线标题修改与服务端正文修改合并",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W024",
+    "title": "可分享 URL 筛选状态",
+    "source": "business.mjs#parseFilters",
+    "doc": "docs/coding/workshop-web-business.md#w024",
+    "scenario": "商品筛选页规范化页码、排序和重复标签",
+    "test": "business.test.mjs"
+  },
+  {
+    "id": "W025",
+    "title": "动态列表事件委托",
+    "source": "dom.mjs#delegate",
+    "doc": "docs/coding/workshop-web-dom.md#w025",
+    "scenario": "订单行动态追加后仍可点取消",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W026",
+    "title": "Disclosure ARIA 同步",
+    "source": "dom.mjs#setDisclosure",
+    "doc": "docs/coding/workshop-web-dom.md#w026",
+    "scenario": "同步发票详情可见性与 aria-expanded",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W027",
+    "title": "原生 dialog 焦点归还",
+    "source": "dom.mjs#setupDialog",
+    "doc": "docs/coding/workshop-web-dom.md#w027",
+    "scenario": "退款说明 modal 关闭后回到开启按钮",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W028",
+    "title": "Combobox active option 移动",
+    "source": "dom.mjs#moveActiveOption",
+    "doc": "docs/coding/workshop-web-dom.md#w028",
+    "scenario": "配送城市候选列表使用方向键循环",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W029",
+    "title": "IntersectionObserver 图片懒加载",
+    "source": "dom.mjs#observeImages",
+    "doc": "docs/coding/workshop-web-dom.md#w029",
+    "scenario": "商品列表图片接近视口后加载一次",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W030",
+    "title": "字段错误关联描述 ID",
+    "source": "dom.mjs#setFieldError",
+    "doc": "docs/coding/workshop-web-dom.md#w030",
+    "scenario": "保留邮箱帮助文字并关联校验错误",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W031",
+    "title": "模态框 Tab 边界围栏",
+    "source": "dom.mjs#wrapTab",
+    "doc": "docs/coding/workshop-web-dom.md#w031",
+    "scenario": "自建 modal 焦点不逃出可交互区域",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W032",
+    "title": "可重试表单提交门控",
+    "source": "dom.mjs#submitOnce",
+    "doc": "docs/coding/workshop-web-dom.md#w032",
+    "scenario": "资料保存期间忽略重复点击但失败后恢复",
+    "test": "dom.test.mjs"
+  },
+  {
+    "id": "W033",
+    "title": "Map 顺序 LRU",
+    "source": "engineering.mjs#LruCache",
+    "doc": "docs/coding/workshop-web-engineering.md#w033",
+    "scenario": "仪表盘只保留最近 100 个查询结果",
+    "test": "engineering.test.mjs"
+  },
+  {
+    "id": "W034",
+    "title": "读时淘汰 TTL cache",
+    "source": "engineering.mjs#TtlCache",
+    "doc": "docs/coding/workshop-web-engineering.md#w034",
+    "scenario": "验证码临时状态在截止点过期",
+    "test": "engineering.test.mjs"
+  },
+  {
+    "id": "W035",
+    "title": "Stale while revalidate",
+    "source": "engineering.mjs#createStaleWhileRevalidate",
+    "doc": "docs/coding/workshop-web-engineering.md#w035",
+    "scenario": "旧功能开关即时展示并在后台单飞刷新",
+    "test": "engineering.test.mjs"
+  },
+  {
+    "id": "W036",
+    "title": "稳定语义 cache key",
+    "source": "engineering.mjs#stableCacheKey",
+    "doc": "docs/coding/workshop-web-engineering.md#w036",
+    "scenario": "构建预览配置 key 对对象属性顺序稳定",
+    "test": "engineering.test.mjs"
+  },
+  {
+    "id": "W037",
+    "title": "算术表达式 tokenizer",
+    "source": "engineering.mjs#tokenize",
+    "doc": "docs/coding/workshop-web-engineering.md#w037",
+    "scenario": "小型表达式编辑器报告非法运算符位置",
+    "test": "engineering.test.mjs"
+  },
+  {
+    "id": "W038",
+    "title": "Pratt 表达式 evaluator",
+    "source": "engineering.mjs#evaluateExpression",
+    "doc": "docs/coding/workshop-web-engineering.md#w038",
+    "scenario": "计算器正确处理乘法优先级和括号",
+    "test": "engineering.test.mjs"
+  },
+  {
+    "id": "W039",
+    "title": "Canvas 高 DPI 矩形命中",
+    "source": "engineering.mjs#hitTestRect",
+    "doc": "docs/coding/workshop-web-engineering.md#w039",
+    "scenario": "高 DPI 画布点击落点从 CSS 映射至 backing store",
+    "test": "engineering.test.mjs"
+  },
+  {
+    "id": "W040",
+    "title": "帧预算 FIFO 准入",
+    "source": "engineering.mjs#takeFrameJobs",
+    "doc": "docs/coding/workshop-web-engineering.md#w040",
+    "scenario": "图表每帧限制 CPU 准备任务预算",
+    "test": "engineering.test.mjs"
+  }
+]

@@ -80,3 +80,13 @@ test('implemented but unexecuted does not become an executed model', () => {
   question.fields['依据与状态'] = '作者已实现并实跑，具体范围见测试说明。';
   assert.equal(makeManifest([question]).questions[0].implementation_status, 'implemented_model');
 });
+
+test('reader prose and hidden index records preserve complete question fields', () => {
+  const original = fixture();
+  original.fields['依据与状态'] += ' [参考](handwritten-practice-sources.md#s01)';
+  const metadata = labels.map(label => `- **${label}：**${original.fields[label]}`).join('\n');
+  const [question] = parseQuestions(`### H001. 可验证的题目\n\n先写出完整实现。\n\n<!-- Question record\n${metadata}\n-->`, 'page.md');
+  assert.deepEqual(validateQuestions([question], sources, 1), []);
+  assert.equal(question.fields['用例 A'], original.fields['用例 A']);
+  assert.deepEqual(question.refs, ['s01']);
+});

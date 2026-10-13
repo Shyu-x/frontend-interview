@@ -1,0 +1,290 @@
+[
+  {
+    "id": "G001",
+    "title": "有界订单工作池",
+    "source": "concurrency.go#WorkerMap",
+    "doc": "workshop-go-concurrency.md#g001",
+    "scenario": "批量补全订单且限制下游并发",
+    "test": "concurrency_test.go#TestG001WorkerMap"
+  },
+  {
+    "id": "G002",
+    "title": "多源遥测合流",
+    "source": "concurrency.go#FanIn",
+    "doc": "workshop-go-concurrency.md#g002",
+    "scenario": "将多个日志分区输入一个消费端并确保结束关闭",
+    "test": "concurrency_test.go#TestG002FanIn"
+  },
+  {
+    "id": "G003",
+    "title": "供应商报价扇出",
+    "source": "concurrency.go#FanOut",
+    "doc": "workshop-go-concurrency.md#g003",
+    "scenario": "并发查询多个供应商，首个错误触发取消",
+    "test": "concurrency_test.go#TestG003FanOut"
+  },
+  {
+    "id": "G004",
+    "title": "并发处理保持输入顺序",
+    "source": "concurrency.go#OrderedMap",
+    "doc": "workshop-go-concurrency.md#g004",
+    "scenario": "并行转换导出行但维持原始报表顺序",
+    "test": "concurrency_test.go#TestG004OrderedMap"
+  },
+  {
+    "id": "G005",
+    "title": "可取消的数据流水线",
+    "source": "concurrency.go#PipelineSum",
+    "doc": "workshop-go-concurrency.md#g005",
+    "scenario": "逐段聚合事件流且下游退出时上游可停",
+    "test": "concurrency_test.go#TestG005PipelineSum"
+  },
+  {
+    "id": "G006",
+    "title": "带超时的后端查询",
+    "source": "concurrency.go#WithDeadline",
+    "doc": "workshop-go-concurrency.md#g006",
+    "scenario": "为单次推荐服务调用设置截止时间",
+    "test": "concurrency_test.go#TestG006Deadline"
+  },
+  {
+    "id": "G007",
+    "title": "令牌桶请求限流",
+    "source": "concurrency.go#TokenBucket",
+    "doc": "workshop-go-concurrency.md#g007",
+    "scenario": "限制登录验证码接口突发和持续请求速率",
+    "test": "concurrency_test.go#TestG007TokenBucket"
+  },
+  {
+    "id": "G008",
+    "title": "带过期时间的并发缓存",
+    "source": "concurrency.go#TTLCache",
+    "doc": "workshop-go-concurrency.md#g008",
+    "scenario": "短暂缓存配置快照并在过期读取时回收条目",
+    "test": "concurrency_test.go#TestG008TTLCache"
+  },
+  {
+    "id": "G009",
+    "title": "合并相同键的并发回源",
+    "source": "concurrency.go#CallGroup",
+    "doc": "workshop-go-concurrency.md#g009",
+    "scenario": "同一用户资料缓存未命中时只发起一次数据库读取",
+    "test": "concurrency_test.go#TestG009CallGroup"
+  },
+  {
+    "id": "G010",
+    "title": "可取消并发信号量",
+    "source": "concurrency.go#Semaphore",
+    "doc": "workshop-go-concurrency.md#g010",
+    "scenario": "为图片转码或外部 RPC 固定并发上限",
+    "test": "concurrency_test.go#TestG010Semaphore"
+  },
+  {
+    "id": "G011",
+    "title": "带退避间隔的 GET 重试",
+    "source": "http.go#RetryGET",
+    "doc": "workshop-go-http.md#g011",
+    "scenario": "对临时 5xx 的幂等读取重试并关闭失败响应体",
+    "test": "http_test.go#TestG011RetryGET"
+  },
+  {
+    "id": "G012",
+    "title": "请求 ID 中间件",
+    "source": "http.go#RequestID",
+    "doc": "workshop-go-http.md#g012",
+    "scenario": "在访问日志与下游服务间传播请求追踪编号",
+    "test": "http_test.go#TestG012RequestID"
+  },
+  {
+    "id": "G013",
+    "title": "上传 JSON 大小限制",
+    "source": "http.go#DecodeJSONLimit",
+    "doc": "workshop-go-http.md#g013",
+    "scenario": "阻止超大 webhook 请求体耗尽服务器内存",
+    "test": "http_test.go#TestG013DecodeJSONLimit"
+  },
+  {
+    "id": "G014",
+    "title": "严格 JSON 解码",
+    "source": "http.go#DecodeStrictJSON",
+    "doc": "workshop-go-http.md#g014",
+    "scenario": "拒绝拼错字段的管理 API 配置更新",
+    "test": "http_test.go#TestG014StrictJSON"
+  },
+  {
+    "id": "G015",
+    "title": "安全分页切片",
+    "source": "http.go#Page",
+    "doc": "workshop-go-http.md#g015",
+    "scenario": "从内存报表按页返回 API 结果并处理越界页码",
+    "test": "http_test.go#TestG015Page"
+  },
+  {
+    "id": "G016",
+    "title": "Content-Length 边界校验",
+    "source": "http.go#ParseContentLength",
+    "doc": "workshop-go-http.md#g016",
+    "scenario": "校验上传元数据中的字节数并拦截溢出",
+    "test": "http_test.go#TestG016ContentLength"
+  },
+  {
+    "id": "G017",
+    "title": "有界 HTTP 响应读取",
+    "source": "http.go#ReadHTTPBody",
+    "doc": "workshop-go-http.md#g017",
+    "scenario": "读取供应商 API 返回并限制响应字节数",
+    "test": "http_test.go#TestG017ReadHTTPBody"
+  },
+  {
+    "id": "G018",
+    "title": "存活与就绪探针",
+    "source": "http.go#HealthHandler",
+    "doc": "workshop-go-http.md#g018",
+    "scenario": "应用存活时保持 liveness 成功但依赖断开时 readiness 失败",
+    "test": "http_test.go#TestG018HealthHandler"
+  },
+  {
+    "id": "G019",
+    "title": "流式统计非空行",
+    "source": "dataio.go#CountNonEmptyLines",
+    "doc": "workshop-go-streams.md#g019",
+    "scenario": "扫描大型应用日志而不把全文件载入内存",
+    "test": "dataio_test.go#TestG019CountLines"
+  },
+  {
+    "id": "G020",
+    "title": "读取可变列 CSV",
+    "source": "dataio.go#ParseCSV",
+    "doc": "workshop-go-streams.md#g020",
+    "scenario": "导入第三方对账文件并保留不同宽度记录",
+    "test": "dataio_test.go#TestG020ParseCSV"
+  },
+  {
+    "id": "G021",
+    "title": "原子替换状态文件",
+    "source": "dataio.go#AtomicWriteFile",
+    "doc": "workshop-go-streams.md#g021",
+    "scenario": "写本地任务检查点时避免崩溃留下半个 JSON 文件",
+    "test": "dataio_test.go#TestG021AtomicWrite"
+  },
+  {
+    "id": "G022",
+    "title": "限额复制并计算 SHA-256",
+    "source": "dataio.go#CopyHash",
+    "doc": "workshop-go-streams.md#g022",
+    "scenario": "边上传归档边校验摘要并硬限制最大文件大小",
+    "test": "dataio_test.go#TestG022CopyHash"
+  },
+  {
+    "id": "G023",
+    "title": "逐行解析 JSONL",
+    "source": "dataio.go#ParseJSONLines",
+    "doc": "workshop-go-streams.md#g023",
+    "scenario": "增量处理埋点导出记录并报告坏行号",
+    "test": "dataio_test.go#TestG023JSONLines"
+  },
+  {
+    "id": "G024",
+    "title": "清理上传文件名",
+    "source": "dataio.go#SafeUploadName",
+    "doc": "workshop-go-streams.md#g024",
+    "scenario": "将客户端文件名转为安全 basename 后再存入目标目录",
+    "test": "dataio_test.go#TestG024SafeUploadName"
+  },
+  {
+    "id": "G025",
+    "title": "最近最少使用缓存",
+    "source": "structures.go#LRU",
+    "doc": "workshop-go-structures.md#g025",
+    "scenario": "为容量有限的模板渲染器保留热键",
+    "test": "structures_test.go#TestG025LRU"
+  },
+  {
+    "id": "G026",
+    "title": "支持 Unicode 的前缀树",
+    "source": "structures.go#Trie",
+    "doc": "workshop-go-structures.md#g026",
+    "scenario": "实现中文城市名和站点名称的前缀搜索",
+    "test": "structures_test.go#TestG026Trie"
+  },
+  {
+    "id": "G027",
+    "title": "堆选出最小 K 项",
+    "source": "structures.go#KSmallest",
+    "doc": "workshop-go-structures.md#g027",
+    "scenario": "从大批商品价格中取最低 K 个进行促销分析",
+    "test": "structures_test.go#TestG027KSmallest"
+  },
+  {
+    "id": "G028",
+    "title": "合并排班闭区间",
+    "source": "structures.go#MergeIntervals",
+    "doc": "workshop-go-structures.md#g028",
+    "scenario": "合并相邻维护窗口后判断服务不可用时间段",
+    "test": "structures_test.go#TestG028MergeIntervals"
+  },
+  {
+    "id": "G029",
+    "title": "稳定去重",
+    "source": "structures.go#StableUnique",
+    "doc": "workshop-go-structures.md#g029",
+    "scenario": "规范化导入标签且保留用户首次选择顺序",
+    "test": "structures_test.go#TestG029StableUnique"
+  },
+  {
+    "id": "G030",
+    "title": "有序数组下界查找",
+    "source": "structures.go#LowerBound",
+    "doc": "workshop-go-structures.md#g030",
+    "scenario": "在价格索引中定位第一个满足门槛的项目",
+    "test": "structures_test.go#TestG030LowerBound"
+  },
+  {
+    "id": "G031",
+    "title": "原子计数器",
+    "source": "lifecycle.go#AtomicCounter",
+    "doc": "workshop-go-lifecycle.md#g031",
+    "scenario": "并发统计轻量级请求数而不保护无关状态",
+    "test": "lifecycle_test.go#TestG031AtomicCounter"
+  },
+  {
+    "id": "G032",
+    "title": "不超卖的库存预留",
+    "source": "lifecycle.go#Inventory",
+    "doc": "workshop-go-lifecycle.md#g032",
+    "scenario": "并发下单时将库存检查与扣减作为一个原子步骤",
+    "test": "lifecycle_test.go#TestG032Inventory"
+  },
+  {
+    "id": "G033",
+    "title": "幂等资源关闭",
+    "source": "lifecycle.go#OnceCloser",
+    "doc": "workshop-go-lifecycle.md#g033",
+    "scenario": "多个清理路径同时尝试关闭共享连接池",
+    "test": "lifecycle_test.go#TestG033OnceCloser"
+  },
+  {
+    "id": "G034",
+    "title": "可取消并等待的任务组",
+    "source": "lifecycle.go#TaskGroup",
+    "doc": "workshop-go-lifecycle.md#g034",
+    "scenario": "聚合多个下游请求，失败时取消兄弟任务并等待退出",
+    "test": "lifecycle_test.go#TestG034TaskGroup"
+  },
+  {
+    "id": "G035",
+    "title": "原子配置快照",
+    "source": "lifecycle.go#Snapshot",
+    "doc": "workshop-go-lifecycle.md#g035",
+    "scenario": "让请求线程无锁读取热更新的只读路由配置",
+    "test": "lifecycle_test.go#TestG035Snapshot"
+  },
+  {
+    "id": "G036",
+    "title": "带截止时间的 HTTP 优雅关停",
+    "source": "lifecycle.go#ShutdownHTTP",
+    "doc": "workshop-go-lifecycle.md#g036",
+    "scenario": "部署滚动更新时先排空连接，超时后强制关闭监听器",
+    "test": "lifecycle_test.go#TestG036ShutdownHTTP"
+  }
+]

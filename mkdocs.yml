@@ -55,6 +55,10 @@ theme:
 plugins:
   - search
 
+validation:
+  links:
+    anchors: warn
+
 markdown_extensions:
   - abbr
   - admonition
@@ -71,7 +75,9 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.betterem:
-      smart_enable: all
+      # Smart asterisks reject **中文标签：**正文; keep only smart underscores
+      # so snake_case stays literal while labels render without artificial spaces.
+      smart_enable: underscore
   - pymdownx.caret
   - pymdownx.details
   - pymdownx.emoji:
@@ -513,28 +519,48 @@ nav:
 - 编程实战:
   - 手写代码:
     - 概览: coding/index.md
-    - 真实题目与秋招练习:
-      - 前端与全栈题库：360 道合同化挑战: coding/handwritten-practice-360.md
-      - 手写题来源与证据分级: coding/handwritten-practice-sources.md
-      - 手写题目录：48 道规格与验收练习: coding/handwritten-question-catalog.md
-      - 真实场景题：异步、分页、SSR、Canvas 与协同: coding/real-interview-scenarios.md
-      - 简易动画引擎：时间线、状态与异常隔离: coding/animation-engine-handwritten.md
-      - 倒计时与打字机：绝对时间与 Unicode 字素: coding/deadline-clock-and-typewriter.md
-      - 秋招算法与协议：滑动窗口、版本与差分测试: coding/autumn-exam-algorithms.md
-      - 三道挑战题完整解答：拆帧、CAS 与代次句柄: coding/handwritten-challenge-solutions.md
+    - 练习与题解:
+      - 题库入口: coding/handwritten-practice-360.md
+      - 怎样练得自然: coding/coding-fluency.md
+      - 企业题型: coding/company-question-playbook.md
+      - 经典 48 题: coding/handwritten-question-catalog.md
+      - 场景专题: coding/real-interview-scenarios.md
+      - 动画引擎: coding/animation-engine-handwritten.md
+      - 倒计时与打字机: coding/deadline-clock-and-typewriter.md
+      - 秋招算法: coding/autumn-exam-algorithms.md
+      - 拆帧、CAS 与句柄: coding/handwritten-challenge-solutions.md
+    - JavaScript 与浏览器实战:
+      - 实战入口: coding/workshop-web-lab-index.md
+      - 链式调用与经典手写: coding/workshop-web-javascript.md
+      - 请求与异步: coding/workshop-web-async.md
+      - DOM 与键盘交互: coding/workshop-web-dom.md
+      - 业务状态: coding/workshop-web-business.md
+      - 缓存、解析与图形: coding/workshop-web-engineering.md
+    - Node.js 实战:
+      - 线程池与流: coding/workshop-node-workers-streams.md
+      - HTTP 与生命周期: coding/workshop-node-http-lifecycle.md
+      - 上传与存储: coding/workshop-node-upload-storage.md
+      - 服务韧性: coding/workshop-node-service-resilience.md
+      - 构建与配置: coding/workshop-node-build-config.md
+    - Go 实战:
+      - 并发任务: coding/workshop-go-concurrency.md
+      - HTTP 服务: coding/workshop-go-http.md
+      - 流与文件: coding/workshop-go-streams.md
+      - 数据结构: coding/workshop-go-structures.md
+      - 同步与关机: coding/workshop-go-lifecycle.md
     - 前端与全栈进阶题册:
-      - H049–H074：UI 与可访问组件: coding/practice-ui-components.md
-      - H075–H100：异步编排与调度: coding/practice-async-orchestration.md
-      - H101–H126：框架与状态系统: coding/practice-framework-state.md
-      - H127–H152：编译器与工具链: coding/practice-compilers-tooling.md
-      - H153–H178：Node 与 HTTP: coding/practice-node-http.md
-      - H179–H204：数据库与事务: coding/practice-databases-transactions.md
-      - H205–H230：鉴权与安全: coding/practice-auth-security.md
-      - H231–H256：分布式同步: coding/practice-distributed-sync.md
-      - H257–H282：算法与数据结构: coding/practice-algorithms-structures.md
-      - H283–H308：解析器与协议: coding/practice-parsers-protocols.md
-      - H309–H334：图形与媒体: coding/practice-graphics-media.md
-      - H335–H360：运行时与内存: coding/practice-runtime-memory.md
+      - UI 与可访问性: coding/practice-ui-components.md
+      - 异步调度: coding/practice-async-orchestration.md
+      - 框架与状态: coding/practice-framework-state.md
+      - 编译与工具: coding/practice-compilers-tooling.md
+      - Node 与 HTTP: coding/practice-node-http.md
+      - 数据库与事务: coding/practice-databases-transactions.md
+      - 鉴权与安全: coding/practice-auth-security.md
+      - 分布式同步: coding/practice-distributed-sync.md
+      - 算法与结构: coding/practice-algorithms-structures.md
+      - 解析与协议: coding/practice-parsers-protocols.md
+      - 图形与媒体: coding/practice-graphics-media.md
+      - 运行时与内存: coding/practice-runtime-memory.md
     - 异步与原生方法:
       - 原生方法: coding/native-methods.md
       - Promise 与异步控制: coding/promise-implementations.md

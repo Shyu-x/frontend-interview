@@ -1,15 +1,34 @@
 ---
 title: 手写代码概览
-description: 手写代码题总览：30 道高频手写题的分类、学习路径与参考资料。
+description: 从经典 JavaScript 到浏览器交互、Node.js 服务与 Go 并发，按需求连接手写练习、完整实现和自动测试。先从小例子理解状态，再独立编码、改变约束和检查失败路径，逐步建立能迁移到真实项目的代码熟练度。
 tags:
   - coding
   - interview
 date: 2026-05-17
+level: reference
+prerequisites:
+  - JavaScript 函数、数组、对象和 Promise
+runnable: false
+verified_at: 2026-10-13
+source_commit: a489bf9bbebe96c3653c0dbe6bf1e97343aaf655
 ---
 
 # 手写代码概览
 
-> 本栏目收录 30 道高频前端手写题，每道题均提供完整、可运行的实现代码，按主题分页整理。
+从一个具体需求开始。先手算例子，再写状态和函数，最后跑测试。想提高独立编码能力，先读[怎样练得自然](coding-fluency.md)。想选题，打开[练习与题解入口](handwritten-practice-360.md)。
+
+新增实战有 106 道完整题解。Web 40 道，Node 30 道，Go 36 道。代码带注释，每题有测试。360 道限时练习另按 H 编号保留，不把题面数量当成已完成题解数量。
+
+| 想练什么 | 学习入口 |
+| --- | --- |
+| 经典函数与链式调用 | [JavaScript 实战](workshop-web-javascript.md) |
+| 请求、DOM 和业务状态 | [异步](workshop-web-async.md)、[DOM](workshop-web-dom.md)、[业务](workshop-web-business.md) |
+| 缓存、解析器和图形 | [工程实战](workshop-web-engineering.md) |
+| 真线程池、流和 HTTP | [Node 线程与流](workshop-node-workers-streams.md)、[HTTP](workshop-node-http-lifecycle.md) |
+| 上传、幂等和构建 | [存储](workshop-node-upload-storage.md)、[韧性](workshop-node-service-resilience.md)、[构建](workshop-node-build-config.md) |
+| Go 并发与服务 | [并发](workshop-go-concurrency.md)、[HTTP](workshop-go-http.md)、[生命周期](workshop-go-lifecycle.md) |
+| Go 文件与算法 | [流与文件](workshop-go-streams.md)、[数据结构](workshop-go-structures.md) |
+| 企业题型与场景 | [企业索引](company-question-playbook.md)、[场景专题](real-interview-scenarios.md) |
 
 ## 1. 范围与用法
 
