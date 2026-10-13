@@ -25,3 +25,13 @@ test('closed cycle without an accepting boundary requires full reload', () => {
   const graph = new ModuleGraph(); graph.add('a', ['b']); graph.add('b', ['a']);
   assert.equal(graph.invalidate('a').fullReload, true);
 });
+test('an accepting sibling does not hide a separate closed importer cycle', () => {
+  const graph = new ModuleGraph();
+  graph.add('changed');
+  graph.add('accepting', ['changed']);
+  graph.add('a', ['changed', 'b']);
+  graph.add('b', ['a']);
+  const result = graph.invalidate('changed', new Set(['accepting']));
+  assert.equal(result.fullReload, true);
+  assert.deepEqual(result.boundaries, new Set(['accepting']));
+});

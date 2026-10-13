@@ -24,7 +24,17 @@ export class ModuleGraph {
       if (!parents?.size) return { fullReload: true, invalidated: visited, boundaries };
       queue.push(...parents);
     }
-    // A closed cycle with no accept boundary cannot produce a safe update either.
-    return { fullReload: boundaries.size === 0, invalidated: visited, boundaries };
+    // Every invalidated branch must reach an accepting boundary. One accepted
+    // sibling cannot make a separate closed importer cycle safe to update.
+    const covered = new Set(boundaries);
+    const pending = [...boundaries];
+    for (let cursor = 0; cursor < pending.length; cursor++) {
+      for (const dependency of this.#imports.get(pending[cursor]) ?? []) {
+        if (!visited.has(dependency) || covered.has(dependency)) continue;
+        covered.add(dependency);
+        pending.push(dependency);
+      }
+    }
+    return { fullReload: [...visited].some(id => !covered.has(id)), invalidated: visited, boundaries };
   }
 }
