@@ -1,6 +1,11 @@
 ---
 title: "渲染性能优化：布局、绘制与合成"
-description: "让每一帧都不超过 16ms"
+description: "从样式、布局、绘制与合成解释渲染成本，区分代码触发布局和浏览器实际更新。结合长列表、动画和读写交错设计测量，通过帧预算、性能轨迹与资源清理验证优化是否有效。"
+tags: [performance, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 渲染性能优化：布局、绘制与合成

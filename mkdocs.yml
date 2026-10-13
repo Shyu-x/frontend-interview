@@ -522,6 +522,7 @@ nav:
     - 练习与题解:
       - 题库入口: coding/handwritten-practice-360.md
       - 怎样练得自然: coding/coding-fluency.md
+      - 原理到完整项目: coding/implementation-paths.md
       - 企业题型: coding/company-question-playbook.md
       - 经典 48 题: coding/handwritten-question-catalog.md
       - 场景专题: coding/real-interview-scenarios.md

@@ -2,14 +2,16 @@
 title: "WebGL 与 WebGPU 资源生命周期：状态机、绑定与提交"
 description: "比较 WebGL 隐式状态机与 WebGPU 显式 pipeline、buffer、bind group 和 render pass；通过资源预算、draw call 归并、同步陷阱、销毁与设备丢失，建立可观测的 GPU 生命周期管理。"
 tags: [browser, webgl, webgpu, gpu]
-date: 2026-10-12
+date: 2026-10-13
 level: advanced
 prerequisites:
   - JavaScript Promise 与二进制数据
   - WebGL 顶点/片元着色器基础
 runnable: false
-verified_at: 2026-10-12
+verified_at: 2026-10-13
+verified_scope: 只核对新增的通用资源租约与 GPUBuffer.destroy 说明。
 source_commit: f12e7868b4cb9d491512d7f0f372e329a5d2bc0f
+implementation_source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # WebGL 与 WebGPU 资源生命周期：状态机、绑定与提交
@@ -28,6 +30,26 @@ flowchart TD
   G[设备丢失或 context lost] --> H[重建资源与状态]
   F --> G
 ```
+
+## 资源预算与幂等释放 {#handwrite-gpu-resource-lease}
+
+显式 GPU API 要求应用管理 buffer、texture 等对象的生命周期；释放路径可能来自正常卸载，也可能来自设备丢失后的重建。资源管理器应先从账本删除租约，再调用销毁回调，这样回调抛错或重复清理都不会让同一份预算被重复计数。[WebGPU：GPUBuffer.destroy](https://www.w3.org/TR/webgpu/#dom-gpubuffer-destroy)
+
+[`resource-lease.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/resource-lease.mjs) 是可运行的通用预算模型，不创建真实 GPU 对象。它演示容量上限、唯一 key、幂等 release 和 `disposeAll`；运行 `node --test scripts/implementation-labs/systems/resource-lease.test.mjs`，观察超额申请会失败且两次清理只调用一次销毁。
+
+管理器保存 `key → {bytes, destroy, released}`，申请前把当前账本与新资源大小相加，超过预算就拒绝创建。释放闭包首先移除账本记录并标记 released，再调用 `destroy()`；顺序很重要，因为 GPU 回收回调可能抛错，预算也不能因此永久占住。批量设备丢失清理需要继续尝试其它资源，最后聚合错误统一报告，否则第一个异常就会让后续 buffer 泄漏。
+
+```js
+if (pool.bytes + bytes > pool.budgetBytes) throw new Error('budget exceeded');
+const release = pool.acquire(key, bytes, () => gpuBuffer.destroy());
+device.addEventListener('lost', () => {
+  try { pool.disposeAll(); }
+  catch (error) { reportCleanupFailures(error.errors); }
+  recreateDeviceResources();
+}, { once: true });
+```
+
+这里的管理器是通用生命周期账本，实际 `GPUDevice` 丢失事件需由创建 device 的组件连接。GPU buffer 的字节数不等于实际显存消耗；纹理对齐、驱动分配与浏览器策略都可能使预算估值偏小，因此要留余量并处理 `device.lost` 后的重建。
 
 1. WebGL 主要通过可变的 context state 工作：当前 program、buffer、纹理单元、blend/depth 状态影响后续命令。
 2. WebGPU 将 shader、vertex layout、primitive/depth/blend 等组合成显式 pipeline，再通过 bind group 绑定资源，命令写入 encoder/pass 后提交 queue。

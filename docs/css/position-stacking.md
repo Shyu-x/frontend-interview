@@ -1,11 +1,32 @@
 ---
 title: position 与层叠上下文
-description: 五种 position、包含块、sticky 与 fixed 失效、z-index 与层叠上下文。
+description: 通过固定定位、变换祖先和层叠上下文的 HTML/CSS 结构，判断包含块与绘制顺序，定位弹层被遮挡的原因，并用开发者工具逐层观察修复是否有效。
 tags:
   - css
+date: 2026-10-13
+level: intermediate
+prerequisites: [CSS 盒模型, position 属性, z-index]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # position 与层叠上下文
+
+### 诊断“z-index 加到很大仍被遮挡” {#handwrite-stacking-diagnosis}
+
+先找元素参与的 stacking context，再找该上下文与遮挡元素上下文的共同祖先；子元素的 `z-index: 999999` 不能越过父级 stacking context 与兄弟上下文排序。若弹层祖先带 `transform`、`filter` 或 containment，也要检查它是否建立了新的包含块或堆叠上下文。定位与包含块的规则可查 [MDN containing block](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Display/Containing_block)。
+
+验证要用浏览器开发者工具检查 computed styles 和实际祖先链：纯 HTML 结构不能确定最终遮挡，因为层叠还受 stacking context、position 和绘制阶段共同约束。本页这次更新核对的是诊断模型，不是全页浏览器兼容审计。
+
+修复顺序是先删除不必要的祖先 `transform`，再决定弹层是否应提升到更高的 DOM 层（例如 dialog/top layer），最后才比较同一上下文里的 `z-index` 数值。把数值加到百万但没有检查共同祖先，只会掩盖真正的上下文隔离问题。
+
+```css
+.panel { position: relative; z-index: 1; transform: translateZ(0); }
+.panel .menu { position: fixed; z-index: 9999; }
+.global-dialog { position: fixed; z-index: 2; }
+```
+
+这里 `.menu` 仍受 `.panel` 的上下文约束，所以全局 dialog 可能盖在它上面。逐层在 DevTools 里取消 `transform` 并观察层级变化，可以区分“创建了新上下文”和“值不够大”两种原因。弹层跨越页面区域时，优先使用 dialog/top layer 或 portal 到共享根节点，再按同一层级比较 z-index。
 
 
 ## 1. position 属性

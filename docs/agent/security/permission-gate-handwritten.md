@@ -1,6 +1,14 @@
 ---
 title: "手写权限闸门：规则引擎、审批与审计"
-description: "把权限做成可测试的纯逻辑"
+description: "读文件和删文件可能使用同一套 JSON-RPC 信封，但权限不能由相同信封推出来。先确定调用者身份，再解析工具参数，最后对具体资源作决定。模型返回的 allow 字样、工具描述的 readOnlyHint 和页面文字都不是授权凭据。"
+tags: [ai-agent, security, tools]
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 手写权限闸门：规则引擎、审批与审计
@@ -11,6 +19,30 @@ description: "把权限做成可测试的纯逻辑"
     3. 按用户、项目、会话范围合并规则，并用超时机制处理挂起的审批。
     4. 记录带决策理由的审计日志，回放历史请求找出规则变化导致的不一致。
 
+## 批准之后才允许产生副作用 {#approval-boundary}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)核对 MCP 2026-07-28 tools。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+读文件和删文件可能使用同一套 JSON-RPC 信封，但权限不能由相同信封推出来。先确定调用者身份，再解析工具参数，最后对具体资源作决定。模型返回的 allow 字样、工具描述的 readOnlyHint 和页面文字都不是授权凭据。权限门必须放在执行函数之前，否则记录一次拒绝也阻止不了已经发生的写入。
+
+```js
+import { invokeWithApproval } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+let writes = 0;
+const decision = await invokeWithApproval(
+  'delete-note', { id: 'note-7' },
+  async () => false, // 本次策略明确拒绝，不依赖模型自报安全性。
+  async () => { writes += 1; return 'deleted'; },
+);
+console.log(decision.reason, writes); // denied 0
+```
+
+先运行拒绝路径，再运行批准路径。拒绝时 writes 必须为零，批准时才允许增加一次。第三个测试让审批函数抛错，也不能执行工具。不要把 UI 提示框的显示当作审批完成；异步审批尚未返回时，执行函数还不应开始。
+
+真实应用还要把审批绑定到规范化参数。用户批准读取 A 文件后，工具不能在审批结束前把参数对象换成 B 文件。先解析、复制并冻结这次决定使用的参数，再送入审批与执行。文件访问还需检查真实路径和符号链接，URL 访问还需出口策略；这个小函数不替代这些服务端检查。
+
+A005 的测试验证批准与拒绝的调用次数。运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。将它接入 MCP 时，宿主的批准与服务器的身份、scope 校验各守一道边界。public 缓存描述、合法工具名称或成功版本探测，都不能跳过其中任何一道。
 ## 0. 知识地图
 
 ```mermaid

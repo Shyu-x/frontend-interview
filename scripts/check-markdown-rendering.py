@@ -39,6 +39,8 @@ def main():
         ("- **难度/限时：**中。**实现路径：**代码", "<strong>实现路径：</strong>"),
         ("**强调**中文，**HTTP：**请求", "<strong>HTTP：</strong>"),
         ("snake_case_identifier", "snake_case_identifier"),
+        ('!!! tip "先写失败用例"\n    请求超时后，不再更新已卸载的视图。', 'class="admonition tip"'),
+        ('`!!! tip` 是提示块标记，代码示例不应被误报。', '<code>!!! tip</code>'),
     ]
     for source, expected in fixtures:
         html = renderer.reset().convert(source)
@@ -56,6 +58,12 @@ def main():
         leaked = pattern.findall("".join(prose.parts))
         if leaked:
             failures.append(f"{page}: unparsed labels {leaked[:5]}")
+        # Inline !!! labels are not admonitions. Exclude code examples above,
+        # then catch malformed markers that actually reach the reader.
+        markers = re.findall(r"!!!\s+(?:tip|note|warning|danger|abstract|example|question)\b",
+                             "".join(prose.parts))
+        if markers:
+            failures.append(f"{page}: unparsed admonitions {markers[:5]}")
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1

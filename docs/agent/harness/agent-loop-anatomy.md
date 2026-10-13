@@ -1,9 +1,44 @@
 ---
 title: "Agent Loop 解剖：一次对话到底发生了什么"
-description: "对照 pi-agent-core 真实源码，逐步讲清 agent loop"
+description: "一次模型返回不一定是最终答案。它可能要求调用工具，工具结果还要作为下一轮的输入。先写清楚模型输入、工具建议和执行结果三种数据，再决定谁推动下一轮。下面使用本地假模型测试控制流，不调用付费 API。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Agent Loop 解剖：一次对话到底发生了什么
+
+## 把下一轮和停止条件写进循环 {#agent-loop-stop-state}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 Official function-calling guide checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+一次模型返回不一定是最终答案。它可能要求调用工具，工具结果还要作为下一轮的输入。先写清楚模型输入、工具建议和执行结果三种数据，再决定谁推动下一轮。下面使用本地假模型测试控制流，不调用付费 API。runAgentLoop 接收的 reply 是项目内部结构，不是假装任意厂商 SDK 都直接返回这个对象。
+
+```js
+import { runAgentLoop } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+let turns = 0;
+const result = await runAgentLoop({
+  maxTurns: 2,
+  tools: new Map([['sum', ({ a, b }) => a + b]]),
+  model: async () => ++turns === 1
+    ? { toolCalls: [{ id: 'c1', name: 'sum', arguments: { a: 1, b: 2 } }] }
+    : { content: '计算完成' },
+});
+console.log(result.reason, result.turns); // final 2
+```
+
+第一轮只提出建议。注册表决定有没有这个工具，执行器运行它，并把结果带着 c1 放进 transcript。第二轮才得到计算结果。不能把工具结果当成新的用户授权，也不能按数组位置猜它属于哪个调用。工具查找要排除对象原型上的 toString 等属性，使用 Map 或显式 own-property 检查。
+
+循环每轮都检查取消信号，并限制总轮数。一个不断返回工具调用的假模型应在 maxTurns 处停止；一直返回未知工具也不能绕开轮数限制。本模块按顺序执行工具，尚未实现工具独立超时、权限策略和总 token 限额，这些要接到执行层而不是只写在提示词里。
+
+A006 的测试检查工具结果进入下一轮和预算停止。接厂商 API 时增加一层适配器，把协议里的 call_id、参数字符串和工具结果映射到内部结构。Responses API、Agents API 与 Agents SDK 的控制权不同，不能复制一个自动执行工具的 SDK 例子，就认为手写循环也会自动执行。
 
 !!! abstract "学完这一页你能"
     - 按事件顺序画出一次 run 从 `prompt` 到 `agent_end` 的完整流程，并标出每个 `turn` 的边界。

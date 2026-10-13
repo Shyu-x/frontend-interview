@@ -1,0 +1,396 @@
+{
+  "verified_at": "2026-10-13",
+  "scope": "仅核查以下新增章节中的明确协议规则、运行时版本声明与对应实现实验；不代表对各页旧正文作全页事实审计。",
+  "pages": [
+    {
+      "path": "docs/browser/http-cache.md",
+      "sectionAnchor": "handwrite-cache-age",
+      "implementationIds": [
+        "S001"
+      ],
+      "sources": [
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.3",
+          "claim": "current_age 合并 apparent age、Age、响应延迟与驻留时间",
+          "version": "RFC 9111，2022"
+        }
+      ]
+    },
+    {
+      "path": "docs/browser/browser-databases-query-plans.md",
+      "sectionAnchor": "handwrite-browser-sql-explain",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://duckdb.org/docs/stable/guides/meta/explain",
+          "claim": "EXPLAIN 输出查询的优化后物理计划，EXPLAIN ANALYZE 运行并计量实际计划",
+          "version": "DuckDB stable documentation，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/browser/canvas-scene-graph-hit-testing.md",
+      "sectionAnchor": "handwrite-canvas-singular",
+      "implementationIds": [
+        "S010"
+      ],
+      "sources": [
+        {
+          "url": "https://html.spec.whatwg.org/multipage/canvas.html",
+          "claim": "Canvas 2D context transform 采用二维仿射矩阵映射",
+          "version": "WHATWG HTML Living Standard，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/browser/webgl-webgpu-resource-lifecycle.md",
+      "sectionAnchor": "handwrite-gpu-resource-lease",
+      "implementationIds": [
+        "S012"
+      ],
+      "sources": [
+        {
+          "url": "https://www.w3.org/TR/webgpu/#dom-gpubuffer-destroy",
+          "claim": "GPUBuffer.destroy 释放其关联的 GPU 资源",
+          "version": "WebGPU W3C Working Draft，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/runtime/nodejs-streams-backpressure.md",
+      "sectionAnchor": "handwrite-stream-backpressure-boundary",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://nodejs.org/docs/latest-v24.x/api/stream.html#buffering",
+          "claim": "Writable.write 返回 false 表示达到背压条件，应等待 drain",
+          "version": "Node.js v24 Stream API，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/runtime/nodejs-core.md",
+      "sectionAnchor": "handwrite-node-callback-budget",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop",
+          "claim": "JavaScript 回调执行仍占用事件循环线程，CPU 密集操作会阻塞其他回调",
+          "version": "Node.js Learn，正文与链接核验于 2026-10-14",
+          "checked_at": "2026-10-14"
+        }
+      ]
+    },
+    {
+      "path": "docs/runtime/bun-guide.md",
+      "sectionAnchor": "handwrite-bun-release-status",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://bun.sh/blog",
+          "claim": "Bun 官方发布索引截至核验日期列出 1.4.3",
+          "version": "Bun 1.4.3，2026-10-10"
+        }
+      ]
+    },
+    {
+      "path": "docs/runtime/deno-guide.md",
+      "sectionAnchor": "handwrite-deno-release-status",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://deno.com/blog/v2.9",
+          "claim": "Deno 2.9 的 deno install 可读取其他包管理器锁文件",
+          "version": "Deno 2.9，2026-06-25"
+        },
+        {
+          "url": "https://nodejs.org/docs/latest-v24.x/api/typescript.html",
+          "claim": "Node v24.12 稳定启用类型剥离且不执行类型检查",
+          "version": "Node.js v24.12+ TypeScript support，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/network/deep-dive/http-caching-conditional-range.md",
+      "sectionAnchor": "handwrite-range-parser",
+      "implementationIds": [
+        "S002"
+      ],
+      "sources": [
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html#section-14",
+          "claim": "Range 字节区间语法及不可满足范围的响应语义",
+          "version": "RFC 9110，2022"
+        }
+      ]
+    },
+    {
+      "path": "docs/network/websocket-protocol-handwritten.md",
+      "sectionAnchor": "handwrite-websocket-frame-boundary",
+      "implementationIds": [
+        "S004"
+      ],
+      "sources": [
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc6455.html#section-5.2",
+          "claim": "WebSocket 帧格式定义掩码、负载长度和 RSV 位",
+          "version": "RFC 6455，2011"
+        }
+      ]
+    },
+    {
+      "path": "docs/network/nginx-proxy.md",
+      "sectionAnchor": "handwrite-proxy-trust-boundary",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://nginx.org/en/docs/http/ngx_http_realip_module.html",
+          "claim": "real_ip 模块用 set_real_ip_from 指定可信地址来源",
+          "version": "nginx realip module 文档，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/api/gateway-bff-rate-limiting.md",
+      "sectionAnchor": "handwrite-api-retry-budget",
+      "implementationIds": [
+        "S005",
+        "S006"
+      ],
+      "sources": [
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html#section-10.2.3",
+          "claim": "Retry-After 响应字段可提供重试等待时间",
+          "version": "RFC 9110，2022"
+        }
+      ]
+    },
+    {
+      "path": "docs/api/sse-longpolling-webtransport.md",
+      "sectionAnchor": "handwrite-sse-fragment-parser",
+      "implementationIds": [
+        "S003"
+      ],
+      "sources": [
+        {
+          "url": "https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream",
+          "claim": "SSE 解析算法规定字段行、事件 data 缓冲与 dispatch 条件",
+          "version": "WHATWG HTML Living Standard，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/api/rest-fundamentals.md",
+      "sectionAnchor": "handwrite-rest-retry-semantics",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2",
+          "claim": "幂等方法重复执行的预期效果与单次相同",
+          "version": "RFC 9110，2022"
+        }
+      ]
+    },
+    {
+      "path": "docs/security/cors.md",
+      "sectionAnchor": "handwrite-cors-preflight-boundary",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://fetch.spec.whatwg.org/#cors-protocol",
+          "claim": "CORS 协议区分预检与实际请求的响应检查",
+          "version": "Fetch Standard Living Standard，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/security/csrf.md",
+      "sectionAnchor": "handwrite-csrf-samesite-boundary",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html",
+          "claim": "OWASP 推荐结合 CSRF token 与来源校验防御状态变更请求",
+          "version": "OWASP Cheat Sheet，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/security/same-origin-policy.md",
+      "sectionAnchor": "handwrite-sop-read-boundary",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://html.spec.whatwg.org/multipage/browsers.html#origins",
+          "claim": "origin 由 scheme、host 与 port 或 opaque origin 表示",
+          "version": "WHATWG HTML Living Standard，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/web-vitals-rum-monitoring.md",
+      "sectionAnchor": "handwrite-rum-bounded-batch",
+      "implementationIds": [
+        "S011"
+      ],
+      "sources": [
+        {
+          "url": "https://www.w3.org/TR/beacon/",
+          "claim": "sendBeacon 返回值表示用户代理接受排队而非服务器已收到",
+          "version": "W3C Beacon Recommendation，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/large-file-upload.md",
+      "sectionAnchor": "handwrite-upload-cancel-commit",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://fetch.spec.whatwg.org/#abortcontroller-interface",
+          "claim": "AbortController 通过 AbortSignal 通知可取消的异步操作",
+          "version": "Fetch Standard Living Standard，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/memory-profiling.md",
+      "sectionAnchor": "handwrite-heap-snapshot-risk",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://nodejs.org/docs/latest-v24.x/api/v8.html#v8writeheapsnapshotfilename-options",
+          "claim": "生成 V8 heap snapshot 需要遍历进程堆且可能导致进程内存耗尽",
+          "version": "Node.js v24 V8 API，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/engineering/vite-hmr-internals.md",
+      "sectionAnchor": "handwrite-hmr-invalidation-graph",
+      "implementationIds": [
+        "S007"
+      ],
+      "sources": [
+        {
+          "url": "https://vite.dev/guide/api-hmr",
+          "claim": "Vite HMR API 通过接受依赖与更新回调定义模块边界",
+          "version": "Vite HMR API，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/engineering/sourcemap-vlq.md",
+      "sectionAnchor": "handwrite-vlq-bounded-codec",
+      "implementationIds": [
+        "S009"
+      ],
+      "sources": [
+        {
+          "url": "https://tc39.es/ecma426/#sec-base64-vlq",
+          "claim": "VLQSignedValue 限制有符号32位，sign-only B 返回负2的31次方；BigInt不能扩大格式取值范围",
+          "version": "ECMA-426 2026-09-11 草案，32位与 B 特殊值核验于 2026-10-14",
+          "checked_at": "2026-10-14"
+        }
+      ]
+    },
+    {
+      "path": "docs/engineering/supply-chain-lockfile-security.md",
+      "sectionAnchor": "handwrite-lockfile-integrity-check",
+      "implementationIds": [
+        "S008"
+      ],
+      "sources": [
+        {
+          "url": "https://docs.npmjs.com/cli/v11/configuring-npm/package-lock-json",
+          "claim": "package-lock 格式分别记录 resolved 地址与 integrity 摘要",
+          "version": "npm CLI v11 package-lock 文档，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/build-tools/vite-deep-dive.md",
+      "sectionAnchor": "handwrite-vite-supported-line",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://vite.dev/releases",
+          "claim": "Vite 官方支持页列出仍受支持的主要和次要维护分支",
+          "version": "Vite release policy，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/build-tools/bundler-comparison.md",
+      "sectionAnchor": "handwrite-bundler-benchmark-contract",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://vite.dev/blog/announcing-vite8.html",
+          "claim": "Vite 8 正式以 Rolldown 作为统一 bundler",
+          "version": "Vite 8.0，2026-03-12"
+        }
+      ]
+    },
+    {
+      "path": "docs/package-manager/pnpm-deep-dive.md",
+      "sectionAnchor": "handwrite-pnpm-lock-reproducibility",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://pnpm.io/blog?type=releases",
+          "claim": "pnpm 官方 release 索引列出 12.13.0 发行记录",
+          "version": "pnpm 12.13.0，2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/package-manager/yarn-berry.md",
+      "sectionAnchor": "handwrite-yarn-pnp-boundary",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://yarnpkg.com/features/pnp",
+          "claim": "Plug’n’Play 通过生成依赖映射而不是 node_modules 遍历解析包",
+          "version": "Yarn 4 PnP 文档，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/web-apis/web-crypto-api.md",
+      "sectionAnchor": "handwrite-webcrypto-timing-boundary",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues",
+          "claim": "getRandomValues 单次调用的参数缓冲区最多 65536 字节",
+          "version": "Web Crypto API W3C Recommendation，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/web-apis/webcodecs-media-pipelines.md",
+      "sectionAnchor": "handwrite-webcodecs-queue-backpressure",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://www.w3.org/TR/webcodecs/#dom-videodecoder-decodequeuesize",
+          "claim": "decodeQueueSize 表示队列中尚待处理的 decode request 数量",
+          "version": "WebCodecs W3C Working Draft，核验于 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/web-apis/messaging-workers-broadcast.md",
+      "sectionAnchor": "handwrite-transfer-ownership",
+      "implementationIds": [],
+      "sources": [
+        {
+          "url": "https://html.spec.whatwg.org/multipage/structured-data.html#transferable-objects",
+          "claim": "结构化数据转移使 transferable 的所有权转到接收环境",
+          "version": "WHATWG HTML Living Standard，核验于 2026-10-13"
+        }
+      ]
+    }
+  ]
+}

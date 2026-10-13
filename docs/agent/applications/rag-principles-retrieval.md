@@ -1,9 +1,46 @@
 ---
 title: "RAG：原理与检索系统"
-description: "RAG 的核心原理与检索系统：向量检索、混合检索与重排序。"
+description: "关键词分数可能大于一，向量距离可能越小越好。直接取 max 会让量纲决定结果。先给每个检索器内部排序，再使用名次融合。下面实现简化的 reciprocal rank fusion，只用于合并已经授权的候选，不决定文档真实性，也不能弥补某个检"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # RAG：原理与检索系统
+
+## 不同检索分数先转换成名次 {#handwrite-rank-fusion}
+
+
+本节对照[官方资料](https://www.postgresql.org/docs/current/textsearch-controls.html)核对 PostgreSQL text search ranking documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+关键词分数可能大于一，向量距离可能越小越好。直接取 max 会让量纲决定结果。先给每个检索器内部排序，再使用名次融合。下面实现简化的 reciprocal rank fusion，只用于合并已经授权的候选，不决定文档真实性，也不能弥补某个检索器漏掉关键资料的问题。
+
+```js
+function fuseRanks(rankedLists, offset = 60) {
+  const scores = new Map();
+  for (const list of rankedLists) {
+    const seen = new Set();
+    list.forEach((id, index) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      scores.set(id, (scores.get(id) ?? 0) + 1 / (offset + index + 1));
+    });
+  }
+  return [...scores].sort((a, b) => b[1] - a[1]);
+}
+```
+
+先对单个列表去重，避免同一文档在同一检索器中重复加分。再把各列表的贡献相加。offset 是算法参数，不是普遍最优值，应在自己的数据集上测试。并列结果还可按规范 ID 加稳定次序，避免每次结果抖动影响缓存和模型输入。
+
+与 A012 比较。A012 适用于同尺度分数的重复证据，只保留较高分；本例按多个检索来源的名次累计，二者解决的问题不同。融合之后再做上下文预算截断，确保一篇长文不会挤掉全部其他证据。
+
+手算两个短列表再运行函数，检查排名改变是否符合预期。失败例包括同列表重复 ID、越权候选和无有效结果。权限过滤必须在融合之前完成，不能认为算法只做排序就与安全无关。本段为算法教学示例，尚未加入仓库运行目录的自动测试。
 
 !!! abstract "学完这一页你能"
 

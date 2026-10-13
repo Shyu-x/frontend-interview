@@ -1,10 +1,16 @@
 ---
 title: pnpm 深度解析
-description: 详解 pnpm 的 Hard Link、Symlink 机制、Content-addressable Store、幽灵依赖问题解决和 workspace 配置。
+description: 以 pnpm 12 官方文档解释内容寻址存储、虚拟 store 与 workspace lockfile 的职责，并用 frozen install、脚本许可和 tarball integrity 失败证据检查依赖图是否可复现。
 tags:
   - package-manager
   - pnpm
-date: 2026-05-17
+date: 2026-10-13
+level: advanced
+prerequisites: [Node.js modules, package lockfiles, symlink]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对 pnpm 12.13 发布状态和新增锁文件说明。
 ---
 
 # pnpm 深度解析
@@ -14,6 +20,39 @@ date: 2026-05-17
 ---
 
 ## 1. 核心设计理念
+
+## 锁文件冻结的是解析状态，不是安装环境的所有因素 {#handwrite-pnpm-lock-reproducibility}
+
+截至 2026-10-13，pnpm 官方发布记录已到 12.13.0；pnpm 12 是 Rust CLI 线，pnpm 11 则继续维护 JavaScript CLI。lockfile 即使固定版本和完整性，也不能固定 Node ABI、操作系统可选依赖、安装脚本输出或外部 registry 的可用性。[pnpm 12.13 release](https://pnpm.io/blog?type=releases) · [pnpm 12.0 release](https://pnpm.io/blog/releases/12.0)
+
+CI 应按项目的 `packageManager` 字段选择版本，使用 frozen install，且在独立工作区对比 `pnpm-lock.yaml` 是否变化。构建脚本许可要按项目配置显式审核；允许安装脚本运行与锁文件完整性验证是两个不同控制。
+
+Node 项目把 pnpm 版本固定在 `package.json` 的 packageManager 字段后，CI 还要启用对应的 Corepack/官方安装器并验证实际 CLI 版本。随后运行冻结安装，若 lockfile 因平台、peer dependency 或配置差异被重写，任务应失败并要求开发者提交明确的锁文件更新，而不是在 CI 中静默求解最新依赖。
+
+```sh
+node --version
+pnpm --version
+pnpm install --frozen-lockfile
+git diff --exit-code -- pnpm-lock.yaml
+pnpm run test
+pnpm run build
+```
+
+逐步读安装图时看 importer snapshot、package 解析版本、registry resolution 和 integrity；再检查 `.pnpm` 虚拟目录如何链接内容寻址 store。硬链接让相同内容共享文件数据，但项目 `node_modules` 与 store 的目录项仍不同；跨文件系统时实现不能假定 hard link 一定可用。幽灵依赖应通过隔离布局暴露，而不是依赖偶然 hoist。
+
+安装验收伪代码如下；实际项目把 CLI 固定到 `packageManager` 字段，再在隔离工作树执行这些步骤：
+
+```pseudocode
+读取仓库 packageManager 与 pnpm-lock.yaml
+核对本次执行的 pnpm 精确版本
+在无 node_modules 的干净工作树开始安装
+使用 frozen 模式还原锁定的依赖图
+如果 lockfile diff 非空则让 CI 失败
+运行脚本许可审查后执行 test 和 build
+将 registry、平台和 Node ABI 写入报告
+```
+
+步骤顺序能分开定位 CLI 漂移、锁文件漂移、平台差异和生命周期脚本失败。若为了让 CI 通过而关闭 frozen 模式，依赖求解已经改变，测试结果不能代表 lockfile 的可复现性。
 
 pnpm（performant npm）由 Node.js 核心贡献者 Zoltan Kochan 创建，主要解决：
 

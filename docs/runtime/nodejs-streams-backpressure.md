@@ -1,6 +1,14 @@
 ---
 title: "Node.js Stream 与背压：highWaterMark 与 pipeline"
-description: "四种流、缓冲与背压的完整机制"
+description: "解释 Node.js 流的缓冲上限、write 返回 false 与 drain 恢复条件，并结合可复现实验说明背压如何限制生产速度和内存增长。"
+tags: [runtime, node, streams]
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, EventEmitter]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 仅核查新增的 Node.js 24 Stream API 段落。
 ---
 
 # Node.js Stream 与背压：highWaterMark 与 pipeline
@@ -1649,3 +1657,22 @@ React 文档提供 `onShellReady` 与 `abort` 两个钩子，让外壳先发出�
 - Node.js 官方文档 `stream.pipeline` 与 `stream.promises.pipeline`。
 - Node.js 官方文档 `Readable.toWeb`、`Readable.fromWeb`、`Writable.toWeb`、`Writable.fromWeb`。
 - MDN Web Docs：Streams API concepts、ReadableStream、WritableStream、Backpressure。
+
+## Node.js 24 中背压信号的边界 {#handwrite-stream-backpressure-boundary}
+
+`writable.write(chunk)` 返回 `false` 表示写队列达到或超过 `highWaterMark`；调用方应暂停继续生产，等 `drain` 再继续。`false` 不表示当前 chunk 丢失，也不表示写入已失败。Node.js 文档要求等待 `drain`，否则持续写入可能累积内存并导致进程退出。[Node.js v24 Stream API](https://nodejs.org/docs/latest-v24.x/api/stream.html#buffering)
+
+`pipeline` 负责把错误和销毁传播到整条流链，但它不能替业务决定取消策略，例如客户端断开后是否重试、是否删除临时文件。每条实际管线还要核对 `AbortSignal` 的生命周期和下游可恢复性。[Node.js v24 `stream.pipeline`](https://nodejs.org/docs/latest-v24.x/api/stream.html#streampipeline)
+
+最小消费端应等 `drain` 才继续生产。`write()` 返回 true 时，数据仍可能缓存在用户态队列；返回 false 时暂停不是可选优化，而是上游遵守下游容量的反馈信号。Node 文档建议在持续写入前检查写入结果，否则内存占用会跟输入量增长。
+
+```js
+import { once } from 'node:events';
+for await (const chunk of source) {
+  if (!destination.write(chunk)) await once(destination, 'drain');
+}
+destination.end();
+await once(destination, 'finish');
+```
+
+真实代码还要将 `error` 和 `close` 同时纳入等待，否则目的流先失败或关闭时，`once('drain')` 可能永远不恢复。优先用 `pipeline(source, destination, { signal })` 管理错误传播，再对不可恢复的业务副作用编排清理。测试应使用故意慢速的 Writable，验证其 `write()` 曾返回 false，随后产生 drain，最后确认所有字节按序到达。

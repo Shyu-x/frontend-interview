@@ -1,6 +1,15 @@
 ---
 title: HTTP 缓存
-description: 强缓存与协商缓存、Cache-Control、ETag 与 Last-Modified、缓存决策与服务端实现。
+description: 从 RFC 9111 的 current_age 算法推导缓存新鲜度，区分私有与共享缓存的寿命，并用可控时钟复现 Age、Date、响应延迟对缓存命中的影响。
+tags: [browser, http, cache]
+date: 2026-10-13
+level: intermediate
+prerequisites: [HTTP 响应头, Date 时间戳]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 RFC 9111 current_age 算法实验。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # HTTP 缓存
@@ -511,4 +520,24 @@ Nginx 对静态文件默认开启 ETag，浏览器用 `If-None-Match` 验证并�
 - 修改 JS 内容后引用 URL 变化，旧 URL 没有被新内容覆盖。
 - curl 带 `If-None-Match` 请求返回 `304 Not Modified`。
 - 实验报告列出首次与第二次请求流量差。
+
+## 缓存年龄不是“从收到响应开始计时” {#handwrite-cache-age}
+
+RFC 9111 的 `current_age` 会先计算响应在到达客户端前已经消耗的寿命，再加上驻留时间。代理的 `Age` 不能简单加在浏览器计时上，因为网络响应延迟也要计入校正后的初始年龄。[RFC 9111 §4.2.3](https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.3)
+
+仓库实现把时钟作为输入，便于重放边界：[`http-cache-age.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/http-cache-age.mjs)。`currentAgeMs` 返回 RFC 算法的毫秒结果，`freshness` 对共享缓存优先选 `s-maxage`。运行 `node --test scripts/implementation-labs/systems/http-cache-age.test.mjs` 可看到 Age、响应延迟、`s-maxage` 边界分别如何影响结果。
+
+读实现时依次跟四个值：`apparentAge = max(0, responseTime - Date)`；`responseDelay = responseTime - requestTime`；`correctedInitialAge = max(apparentAge, Age + responseDelay)`；`currentAge = correctedInitialAge + residentTime`。时钟倒退会把驻留时间截为零，避免时间源纠偏产生负年龄。第一步让 `Age` 为零，验证 `Date` 已经过期会增加年龄；第二步提高 `Age`，看它是否超过 apparent age；第三步移动当前时钟，验证新鲜度会在 `max-age` 边界严格变为 stale。
+
+```js
+const apparent = Math.max(0, responseMs - dateMs);
+const delay = Math.max(0, responseMs - requestMs);
+const corrected = Math.max(apparent, ageSeconds * 1000 + delay);
+const resident = Math.max(0, nowMs - responseMs);
+return corrected + resident;
+```
+
+反例：只用 `now - responseTime` 会把代理已经缓存了十分钟的响应当成刚收到的新内容。若浏览器收到 `Age: 600` 且响应刚抵达，实际年龄仍至少十分钟；即使本地 `max-age=900`，最多只剩五分钟新鲜期。
+
+这段模型没有解析 `Cache-Control` 语法，也不实现启发式缓存、`no-cache`、`Vary` 或存储策略。生产代理必须在解析头、缓存键和响应授权后再使用年龄判定；不要把“fresh”理解成“允许共享”。
 

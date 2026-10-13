@@ -1,10 +1,16 @@
 ---
 title: 打包工具对比
-description: 对比主流打包工具 Webpack、Rollup、Parcel、esbuild 的核心特性、Tree-shaking 原理与代码分割策略。
+description: 对比 Webpack、Rollup、Parcel、esbuild、Vite 与 Rolldown 的模块图和扩展边界，要求以固定项目、版本和缓存状态测量构建时间、产物体积与运行行为。
 tags:
   - build-tools
   - webpack
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [ES modules, tree shaking, code splitting]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 benchmark 条件说明和 Vite 8 架构来源。
 ---
 
 # 打包工具对比
@@ -26,6 +32,24 @@ date: 2026-05-17
 | **Tree-shaking** | 支持（需配置） | 原生支持 | 自动 | 原生 |
 | **代码分割** | splitChunks | manualChunks | 自动 | 不支持 |
 | **适用场景** | 大型应用 | NPM 库 | 快速原型 | 性能关键 |
+
+## 性能排名必须绑定工作负载 {#handwrite-bundler-benchmark-contract}
+
+同一个 bundler 的耗时会受冷暖缓存、插件、压缩器、source map、并发数和文件系统影响。对比表里的“快/慢”只有在固定输入提交、机器、工具版本、缓存策略和运行次数后才有意义；否则应将单元格改成“测量方法”，不保留跨机器的绝对结论。
+
+Vite 8 的官方公告说明其构建改为 Rolldown，但这只能支持“架构组件变化”这一结论，不能推出它在任意仓库的收益比例。[Vite 8 announcement](https://vite.dev/blog/announcing-vite8.html) 记录中位数、离散程度、错误率与最终产物哈希，避免只对比一次 wall time。
+
+benchmark 分为 cold install、cold build、warm build 三种场景，不能混用。先用同一 commit、锁文件与浏览器目标，在独立临时目录安装每个工具；预热一次后重复至少 5 次，按中位数和 P95 报告 wall time，同时记录 peak RSS、输出字节数和 chunk 数。启动时间更短但输出不等价，不算可比结果。
+
+```pseudocode
+固定 commit + lockfile + Node 版本
+为每个 bundler 固定 config 与压缩/sourcemap 设置
+清理产物但保留依赖，记录 cold build
+连续运行 5 次 warm build，采集 wall time / RSS
+比较输出 hash、文件字节数、HTTP 请求与功能测试
+```
+
+解释结果时注明机器型号、OS、文件系统缓存、CPU 限频、电源模式和插件版本。若测试机不同，性能倍数不能直接横比；若只运行一次，改写成“观察到的单次值”，不使用排名词。
 
 ### 1.2 工作原理对比
 

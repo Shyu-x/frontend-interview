@@ -1,9 +1,45 @@
 ---
 title: "决策层"
-description: "Agent 分层架构之决策层：规划、策略选择与行动决策。"
+description: "决策层输出不是可直接执行的代码。先限定动作集合，再解析模型输出。它可以回答、检索或申请一个已注册工具，不能临时创造一个 shell 命令并自动得到执行资格。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 决策层
+
+## 路由输出要先变成受限动作 {#handwrite-decision-routing}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 OpenAI function calling documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+决策层输出不是可直接执行的代码。先限定动作集合，再解析模型输出。它可以回答、检索或申请一个已注册工具，不能临时创造一个 shell 命令并自动得到执行资格。动作要携带本次任务的预算和权限上下文，但这些上下文由系统注入，不能让模型自己填写已授权标志。
+
+```pseudocode
+decide(proposal, context):
+    if proposal.kind == answer: return FinalAnswer(proposal.text)
+    if proposal.kind not in [retrieve, tool]: return InvalidDecision
+    if context.cancelled: return Cancelled
+    if context.remainingTurns == 0: return BudgetExceeded
+    if proposal.kind == retrieve:
+        return SearchWithinAuthorizedScope(proposal.query, context.identity)
+    tool = registry.lookupOwnEntry(proposal.name)
+    if tool is missing: return UnknownTool
+    args = validateAgainstToolSchema(proposal.arguments)
+    return AwaitApproval(tool, args, context.identity)
+```
+
+先拒绝未知 kind，再处理已经取消或超限的任务。检索与工具走不同路径，检索范围不能由一个任意字符串放大。工具参数通过 schema 后还要经过审批，所以 AwaitApproval 不是执行成功。把状态变化显式返回，上层界面才知道该显示等待、失败还是完成。
+
+路由可以用规则，也可以由模型建议。规则能保证确定边界，模型能处理语义选择；二者不是互相替代。模型选错工具时记录工具名称、参数和失败类别，不把失败说明塞进一个无限重试循环。
+
+A006/A007 提供循环和预算机制。对决策层另写输入测试，包含未知工具、额外字段、非法 JSON 和已经取消的任务。通过条件不是“模型大多数时候听话”，而是这些输入不会运行未注册处理器，也不会越过预算或审批。
 
 !!! abstract "学完这一页你能"
     - 用一句话说清决策层的职责边界：它接收什么、产出什么、不负责什么。

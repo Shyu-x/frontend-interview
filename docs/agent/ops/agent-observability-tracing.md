@@ -1,9 +1,47 @@
 ---
 title: "Agent 可观测：trace、会话回放与线上事故排查"
-description: "看不见就修不了"
+description: "一条总耗时只能告诉你慢了，不能告诉你慢在哪。先给一次请求创建 trace，再分别记录模型、审批和工具执行的 span。每个 span 保留开始、结束、结果类别和父节点。工具参数里可能有密钥和个人资料，不能因为调试方便就把整份输入写进日志。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Agent 可观测：trace、会话回放与线上事故排查
+
+## 用父子跨度解释一次工具调用 {#handwrite-call-spans}
+
+
+本节对照[官方资料](https://opentelemetry.io/docs/concepts/signals/traces/)核对 OpenTelemetry tracing documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+一条总耗时只能告诉你慢了，不能告诉你慢在哪。先给一次请求创建 trace，再分别记录模型、审批和工具执行的 span。每个 span 保留开始、结束、结果类别和父节点。工具参数里可能有密钥和个人资料，不能因为调试方便就把整份输入写进日志。
+
+```pseudocode
+requestSpan = startSpan("assistant-request")
+try:
+    modelSpan = startChild(requestSpan, "model")
+    try: proposal = await model()
+    finally: finishSpan(modelSpan, modelStatus)
+    approvalSpan = startChild(requestSpan, "approval")
+    try: decision = await checkPermission(proposal)
+    finally: finishSpan(approvalSpan, approvalStatus)
+    if decision.allowed:
+        toolSpan = startChild(requestSpan, "tool", safeToolName(proposal))
+        try: await executeTool(proposal)
+        finally: finishSpan(toolSpan, executionStatus)
+finally: finishSpan(requestSpan, requestStatus)
+```
+
+先把父子关系串好，再采集耗时。审批等待不应该算成工具 CPU 时间；重试也不能偷偷复用一个看不见次数的 span。并发工具的时间会重叠，父 span 总时间不等于子 span 时间相加。每个异常出口都要结束 span，否则看板上会留下永远进行中的请求。
+
+日志保存安全工具名、调用 ID、错误类别和经过策略批准的摘要。对密钥字段在记录前删除，而不是展示时再遮挡；原日志已经写出去后，界面脱敏无法收回它。trace ID 只是关联键，不是用户身份或授权证据。
+
+先用 A006 的假模型生成确定轨迹，核对父子关系和结束状态。再延迟审批与工具，检查图上能分别看见等待和执行。取消时应得到 cancelled 的终态跨度，而不是一条没有结束时间的记录。生产监控另需采样、存储上限和保留策略。
 
 !!! abstract "学完这一页你能"
     - 把一次 Agent 会话的事件流按 `spanId` 和 `parentId` 组装成一棵可查询的 trace 树。

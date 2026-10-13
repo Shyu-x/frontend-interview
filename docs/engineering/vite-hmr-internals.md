@@ -1,6 +1,15 @@
 ---
 title: "Vite 底层：预构建、按需编译、HMR 与插件容器"
-description: "dev server 架构与 Rolldown 迁移"
+description: "沿 Vite 模块导入图追踪 HMR 边界，说明 self-accept、依赖 accept 与整页回退如何影响更新范围，并按当前 Vite 8/Rolldown 版本核对公开 API 和迁移边界。"
+tags: [engineering, vite, hmr]
+date: 2026-10-13
+level: advanced
+prerequisites: [ES modules, graph traversal, Vite plugin API]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的图失效模型和 Vite HMR API 页面。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Vite 底层：预构建、按需编译、HMR 与插件容器
@@ -1217,4 +1226,36 @@ function stopTicker() { /* 取消 requestAnimationFrame */ }
 - 删掉 `accept` 后同一改动触发整页刷新，并能说明边界搜索走到根的过程。
 - 连续改动 3 次，`dispose` 的清理逻辑有效，不出现重复定时器或重复事件监听。
 - 对比表里每条结论都标明观测环境与所用工具，没有把 dev 数据当作 build 结论。
+
+## HMR 边界是沿 importer 链向上寻找接受者 {#handwrite-hmr-invalidation-graph}
+
+模块发生变化后，更新能否局部应用取决于依赖链上是否找到接受该变化的边界；没有任何 importer 的链会回退到完整刷新。循环依赖需要 visited 集合，否则图遍历会无限循环。[Vite HMR API](https://vite.dev/guide/api-hmr)
+
+[`module-invalidation.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/module-invalidation.mjs) 用导入者反向边演示边界搜索。运行 `node --test scripts/implementation-labs/systems/module-invalidation.test.mjs`，测试局部接受、入口回退和环图；它刻意不实现 Vite 的模块 URL、失效传播细节或 WebSocket 通信。
+
+为一个模块记录它直接 import 的集合，同时维护反向 `importer` 集合。发生变更时从变更模块开始向 importer 方向广度优先遍历：每访问一次放入 visited，命中接受边界就停止该分支；没有 importer 到达图根则整页刷新；如果整张可达子图形成环而无任何接受者，也不能假设安全更新。更新依赖集合时必须先清除旧的 reverse edge，避免删除了 import 却仍把旧父模块纳入 HMR。
+
+```js
+const queue = [changedId];
+while (queue.length) {
+  const id = queue.shift();
+  if (visited.has(id)) continue;
+  visited.add(id);
+  if (accepts.has(id)) { boundaries.add(id); continue; }
+  const parents = importers.get(id);
+  if (!parents?.size) return { fullReload: true, visited };
+  queue.push(...parents);
+}
+const covered = new Set(boundaries), pending = [...boundaries];
+for (let cursor = 0; cursor < pending.length; cursor++) {
+  for (const dependency of imports.get(pending[cursor]) ?? []) {
+    if (!visited.has(dependency) || covered.has(dependency)) continue;
+    covered.add(dependency);
+    pending.push(dependency);
+  }
+}
+return { fullReload: [...visited].some(id => !covered.has(id)), visited };
+```
+
+发现接受边界后，沿它的 import 边回溯已访问的节点。每个失效节点都必须被某个接受边界覆盖；一个兄弟分支接受更新，不能让另一条闭环自动变安全。测试包括这条混合拓扑，以及局部接受、入口回退、环图和依赖重写。这个模型不等同于 Vite 实现，真实 HMR 还处理模块 URL、transport、插件 hook 与客户端生命周期。
 

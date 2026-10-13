@@ -1,13 +1,42 @@
 ---
 title: Agent 工具与基础设施
-description: 调研 Composio、SwarmClaw、Claude Code、AutoGPT、MCP、LiteLLM 等 Agent 工具与基础设施，并给出选型指南。
+description: "规范里叫 Server，不代表 npm 包一定导出一个 MCPServer 类。先分清协议对象、SDK API 与宿主配置，再选择依赖。"
 tags:
   - open-source
   - ai-agents
-date: 2026-05-17
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Agent 工具与基础设施
+
+## 先验证协议，再选择 SDK {#handwrite-protocol-without-sdk-guessing}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/specification/2026-07-28/basic)核对 MCP 2026-07-28。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+规范里叫 Server，不代表 npm 包一定导出一个 MCPServer 类。先分清协议对象、SDK API 与宿主配置，再选择依赖。无 SDK 的小实现可以让你看见 wire format，SDK 则减少传输和 schema 细节的维护负担。两者都必须锁定具体版本，并验证它支持的协议年代。
+
+```js
+import { makeRequest, dispatch } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const message = makeRequest(7, 'tools/call', {
+  name: 'sum', arguments: { a: 4, b: 5 },
+});
+const response = dispatch(message);
+console.log(response.id, response.result.structuredContent.value); // 7 9
+```
+
+这个例子没有猜测官方 SDK 导出。先生成每请求元数据，再由 dispatcher 检查信封、版本和工具输入，最后把响应 ID 原样返回。接 SDK 时，用已安装包的类型定义和官方对应版本示例核对导入路径，不从旧博客拼接一个不存在的类。
+
+2026-07-28 不使用旧版 initialize 握手。旧 SDK 即使能安装，也未必理解 server/discover、resultType 或新的缓存字段。需要旧版互通时明确启用旧协议路径，不能把它的测试结果当作新规范的通过证据。目录里出现某个服务器名字同样不证明它支持所有扩展。
+
+A001/A002 的源码与真实端点测试提供当前子集。对第三方 SDK 另做一条实际连接测试，保存客户端版本、服务器版本、协议版本与调用结果。只跑本地 dispatch 是数据层测试，真实 HTTP、stdio 和第三方宿主互通必须分别记录。
 
 > 本文是「Agent 开源生态」系列第 2 篇（共 2 篇）。上一篇：[Agent 开发框架](agent-frameworks.md)
 
@@ -1066,176 +1095,21 @@ graph TB
 | 企业数据源连接 | 4/5 | 安全访问 |
 | 多框架工具共享 | 5/5 | 一次开发多处使用 |
 
-### 5.6 MCP 服务器示例
+### 5.6 手写服务端，不猜测 SDK 导出
 
-```typescript
-import { MCPServer, Tool, Resource, Prompt } from "@modelcontextprotocol/sdk";
+这里使用仓库内的原生 Node 教学实现，不再保留无法对应真实包导出的 MCPServer、Tool 或 MCPClient 示例。服务端以每请求元数据分发 server/discover、tools/list 和 tools/call，完整校验与传输见[协议教程](../../agent/mcp/mcp-integration.md)。
 
-// 创建 MCP 服务器
-const server = new MCPServer({
-  name: "weather-mcp-server",
-  version: "1.0.0",
-  description: "天气查询 MCP 服务器",
-});
-
-// 定义工具
-server.tool({
-  name: "get_weather",
-  description: "获取指定城市的当前天气",
-  inputSchema: {
-    type: "object",
-    properties: {
-      city: { 
-        type: "string",
-        description: "城市名称（中文或英文）",
-      },
-      units: {
-        type: "string",
-        enum: ["celsius", "fahrenheit"],
-        default: "celsius",
-      },
-    },
-    required: ["city"],
-  },
-  
-  // 处理函数
-  handler: async ({ city, units = "celsius" }) => {
-    console.log(`[weather] 查询城市: ${city}`);
-    
-    // 实际项目中调用天气 API
-    const weatherData = await fetchWeather(city, units);
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: `当前${city}天气：${weatherData.condition}，气温${weatherData.temp}°C，湿度${weatherData.humidity}%`,
-        },
-      ],
-      // 可选的元数据
-      meta: {
-        source: "weather-api",
-        timestamp: new Date().toISOString(),
-      },
-    };
-  },
-});
-
-// 定义资源
-server.resource({
-  uri: "weather://cities",
-  name: "City List",
-  description: "支持的城市列表",
-  mimeType: "application/json",
-  
-  handler: async () => {
-    return {
-      contents: [
-        {
-          uri: "weather://cities/list",
-          mimeType: "application/json",
-          text: JSON.stringify({
-            cities: ["北京", "上海", "广州", "深圳", "杭州"],
-          }),
-        },
-      ],
-    };
-  },
-});
-
-// 定义提示模板
-server.prompt({
-  name: "weather_report",
-  description: "生成天气报告",
-  
-  arguments: [
-    {
-      name: "city",
-      description: "城市名称",
-      required: true,
-    },
-    {
-      name: "days",
-      description: "预报天数",
-      required: false,
-    },
-  ],
-  
-  handler: async ({ city, days = 3 }) => {
-    return {
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `请为 ${city} 生成一份 ${days} 天的天气预报，包括温度范围、天气状况和建议。`,
-          },
-        },
-      ],
-    };
-  },
-});
-
-// 启动服务器（stdio 模式）
-server.start();
-
-// 或 HTTP + SSE 模式
-server.start({
-  transport: "http-sse",
-  port: 3000,
-});
+```js
+import { makeRequest, dispatch } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const request = makeRequest(1, 'tools/call', { name: 'sum', arguments: { a: 2, b: 3 } });
+console.log(dispatch(request).result.structuredContent.value); // 5
 ```
 
-### 5.7 客户端使用
+### 5.7 客户端关联调用
 
-```typescript
-import { MCPClient } from "@modelcontextprotocol/client";
+[并发客户端](../../agent/mcp/mcp-integration.md#rpc-client-pending-map)使用 ID 到 Promise 的 Map，处理乱序、超时和关闭。[HTTP 教学客户端](../../agent/mcp/mcp-integration.md#http-client-send)只接收本课 JSON 响应，不宣称支持完整 SSE 绑定。
 
-// 创建客户端连接
-async function useMCPServer() {
-  const client = new MCPClient({
-    // stdio 连接
-    command: "node",
-    args: ["./weather-server.js"],
-    
-    // 或 HTTP 连接
-    // url: "http://localhost:3000/mcp",
-  });
-
-  await client.connect();
-  console.log("[client] MCP 客户端已连接");
-
-  // 发现可用工具
-  const tools = await client.listTools();
-  console.log("可用工具:", tools.map((t) => t.name));
-
-  // 发现可用资源
-  const resources = await client.listResources();
-  console.log("可用资源:", resources.map((r) => r.uri));
-
-  // 调用工具
-  const weatherResult = await client.callTool("get_weather", { 
-    city: "北京",
-    units: "celsius",
-  });
-  console.log("天气结果:", weatherResult);
-
-  // 访问资源
-  const cities = await client.readResource("weather://cities");
-  console.log("城市列表:", cities);
-
-  // 使用提示模板
-  const promptResult = await client.getPrompt("weather_report", {
-    city: "上海",
-    days: 5,
-  });
-  console.log("提示结果:", promptResult);
-
-  await client.disconnect();
-}
-
-useMCPServer();
-```
+SDK 接入先锁定具体包版本，再核对对应导出和协议版本。初始化型旧 SDK 的互通结果不能当作 2026-07-28 无会话协议的通过证据。
 
 ### 5.8 深度分析
 
@@ -1257,8 +1131,8 @@ sequenceDiagram
     participant C as MCP Client
     participant S as MCP Server
     
-    H->>C: 初始化请求
-    C->>S: JSON-RPC: initialize
+    H->>C: 发起工具请求
+    C->>S: server/discover 与每请求元数据
     S-->>C: capabilities
     
     H->>C: 工具调用请求
@@ -1646,7 +1520,7 @@ graph TD
 | 资源 | 为什么读 | 怎么读 |
 |---|---|---|
 | [Model Context Protocol 文档](https://modelcontextprotocol.io/) | MCP 是本页核心基础设施，先建立客户端/服务器角色的整体认知。 | 读 Introduction 后跑 quickstart，弄清 host、client、server 各负责什么，再回到自己的接入场景。 |
-| [MCP 规范](https://modelcontextprotocol.io/specification) | 读懂 transport 与 lifecycle 才能写出真正合规的 MCP 服务器。 | 重点读 lifecycle 初始化协商与 stdio/HTTP transport 差异，对照自己的实现逐条核对。 |
+| [MCP 规范](https://modelcontextprotocol.io/specification) | 读懂 transport 与 lifecycle 才能写出真正合规的 MCP 服务器。 | 对照 2026-07-28 的逐请求元数据、版本选择与 stdio/HTTP 绑定；旧生命周期只作迁移对照。 |
 | [Claude Code 文档](https://code.claude.com/docs/en/overview) | Claude Code 是主流水线工具，官方文档覆盖命令、hooks 与子 Agent。 | 按 slash commands、hooks、subagents 顺序实操，每节跑通示例再决定是否引入团队流程。 |
 | [Claude Tool Use 概览](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview) | 工具定义 schema 是 Agent 调用失败的高频原因，值得逐字理解。 | 手写一遍 JSON schema 与参数描述，故意构造错误传参观察模型如何纠正。 |
 | [AutoGPT](https://github.com/Significant-Gravitas/AutoGPT) | AutoGPT 是自主 Agent 的早期范式，理解其局限能避免重复踩坑。 | 浏览架构与任务循环文档，记录其规划与记忆设计的失效点，与你的方案对照。 |

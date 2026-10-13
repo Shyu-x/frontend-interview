@@ -1,10 +1,17 @@
 ---
 title: 包管理器全景图
-description: npm / pnpm / Yarn 三足鼎立，面试必考核心差异，详解三大包管理器的核心机制与选型建议。
+description: 从解析锁定、依赖链接和安装脚本权限三个维度比较 npm、pnpm 与 Yarn，给出按项目 packageManager 固定工具版本、在 CI 验证锁文件与构建结果的检查路径。
 tags:
   - package-manager
   - npm
-date: 2026-05-17
+date: 2026-10-13
+level: reference
+prerequisites: [package.json, Node.js basics]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 pnpm 发布状态与 Yarn PnP 说明。
+---
 ---
 
 # 包管理器全景图
@@ -14,6 +21,20 @@ date: 2026-05-17
 ---
 
 ## 1. 本章范围
+
+## 选型前先固定包管理器的解析输入 {#handwrite-package-manager-resolution-inputs}
+
+包管理器行为不只由命令决定，还受精确 CLI 版本、lockfile 格式、workspace 配置、registry、Node 版本和平台可选依赖影响。`packageManager` 字段可以声明项目期望的工具及版本，但 CI 仍要确保 Corepack 或对应执行器按该字段运行，并使用不可变安装模式。
+
+截至 2026-10-13，pnpm 官方记录已列出 12.13.0；Yarn 4 的官方文档仍以 Berry/PnP 机制为主。不要把 2024 年版本对比表中的“快慢”视作当前性能排序；按同一依赖树和缓存状态运行自己的安装基准。[pnpm release log](https://pnpm.io/blog?type=releases) · [Yarn PnP](https://yarnpkg.com/features/pnp)
+
+对每个仓库先抄录 packageManager 字段、Node 版本、lockfile 文件名、workspace 声明和安装脚本策略。再在干净工作目录使用固定 CLI 做不可变安装、构建和测试；最终比较 lockfile 是否被改动、Node 模块查找是否有隐式依赖、平台可选二进制是否正确安装。性能测量另外报告 warm/cold cache，而不是把官网 benchmark 外推。
+
+| 输入证据 | 核查结果 |
+| --- | --- |
+| packageManager 和 lockfile | 唯一决定 CLI 及依赖解析快照 |
+| install lifecycle policy | 明确允许哪些依赖脚本执行 |
+| clean install output | 没有隐式 lockfile 变更或未声明依赖 |
 
 本章讲解 npm、pnpm、Yarn 的核心机制差异：先看三者全景与选型，再分别深入 pnpm 的内容寻址存储与 workspace，以及 Yarn Berry 的 PnP 与 Zero-install。
 

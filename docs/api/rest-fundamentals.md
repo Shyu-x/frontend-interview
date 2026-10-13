@@ -1,6 +1,14 @@
 ---
 title: "REST 基础：资源、方法、状态码"
-description: "从 Fielding 的约束讲到日常用法"
+description: "从 HTTP 方法语义校正资源操作设计，结合 RFC 9110 的安全性与幂等性规则说明重试边界、条件更新和成功响应应提供的表示证据。"
+tags: [api, rest, http]
+date: 2026-10-13
+level: intermediate
+prerequisites: [HTTP 方法与状态码, JSON 表示]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 RFC 9110 方法幂等性说明。
 ---
 
 # REST 基础：资源、方法、状态码
@@ -103,7 +111,7 @@ console.log(missingConstraints(myDesign));
 
 运行结果：
 
-```text
+```pseudocode
 [ 'cacheable', 'layered-system' ]
 ```
 
@@ -176,7 +184,7 @@ server.close();
 
 运行结果：
 
-```text
+```pseudocode
 约束检查通过，服务响应头符合可缓存与自描述消息
 ```
 
@@ -1766,3 +1774,23 @@ async function putOp(req, res, boardId, opId) {      // 单例资源：一笔操
 - RFC 8288：Web Linking，重点阅读链接关系与 Link 头。
 - Roy Fielding 论文：Architectural Styles and the Design of Network-based Software Architectures，重点阅读第 5 章 Representational State Transfer。
 - Martin Fowler 博客：Richardson Maturity Model，重点核对 Level 0 到 Level 3 的原文示例。
+
+## 方法幂等性决定安全重试边界 {#handwrite-rest-retry-semantics}
+
+RFC 9110 将幂等性定义为多次相同请求的预期效果等同于一次请求。`PUT` 和 `DELETE` 通常具备幂等语义，`POST` 默认不具备；网络超时发生在服务端提交之后时，客户端无法仅凭“没收到响应”判断副作用是否发生。[RFC 9110 §9.2.2](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2)
+
+设计可重试的创建接口时，服务端应把幂等键与请求结果原子关联，并定义相同 key、不同 payload 时的错误响应。幂等键是应用协议约定，不会自动让数据库事务、邮件发送或下游副作用一起原子化。
+
+对 POST 创建，服务端可把 `(authenticated principal, idempotency key)` 作为唯一索引，并保存请求摘要、处理中/完成状态和最终响应。请求摘要用于识别同一个 key 被错误地复用于另一个 payload；事务把“创建资源”和“记录幂等结果”一起提交，重试时返回同一个结果而不重复副作用。外部邮件等事务外效果需用 outbox 或另一个幂等消费者处理。
+
+```pseudocode
+验证用户身份与请求结构
+按用户与幂等键查询记录
+若存在且摘要不同: 返回冲突，不执行动作
+若存在且状态完成: 返回之前的 status 与 body
+否则事务内插入 pending 记录并创建资源
+事务提交时记录最终响应
+返回 201 与资源 Location
+```
+
+超时重试必须使用原幂等键；生成新 key 会把它变成另一项创建请求。验收模拟“服务端提交后、响应发出前断开”，客户端原 key 重试后只能得到一个资源 ID；相同 key 换 payload 则必须冲突。

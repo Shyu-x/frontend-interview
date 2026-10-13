@@ -40,6 +40,11 @@ jobs:
           cd scripts/teaching-labs/go
           go test ./...
           go test -race ./...
+      - name: Verify implementation-first teaching and dated evidence
+        run: |
+          node --test scripts/check-implementation-teaching.test.mjs
+          node scripts/check-implementation-teaching.mjs
+          node --test scripts/implementation-labs/agent/*.test.mjs scripts/implementation-labs/frontend/*.test.mjs scripts/implementation-labs/systems/*.test.mjs
       - name: Metadata gate for new and modified pages
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}

@@ -1,6 +1,11 @@
 ---
 title: "前端的 CI/CD 与容器化：缓存、产物与发布策略"
-description: "流水线设计、构建缓存与部署策略"
+description: "把前端发布拆成依赖安装、构建、测试、镜像和部署步骤，说明每层输入与可复现边界。通过锁文件、缓存、环境变量和回滚策略检查流水线，避免本机能运行却无法可靠发布。"
+tags: [engineering, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 前端的 CI/CD 与容器化：缓存、产物与发布策略

@@ -1,6 +1,11 @@
 ---
 title: "多 Agent 的缺陷：MAST 失败分类与工程对策"
-description: "为什么多 agent 系统经常失败"
+description: "分析多 Agent 的重复执行、上下文污染、部分失败和结果冲突，用任务所有权、预算与恢复状态解释故障。结合具体事件顺序设计验收，让失败可以定位到某个任务和可观察的副作用。"
+tags: [agent, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 多 Agent 的缺陷：MAST 失败分类与工程对策

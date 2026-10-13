@@ -1,6 +1,15 @@
 ---
 title: "API 网关、BFF 与限流：入口层的设计"
-description: "网关做什么、BFF 为什么存在"
+description: "从令牌桶的突发容量和补充速率推导网关限流行为，并把重试次数、总耗时预算和 Retry-After 语义纳入客户端故障策略。"
+tags: [api, gateway, reliability]
+date: 2026-10-13
+level: advanced
+prerequisites: [HTTP 状态码, 时间预算, 分布式限流基础]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的本地限流与 deadline 重试模型。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # API 网关、BFF 与限流：入口层的设计
@@ -1791,3 +1800,23 @@ Kong 把密钥认证与限流都做成插件，限流键可以取调用方标识
 - Node.js 官方文档：HTTP 模块章节中的请求头与响应头部分
 - Redis 官方文档：Commands 章节中的 INCR 与 PEXPIRE 部分
 - Redis 官方文档：Programmability 章节中的 Lua scripting 部分
+
+## 限流还要限制重试预算 {#handwrite-api-retry-budget}
+
+令牌桶把可突发额度和长期补充速率分开表达。[`token-bucket.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/token-bucket.mjs) 使用单调时钟维护额度，拒绝时返回 `retryAfterMs`；运行 `node --test scripts/implementation-labs/systems/token-bucket.test.mjs` 可重放耗尽、部分补充和时钟回退。
+
+客户端重试不能只按指数退避，还要服从一次业务请求的截止时间。[`retry-budget.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/retry-budget.mjs) 把抖动延迟放进 deadline 再决定是否重试，测试命令是 `node --test scripts/implementation-labs/systems/retry-budget.test.mjs`。这只是单进程决策模型；多实例的限额必须由共享存储原子执行，且副作用请求还要有幂等键。
+
+令牌桶状态只有“剩余令牌”和“上次补充时刻”两个数。每次请求先以单调时钟计算经过时间，补充 `elapsed × refillRate` 并钳制到 capacity；如果令牌不足，则拒绝且返回填足差值所需的毫秒数。不能用 wall clock，因为 NTP 调时可能倒退；也不能在多副本各自建立桶后称为全局限流。
+
+```js
+tokens = Math.min(capacity, tokens + elapsedMs * refillPerSecond / 1000);
+if (tokens < cost) {
+  const retryAfterMs = Math.ceil((cost - tokens) * 1000 / refillPerSecond);
+  return { allowed: false, retryAfterMs };
+}
+tokens -= cost;
+return { allowed: true, remaining: tokens };
+```
+
+开始时用 capacity 个请求同时打入，观察允许数恰为容量；随后等待半秒，补充量必须正好是 `rate/2`；最后把时钟倒退，模型拒绝输入而非补出负令牌。分布式部署要把 refill、check、扣减放在 Redis Lua 或其它原子事务内，防止两个节点都读到最后一个 token。

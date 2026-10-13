@@ -1,9 +1,47 @@
 ---
 title: "状态机与编排"
-description: "涵盖 Agent 状态机设计、任务编排系统、并行执行模式及错误恢复策略。"
+description: "一个异步任务可能先收到取消，再收到网络成功，也可能先成功再收到超时。Promise 的一次结算只能保证等待结果不变，不能保证你在回调里只更新一次界面或只关闭一次资源。先列状态，再规定哪些事件可以改变状态。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 状态机与编排
+
+## 终态只能进入一次 {#handwrite-terminal-states}
+
+
+本节对照[官方资料](https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise-resolve-functions)核对 ECMAScript living specification checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+一个异步任务可能先收到取消，再收到网络成功，也可能先成功再收到超时。Promise 的一次结算只能保证等待结果不变，不能保证你在回调里只更新一次界面或只关闭一次资源。先列状态，再规定哪些事件可以改变状态。所有终态都必须经过同一个入口，副作用不能散落在多个监听器中。
+
+```pseudocode
+state = pending
+finish(nextState, value):
+    if state != pending: return false
+    state = nextState
+    removeAbortListener()
+    clearDeadlineTimer()
+    disposeOwnedResources()
+    emitOneTerminalEvent(nextState, value)
+    return true
+onSuccess(value): finish(succeeded, value)
+onFailure(error): finish(failed, error)
+onAbort(reason): finish(cancelled, reason)
+onDeadline(): finish(timedOut, deadlineError)
+```
+
+先写 state，再清理资源。这让清理函数里的重入回调也看见任务已经结束。状态入口返回是否真的发生迁移，后续统计只对 true 记一次。清理失败要保留证据并继续清理其他资源，不能把第一处异常变成剩余资源的泄漏。
+
+状态机并不改变远端事实。timedOut 只是本地等待结束，付款等操作仍可能已经完成。需要把未知远端结果单独记录为业务状态，并通过对账收敛，不能把 failed 与 cancelled 都解释成没有副作用。
+
+A011 用同样的单结算入口处理 abort 等待。继续练时把成功、取消、超时事件的排列全部枚举，断言终态事件只有一次，资源关闭次数只有一次，迟到结果不会改变已显示的最终状态。再加入 cleanup 抛错，检查其他资源仍然释放。
 
 !!! abstract "学完这一页你能"
 

@@ -1,6 +1,11 @@
 ---
 title: "前端工程师的后端基础：Node 服务、数据库与缓存"
-description: "把全栈打通"
+description: "用页面需求组织 Node BFF 的接口聚合、缓存与身份边界，解释浏览器请求和下游服务之间的职责。围绕超时、取消、部分失败和幂等恢复设计代码，避免聚合层放大并发与故障。"
+tags: [engineering, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 前端工程师的后端基础：Node 服务、数据库与缓存

@@ -1,6 +1,11 @@
 ---
 title: "编排模式：链、路由、并行、编排者-工作者与评估-优化"
-description: "Anthropic 提出的五种工作流与它们的工程实现"
+description: "比较顺序、并行、协调者与专家分工的工作流程，解释任务依赖、上下文隔离和结果收敛。围绕并发上限、部分失败与取消设计调度，避免把启动多个任务当作已经完成整体交付。"
+tags: [agent, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 编排模式：链、路由、并行、编排者-工作者与评估-优化

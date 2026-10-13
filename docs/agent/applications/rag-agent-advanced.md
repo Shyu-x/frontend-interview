@@ -1,9 +1,45 @@
 ---
 title: "RAG：Agent 集成与高级 RAG"
-description: "Agent 与 RAG 的集成方式，以及 Agentic RAG、GraphRAG 等高级技术。"
+description: "没有检索到证据时，改写查询可能有帮助，但也可能无限重复同一个词。先记录已经试过的规范化查询，再限制改写轮数。决定是否回答时区分资料不足、工具失败和权限拒绝，不能把它们都当作“再搜一次”。否则系统会浪费预算，还可能不断向未授权数据源发请求。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # RAG：Agent 集成与高级 RAG
+
+## 检索改写也要有停止条件 {#handwrite-retrieval-stop-budget}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 Official tool loop documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+没有检索到证据时，改写查询可能有帮助，但也可能无限重复同一个词。先记录已经试过的规范化查询，再限制改写轮数。决定是否回答时区分资料不足、工具失败和权限拒绝，不能把它们都当作“再搜一次”。否则系统会浪费预算，还可能不断向未授权数据源发请求。
+
+```pseudocode
+seenQueries = Set()
+evidence = []
+for attempt in range(maxSearches):
+    query = normalizeQuery(nextQuery)
+    if query in seenQueries: return InsufficientEvidence
+    seenQueries.add(query)
+    candidates = searchAuthorizedSources(query)
+    evidence = mergeVersionedEvidence(evidence, candidates)
+    if enoughSupportedClaims(evidence): return AnswerWithCitations(evidence)
+    nextQuery = proposeSpecificMissingFact(evidence)
+return InsufficientEvidence
+```
+
+规范化只消除确实等价的空白与大小写形式，不应把不同语义查询合并。改写依据必须是缺少哪项事实，而不是一条没有内容的“继续搜索”。工具失败先记录错误类别，权限拒绝不能通过换一个 URL 绕过策略。
+
+enoughSupportedClaims 要由业务问题决定。问版本日期需要能指向发布说明，问机制需要对应规范条款。模型说“证据充足”只是建议，不能替代检查来源与目标论断是否对应。没有依据时返回资料不足，比编造一个看似完整的回答更可验证。
+
+A007 限制使用量，A012 合并候选；这里的停止设计没有调用真实模型。测试可用固定搜索结果，让相同查询重复出现，要求第二次之前停止；再让每轮得到空结果，检查总请求数不超过上限。保留查询、来源 ID 和停止原因，才能解释失败在哪里。
 
 !!! abstract "学完这一页你能"
     1. 能把一条用户查询分派到知识检索、工具调用、任务执行、闲聊四个分支，并说清分派依据。
@@ -49,7 +85,7 @@ flowchart TB
 
 同一个客服入口，用户可能说「退货政策是什么」，也可能说「帮我退掉昨天那单」。前者要查文档，后者要执行动作。一个入口怎么分派这两类请求？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 !!! tip "心智模型"
     一句话模型：Agent 是调度台，RAG 是资料室，工具是外勤。
@@ -294,7 +330,7 @@ console.log('全部断言通过');
 
 帮助中心的退货政策昨晚改了，从 7 天变成 15 天。如果知识库还是全量重建，重建窗口内的回答会同时出现两个版本。怎么只更新变动的那一篇？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 !!! tip "心智模型"
     一句话模型：给每篇文档算一个内容指纹，指纹变了才动索引。
@@ -532,7 +568,7 @@ console.log('全部断言通过');
 
 用户和客服助手聊了 30 轮，每轮的检索结果都留在上下文里。第 31 轮请求发出去，模型报超长错误。这时候该丢哪部分历史？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 !!! tip "心智模型"
     一句话模型：上下文窗口是一张固定大小的桌子，桌上只能摆有限的纸。
@@ -768,7 +804,7 @@ user：那到底几天内能退
 
 检索返回了 5 篇文档，其中 3 篇只是关键词碰巧相同，实际不回答用户的问题。如果全部塞进提示词，模型可能被无关内容带偏。有没有办法在生成之前先筛一遍？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 !!! tip "心智模型"
     一句话模型：先让模型给每篇检索结果贴标签，再只拿通过标签的片段去回答。
@@ -1003,7 +1039,7 @@ console.log('全部断言通过');
 
 用户问的是一个知识库里根本没有的新问题，检索返回的 10 篇文档相似度都低于阈值，但总还是能返回一些结果。这时候直接交给模型生成，回答就像是在硬凑。这种情况该走什么流程？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 !!! tip "心智模型"
     一句话模型：先给检索结果打一个质量档，再按档位决定用不用它。
@@ -1247,7 +1283,7 @@ console.log('全部断言通过');
 
 同一个知识库里既有商品参数表，也有客服话术文档。用户问「A1234 的防水等级」时，关键词检索比向量检索准；问「这款能不能游泳戴」时，向量检索更准。系统怎么知道该用哪种？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 !!! tip "心智模型"
     一句话模型：先判断查询属于哪一类，再把它发给对应的检索通道。
@@ -1444,7 +1480,7 @@ console.log('全部断言通过');
 
 用户问「A 部门和 B 部门在同一个项目上有什么交集」。答案散落在十几篇文档里，每篇只提到其中两个实体。向量检索按片段相似度排序，很难把这条关系链拼出来。
 
-**!!! tip "心智模型"**
+### 核心模型
 
 !!! tip "心智模型"
     一句话模型：先把知识拆成实体和关系建成图，再对图做社区划分并预先写好摘要。

@@ -1,6 +1,15 @@
 ---
 title: "Source Map 原理：VLQ 编码与手写解析器"
-description: "映射格式、调试与线上还原"
+description: "拆解 Source Map v3 的 Base64 VLQ 符号编码和差分字段，使用有界解码器重建单个整数，并说明映射段解析、source index 与行列偏移仍需完整格式解析器负责。"
+tags: [engineering, sourcemap, debugging]
+date: 2026-10-13
+level: advanced
+prerequisites: [Base64, signed integer encoding, source map mappings]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的有界 VLQ 单整数实验。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Source Map 原理：VLQ 编码与手写解析器
@@ -14,7 +23,7 @@ description: "映射格式、调试与线上还原"
 
 ## 1. Source Map v3 字段与数据模型
 
-Source Map 由 2011 年的 Source Map Revision 3 提案（sourcemaps.info/spec.html）定义，至今浏览器、Node、打包器都按这一版实现。它是一份 JSON（也允许作为 data URI 内联）。
+Source Map 的 v3 格式起源于 2011 年提案，后来由 ECMA-426 标准进一步规范。当前应参考 [TC39 维护的 ECMA-426 文本](https://tc39.es/ecma426/)，本次核对的是 2026-09-11 草案快照，不把草案改动当作所有工具已支持的保证。JSON 的 version 字段仍固定为 3，也允许通过 data URI 内联。
 
 ### 1.1 顶层字段
 
@@ -123,7 +132,7 @@ flowchart TD
 
 ### 3.1 VLQ 的位布局
 
-VLQ（Variable Length Quantity）用变长字节表示任意整数，每个字符承载 6 bit：
+VLQ（Variable Length Quantity）使用变长编码。当前 Source Map 格式限定有符号 32 位整数，每个字符承载 6 bit：
 
 ```
 bit:   5        4 3 2 1 0
@@ -132,7 +141,7 @@ bit:   5        4 3 2 1 0
 
 - `cont`（值为 32）为 1 表示后面还有字节，为 0 表示结束。
 - payload 是 5 bit 无符号数据，**低位在前**（little-endian）。
-- 符号处理在数字层面，不在位层面：`toVLQ(value) = value < 0 ? (-value) * 2 + 1 : value * 2`。因此负数的最低位一定是 1。把符号位放在最低位而不是最高位，是因为没有固定字长，最高位必须让给 continuation 标志。
+- 除最小有符号 32 位整数外，符号编码使用 `value < 0 ? (-value) * 2 + 1 : value * 2`。最小值使用特殊编码 B。负数的最低位为 1；字符的最高位留给 continuation，不承担整个整数的符号。
 - 5 bit 的 payload 映射到 Base64 字母表 `A-Za-z0-9+/`。
 
 | 十进制 | 符号编码后 | 二进制 | 输出 |
@@ -164,8 +173,10 @@ for (let i = 0; i < BASE64_CHARS.length; i++) {
  * 用 % 和 Math.floor 而不是 << / >>，避免 32 位位运算在超过 2^31 时溢出。
  */
 function encodeVLQ(value) {
+  if (!Number.isInteger(value) || value < -(2 ** 31) || value >= 2 ** 31)
+    throw new RangeError('ECMA-426 要求有符号 32 位整数');
   // 步骤 1：符号编码，负数 -> 偶数位取反 + 1，保证最低位是符号位
-  let vlq = value < 0 ? -value * 2 + 1 : value * 2;
+  let vlq = value === -(2 ** 31) ? 1 : value < 0 ? -value * 2 + 1 : value * 2;
 
   let out = '';
   do {
@@ -199,13 +210,15 @@ function decodeVLQ(str, index) {
 
     continuation = (digit & 32) !== 0;  // 第 6 bit 是 continuation 标志
     result += (digit & 31) * shift;     // 低 5 bit 是有效载荷
+    if (result >= 2 ** 32 || shift >= 2 ** 50)
+      throw new RangeError('VLQ 超出格式范围或 continuation 资源上限');
     shift *= 32;
   }
 
   // 最低位是符号位。用 % 2 而不是 & 1，避免大数被截断成 32 位。
   const isNegative = result % 2 === 1;
   const magnitude = (result - (isNegative ? 1 : 0)) / 2;
-  return [isNegative ? -magnitude : magnitude, index];
+  return [result === 1 ? -(2 ** 31) : isNegative ? -magnitude : magnitude, index];
 }
 
 module.exports = { BASE64_CHARS, encodeVLQ, decodeVLQ };
@@ -1398,4 +1411,28 @@ DevTools 的忽略列表会影响断点落在哪个文件上。它和 source map
 - 传入行末之后的列号，返回该行最后一个段。
 - 传入空行或超出 `mappings` 行数的行号，返回空并原样输出堆栈帧。
 - 输出里的行号是 1-based，能直接粘贴到编辑器跳转。
+
+## VLQ 的符号位与 continuation 位要分开处理 {#handwrite-vlq-bounded-codec}
+
+每个 Base64 digit 的低 5 位承载数据，第 6 位表示后续是否还有 digit；完整值最低位编码正负号，其余位是绝对值。当前 ECMA-426 限定有符号 32 位范围，并规定 sign-only 编码 B 表示负的 2 的 31 次方，而不是负零。实现还要限制 continuation 长度，防止畸形输入消耗资源。[ECMA-426 VLQ](https://tc39.es/ecma426/#sec-base64-vlq)
+
+[`vlq.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/vlq.mjs) 提供单值编码与解码，不负责逗号/分号分段、source map 的跨 segment 差分累计或位置查询。运行 `node --test scripts/implementation-labs/systems/vlq.test.mjs`，验证负数、continuation、拼接值和非法截断。
+
+解码使用 BigInt 累加每组 5-bit 数据，避免 JavaScript 32 位移位截断。这不意味着 Source Map 允许任意大整数。每个 digit 检查 Base64 字母表，continuation 到达约定上限仍未结束就拒绝；终止时先检查格式的 32 位范围，再处理 B 的特殊值，最后才转换成 Number。
+
+```js
+let encoded = 0n, shift = 0n;
+for (const char of segment) {
+  const digit = digitMap.get(char);
+  if (digit === undefined) throw new TypeError('invalid digit');
+  encoded |= BigInt(digit & 31) << shift;
+  if (digit & 32) { shift += 5n; continue; }
+  const magnitude = encoded >> 1n;
+  if (magnitude >= 2n ** 31n) throw new RangeError('超出 ECMA-426 范围');
+  values.push(encoded === 1n ? -(2 ** 31) : Number(encoded & 1n ? -magnitude : magnitude));
+  encoded = 0n; shift = 0n;
+}
+```
+
+测试从 0、1、-1 开始，再验证最大和最小有符号 32 位整数。2**31 和 Number.MAX_SAFE_INTEGER 必须被拒绝，B 必须解码成最小值。先通过当前规范的边界用例，再把结果拼进 segment parser；段级差分累加还需独立测试，因为 VLQ 正确不代表 source index 和原始列更新正确。
 

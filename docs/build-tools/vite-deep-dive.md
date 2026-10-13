@@ -1,10 +1,16 @@
 ---
-title: Vite 8.x 深度解析
-description: 深入剖析 Vite 8.x 的核心架构、Dev Server 原理、HMR 机制与构建流程。
+title: Vite 8 深度解析
+description: 解释 Vite 8 使用 Rolldown 的构建边界、开发服务器模块请求与 HMR 接受链，并给出按当前支持版本检查插件兼容和生产构建差异的方法。
 tags:
   - build-tools
   - vite
-date: 2026-05-17
+date: 2026-10-13
+level: advanced
+prerequisites: [ES modules, package.json, bundler basics]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对 Vite 8 架构和支持分支；未运行该文档项目。
 ---
 
 # Vite 8.x 深度解析
@@ -14,6 +20,25 @@ date: 2026-05-17
 ---
 
 ## 1. Vite 8.0 核心变化
+
+## Vite 8 是正式版，但 8.0 不等于当前维护小版本 {#handwrite-vite-supported-line}
+
+Vite 8.0 于 2026-03-12 发布，正式把 Rolldown 用作统一 bundler；官方支持页在 2026-10-13 已列出 8.3 常规补丁，以及对 8.2/7.3 回补的重要修复。教程中的“Vite 8”说明主版本架构，不应把 8.0 的旧安装命令或支持承诺直接视为当前最新版。[Vite 8 announcement](https://vite.dev/blog/announcing-vite8.html) · [Vite release policy](https://vite.dev/releases)
+
+升级实验应记录 `vite --version`、Node 精确版本、插件列表和构建输出，并在相同依赖锁文件下分别验证 dev、build 与 preview。官方兼容层能迁移部分配置，不代表自定义 Rollup 插件的全部副作用都被覆盖。
+
+升级顺序可以隔离问题来源：先复制 lockfile 建立临时分支；固定现有依赖跑完整基线；只更新 Vite 主包并记录 deprecation 与 plugin warnings；再分别跑开发服务器浏览器流程、生产 build 和静态 preview。开发时检查模块请求与 HMR 边界，生产时检查 chunk 数、初始加载图和 source map；不能拿 HMR 更新耗时证明 production build 更快。
+
+```sh
+node --version
+npx vite --version
+npm ci
+npm run test
+npm run build -- --debug
+npm run preview -- --host 127.0.0.1
+```
+
+每步保存命令退出码、控制台错误和产物 hash。若升级后只有一个 legacy plugin 触发警告，先在小分支移除它复跑，而不是同时改浏览器目标、压缩器与 chunk 配置；一次只改变一个变量，定位结果才有解释力。
 
 ### 1.1 Rolldown 统一打包器
 

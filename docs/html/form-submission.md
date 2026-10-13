@@ -1,9 +1,31 @@
 ---
 title: 表单提交原理
-description: 表单属性、enctype、文件上传、FormData、原生校验与 preventDefault。
+description: 追踪原生表单从成功控件筛选到 FormData 编码的路径，并区分约束校验、提交按钮、文件字段和 JavaScript 拦截行为。
+tags: [html, forms, browser]
+date: 2026-10-13
+level: intermediate
+prerequisites: [HTML form, input name/value, DOM events]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # 表单提交原理
+
+### FormData 只收集成功控件 {#handwrite-form-data-boundary}
+
+表单序列化与屏幕上能看到什么不是同一回事。字段要有 `name`；未选中的 checkbox、disabled 控件和没有 name 的输入不会产生通常期望的提交项。`requestSubmit()` 按钮会触发验证和 `submit` 事件，而旧式 `form.submit()` 直接提交，绕开这两步。
+
+```js
+form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(form, event.submitter);
+  for (const [name, value] of data) console.log(name, value);
+});
+```
+
+真实验证应分别检查 `required` 无效时是否阻止事件、字段缺少 `name` 时是否缺项，以及两个 submit button 的 `name/value` 是否由 `event.submitter` 区分。规范详见 [HTML Standard forms](https://html.spec.whatwg.org/multipage/forms.html)。
+
+调试时先在 DevTools 的 Network 面板看 Request Payload，再回到 DOM 查具体控件是不是 disabled、有没有 name、是否被成功控件算法排除。JavaScript 的 `preventDefault()` 只阻止默认导航，不会自动执行校验或构造 JSON；如果应用选择 JSON API，应明确定义文件字段、重复字段和空值的转换规则，不能简单地 `Object.fromEntries(new FormData(form))` 丢掉同名字段。
 
 ## 1. 表单属性详解
 

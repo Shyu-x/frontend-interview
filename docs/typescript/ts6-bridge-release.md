@@ -1,15 +1,58 @@
 ---
 title: "TypeScript 6.0：桥梁版本与迁移指南"
-description: "6.0 的默认值变化、弃用清单与迁移步骤"
+description: "定位 TypeScript 6.0 的迁移作用，按官方发行说明核对默认值与废弃配置，再用 7.0 正式版信息说明原生编译器的兼容边界。"
+tags: [typescript, migration, release]
+date: 2026-10-13
+level: advanced
+prerequisites: [tsconfig, TypeScript 5.9]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # TypeScript 6.0：桥梁版本与迁移指南
 
+### 从 6.0 过渡到 7.0：显式固定项目假设 {#handwrite-ts6-current-boundary}
+
+升级的第一步不是复制一套“最佳默认 tsconfig”，而是确认项目通过 Node 还是 bundler 运行、是否需要全局类型、声明文件输出到哪里。TypeScript 6.0 把部分默认变化提前暴露，7.0 已发布后，`ignoreDeprecations` 只能降低迁移噪声，不能复活被移除的选项。
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "types": ["node"],
+    "rootDir": "./src"
+  }
+}
+```
+
+这段配置只展示把隐式默认变成显式约束的思路；`types` 和 `rootDir` 必须按项目实际调整。随后分别用 6.0 `tsc --noEmit`、7.0 CLI、编辑器语言服务和依赖 TypeScript API 的工具验证，不要把一次命令成功当成生态迁移完成。默认值对照以 [TS 6.0 release notes](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html) 为准。
+
+把迁移检查写成流水线。下面是伪代码，两个编译器命令与输出目录由各自锁定的项目配置提供，不假设它们共享同一包名。
+
+```pseudocode
+baseline = compileWithLockedCompiler(project, version6)
+candidate = compileWithLockedCompiler(project, version7)
+if baseline.hasUnexpectedErrors: fail("先修复已有诊断")
+if candidate.hasUnexpectedErrors: saveDiagnosticsAndFail()
+for declaration in candidate.declarations:
+    comparePublicApi(declaration, baseline.declarations)
+for plugin in project.compilerApiPlugins:
+    runPluginCompatibilityTests(plugin, version7)
+runRuntimeTests(candidate.javascript)
+publishOnlyIfEveryGatePassed()
+```
+
+类型检查成功只通过了第二道门。声明文件可能变化，插件可能使用旧编译器 API，生成的 JavaScript 也可能依赖目标环境不支持的语法。分别保存诊断、声明差异和运行结果，才能知道迁移具体卡在哪里。
+
+截至 2026-10-13，TypeScript 6.0 已发布，7.0 原生编译器也已在 2026-07-08 发布稳定版。因此“6.0 是即将到来的桥梁、7.0 尚未发布”只能作为历史时间线写法；在当前迁移建议中应描述为两条可安装版本线，并以各自 release notes 列出的配置和工具支持情况为准。[TypeScript 6.0 release notes](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html) 和 [7.0 announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/) 供读者核验。
+
+以下默认值表中如果提到 7.0 行为，应给出对应 7.0 说明出处；“将不再支持”统一改读为“7.0 实际不支持”，避免把未来时态残留在当前教程中。本次只核对桥梁定位与发布日期，不等同于逐项重验表内的全部 tsconfig 默认值。
+
 !!! abstract "核心结论"
-    - TypeScript 6.0 是 5.9 与 7.0 之间的"桥梁版本"，也是最后一个基于 JavaScript 代码库的版本：它的核心职责是让默认行为提前与 7.0 对齐，把破坏性变更转化为 6.0 的告警与 7.0 的强制。
+    - TypeScript 6.0 是 5.9 与已发布的 7.0 之间的迁移版本，也是最后一个基于 JavaScript 代码库的版本；它让部分弃用问题先在 6.0 暴露。
     - 默认值整体收紧：strict 默认 true、module 默认 esnext、target 默认 es2025、noUncheckedSideEffectImports 默认 true、types 默认 []、rootDir 默认 "."；多数存量项目至少需要显式设置 types 与 rootDir。
     - 弃用与移除清单覆盖旧构建链路：target es5、downlevelIteration、node/node10/classic 解析、amd/umd/systemjs/none 模块、baseUrl、outFile、esModuleInterop=false 与 allowSyntheticDefaultImports=false、alwaysStrict=false 等。
-    - `"ignoreDeprecations": "6.0"` 只能暂时压制弃用告警，7.0 将完全不再支持这些行为；实验工具 ts5to6 可自动调整 baseUrl 与 rootDir，types 仍需人工确认。
+    - `"ignoreDeprecations": "6.0"` 只压制弃用告警，不能使 7.0 恢复已移除行为；迁移工具是否适用需按当前官方发布说明核实。
     - 迁移验收以 `tsc --noEmit` 为最低门槛：示例工程在 strict + esnext + es2025 下通过编译，且无 TS5112、无弃用告警，才算完成迁移。
 
 ## 1. 桥梁版本定位：5.9 与 7.0 之间
@@ -21,12 +64,12 @@ TypeScript 6.0 于 2026-03-23 发布（Daniel Rosenwasser），位于 5.9 与 7.
 - 功能上，6.0 并不追求引入大量全新语法或类型系统能力，它更像一次"默认值 + 弃用项"的集中调整。
 - 工程上，它是最后一个基于 JavaScript 代码库的版本，7.0 将基于新的代码库。
 
-这决定了 6.0 的迁移价值：团队现在把 5.x 的宽松默认值和旧构建选项修掉，7.0 到来时就不会被硬性移除打断。`ignoreDeprecations: "6.0"` 的存在也印证了这一点——它是"允许你今天继续跑，但明天必须改"的信号，而不是永久豁免。
+这决定了 6.0 的迁移价值：团队可以先在 JavaScript 编译器线上处理默认值变化，再评估原生 7.0 的工具兼容性。`ignoreDeprecations: "6.0"` 只影响 6.0 告警，不能恢复已从 7.0 移除的设置。这里的“桥梁”是版本关系的概括，不表示 7.0 仍在未来。
 
 ### 1.2 桥梁版本的三层含义
 
 1. 默认值桥梁：strict/module/target/types/rootDir 等默认值先行切换，让"新项目开箱即严格，旧项目显式声明例外"。
-2. 弃用桥梁：一批 5.x 时代仍可用的旧行为在 6.0 中进入弃用告警或直接移除，7.0 彻底删除。
+2. 弃用迁移：一批 5.x 时代仍可用的旧行为在 6.0 中进入弃用告警或直接移除，7.0 已不支持其废弃用法。
 3. 诊断桥梁：新增 `--stableTypeOrdering` 让类型排序与 7.0 一致，便于在 6.0 上提前对比迁移效果（官方资料注明可能慢至 25%，仅用于诊断）。
 
 ## 2. 默认值变化：从宽松默认到严格默认
@@ -840,7 +883,7 @@ baseUrl 移除后，paths 值以 tsconfig 所在目录为基准。旧配置 `bas
 
 ## 8. 结语
 
-6.0 的迁移主线只有一句话：把"靠默认值活着的配置"改成"靠显式声明活着的配置"。strict、module、target、types、rootDir 五个默认值翻转决定了新项目的基线，baseUrl/outFile/amd 等弃用项决定了旧构建链路的归宿。用 `tsc --noEmit` 做最低验收门槛，用 ts5to6 自动化 baseUrl 与 rootDir，再用 ignoreDeprecations 争取过渡窗口，就能在 7.0 到来前把技术债清零。
+6.0 的迁移主线是把“靠默认值活着的配置”改成“靠显式声明活着的配置”。strict、module、target、types、rootDir 的默认值变化决定了新项目基线，baseUrl/outFile/amd 等弃用项决定旧构建链路的去向。TypeScript 7.0 已于 2026-07-08 正式发布；迁移时用 `tsc --noEmit` 做最低验收、用 ts5to6 辅助整理旧配置，再逐项验证实际解析结果。`ignoreDeprecations` 只适合官方仍允许的过渡情形，不能把它当成跳过 7.0 兼容检查的通行证。
 
 ## 深入阅读与参考
 

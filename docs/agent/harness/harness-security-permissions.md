@@ -1,6 +1,11 @@
 ---
 title: "Harness 安全：权限、沙箱与提示注入"
-description: "工具权限模型与防御纵深"
+description: "从工具执行入口理解权限门、批准记录和沙箱边界，区分参数校验与资源授权。通过拒绝操作、路径越界和取消用例验证副作用，说明进程、文件系统与网络隔离分别负责哪一层。"
+tags: [agent, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # Harness 安全：权限、沙箱与提示注入

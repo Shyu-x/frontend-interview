@@ -1,9 +1,42 @@
 ---
 title: "权限模型光谱：从 pi 的零权限到企业级策略引擎"
-description: "六种产品的权限设计对照"
+description: "权限模型可以使用角色、属性或资源策略，但执行点仍要得到一个明确决定。插件申请 write 并不代表宿主允许 write。先计算有效权限，再把它带到执行层；不要把一个全局 isAdmin 当作所有文件与所有租户的通行证。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 权限模型光谱：从 pi 的零权限到企业级策略引擎
+
+## 申请权限与实际权限取交集 {#handwrite-scope-intersection}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)核对 MCP 2026-07-28 authorization。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+权限模型可以使用角色、属性或资源策略，但执行点仍要得到一个明确决定。插件申请 write 并不代表宿主允许 write。先计算有效权限，再把它带到执行层；不要把一个全局 isAdmin 当作所有文件与所有租户的通行证。权限变化之后，旧缓存也不能继续代表当前决定。
+
+```js
+function effectivePermissions(requested, granted) {
+  const allowed = new Set(granted);
+  return new Set(requested.filter(permission => allowed.has(permission)));
+}
+const permissions = effectivePermissions(
+  ['notes:read', 'notes:write'], ['notes:read'],
+);
+console.log(permissions.has('notes:write')); // false
+```
+
+先固定权限名称与资源作用域，再检查交集。这个函数只实现名称集合，不处理通配符和租户条件。需要 wildcard 时，先定义匹配语法、优先级和 deny 规则，不能用 permission.includes('write') 做授权。多个角色组合也要明确拒绝是否覆盖允许。
+
+MCP 的工具注解只帮助客户端理解行为，不能替代 scope 与资源检查。Roots、Sampling 和 Logging 在 2026-07-28 处于弃用窗口，不应作为新权限模型的默认依赖。Dynamic Client Registration 是兼容路径，不是当前唯一注册方案。OAuth 凭证与其签发者、audience 绑定，不能用同一个 token 随意访问另一服务。
+
+用 A010 练注册声明，再用 A005 练实际审批。接着加入角色撤销和资源移动，要求下一次调用立即重新检查。失败测试应证明被拒绝的操作没有执行，不能只验证返回了 false 却让异步写入在后台完成。
 
 !!! abstract "学完这一页你能"
     - 说出 pi、Claude Code、Codex CLI、Cursor、Gemini CLI、DeepSeek Harness 在审批、沙箱、网络、管理控制四个维度的默认行为。

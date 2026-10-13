@@ -1,0 +1,497 @@
+{
+  "verified_at": "2026-10-13",
+  "scope": "Only named implementation sections and explicit MCP corrections; existing unrelated examples are not declared verified or executed.",
+  "pages": [
+    {
+      "path": "docs/agent/mcp/mcp-integration.md",
+      "sectionAnchor": "mcp-2026-07-28",
+      "implementationIds": [
+        "A001"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/basic",
+          "claim": "Every request carries protocolVersion and clientCapabilities in _meta; complete results and discovery use the current schema.",
+          "version": "MCP 2026-07-28"
+        }
+      ]
+    },
+    {
+      "path": "docs/api/json-rpc-and-mcp.md",
+      "sectionAnchor": "http-mcp-headers",
+      "implementationIds": [
+        "A002",
+        "A003"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http",
+          "claim": "HTTP mirrors protocol and routing metadata, rejects header mismatches with -32020, and maps unknown RPC methods to 404.",
+          "version": "MCP 2026-07-28 HTTP binding"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/mcp/mcp-servers-ecosystem.md",
+      "sectionAnchor": "handwrite-server-selection",
+      "implementationIds": [
+        "A001",
+        "A002"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning",
+          "claim": "Modern clients may discover versions; recognized modern version errors lead to version selection rather than blind initialize fallback.",
+          "version": "MCP 2026-07-28 versioning"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/security/permission-gate-handwritten.md",
+      "sectionAnchor": "approval-boundary",
+      "implementationIds": [
+        "A005"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/server/tools",
+          "claim": "Tool annotations are untrusted unless the server is trusted and user interaction should retain the ability to deny invocations.",
+          "version": "MCP 2026-07-28 tools"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/context/prompt-caching-kv-cache.md",
+      "sectionAnchor": "server-cache-scope",
+      "implementationIds": [
+        "A004"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/server/tools",
+          "claim": "Tool-list cache results contain ttlMs and public/private cacheScope; private results cannot cross authorization contexts.",
+          "version": "MCP 2026-07-28 cacheable lists"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/harness/agent-loop-anatomy.md",
+      "sectionAnchor": "agent-loop-stop-state",
+      "implementationIds": [
+        "A006"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "A tool call requires application-side execution and a correlated tool result before the next model turn.",
+          "version": "Official function-calling guide checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/ops/cost-latency-budgeting.md",
+      "sectionAnchor": "independent-runtime-budgets",
+      "implementationIds": [
+        "A007"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "Tool results may trigger additional model turns; application-side controls are required for a bounded loop.",
+          "version": "Official tool loop guide checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/storage/session-storage-overview.md",
+      "sectionAnchor": "session-snapshot-validation",
+      "implementationIds": [
+        "A008"
+      ],
+      "sources": [
+        {
+          "url": "https://nodejs.org/api/fs.html",
+          "claim": "File writes and rename have distinct failure and durability boundaries; JSON serialization alone does not implement persistent transactions.",
+          "version": "Node.js file API checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/multi/subagents-context-isolation.md",
+      "sectionAnchor": "bounded-agent-fanout",
+      "implementationIds": [
+        "A009"
+      ],
+      "sources": [
+        {
+          "url": "https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise.all",
+          "claim": "Promise.all aggregates existing asynchronous operations but does not impose a concurrency limit on their creation.",
+          "version": "ECMAScript living specification checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/harness/extensions-skills-hooks.md",
+      "sectionAnchor": "plugin-manifest-boundary",
+      "implementationIds": [
+        "A010"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/server/tools",
+          "claim": "Server-produced tool annotations and descriptions are data, not independently trusted authorization decisions.",
+          "version": "MCP 2026-07-28 trust boundary"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/harness/steering-queues-abort.md",
+      "sectionAnchor": "abort-settles-promise",
+      "implementationIds": [
+        "A011"
+      ],
+      "sources": [
+        {
+          "url": "https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal",
+          "claim": "AbortSignal communicates cancellation to cooperating operations; racing a Promise does not forcibly terminate its underlying work.",
+          "version": "AbortSignal current documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/applications/rag-implementation.md",
+      "sectionAnchor": "dedupe-evidence",
+      "implementationIds": [
+        "A012"
+      ],
+      "sources": [
+        {
+          "url": "https://www.postgresql.org/docs/current/textsearch-intro.html",
+          "claim": "Retrieval produces ranked document candidates; identity, authorization filtering and result merging remain application concerns.",
+          "version": "PostgreSQL current text search documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/harness/tool-calling-protocol.md",
+      "sectionAnchor": "handwrite-call-correlation",
+      "implementationIds": [
+        "A006"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "Function-call outputs correlate through call_id, and applications execute and return tool results rather than treating generated arguments as execution.",
+          "version": "OpenAI function calling guide checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/harness/sessions-branching-persistence.md",
+      "sectionAnchor": "handwrite-session-branch",
+      "implementationIds": [
+        "A008"
+      ],
+      "sources": [
+        {
+          "url": "https://nodejs.org/api/fs.html",
+          "claim": "Persisting bytes does not capture active JavaScript execution or coordinate concurrent writers; recovery requires application-defined durable state.",
+          "version": "Node.js file API checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/harness/subagents-orchestration.md",
+      "sectionAnchor": "handwrite-owned-task-dispatch",
+      "implementationIds": [
+        "A009"
+      ],
+      "sources": [
+        {
+          "url": "https://nodejs.org/api/worker_threads.html",
+          "claim": "Worker execution and message passing do not automatically provide application-level file ownership or conflict resolution.",
+          "version": "Node.js worker_threads documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/architecture/memory-system.md",
+      "sectionAnchor": "handwrite-memory-ownership",
+      "implementationIds": [
+        "A012"
+      ],
+      "sources": [
+        {
+          "url": "https://www.postgresql.org/docs/current/ddl-rowsecurity.html",
+          "claim": "Row-level security controls which rows a database role may read or modify; ranking alone is not an authorization mechanism.",
+          "version": "PostgreSQL row security documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/architecture/layer-decision.md",
+      "sectionAnchor": "handwrite-decision-routing",
+      "implementationIds": [
+        "A006",
+        "A007"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "Tools are explicit named functions with parameter schemas; generated requests require application-side validation and execution.",
+          "version": "OpenAI function calling documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/architecture/state-machine-patterns.md",
+      "sectionAnchor": "handwrite-terminal-states",
+      "implementationIds": [
+        "A011"
+      ],
+      "sources": [
+        {
+          "url": "https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise-resolve-functions",
+          "claim": "Promise resolution functions enforce a single settlement, but application resource cleanup and side effects require separate invariants.",
+          "version": "ECMAScript living specification checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/ops/agent-evals-from-scratch.md",
+      "sectionAnchor": "handwrite-eval-observable-behavior",
+      "implementationIds": [
+        "A005",
+        "A006"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "A generated function call and its execution result are separate stages; final text alone cannot prove correct application-side execution.",
+          "version": "Official tool lifecycle documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/ops/agent-observability-tracing.md",
+      "sectionAnchor": "handwrite-call-spans",
+      "implementationIds": [
+        "A006"
+      ],
+      "sources": [
+        {
+          "url": "https://opentelemetry.io/docs/concepts/signals/traces/",
+          "claim": "Traces connect spans through parent-child relationships and identify timed operations; sensitive payload storage is an application policy.",
+          "version": "OpenTelemetry tracing documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/mcp/mcp-security-config.md",
+      "sectionAnchor": "handwrite-mcp-security",
+      "implementationIds": [
+        "A005",
+        "A002"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices",
+          "claim": "MCP security guidance prohibits inappropriate token passthrough and requires separate protection against untrusted origins and downstream authorization risks.",
+          "version": "MCP security guidance checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/security/permission-models-spectrum.md",
+      "sectionAnchor": "handwrite-scope-intersection",
+      "implementationIds": [
+        "A005",
+        "A010"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization",
+          "claim": "Authorization validates target resources and granted access; tool descriptions and clientInfo do not grant authority, and legacy registration mechanisms must be distinguished.",
+          "version": "MCP 2026-07-28 authorization"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/security/prompt-injection-defense.md",
+      "sectionAnchor": "handwrite-untrusted-tool-output",
+      "implementationIds": [
+        "A005",
+        "A006"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/server/tools",
+          "claim": "Tool annotations are untrusted unless from trusted servers; external content must not substitute for application-side authorization.",
+          "version": "MCP 2026-07-28 tool trust guidance"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/security/enterprise-agent-governance.md",
+      "sectionAnchor": "handwrite-audit-without-secrets",
+      "implementationIds": [
+        "A005",
+        "A007"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices",
+          "claim": "Token passthrough and confused-deputy risks require trusted authorization boundaries; logging must not expose sensitive credentials.",
+          "version": "MCP current security guidance checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/applications/rag-principles-retrieval.md",
+      "sectionAnchor": "handwrite-rank-fusion",
+      "implementationIds": [
+        "A012"
+      ],
+      "sources": [
+        {
+          "url": "https://www.postgresql.org/docs/current/textsearch-controls.html",
+          "claim": "Text-search ranking depends on the chosen ranking function and normalization; unrelated raw scores are not automatically comparable.",
+          "version": "PostgreSQL text search ranking documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/applications/rag-agent-advanced.md",
+      "sectionAnchor": "handwrite-retrieval-stop-budget",
+      "implementationIds": [
+        "A007",
+        "A012"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "Application-side loops control repeated model and tool calls; generated tool requests do not provide an automatic stopping guarantee.",
+          "version": "Official tool loop documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/tools/tool-orchestration-implementation.md",
+      "sectionAnchor": "handwrite-effect-safe-retries",
+      "implementationIds": [
+        "A005",
+        "A011"
+      ],
+      "sources": [
+        {
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2",
+          "claim": "Automatic retry safety depends on idempotency and knowledge of whether the original operation was applied; transport failure alone is insufficient.",
+          "version": "RFC 9110 idempotency semantics"
+        }
+      ]
+    },
+    {
+      "path": "docs/open-source/ai-agents/agent-infrastructure.md",
+      "sectionAnchor": "handwrite-protocol-without-sdk-guessing",
+      "implementationIds": [
+        "A001",
+        "A002"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/basic",
+          "claim": "Protocol messages and per-request metadata are defined by the specification; package exports must not be inferred from protocol terminology.",
+          "version": "MCP 2026-07-28"
+        }
+      ]
+    },
+    {
+      "path": "docs/open-source/trending/ai-dev-tools.md",
+      "sectionAnchor": "handwrite-project-evaluation",
+      "implementationIds": [
+        "A006",
+        "A009"
+      ],
+      "sources": [
+        {
+          "url": "https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases",
+          "claim": "Releases and tags identify project snapshots; popularity metrics alone do not establish behavior or implementation compatibility.",
+          "version": "GitHub releases documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/minicode/day2-entry-and-single-call-agent.md",
+      "sectionAnchor": "handwrite-single-call-adapter",
+      "implementationIds": [
+        "A006"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "Provider-specific output items must be adapted into application decisions; function generation is not application execution.",
+          "version": "Official function calling lifecycle checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/minicode/day3-agent-loop-and-tools.md",
+      "sectionAnchor": "handwrite-loop-incremental-build",
+      "implementationIds": [
+        "A006",
+        "A005"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/function-calling",
+          "claim": "The application executes tool calls, correlates results, and may continue the model loop; authorization remains an execution concern.",
+          "version": "Official function calling documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/minicode/day4-session-and-compaction.md",
+      "sectionAnchor": "handwrite-compaction-boundary",
+      "implementationIds": [
+        "A008"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/compaction",
+          "claim": "Compaction and conversation state have product-specific semantics; application-managed summaries need explicit preservation and commit boundaries.",
+          "version": "Official compaction documentation checked 2026-10-13"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/architecture/layer-extension.md",
+      "sectionAnchor": "handwrite-extension-dispatch",
+      "implementationIds": [
+        "A010",
+        "A005"
+      ],
+      "sources": [
+        {
+          "url": "https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning",
+          "claim": "Extensions are advertised through capability maps; unsupported extensions must fall back or reject rather than bypass core semantics.",
+          "version": "MCP 2026-07-28 extensions negotiation"
+        }
+      ]
+    },
+    {
+      "path": "docs/agent/foundations/agent-frameworks.md",
+      "sectionAnchor": "handwrite-framework-control-ownership",
+      "implementationIds": [
+        "A006",
+        "A009"
+      ],
+      "sources": [
+        {
+          "url": "https://developers.openai.com/api/docs/guides/agents",
+          "claim": "Agents API, Agents SDK and lower-level model APIs expose different control and hosting boundaries; generated tool requests and automatic orchestration are not identical.",
+          "version": "Official agents overview checked 2026-10-13"
+        }
+      ]
+    }
+  ]
+}

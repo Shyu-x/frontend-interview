@@ -1,6 +1,11 @@
 ---
 title: "Bun 内部原理：为什么快、快在哪、有哪些取舍"
-description: "Bun 的架构与内置能力"
+description: "从 JavaScript 引擎、原生绑定、事件循环与打包机制理解 Bun 的运行时组成，区分兼容 API 与底层实现。通过模块解析、I/O 和内存边界设计对照实验，不把工具整合直接等同于性能收益。"
+tags: [runtime, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # Bun 内部原理：为什么快、快在哪、有哪些取舍

@@ -1,6 +1,15 @@
 ---
 title: "WebSocket 协议：握手、帧格式与手写服务器"
-description: "RFC 6455 的帧结构与心跳"
+description: "按 RFC 6455 解析握手和客户端帧，逐字节说明掩码、扩展长度、控制帧与分片边界，并通过限制负载的增量解码实验检查网络输入。"
+tags: [network, websocket, protocol]
+date: 2026-10-13
+level: advanced
+prerequisites: [TCP 字节流, Buffer, HTTP Upgrade]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的受限单帧解析模型；不核验既有完整服务器。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # WebSocket 协议：握手、帧格式与手写服务器
@@ -2498,3 +2507,25 @@ connect();
 - Node.js 官方文档 net 模块的 Class: net.Socket：write 返回值与 drain 事件
 - Node.js 官方文档 crypto 模块的 Hash 类：createHash 的用法
 - MDN WebSocket API 章节：浏览器事件与 readyState 取值
+
+## 帧解码不能假设一次 socket data 就是一帧 {#handwrite-websocket-frame-boundary}
+
+TCP 只提供字节流，WebSocket 帧头、掩码键和负载都可能跨越多次读取。服务端必须缓冲到完整帧再解析；同时限制负载长度，避免攻击者通过 64 位长度字段申请过量内存。客户端到服务端帧必须带掩码；扩展位只有在协商扩展后才可解释。[RFC 6455 §5.2](https://www.rfc-editor.org/rfc/rfc6455.html#section-5.2)
+
+[`websocket-frame.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/websocket-frame.mjs) 只解一个完整、未分片的客户端帧，并返回 `bytesRead` 供上层保留后续字节。运行 `node --test scripts/implementation-labs/systems/websocket-frame.test.mjs`，测试每个截断位置、未掩码帧、保留位和超限负载。真实服务还必须实现 continuation、control frame 的 125 字节限制、UTF-8 校验、关闭状态机和扩展协商。
+
+增量解析的第一步只读两个字节以确定基本头；第二步按 7 位长度字段决定后续需要 0、2 或 8 个长度字节；第三步等 4 字节 mask key 和完整 payload 到齐；最后复制 payload 并逐字节 XOR。必须先验证 payload length 再分配新 Buffer，不然超大声明会造成内存耗尽。掩码偏移从 payload 的第 0 字节开始，每 4 字节循环使用 key。
+
+```js
+if (buffer.length < 2) return null;
+let length = buffer[1] & 0x7f;
+let offset = 2;
+if (length === 126) { if (buffer.length < 4) return null; length = buffer.readUInt16BE(2); offset = 4; }
+if (length > maxPayload) throw new Error('payload exceeds limit');
+if (buffer.length < offset + 4 + length) return null;
+const mask = buffer.subarray(offset, offset + 4);
+const payload = Buffer.from(buffer.subarray(offset + 4, offset + 4 + length));
+for (let i = 0; i < payload.length; i++) payload[i] ^= mask[i & 3];
+```
+
+样例省略 64 位长度处理和最小编码校验，真实实现需用 BigInt 读取 64 位长度并拒绝超过安全整数或配置上限的输入。帧完整后也还要依据 opcode 验证 UTF-8 文本、Close 状态码和控制帧约束。

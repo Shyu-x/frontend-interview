@@ -1,9 +1,31 @@
 ---
 title: "层叠、@layer、嵌套与容器查询：MDN 精读"
-description: "现代 CSS 架构能力"
+description: "按来源、层叠层与特异性推导 CSS 声明胜者，再用具体卡片结构验证容器查询依赖最近合格祖先、内联尺寸隔离与组件布局边界。"
+tags: [css, cascade, container-queries]
+date: 2026-10-13
+level: advanced
+prerequisites: [CSS 选择器, 层叠与特异性, Grid/Flex 基础]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # 层叠、@layer、嵌套与容器查询：MDN 精读
+
+### 把容器查询放回组件上下文 {#handwrite-container-layout}
+
+卡片组件常被复用在侧栏和主栏。视口宽度相同，不代表它所在的列宽相同，因此应由外层声明 `container-type: inline-size`，让内部版式按祖先的行内尺寸切换。尺寸查询容器是“最近的合格祖先”；未命名查询不会越过它继续找更远容器。`inline-size` 会引入内联尺寸 containment，容器仍需由父级布局或显式尺寸决定宽度。[MDN 容器查询指南](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Containment/Container_queries) 描述了该行为及当前支持信息。
+
+```css
+.dashboard-column { container: results / inline-size; }
+.result-card { display: block; }
+@container results (width >= 38rem) {
+  .result-card { display: grid; grid-template-columns: 8rem 1fr; }
+}
+```
+
+读样式时先找 container 声明的祖先，再确认 query 目标是它的后代。若规则不生效，检查容器是否被加在卡片本身（查询不能依据元素自身样式改自身）、命名是否拼错，以及断点单位是否符合组件宽度，而不是继续调 viewport media query。
+
+本节是浏览器样式示例，必须在浏览器里观察 `@container` 前后的实际宽度，不把 `node --test` 的纯数据断言说成 CSS 布局验证。到 2026-10-13，MDN 将基础 container query 标记为 Baseline Widely available；新型 scroll-state 与 anchored 查询是不同能力，不能由这一兼容结论外推。
 
 !!! abstract "核心结论"
 

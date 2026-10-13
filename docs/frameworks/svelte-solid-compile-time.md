@@ -1,6 +1,11 @@
 ---
 title: "Svelte 与 Solid：编译期与细粒度响应式"
-description: "没有虚拟 DOM 的框架"
+description: "通过编译输出与细粒度依赖理解 Svelte 和 Solid 的更新机制，区分编译优化、运行时追踪与组件重执行。围绕分支依赖、生命周期和资源清理练习状态变化，而不是只比较语法。"
+tags: [frameworks, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # Svelte 与 Solid：编译期与细粒度响应式

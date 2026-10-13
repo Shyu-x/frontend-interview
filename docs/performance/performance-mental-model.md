@@ -1,6 +1,11 @@
 ---
 title: "性能优化的心智模型"
-description: "把性能优化变成一套可重复的流程"
+description: "把性能问题分解成等待、计算、数据搬运和渲染，先确定用户可见目标，再选择测量方法。用时间线、预算和故障对照分析瓶颈，避免把一个快的微基准误认为整个页面已经改善。"
+tags: [performance, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 性能优化的心智模型

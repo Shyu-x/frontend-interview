@@ -2,15 +2,17 @@
 title: "Canvas 场景图与命中测试：从绘制列表到逆矩阵"
 description: "从 Canvas 即时模式扩展到保留式场景图，讲清对象生命周期、脏区、DPR 与坐标空间、逆矩阵命中测试、事件委托、无障碍语义和 OffscreenCanvas 的线程边界。"
 tags: [browser, canvas, graphics, interaction]
-date: 2026-10-12
+date: 2026-10-13
 level: advanced
 prerequisites:
   - Canvas 2D 状态与变换
   - 2D 仿射矩阵
 runnable: true
 tested_with: [node@24.16.0]
-verified_at: 2026-10-12
+verified_at: 2026-10-13
+verified_scope: 只核对新增的奇异矩阵实验；其余正文仍按 source_commit 核验。
 source_commit: 65552017d23255c1442a7d4ac7f0d49e3225fb1d
+implementation_source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Canvas 场景图与命中测试：从绘制列表到逆矩阵
@@ -31,6 +33,27 @@ flowchart LR
   G[保留式对象树] --> H[绘制与命中索引]
   H --> E
 ```
+
+## 逆变换中的退化矩阵 {#handwrite-canvas-singular}
+
+点击命中要把画布坐标逆变换到节点本地坐标。缩放矩阵的行列式为零时没有逆矩阵，直接除以行列式会得到 `Infinity` 或 `NaN`，所以实现应把它作为“不可命中”处理。[MDN：CanvasRenderingContext2D.getTransform](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/getTransform)
+
+[`canvas-transform.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/canvas-transform.mjs) 接受 Canvas 的 `[a,b,c,d,e,f]` 顺序，`inversePoint` 在行列式接近零时返回 `null`，`hitTestRect` 再用本地矩形判断。运行 `node --test scripts/implementation-labs/systems/canvas-transform.test.mjs`，其中旋转和奇异矩阵两个用例能区分“屏幕轴对齐框”与“节点局部几何”。
+
+实现时先从 pointer event 得到 CSS 像素，再除以 DPR 得到 backing-store 坐标；之后减去对象平移并乘以 2×2 线性部分的逆矩阵。父子场景图要把父节点矩阵与局部矩阵按约定次序相乘，然后对组合矩阵求逆。最后在本地矩形做边界比较，因此旋转过的对象也能准确命中。矩阵乘法次序错了会出现“绘制在一个位置、点击命中却在另一个位置”的症状。
+
+```js
+const det = a * d - b * c;
+if (Math.abs(det) < 1e-12) return null;
+const dx = screenX - e;
+const dy = screenY - f;
+const localX = (d * dx - c * dy) / det;
+const localY = (-b * dx + a * dy) / det;
+return rect.x <= localX && localX <= rect.x + rect.width
+  && rect.y <= localY && localY <= rect.y + rect.height;
+```
+
+验收按 identity、缩放加平移、旋转三组矩阵逐一执行，再将 `scaleX=0` 传入。前三组分别命中和落空的坐标要符合手算结果；最后一组返回 miss，不能靠 `NaN` 比较偶然落空。
 
 1. Canvas 只持有最终位图；场景图由应用维护对象、父子关系、局部矩阵和交互属性。
 2. 绘制通常按树遍历输出命令；命中测试反向使用同一组坐标变换。

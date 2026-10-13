@@ -1,9 +1,39 @@
 ---
 title: "成本与延迟：token 账本、预算与模型路由"
-description: "把 agent 当成一个要核算成本的系统"
+description: "只限制模型调用次数，不能限制一轮里发出的几十个工具。只限制工具次数，也不能阻止模型不停重试。先把轮数、调用数和 token 使用量记成三个独立计数器，再把超限原因返回给上层。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 成本与延迟：token 账本、预算与模型路由
+
+## 分别计算轮数、工具数和 token {#independent-runtime-budgets}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 Official tool loop guide checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+只限制模型调用次数，不能限制一轮里发出的几十个工具。只限制工具次数，也不能阻止模型不停重试。先把轮数、调用数和 token 使用量记成三个独立计数器，再把超限原因返回给上层。价格与模型额度会变化，这个练习不硬编码当前价格；它练的是使用量怎样累计、在哪里拒绝新工作。
+
+```js
+import { consumeBudget } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const limits = { turns: 4, calls: 8, tokens: 5000 };
+const used = { turns: 2, calls: 8, tokens: 1200 };
+const decision = consumeBudget(used, { calls: 1 }, limits);
+console.log(decision.reason); // tool_budget
+```
+
+先校验计数为有限非负数。累计后分别比较上限，不把三个数量混成一个分数。当前计数等于上限仍是合法已经发生的用量，但下一次增加会被拒绝。实际执行前预留额度，执行后用供应商返回的真实使用量对账，不能把估算 token 当成最终账单。
+
+时间预算要单独用截止时间控制。每次重试都重新给一整段超时时间，会让总延迟成倍增长。先计算剩余时间，再决定还允不允许启动工作。中止等待不等于远端已经停下，更不能自动重做有副作用的调用。
+
+A007 验证三个独立停止原因和非法负计数。练习变式是同时到达两个上限时输出原因集合，而不是只有优先匹配的一个原因。生产系统还要把预留和结算放入持久化账本，多个 worker 之间用事务协调；一个纯内存函数不能证明多进程预算一致。
 
 !!! abstract "学完这一页你能"
     1. 能独立写出一个 token 账本，分四类记录输入、输出、缓存读、缓存写，并按单价算出一次调用的成本。

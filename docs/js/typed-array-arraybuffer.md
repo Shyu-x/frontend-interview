@@ -1,9 +1,29 @@
 ---
 title: "ArrayBuffer、TypedArray 与 DataView"
-description: "二进制数据结构、字节序与零拷贝"
+description: "区分 ArrayBuffer、DataView 与 TypedArray 视图边界，按字节偏移、元素长度和对齐约束读写二进制协议数据。"
+tags: [javascript, typed-array, binary]
+date: 2026-10-13
+level: intermediate
+prerequisites: [二进制与字节序, JavaScript 数组]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # ArrayBuffer、TypedArray 与 DataView
+
+### 视图共享存储，不代表下标以字节计 {#handwrite-typed-array-offsets}
+
+`TypedArray` 的 `byteOffset` 与 `byteLength` 用字节计数，数组下标按元素计数；创建视图时偏移必须满足对应元素大小的对齐约束。`DataView` 则允许按字节偏移并显式指定多字节整数的 endian。多个视图指向同一 `ArrayBuffer` 时写入会互相可见；切片是否复制要区分 `slice()` 与 `subarray()`。[MDN TypedArray](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray) 与 [DataView](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DataView) 列出 API 边界。
+
+```js
+const buffer = new ArrayBuffer(8);
+const words = new Uint32Array(buffer, 0, 2);
+const bytes = new Uint8Array(buffer, 0, 8);
+words[0] = 0x01020304;
+console.log(bytes[0], bytes[1]); // 依平台字节序观察共享的底层字节
+```
+
+读取网络协议字段时不要把最后一行写成固定跨平台期望值：`Uint32Array` 使用平台字节序；需要定义 wire format 时用 `DataView.getUint32(offset, littleEndian)` 显式传字节序。构造视图前检查剩余字节数和偏移对齐，越界或偏移未对齐时会抛 RangeError。
 
 !!! abstract "核心结论"
 

@@ -1,9 +1,42 @@
 ---
 title: "RAG：代码实现与展望"
-description: "RAG 完整代码实现、总结与前沿展望。"
+description: "关键词检索和向量检索可能命中同一段文档。直接拼接两份结果，会浪费上下文，也会让同一来源看起来像两份独立证据。先定义证据身份，再合并候选。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # RAG：代码实现与展望
+
+## 合并同一证据，再交给模型 {#dedupe-evidence}
+
+
+本节对照[官方资料](https://www.postgresql.org/docs/current/textsearch-intro.html)核对 PostgreSQL current text search documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+关键词检索和向量检索可能命中同一段文档。直接拼接两份结果，会浪费上下文，也会让同一来源看起来像两份独立证据。先定义证据身份，再合并候选。这里只在分数来自同一尺度时保留较高分；不同检索器的原始分数不能直接比较，需要先归一化或采用基于名次的融合算法。
+
+```js
+import { dedupeCandidates } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const merged = dedupeCandidates([
+  { id: 'guide:v2:chunk-4', score: 0.7 },
+  { id: 'guide:v2:chunk-4', score: 0.9 },
+  { id: 'faq:v1:chunk-2', score: 0.8 },
+]);
+console.log(merged.map(row => row.id));
+// guide:v2:chunk-4, faq:v1:chunk-2
+```
+
+ID 不能只用网页标题。同一标题可能有不同租户、版本和分块。先在检索层过滤授权，再使用文档 ID、版本与分块位置构造规范身份。合并时跳过非法分数，保留可追溯的来源位置，最后再按数量或 token 预算截断。
+
+这个算法没有判断内容是否真实。分数较高也不意味着它允许执行里面的指令。送入模型时，明确把片段当作外部资料，并让最终答案引用具体片段。需要重排时，重排器只能调整已批准候选的顺序，不能把未授权文档重新加入结果。
+
+A012 检查重复 ID、非法分数和空结果。继续练时增加文档版本更新，要求旧版本不会与新版本合并；再增加两个租户同名文档，检查授权过滤发生在缓存和融合之前。检索命中率、答案依据和权限泄漏应分别评估，不能用一个总分遮住错误。
 
 !!! abstract "学完这一页你能"
 

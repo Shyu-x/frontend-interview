@@ -2,13 +2,14 @@
 title: "WebCodecs 媒体管线：解复用、解码队列与帧所有权"
 description: "从容器 demux 到 codec chunks，讲解时间戳与关键帧、decodeQueueSize 和 flush、VideoFrame 转移/释放、预览与导出背压、颜色平面、音画时钟及能力探测边界。"
 tags: [web-apis, webcodecs, media, performance]
-date: 2026-10-12
+date: 2026-10-13
 level: advanced
 prerequisites:
   - Promise、ReadableStream 与 Worker 基础
   - 音视频容器、时间戳和关键帧基础
 runnable: false
-verified_at: 2026-10-12
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 decodeQueueSize 队列说明；规范仍为 W3C Working Draft。
 source_commit: 0f91fe768e7ee42703f15e2b8845551b0f1028b3
 ---
 
@@ -31,6 +32,30 @@ flowchart LR
   G --> H[Encoder]
   H --> I[Muxer 写回容器]
 ```
+
+## decodeQueueSize 是队列信号，不是内存上限 {#handwrite-webcodecs-queue-backpressure}
+
+`decodeQueueSize` 表示已入队、尚未完成处理的 decode request 数量；应用应在队列增长时暂停提交 sample，等 `dequeue` 事件再恢复。它不限制已输出且仍被应用持有的 `VideoFrame` 数量，所以每帧还需要明确 `close()` 或 transfer 所有权。[W3C WebCodecs](https://www.w3.org/TR/webcodecs/#dom-videodecoder-decodequeuesize)
+
+实时预览可以在过载时丢弃尚未提交的非关键帧以追上时钟；离线导出通常应反压上游并保留所有帧。二者用同一“队列太长就丢帧”策略会得到不同的正确性结果。
+
+收到 sample 时先用解码器支持的 codec 配置调用 `isConfigSupported()`，再创建 VideoDecoder。每个 key frame 前后依照 demuxer 提供的 decode order 提交；队列接近阈值时停止从容器读取，并等 dequeue 事件恢复。输出 callback 负责消费 `VideoFrame`，渲染完后调用 close；否则即使 decodeQueueSize 已归零，frame backing memory 仍可能被引用。
+
+```js
+const decoder = new VideoDecoder({ output: frame => {
+  render(frame);
+  frame.close();
+}, error: reportDecodeError });
+const support = await VideoDecoder.isConfigSupported(config);
+if (!support.supported) throw new Error('codec unsupported');
+decoder.configure(config);
+while (decoder.decodeQueueSize > queueLimit) await nextDequeue(decoder);
+decoder.decode(chunk);
+await decoder.flush();
+decoder.close();
+```
+
+实际管线还要正确处理 decoder error 与 reset；遇到 seek 时中断旧 generation，避免旧帧在新时间点之后画出。实时预览可以丢弃还没送给 decoder 的过期非关键帧，但文件导出要保留所有 frame，且必须维护音视频时间戳对齐。该 API 在浏览器的 codec 支持随平台变化，配置支持探测不替代真实 sample decode。
 
 1. 容器解复用（demux）抽取轨道配置、压缩 samples 与时间信息；它不解压像素。
 2. WebCodecs decoder 消费带 codec 配置的 `EncodedVideoChunk` / `EncodedAudioChunk`，输出 `VideoFrame` / `AudioData`。

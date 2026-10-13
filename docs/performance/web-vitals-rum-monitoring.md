@@ -1,6 +1,15 @@
 ---
 title: "Web Vitals 与线上监控：实验室数据与真实用户数据"
-description: "LCP/INP/CLS 的定义、测量与采集"
+description: "使用 Core Web Vitals 的 LCP、INP、CLS 阈值解释真实用户分布，设计按页面生命周期批量上报的 RUM 队列，并区分采样、传输失败与服务端分位聚合。"
+tags: [performance, web-vitals, rum]
+date: 2026-10-13
+level: advanced
+prerequisites: [PerformanceObserver, HTTP 上报接口, p75 分位数]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 Beacon 发送和有界 RUM 队列说明。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Web Vitals 与线上监控：实验室数据与真实用户数据
@@ -1881,3 +1890,26 @@ Lighthouse CI 支持用断言配置给指标设阈值，不达阈值时让流水
 - MDN《PerformanceObserver》与《PerformanceObserverEntryList》条目类型章节
 - web-vitals 库 README 的导出函数与回调参数章节
 - Sentry 文档的 Performance 与 Web Vitals 章节
+
+## 页面离开时的批量上报需要有界队列 {#handwrite-rum-bounded-batch}
+
+若每个性能 entry 单独发请求，低价值网络开销会和数据量一起增加；若一直等固定定时器，用户关页时尾批可能丢失。RUM 队列应同时限制条数和序列化字节数，并在发送失败时保留批次以供 `visibilitychange` 或后续 flush 重试。Beacon API 的 `sendBeacon` 适合页面卸载附近的小型 POST，但返回 `true` 只表示浏览器接受排队，不代表服务端已持久化。[W3C Beacon](https://www.w3.org/TR/beacon/)
+
+[`rum-batch.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/rum-batch.mjs) 用字节上限与条数上限保护队列，只有传输函数返回成功才清空。运行 `node --test scripts/implementation-labs/systems/rum-batch.test.mjs`，测试拒绝超限、失败保留和成功清除；页面生命周期钩子与服务端去重仍由接入方实现。
+
+队列在 add 时就序列化一次，用实际 UTF-8 字节数做准入判断，并保存快照而不是调用方传入的可变对象。flush 捕获当前队列前缀并标记一个 in-flight promise；发送期间新指标留在后缀里，成功后只删除已发送前缀。请求抛错或服务端拒收时保留整批，多个 flush 同时触发则共享一次发送，避免重复计数。
+
+```js
+const batch = queue.slice();
+if (inflight) return inflight;
+inflight = send(JSON.stringify(batch))
+  .then(accepted => {
+    if (accepted) queue.splice(0, batch.length);
+    return accepted;
+  })
+  .catch(() => false)
+  .finally(() => { inflight = undefined; });
+return inflight;
+```
+
+生产端发送 `sendBeacon()` 时不能从它的布尔返回推断后端已写入；要使用服务端接收数与浏览器发出数的差值监测丢失。事件体也应剔除完整 URL 查询参数、用户输入和标识符，采用采样与字段白名单控制隐私及队列体积。

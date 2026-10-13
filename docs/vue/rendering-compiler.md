@@ -1,9 +1,28 @@
 ---
 title: 渲染与编译
-description: Vue diff、patchFlag/Block Tree、模板编译与模板相对 JSX 的优势
+description: 通过模板编译产物理解静态提升、patch flags 与运行时更新，并区分 Vue 编译器优化和开发者手写的 DOM diff。
+tags: [vue, compiler, rendering]
+date: 2026-10-13
+level: advanced
+prerequisites: [Vue 3 templates, virtual DOM]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # 渲染与编译
+
+### Patch flag 是动态绑定的提示，不是跳过正确性检查 {#handwrite-vue-compiler-boundary}
+
+例如 `<p>{{ title }}</p>` 中标签与静态属性稳定，只有文本节点动态。编译器可把动态文本标记在 vnode 上，运行时据此减少对子树的无差别比较；若模板包含动态组件、指令或未知插槽，编译器仍必须保留更一般的路径。不能把“编译器知道哪些地方变化”推成“Vue 没有运行时 diff”。
+
+```js
+// 概念化编译结果：不是 Vue 生成代码的逐字输出
+createElementBlock('p', null, toDisplayString(title), PatchFlags.TEXT);
+```
+
+读真实编译器输出时固定 Vue 版本，使用 compiler-sfc/compiler-dom 的同版本构建，并比较有无动态文本时的 patch flag。官方说明见 [Vue rendering mechanism](https://vuejs.org/guide/extras/rendering-mechanism.html)。
+
+阅读一个编译样例时先删去 helper import 与 source map 噪声，只跟踪四个值：静态节点是否 hoist、动态文本传入哪个 flag、更新时 patch 读取了哪些 vnode 字段、完全静态的兄弟节点是否重新创建。若样例更新了静态 class 却未改变生成结果，说明测试输入并没有进入预期动态分支。compiler 生成代码是版本细节，不该复制到业务组件里维护。
 
 > 本页按「概念、原理、代码」逐题展开相关面试专题。
 

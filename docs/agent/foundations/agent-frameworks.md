@@ -1,9 +1,43 @@
 ---
 title: "Agent 框架对比"
-description: "深入对比主流 AI Agent 框架，帮助开发者根据具体场景选择最适合的工具。"
+description: "比较 Agent 框架时先看控制权。谁调用下一轮模型，谁执行工具，谁保存会话，谁处理取消？功能表里都写着 tools，实际职责可能完全不同。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Agent 框架对比
+
+## 框架自动做了什么，要用轨迹回答 {#handwrite-framework-control-ownership}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/agents)核对 Official agents overview checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+比较 Agent 框架时先看控制权。谁调用下一轮模型，谁执行工具，谁保存会话，谁处理取消？功能表里都写着 tools，实际职责可能完全不同。直接模型 API 通常把工具请求交给应用，SDK 可以在进程内编排，托管服务还可能在服务端管理会话和运行环境。不要把某一层的便利性当作所有层都有的保证。
+
+```pseudocode
+evaluateFramework(adapter):
+    fakeModel = scriptedToolThenAnswer()
+    fakeTool = countedReadOnlyTool()
+    result = runWithAdapter(adapter, fakeModel, fakeTool)
+    inspectWhoAdvancedTheSecondTurn(result.trace)
+    inspectWhoExecutedTheTool(result.trace)
+    injectCancellationBeforeToolExecution()
+    inspectPendingWorkAndResourceCleanup()
+    recordWhichStateCanRecoverAfterRestart()
+```
+
+先用确定输入消除模型随机性，再观察真正的执行轨迹。取消前已经开始的工具、尚未开始的工具和正在等待审批的工具应该有不同结果。持久化框架也需要检查它保存的是状态、任务领取记录还是只有消息历史，不把“支持 checkpoint”解释成外部副作用自动幂等。
+
+A006 给出自己掌握控制权的最小循环，A009 给出有界并发。与框架对照时找出增加了哪道机制、转移了哪项责任。真实集成再核对锁定版本的 API；历史示例不能靠改模型名称就变成当前 SDK 调用。
+
+最后用一条失败用例比较恢复能力。工具成功但结果提交前进程退出，再启动后是否重复执行？如果框架只能恢复消息，仍然需要业务幂等策略。把这类观察写成版本化结论，比“某框架更强、更容易”更能指导实现。
 
 !!! abstract "学完这一页你能"
     - 说出 LangChain、LangGraph、AutoGen、CrewAI、LlamaIndex、Dify、Coze 各自解决的问题边界。
@@ -50,7 +84,7 @@ flowchart TD
 
 团队要做客服机器人。同事说"上 LangChain"，另一位说"直接 Dify 拖流程"。两种说法都对，只是它们在回答不同的问题。
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：框架 = 编排单位 + 扩展点 + 交付方式，三者缺一不可。
 
@@ -253,7 +287,7 @@ console.log("全部断言通过");
 
 同一个"查订单能不能退款"的问题，在七个候选里写法差别很大。差别来自哪里？来自它们对"循环"和"状态"的处理方式。
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：一项 Agent 能力 = 提示词 + 循环 + 状态，三者由框架分别提供多少，决定你要自己写多少。
 
@@ -475,7 +509,7 @@ console.log("全部断言通过");
 
 一段"先检索、再判断、不满足就重试"的逻辑，用链式写会变成嵌套回调。用状态图写会变成节点加边。差别在哪里？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：链是直线，图是路网，状态机是带规则的交通灯。
 
@@ -738,7 +772,7 @@ console.log("全部断言通过");
 
 同一个"研究员写初稿、作家改写"的流程，用链式、角色分工、对话轮次三种写法，各需要几行代码？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：三种写法回答同一个问题——谁决定下一步，是代码、流程还是对话。
 
@@ -979,7 +1013,7 @@ console.log("三种编排输出一致");
 
 产品经理问"为什么不用 Dify 一步到位"，你要在三十秒内给出理由。理由必须来自需求和约束，而不是个人偏好。
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：选型 = 需求打分乘上约束过滤，先过滤再排序。
 
@@ -1195,7 +1229,7 @@ console.log("示例结论:", decide(tree, cases[0][0]));
 
 本站旧版内容里写着 Dify 单请求延迟加 100 到 200 毫秒（以原文为准）。这个数字能不能直接写进服务等级协议（Service Level Agreement，SLA）？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：这类数字是相对参考值，不是压测结论。
 

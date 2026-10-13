@@ -1,9 +1,44 @@
 ---
 title: "会话持久化：把对话存成一棵树"
-description: "JSONL 树结构、分支与回放"
+description: "会话分叉不是把父会话所有可变对象交给新任务。先固定父 revision，再从它创建新的会话 ID。消息内容可以共享不可变数据，权限、正在执行的工具和未决 Promise 不能自动继承。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 会话持久化：把对话存成一棵树
+
+## 分叉历史时保留父节点，不复制未决执行 {#handwrite-session-branch}
+
+
+本节对照[官方资料](https://nodejs.org/api/fs.html)核对 Node.js file API checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+会话分叉不是把父会话所有可变对象交给新任务。先固定父 revision，再从它创建新的会话 ID。消息内容可以共享不可变数据，权限、正在执行的工具和未决 Promise 不能自动继承。否则子会话可能把父会话的迟到结果写进自己的历史，或者同时用一份审批去执行两次写入。
+
+```pseudocode
+branch(parentId, expectedRevision):
+    parent = readCommittedSnapshot(parentId)
+    if parent.revision != expectedRevision: return Conflict
+    child = {
+        id: freshSessionId(), parentId, parentRevision: expectedRevision,
+        revision: 0, messages: copyImmutableMessages(parent.messages),
+        pendingCalls: [], approvals: []
+    }
+    persistNewSessionIfAbsent(child.id, child)
+    return child
+```
+
+先检查分叉点没有变化，再创建子会话。父历史继续追加不会改变已固定的分叉点。child 的 pendingCalls 为空，因为正在执行的任务需要独立的领取与恢复协议，不能靠 JSON 复制继续执行。approvals 也为空，新的执行必须重新检查自己的授权范围。
+
+写入存储后再把子会话展示到界面。创建失败时不要保留一个看起来可用但无法恢复的空节点。实际数据库里把检查与创建放进事务，文件快照则要采用明确的单写者或条件提交策略。普通 Map 示例不能证明多进程原子分叉。
+
+A008 可以先练格式校验，再将上述设计接入真实存储。测试父会话在分叉前后分别追加消息、重复创建相同子 ID、以及分叉过程中进程退出。通过的结果是每个子会话能指出确定的父 revision，不继承未决副作用，重启后不会凭空换一段父历史。
 
 !!! abstract "学完这一页你能"
     - 说出会话 JSONL 文件里 entry 的 id 与 parent 各指向什么，并手写这两个字段。

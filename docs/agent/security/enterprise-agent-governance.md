@@ -1,9 +1,45 @@
 ---
 title: "企业级 agent 治理：多租户、密钥、审计与合规"
-description: "把 agent 放进生产环境"
+description: "审计的目标是解释哪次调用被谁批准、访问了什么范围、产生了什么结果，不是备份所有输入。先定义安全字段列表，再记录决定。拿完整上下文做日志，会把 token、私人文档和用户输入一起复制到另一个系统。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 企业级 agent 治理：多租户、密钥、审计与合规
+
+## 审计只记录能解释决定的安全字段 {#handwrite-audit-without-secrets}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices)核对 MCP current security guidance checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+审计的目标是解释哪次调用被谁批准、访问了什么范围、产生了什么结果，不是备份所有输入。先定义安全字段列表，再记录决定。拿完整上下文做日志，会把 token、私人文档和用户输入一起复制到另一个系统。日志展示时加星号已经太晚，原始数据可能早已进入存储和索引。
+
+```js
+function safeAuditEvent(event) {
+  return {
+    requestId: event.requestId, toolName: event.toolName,
+    tenantId: event.tenantId, decision: event.decision,
+    reasonCode: event.reasonCode, durationMs: event.durationMs,
+  }; // 白名单复制，不展开含凭证的原始对象。
+}
+const event = safeAuditEvent({ requestId: 'r7', toolName: 'read-note',
+  tenantId: 't1', decision: 'denied', reasonCode: 'scope',
+  durationMs: 2, accessToken: 'never-copy-this' });
+console.log(Object.hasOwn(event, 'accessToken')); // false
+```
+
+记录稳定的 requestId 和安全资源标识，不记录原始授权头。用户 ID 与租户 ID 也需要保留和访问策略，不是任何人员都能查看的普通调试信息。错误对象常包含 HTTP 请求配置，不能直接 spread 到日志中。失败时只取经过批准的类别与摘要。
+
+随后用审计事件回放权限决定。被拒绝调用的副作用次数应该为零；预算超限有独立 reasonCode；未知远端结果不能伪装成执行失败。若工具输出携带伪造批准说明，审计仍应显示真正的宿主决定，而不是照抄外部文字。
+
+A005/A007 提供批准与预算的确定行为。治理还需真实存储的访问控制、保留周期和防篡改机制。这个白名单函数不证明日志完整性，也不证明组织合规；测试重点是敏感字段不进入事件，以及失败能关联到具体工具调用。
 
 !!! abstract "学完这一页你能"
     - 为一个多租户 agent 平台画出隔离边界，并用路径校验或沙箱把每个租户限制在各自数据面。
@@ -1194,7 +1230,7 @@ agent 每次读文件都弹窗“允许吗”，工程师点了 100 次“允许
 真正危险的操作来了，也顺手点了允许。  
 审批疲劳本身就是安全漏洞，所以需要对请求分层，只把高风险决策留给人类。
 
-!!! note "术语：审批疲劳”
+### 审批疲劳
 
 审批疲劳指高频、低价值的确认请求让人失去警觉。例子：Anthropic 工程博客提到用户手动批准了 93% 的权限提示，以原文为准。
 
@@ -1385,7 +1421,7 @@ console.log('审批疲劳应对验证通过：自动门回退与风险分层符�
 经理问“安全吗”，大家回答“我们写了很多提示词限制它”。  
 没有清单，自证安全就变成了互相说服，而不是逐项验收。
 
-!!! note "术语：上线评审与事故复盘”
+### 上线评审与事故复盘
 
 上线评审是发布前逐项核对风险的流程。事故复盘是事故后按时间线恢复事实、找根因、改流程的工作。例子：上线评审检查项包括“模型能否读取密钥”；复盘项包括“第一次异常发生在哪条日志”。
 

@@ -1,16 +1,45 @@
 ---
 title: "Day 3：Agent Loop 与工具执行"
 tags: [ai-agent, tutorial]
-date: 2026-10-11
-level: intermediate
-runnable: true
+date: 2026-10-13
+level: advanced
+runnable: false
 tested_with: [node@22.18.0, typescript@5.9.3]
-verified_at: 2026-10-12
+verified_at: 2026-10-13
 source_commit: Shyu-x/frontend-interview@4da5f302ef0ac69069e17543d795d82da3a42faa
-description: "理解模型决策、工具执行、结果回灌与预算终止"
+description: "单次调用稳定后，再加一个只读工具。先写注册表、参数校验与结果格式，再把它接入下一轮。不要同时加入写文件、运行命令和并发子任务；失败时无法判断是哪一层的问题。工具实现和模型适配器分开，才能使用假模型验证循环而不依赖网络结果。"
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+implementation_source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Day 3：Agent Loop 与工具执行
+
+## 一次只增加一条工具路径 {#handwrite-loop-incremental-build}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 Official function calling documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+单次调用稳定后，再加一个只读工具。先写注册表、参数校验与结果格式，再把它接入下一轮。不要同时加入写文件、运行命令和并发子任务；失败时无法判断是哪一层的问题。工具实现和模型适配器分开，才能使用假模型验证循环而不依赖网络结果。
+
+```js
+import { runAgentLoop } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+let turn = 0;
+const tools = new Map([['lookup', ({ id }) => ({ id, status: 'ready' })]]);
+const result = await runAgentLoop({ tools, maxTurns: 2,
+  model: async history => ++turn === 1
+    ? { toolCalls: [{ id: 'lookup-1', name: 'lookup', arguments: { id: 7 } }] }
+    : { content: String(history.find(row => row.role === 'tool').output.status) },
+});
+console.log(result.reason); // final
+```
+
+先确认第一轮生成调用，工具收到正确参数，第二轮历史包含正确调用 ID。再把工具改成抛错，明确选择返回工具失败还是结束整轮。当前 runAgentLoop 让处理器异常向上传播；生产恢复策略必须另外定义，不能说它会自动恢复。
+
+加入写操作前接上 A005 的审批门。参数校验通过不代表写入批准，假模型说“用户同意”也不能跳过策略。增加每轮和总预算，未知工具反复申请仍应到达停止条件。
+
+验收顺序是正常只读调用、未知工具、坏参数、批准拒绝和轮数超限。每次只增加一个失败测试，再修改实现。让结果先后乱序时，仍用调用 ID 对应，不使用数组位置。能解释每一步的状态之后，再考虑并发执行。
 
 ## 学习目标
 

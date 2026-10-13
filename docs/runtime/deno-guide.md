@@ -1,15 +1,39 @@
 ---
-title: Deno 2.x 使用指南
-description: 现代 JavaScript 和 TypeScript 安全运行完全指南，涵盖安全沙箱模型、HTTP 服务、内置工具链、Node.js 兼容性、Deno KV 内置存储等核心功能。
+title: Deno 2.9 使用指南
+description: 以 Deno 2.9 官方能力为版本边界，说明权限模型、Node.js 兼容与工具链行为；把安全默认值和迁移兼容性落实为可检查的命令与失败边界。
 tags:
   - runtime
   - deno
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [JavaScript 模块, 命令行基础]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 Deno 2.9 锁文件兼容性说明；未安装 Deno。
 ---
 
-# Deno 2.x 使用指南
+# Deno 2.9 使用指南
 
 > Deno 是现代 JavaScript 和 TypeScript 的安全运行时，默认启用沙箱，提供开箱即用的工具链。
+
+## 当前发布线与锁文件兼容边界 {#handwrite-deno-release-status}
+
+截至 2026-10-13，官方已发布 Deno 2.9。2.9 可直接读取 npm、pnpm、Yarn 与 Bun 的锁文件；这减少锁文件迁移步骤，但不代表所有 npm 脚本、原生扩展和权限行为都完全兼容。[Deno 2.9 发布说明](https://deno.com/blog/v2.9)
+
+权限演示应在临时目录执行：先运行不带 `--allow-read` 的读文件命令，确认权限拒绝，再仅开放目标路径。不要通过 `--allow-all` 证明最小权限；部署环境还应检查子进程、网络和环境变量权限是否被显式授予。
+
+权限最小化可以从一个可观察的拒绝开始：运行模块读取临时文件，捕获 `NotCapable`；然后仅给该目录读权限，确认读取成功但访问目录外文件仍拒绝。把网络权限分配到具体 host，把子进程权限限制到明确 command；依赖锁文件兼容并没有自动扩张这些 capability。
+
+```pseudocode
+deno --version
+deno run ./read-fixture.ts
+deno run --allow-read=./fixtures ./read-fixture.ts
+deno test
+deno lint
+```
+
+检查迁移时依次固定 `deno.json` tasks、import map、npm specifier、native addon 与 lockfile；再在无 npm 缓存的干净目录执行 install/test/build。若 npm 包依赖 postinstall、原生 ABI 或隐式环境变量，记录它是权限拒绝、兼容层缺失还是平台二进制不匹配，不要笼统归类为“npm 不兼容”。
 
 ## 1. 核心哲学
 
@@ -18,8 +42,8 @@ flowchart TD
   subgraph DP["Deno 设计理念"]
     P1["1. 安全优先<br/>沙箱默认启用，需要显式授权文件系统/网络访问"]
     P2["2. 开箱即用<br/>TypeScript 原生支持，无构建步骤<br/>内置 fmt/lint/test 工具"]
-    P3["3. Web 兼容<br/>浏览器同款 API（fetch, WebSocket, Crypto）<br/>ES Module 标准，无 package.json"]
-    P4["4. 去中心化<br/>从 URL 导入模块，npm: 前缀兼容 npm 包<br/>内置标准库 + JSR @std 生态"]
+    P3["3. Web 兼容<br/>实现 fetch、WebSocket、Crypto 等 Web API<br/>以 ESM 为主并提供 Node 兼容层"]
+    P4["4. 工具集成<br/>支持 URL、JSR 与 npm: 导入<br/>也支持 package.json 项目与锁文件"]
     P1 ~~~ P2
     P2 ~~~ P3
     P3 ~~~ P4
@@ -28,15 +52,17 @@ flowchart TD
 
 ### 1.1 与 Node.js 的关键差异
 
-| 特性 | Node.js | Deno |
+| 特性 | Node.js | Deno 2.9 |
 |------|---------|------|
-| **安全模型** | 无限制 | 沙箱默认启用 |
-| **模块系统** | CJS/ESM | 仅 ESM |
-| **TypeScript** | 需配置 | 原生支持 |
-| **权限控制** | 无 | 细粒度控制 |
-| **内置工具** | 无 | fmt/lint/test/bundle |
-| **依赖管理** | package.json | 无需，URL 导入 |
-| **标准库** | 基础 | 完善 (std) |
+| **安全模型** | 进程拥有启动用户的系统权限；可组合容器、权限和 OS 沙箱 | 默认要求对文件、网络、环境变量与子进程能力显式授权 |
+| **模块系统** | CommonJS 与 ESM | ESM 为主，支持 Node/npm 兼容路径与 package.json 项目 |
+| **TypeScript** | Node 22.18+/24.12+ 默认可剥离部分 TS 类型语法；不做类型检查 | 内置 TS 转译与类型检查命令；转译仍不等于静态类型通过 |
+| **权限控制** | 没有和 Deno 同类的逐能力命令行权限模型 | `--allow-*` 可限制运行时能力，应用权限策略仍需部署侧配置 |
+| **内置工具** | Corepack 和测试/检查工具可按项目组合 | 提供 fmt/lint/test/check 与运行时工具链 |
+| **依赖管理** | package.json 加 npm/pnpm/Yarn 等锁文件 | 支持 npm specifier、package.json 项目和多类锁文件 |
+| **标准库** | `node:` 内建模块和 npm 生态 | Web API、Node 兼容层与独立 `@std` 包并存 |
+
+表中权限比较的是运行时能力模型，不代表 Node 进程“完全没有安全隔离”；Node 可用操作系统容器与权限工具约束进程。Deno 的 `--allow-*` 也不是容器替代品，下载依赖的信任、应用身份认证和服务端授权仍由项目负责。
 
 ---
 

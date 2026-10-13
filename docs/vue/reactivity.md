@@ -1,9 +1,35 @@
 ---
 title: Vue 响应式系统
-description: Vue2/Vue3 差异、响应式原理、ref/reactive、computed、watch 与 nextTick
+description: 对照 Vue 2 与 Vue 3 的响应式边界，手写动态依赖收集、分支切换和停止清理，并区分教学代理与 Vue 3.5 的运行时实现。
+tags: [vue, reactivity, javascript]
+date: 2026-10-13
+level: advanced
+prerequisites: [Proxy 与 Reflect, WeakMap, 闭包]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Vue 响应式系统
+
+截至 2026-10-13，Vue 稳定版为 3.5.44，3.6.0 仍处于 RC；不能把下一版候选行为写成已发布稳定能力。Vue 3.5 的响应系统包含版本计数与双向依赖链等实现优化，下面的代码只解释“读取收集、写入通知”这个最小模型，不复刻 Vue 源码。[Vue 3.5 changelog](https://github.com/vuejs/core/blob/main/CHANGELOG.md) 与 [Vue releases](https://github.com/vuejs/core/releases) 是本次核对入口。
+
+### 手写动态依赖：每次运行先清理旧分支 {#handwrite-dynamic-effect}
+
+F004 先用 `WeakMap<target, Map<key, Set<runner>>>` 表示“对象属性到 effect”的索引。runner 执行前删除上次登记的依赖，避免 `enabled ? left : right` 切换后仍被未读取的 `left` 触发；调用栈恢复父 runner，因此嵌套 effect 不会覆盖外层上下文。源码见 [effect.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/effect.mjs)。
+
+```js
+function run(runner) {
+  cleanup(runner); stack.push(runner); active = runner;
+  try { return runner.fn(); }
+  finally { stack.pop(); active = stack.at(-1); }
+}
+```
+
+先实现每轮 cleanup，再用 `WeakMap` 挂依赖集合，最后加分支切换、嵌套调用与 effect 内写入三类测试。
+
+运行 `node --test scripts/implementation-labs/frontend/effect.test.mjs`。测试包括分支切换、相同值不重跑和 `stop` 后脱离集合。此版本没有 computed 缓存、调度队列、数组迭代键、只读代理、集合类型、effect scope 或 Vue 的版本化依赖链，不能用于替代 Vue。
 
 > 本页按「概念、原理、代码」逐题展开相关面试专题。
 

@@ -1,11 +1,40 @@
 ---
 title: 浏览器安全模型与同源策略
-description: Web 安全本质、沙箱机制，以及同源的定义、限制表现与常见误区。
+description: 从 origin 的 scheme、host 与 port 元组推导浏览器数据隔离，比较 opaque origin、document.domain 历史行为及 CORS 的读取授权边界，避免把跨域限制误解为请求阻断。
+tags: [security, browser, origin]
+date: 2026-10-13
+level: intermediate
+prerequisites: [URL 结构, iframe, Cookie]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 origin 与 CORS 请求边界说明。
 ---
 
 # 浏览器安全模型与同源策略
 
 ## 1. Web安全本质与浏览器安全模型
+
+## 同源策略通常限制读取，不代表请求一定没发出 {#handwrite-sop-read-boundary}
+
+跨源 `fetch` 可能已经到达服务器，但浏览器不把响应暴露给脚本；简单表单也可能跨源提交，因此“控制台报 CORS 错误”不能作为请求未执行的证据。Origin 以 scheme、host 和 port 为比较要素，沙箱 iframe 还可能获得 opaque origin。[HTML Standard：Origins](https://html.spec.whatwg.org/multipage/browsers.html#origins)
+
+检查跨源副作用要同时观察服务器日志、网络面板中的 OPTIONS 与实际请求、以及脚本是否能读取响应。CORS 是服务器授予脚本读取响应的机制，不是服务端授权机制，也不能替代 CSRF 防护。
+
+排查 iframe 时分开记录父页面 URL、子页面 URL、sandbox token 与每次读属性的异常。缺少 `allow-same-origin` 的 sandbox 文档拥有 opaque origin，即使 URL 看起来属于同站，也不应直接按普通同源页面处理。对 `postMessage` 还要核对发送方设置的 `targetOrigin` 和接收方的 `event.origin`，这两个检查保护通信两端不同的边界。
+
+```pseudocode
+若 frame 使用 sandbox 且没有 allow-same-origin:
+    将其视为 opaque origin
+否则按 scheme + host + port 比较源
+跨源响应访问被拒时:
+    先确认请求是否已抵达服务器
+    再检查 Fetch/CORS 的读取授权
+消息接收时:
+    验证 event.origin 与消息 schema
+```
+
+特别避免用 `document.domain` 作为新系统的跨子域方案。放宽域名会削弱原有隔离，而且不能让任意跨源 fetch 绕开 CORS；新页面使用明确的消息协议或服务端 API 更容易审计。
 
 ### 1.1 Web安全本质
 

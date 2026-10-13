@@ -11,6 +11,21 @@ const types = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript', 
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, 'http://127.0.0.1');
+    if (url.pathname === '/api/sse-parsing-reference') {
+      if (request.method !== 'GET') { response.writeHead(405).end(); return; }
+      response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' });
+      // Native EventSource is an independent oracle for empty data, CRLF,
+      // multiline data, persistent event IDs, and a discarded EOF fragment.
+      const bytes = Buffer.from('id: fixture-1\r\ndata:\r\n\r\ndata: 一\r\ndata: 二\r\n\r\ndata: discarded-at-eof');
+      let offset = 0;
+      const timer = setInterval(() => {
+        if (response.destroyed) { clearInterval(timer); return; }
+        if (offset === bytes.length) { clearInterval(timer); response.end(); return; }
+        response.write(bytes.subarray(offset, ++offset));
+      }, 1);
+      response.once('close', () => clearInterval(timer));
+      return;
+    }
     if (url.pathname === '/api/orders' || url.pathname === '/api/error') {
       const delay = Math.min(1000, Math.max(0, Number(url.searchParams.get('delay')) || 0));
       const timer = setTimeout(() => {

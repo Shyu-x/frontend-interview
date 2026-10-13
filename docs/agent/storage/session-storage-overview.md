@@ -1,9 +1,41 @@
 ---
 title: "会话与记忆存储全景：JSONL、SQLite 与混合方案"
-description: "生产级编码 agent 到底把会话和记忆存在哪里"
+description: "恢复会话首先恢复数据，不是恢复一段正在执行的函数。快照至少要记录格式版本、会话 ID、revision 和消息历史。加载后先检查这些字段，再交给模型。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 会话与记忆存储全景：JSONL、SQLite 与混合方案
+
+## 先验证快照格式，再恢复会话 {#session-snapshot-validation}
+
+
+本节对照[官方资料](https://nodejs.org/api/fs.html)核对 Node.js file API checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+恢复会话首先恢复数据，不是恢复一段正在执行的函数。快照至少要记录格式版本、会话 ID、revision 和消息历史。加载后先检查这些字段，再交给模型。JSON 能解析只说明它是合法 JSON，null、数组和缺失历史的对象仍不能成为有效会话。下面的小实现只验证序列化格式，不声称已经完成原子落盘。
+
+```js
+import { saveSessionSnapshot, restoreSessionSnapshot } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const text = saveSessionSnapshot({
+  sessionId: 'notes-7', revision: 2,
+  messages: [{ role: 'user', content: '请整理待办' }],
+});
+const session = restoreSessionSnapshot(text);
+console.log(session.version, session.revision); // 1 2
+```
+
+写入函数控制格式版本，调用者不能用同名 version 字段把它覆写。恢复函数拒绝未知版本和不合法 revision。revision 在此只是保存并还原的数字；它没有与旧快照比较，所以不能称为防止旧写覆盖新写的 CAS。并发保存需要另外定义期望 revision 和冲突策略。
+
+真正落盘时，先写临时文件，再按目标文件系统规则提交；需要崩溃耐久性时，还要验证 flush、目录同步和重启恢复。把快照放到对象存储或数据库时，使用该存储提供的条件写入。不要把保存成功的 Promise 与数据在断电后仍存在混为一谈。
+
+A008 测试坏 JSON、未知版本、非法 revision 和正常往返。下一步把文件截断、保存后进程退出、旧 revision 重写三个故障加进集成测试。失败日志保留会话 ID、期望版本和实际版本，避免将一份损坏历史悄悄换成空历史继续运行。
 
 !!! abstract "学完这一页你能"
     - 说出 Codex 为什么不是“用 SQLite 替代了 JSONL”，而是 JSONL 为事实源、SQLite 为镜像索引与状态库。

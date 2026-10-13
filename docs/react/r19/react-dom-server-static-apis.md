@@ -1,6 +1,11 @@
 ---
 title: "react-dom 的服务端与静态 API：流式渲染、prerender 与 resume"
-description: "SSR 与静态生成的 API 全景"
+description: "比较 React DOM 服务端静态输出与流式渲染 API 的输入、结果和接管边界，说明预渲染、恢复与 Suspense 的职责。围绕资源提示、序列化和错误路径设计服务端渲染验收。"
+tags: [react, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # react-dom 的服务端与静态 API：流式渲染、prerender 与 resume

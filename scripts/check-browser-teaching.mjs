@@ -49,6 +49,34 @@ try {
   check('(async () => { const {deepClone} = await import("/scripts/teaching-labs/web/core.mjs"); return deepClone(document.querySelector("#toggle")) === document.querySelector("#toggle"); })()');
   console.log('PASS native DOM: delegation, disclosure, dialog focus, combobox, IntersectionObserver');
 
+  check(`(async () => {
+    const {SseParser} = await import('/scripts/implementation-labs/systems/sse-parser.mjs');
+    const endpoint = '/api/sse-parsing-reference';
+    const native = await new Promise((resolve, reject) => {
+      const source = new EventSource(endpoint);
+      const rows = [];
+      const timer = setTimeout(() => { source.close(); reject(new Error('native SSE did not reach EOF')); }, 3000);
+      source.onmessage = event => rows.push({data:event.data,id:event.lastEventId,event:event.type});
+      source.onerror = () => { clearTimeout(timer); source.close(); resolve(rows); };
+    });
+    const response = await fetch(endpoint);
+    const reader = response.body.getReader();
+    const parser = new SseParser();
+    const custom = [];
+    try {
+      while (true) {
+        const {done,value} = await reader.read();
+        if (done) break;
+        custom.push(...parser.push(value));
+      }
+      custom.push(...parser.push(new Uint8Array(),{final:true}));
+    } finally { reader.releaseLock(); }
+    const expected = [{data:'',id:'fixture-1',event:'message'},{data:'一\\n二',id:'fixture-1',event:'message'}];
+    const observed = custom.map(({data,id,event}) => ({data,id,event}));
+    return JSON.stringify(native) === JSON.stringify(expected) && JSON.stringify(observed) === JSON.stringify(native);
+  })()`);
+  console.log('PASS native EventSource agrees with handwritten SSE on byte-chunked UTF-8, empty data, CRLF, multiline data and EOF');
+
   for (const [width, height] of [[1440, 1000], [1024, 768], [390, 844], [320, 700]]) {
     run('set', 'viewport', String(width), String(height));
     run('open', `${root}/site/coding/practice-distributed-sync/`);
@@ -73,6 +101,22 @@ try {
       check(`document.getElementById(${JSON.stringify(backTarget)}).checked === false`);
     }
     console.log(`PASS site layout and prose at ${width}x${height}`);
+  }
+  for (const width of [1440, 390]) {
+    run('set', 'viewport', String(width), '900');
+    for (const path of ['agent/mcp/mcp-integration', 'api/json-rpc-and-mcp', 'js/event-loop',
+      'browser/http-cache', 'coding/implementation-paths']) {
+      run('open', `${root}/site/${path}/`);
+      check(`(() => {
+        const article=document.querySelector('article');
+        if (!article || !article.querySelector('h1')) return false;
+        const copy=article.cloneNode(true);
+        copy.querySelectorAll('pre,code,script,style').forEach(node=>node.remove());
+        return !/\\*\\*[^*\\n]{1,70}\\*\\*|!!!\\s+(?:tip|note|warning)/.test(copy.textContent)
+          && document.documentElement.scrollWidth <= innerWidth + 1;
+      })()`);
+      console.log(`PASS revised tutorial ${path} at width ${width}`);
+    }
   }
 } finally {
   run('close');

@@ -1,6 +1,11 @@
 ---
 title: "现代 Angular：Signals、独立组件与依赖注入"
-description: "Angular 的完整心智模型"
+description: "从组件、依赖注入、模板编译与响应式状态理解 Angular 的架构，连接路由、表单和渲染流程。比较框架机制与简化模型，围绕生命周期、状态变化和资源清理设计可以验证的练习。"
+tags: [frameworks, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 现代 Angular：Signals、独立组件与依赖注入
