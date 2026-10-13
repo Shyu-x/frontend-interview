@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XHR 与 Fetch 浏览器网络验收</title>
+  <style>
+    body { max-width: 58rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.55 system-ui, sans-serif; color: #17232d; }
+    section { border-top: 1px solid #bbc7d0; padding: 1rem 0; }
+    button { margin: .2rem; padding: .45rem .7rem; font: inherit; }
+    button:focus-visible { outline: 3px solid #1769aa; outline-offset: 2px; }
+    pre { min-height: 2rem; white-space: pre-wrap; background: #f1f4f6; padding: .75rem; }
+    .status { min-height: 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>XHR 与 Fetch 浏览器网络验收</h1>
+  <p>先在仓库根目录运行 <code>node scripts/teaching-labs/browser-server.mjs</code>，再打开 <code>http://127.0.0.1:8123/scripts/teaching-labs/web/network-demo.html</code>。本页会向本地演示 API 发真实浏览器请求。</p>
+
+  <section>
+    <h2>XHR：成功、HTTP 错误与取消</h2>
+    <button id="xhr-success" type="button">XHR 加载订单</button>
+    <button id="xhr-failure" type="button">XHR 请求 503</button>
+    <button id="xhr-cancel-start" type="button">开始慢 XHR</button>
+    <button id="xhr-cancel" type="button">取消 XHR</button>
+    <p id="xhr-status" class="status" role="status" aria-live="polite">待命。</p>
+    <pre id="xhr-result"></pre>
+  </section>
+
+  <section>
+    <h2>Fetch：成功、HTTP 错误与取消</h2>
+    <button id="fetch-success" type="button">Fetch 加载订单</button>
+    <button id="fetch-failure" type="button">Fetch 请求 404</button>
+    <button id="fetch-cancel-start" type="button">开始慢 Fetch</button>
+    <button id="fetch-cancel" type="button">取消 Fetch</button>
+    <p id="fetch-status" class="status" role="status" aria-live="polite">待命。</p>
+    <pre id="fetch-result"></pre>
+  </section>
+
+  <section>
+    <h2>Latest wins：新搜索不能被旧搜索覆盖</h2>
+    <button id="search-old" type="button">先开始慢搜索 old</button>
+    <button id="search-new" type="button">再开始快搜索 new</button>
+    <p id="search-status" class="status" role="status" aria-live="polite">待命。</p>
+    <pre id="search-result"></pre>
+  </section>
+
+  <script type="module">
+    import { xhrRequest, fetchJson, createLatestSearch } from '/scripts/teaching-labs/web/async.mjs';
+
+    const orders = '/api/orders?q=ready';
+    const xhrStatus = document.querySelector('#xhr-status');
+    const xhrResult = document.querySelector('#xhr-result');
+    let xhrController;
+    async function showXhr(url, { signal } = {}) {
+      xhrStatus.textContent = 'XHR 请求中…'; xhrResult.textContent = '';
+      try {
+        const result = await xhrRequest(url, { signal });
+        xhrStatus.textContent = `XHR 完成，HTTP ${result.status}`;
+        xhrResult.textContent = result.text;
+      } catch (error) {
+        xhrStatus.textContent = error.name === 'AbortError' ? 'XHR 已取消。' : `XHR 失败：${error.message}`;
+      }
+    }
+    document.querySelector('#xhr-success').addEventListener('click', () => showXhr(orders));
+    document.querySelector('#xhr-failure').addEventListener('click', () => showXhr('/api/error'));
+    document.querySelector('#xhr-cancel-start').addEventListener('click', () => { xhrController = new AbortController(); showXhr('/api/orders?delay=3000&q=xhr-cancel', { signal: xhrController.signal }); });
+    document.querySelector('#xhr-cancel').addEventListener('click', () => xhrController?.abort());
+
+    const fetchStatus = document.querySelector('#fetch-status');
+    const fetchResult = document.querySelector('#fetch-result');
+    let fetchController;
+    async function showFetch(url, { signal } = {}) {
+      fetchStatus.textContent = 'Fetch 请求中…'; fetchResult.textContent = '';
+      try {
+        const result = await fetchJson(url, { signal });
+        fetchStatus.textContent = 'Fetch 完成。'; fetchResult.textContent = JSON.stringify(result, null, 2);
+      } catch (error) {
+        fetchStatus.textContent = error.name === 'AbortError' ? 'Fetch 已取消。' : `Fetch 失败：${error.message}`;
+      }
+    }
+    document.querySelector('#fetch-success').addEventListener('click', () => showFetch(orders));
+    document.querySelector('#fetch-failure').addEventListener('click', () => showFetch('/api/missing'));
+    document.querySelector('#fetch-cancel-start').addEventListener('click', () => { fetchController = new AbortController(); showFetch('/api/orders?delay=3000&q=fetch-cancel', { signal: fetchController.signal }); });
+    document.querySelector('#fetch-cancel').addEventListener('click', () => fetchController?.abort());
+
+    const searchStatus = document.querySelector('#search-status');
+    const searchResult = document.querySelector('#search-result');
+    const search = createLatestSearch((query, { signal }) => fetchJson(`/api/orders?delay=${query === 'old' ? 1800 : 80}&q=${query}`, { signal }));
+    async function runSearch(query) {
+      searchStatus.textContent = `搜索 ${query} 中…`;
+      try {
+        const result = await search(query);
+        if (!result.current) return; // An obsolete response must not write to the current view.
+        searchStatus.textContent = `当前结果：${result.value.query}`;
+        searchResult.textContent = JSON.stringify(result.value, null, 2);
+      } catch (error) {
+        // Aborting the previous fetch is expected; only the latest request may report an error.
+        if (query === 'new' && error.name !== 'AbortError') searchStatus.textContent = `搜索失败：${error.message}`;
+      }
+    }
+    document.querySelector('#search-old').addEventListener('click', () => runSearch('old'));
+    document.querySelector('#search-new').addEventListener('click', () => runSearch('new'));
+  </script>
+</body>
+</html>

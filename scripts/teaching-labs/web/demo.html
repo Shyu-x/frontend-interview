@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DOM 手写题浏览器验收</title>
+  <style>
+    body { max-width: 52rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.6 system-ui, sans-serif; color: #19232d; }
+    button, input { font: inherit; padding: .45rem .7rem; }
+    button:focus-visible, input:focus-visible { outline: 3px solid #1769aa; outline-offset: 2px; }
+    [hidden] { display: none !important; }
+    dialog { max-width: 28rem; border: 1px solid #8b99a6; border-radius: .5rem; }
+    dialog::backdrop { background: #14202b99; }
+    .row { margin: .35rem 0; }
+    .error { color: #a21b1b; }
+    .preview { display: block; width: 160px; height: 90px; margin: .75rem 0; background: #dce5eb; }
+  </style>
+</head>
+<body>
+  <h1>DOM 手写题浏览器验收</h1>
+  <p>本页直接使用浏览器 DOM、dialog 和 IntersectionObserver。按顺序操作，检查可见状态、键盘焦点和控制台。</p>
+
+  <section aria-labelledby="list-title">
+    <h2 id="list-title">W025 动态列表事件委托</h2>
+    <button id="add-row">新增订单行</button>
+    <ul id="orders"><li class="row"><button class="cancel">取消订单 A-17</button></li></ul>
+    <p id="list-status" aria-live="polite">尚未取消订单。</p>
+  </section>
+
+  <section aria-labelledby="disclosure-title">
+    <h2 id="disclosure-title">W026 同步展开状态</h2>
+    <button id="toggle" aria-expanded="false" aria-controls="details">显示发票详情</button>
+    <div id="details" hidden>发票编号 INV-2048，金额 19.99 元。</div>
+  </section>
+
+  <section aria-labelledby="dialog-title">
+    <h2 id="dialog-title">W027 原生 modal dialog 与焦点归还</h2>
+    <button id="open-dialog">打开退款说明</button>
+    <dialog id="refund-dialog" aria-labelledby="dialog-heading">
+      <h3 id="dialog-heading">退款说明</h3>
+      <p>确认后会进入退款申请，支付状态由服务端确认。</p>
+      <button id="close-dialog">关闭</button>
+    </dialog>
+  </section>
+
+  <section aria-labelledby="combo-title">
+    <h2 id="combo-title">W028 输入候选项键盘移动</h2>
+    <label for="city">配送城市</label>
+    <input id="city" role="combobox" aria-autocomplete="list" aria-controls="cities" aria-expanded="true" aria-activedescendant="">
+    <ul id="cities" role="listbox">
+      <li id="city-0" role="option">上海</li><li id="city-1" role="option">杭州</li><li id="city-2" role="option">苏州</li>
+    </ul>
+    <p>在输入框按 ↑ 或 ↓，观察 aria-activedescendant 和焦点。</p>
+  </section>
+
+  <section aria-labelledby="lazy-title">
+    <h2 id="lazy-title">W029 进入视口后加载图片</h2>
+    <p>滚动到图片附近，src 才会从 data-src 写入。</p>
+    <div style="height: 35vh" aria-hidden="true"></div>
+    <img id="lazy-image" class="preview" alt="延迟加载的演示色块" data-src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='90'%3E%3Crect width='160' height='90' fill='%232a7f62'/%3E%3Ctext x='12' y='50' fill='white' font-size='16'%3ELoaded%3C/text%3E%3C/svg%3E">
+    <p id="image-status" aria-live="polite">图片等待进入视口。</p>
+  </section>
+
+  <section aria-labelledby="form-title">
+    <h2 id="form-title">W030 错误提示关联与 W032 提交去重</h2>
+    <form id="profile-form">
+      <label for="email">邮箱</label>
+      <input id="email" type="email" required aria-describedby="email-help">
+      <span id="email-help">用于发送电子收据。</span>
+      <p id="email-error" class="error" role="alert" hidden></p>
+      <button id="save" type="submit">保存资料</button>
+    </form>
+    <p id="save-status" aria-live="polite"></p>
+  </section>
+
+  <script type="module">
+    import { delegate, setDisclosure, setupDialog, moveActiveOption, observeImages, setFieldError, submitOnce } from './dom.mjs';
+
+    const orders = document.querySelector('#orders');
+    document.querySelector('#add-row').addEventListener('click', () => {
+      const li = document.createElement('li'); li.className = 'row';
+      const button = document.createElement('button'); button.className = 'cancel';
+      button.textContent = `取消订单 A-${Math.floor(Math.random() * 900 + 100)}`;
+      li.append(button); orders.append(li);
+    });
+    const removeOrderListener = delegate(orders, '.cancel', 'click', (_event, button) => {
+      document.querySelector('#list-status').textContent = `${button.textContent}：已标记取消`;
+    });
+
+    const toggle = document.querySelector('#toggle'), details = document.querySelector('#details');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+      setDisclosure(toggle, details, expanded);
+      toggle.textContent = expanded ? '隐藏发票详情' : '显示发票详情';
+    });
+
+    const dialog = document.querySelector('#refund-dialog'), opener = document.querySelector('#open-dialog');
+    const refundDialog = setupDialog(dialog, opener);
+    opener.addEventListener('click', () => refundDialog.open());
+    document.querySelector('#close-dialog').addEventListener('click', () => refundDialog.close());
+
+    const city = document.querySelector('#city'), options = [...document.querySelectorAll('[role="option"]')];
+    let active = -1;
+    city.addEventListener('keydown', event => {
+      if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+      event.preventDefault(); const delta = event.key === 'ArrowDown' ? 1 : -1;
+      active = moveActiveOption(options, active, delta);
+      if (active >= 0) city.setAttribute('aria-activedescendant', options[active].id);
+    });
+
+    const lazyImage = document.querySelector('#lazy-image');
+    const stopObservingImages = observeImages([lazyImage]);
+    lazyImage.addEventListener('load', () => { document.querySelector('#image-status').textContent = '图片已加载。'; }, { once: true });
+
+    const form = document.querySelector('#profile-form'), save = document.querySelector('#save');
+    const email = document.querySelector('#email'), error = document.querySelector('#email-error');
+    email.addEventListener('input', () => {
+      if (email.validity.valid) setFieldError(email, error, '');
+    });
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!email.validity.valid) {
+        setFieldError(email, error, '请输入有效邮箱。'); email.focus(); return;
+      }
+      const result = await submitOnce(save, () => new Promise(resolve => setTimeout(() => resolve(email.value), 350)));
+      if (result.status === 'submitted') {
+        document.querySelector('#save-status').textContent = '资料已保存。';
+      } else if (result.status === 'failed') document.querySelector('#save-status').textContent = '保存失败，可再次提交。';
+    });
+    window.addEventListener('pagehide', () => {
+      removeOrderListener(); stopObservingImages(); refundDialog.dispose();
+    }, { once: true });
+  </script>
+</body>
+</html>
