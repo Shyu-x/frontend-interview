@@ -1,9 +1,32 @@
 ---
 title: "字符串、Unicode 与 Intl"
-description: "码点/码元/字素簇、规范化与国际化 API"
+description: "区分 UTF-16 码元、码点和字素簇，手写保留原文偏移的规范化搜索，并说明大小写映射、组合标记与 ICU 数据版本的边界。"
+tags: [javascript, unicode, intl]
+date: 2026-10-13
+level: intermediate
+prerequisites: [JavaScript 字符串与正则表达式]
+runnable: true
+tested_with: [node@24.16.0, ICU bundled with Node.js]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 字符串、Unicode 与 Intl
+
+### 手写搜索：匹配折叠串，返回原文 UTF-16 范围 {#handwrite-unicode-search}
+
+搜索逻辑不能把规范化后的索引直接拿来 `slice` 原字符串：分解音标、大小写折叠和代理对都会让两边长度不同。F003 的实现逐个分割原文 grapheme，给每个 grapheme 记录 UTF-16 起止偏移，再对每个片段做 NFD、去组合标记和小写折叠；匹配成功时输出原文范围。源码为 [unicode-search.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/unicode-search.mjs)。
+
+```js
+const chunks = [...segmenter.segment(text)];
+const offsets = chunks.map(({ index }) => index);
+const candidate = chunks.map(({ segment }) => fold(segment)).join('');
+// 匹配 candidate 后，使用 offsets 映射回原串，不能拿折叠串下标切片。
+```
+
+测试先用组合音标和代理对校验偏移，再用 Greek final sigma 暴露逐字素大小写折叠与整词小写的区别。
+
+执行 `node --test scripts/implementation-labs/frontend/unicode-search.test.mjs`，测试含分解形式的 `é`、前置 emoji 以及大小写不敏感命中。此算法是教学用的“去音标搜索”，不遵循语言学 collation，也不适用于所有文字系统、土耳其语大小写或需要精确拼写区分的字段。`Intl.Segmenter` 的实现依赖运行时 ICU/Unicode 数据版本。
 
 !!! abstract "核心结论"
 

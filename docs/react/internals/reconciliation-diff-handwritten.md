@@ -1,9 +1,32 @@
 ---
 title: "Reconciliation 与 Diff：key 的作用与手写 patch"
-description: "虚拟 DOM diff 的启发式假设与实现"
+description: "用 key 和旧节点下标推导插入、删除与移动计划，再用最长递增子序列减少移动，并将纯计划与 React/Vue 提交阶段区分。"
+date: 2026-10-13
+tags: [react, reconciliation, diff]
+date: 2026-10-13
+level: advanced
+prerequisites: [数组与 Map, 虚拟 DOM 基础]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Reconciliation 与 Diff：key 的作用与手写 patch
+
+### 手写 keyed diff：用 LIS 保留相对顺序 {#handwrite-keyed-lis}
+
+F005 将新序列中的 key 映射为旧序列下标；新 key 标成 `-1`，旧列表未被认领的 key 进入删除集合。最长递增子序列（LIS）标记旧相对顺序仍正确的节点，其余已存在节点进入移动计划。这里把“计划”作为纯数据输出，避免把框架真实 DOM patch 阶段伪装成数组算法。源码为 [keyed-diff.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/keyed-diff.mjs)。
+
+```js
+const oldForNew = nextKeys.map((key) => oldIndex.has(key) ? oldIndex.get(key) : -1);
+const stablePositions = longestIncreasingSubsequencePositions(oldForNew);
+// 从尾部回退，插入新 key，移动未在 LIS 中的 key，保留 LIS 节点。
+```
+
+先拒绝重复 key，再构造旧下标映射，然后用 LIS 识别无需移动的节点；测试不依赖 DOM，因此结果能精确比较操作计划。
+
+执行 `node --test scripts/implementation-labs/frontend/keyed-diff.test.mjs`。验收包括无变更、插入删除、把首节点移到末尾时只产生一次移动，以及重复 key 必须拒绝。这个教学返回值用于推导，不是 React 或 Vue 的完整 reconciliation；它也没有处理 vnode 类型变化、Fragment、组件副作用与 DOM 锚点。
 
 !!! abstract "学完这一页你能"
 

@@ -1,9 +1,29 @@
 ---
 title: "useEffect 的正确心智模型：同步而不是生命周期"
-description: "Effect 用来做什么、不用来做什么"
+description: "用 setup、cleanup 和依赖变化解释 Effect 的同步生命周期，避免将 Effect 当成组件渲染后的通用数据派生机制。"
+tags: [react, effects, hooks]
+date: 2026-10-13
+level: intermediate
+prerequisites: [useEffect, state 与 props]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # useEffect 的正确心智模型：同步而不是生命周期
+
+### 把一次订阅看成可重复的资源租约 {#handwrite-effect-sync-lifecycle}
+
+若 `roomId` 改变，旧连接必须先断开，然后再建立新连接。依赖数组描述“哪些响应式值变化后要重建同步”，不是一份任意的性能开关。cleanup 闭包持有本次 setup 所创建的 connection，因而能准确清理旧实例；清理后仍要允许下一轮再次 setup。
+
+```jsx
+useEffect(() => {
+  const connection = createConnection(serverUrl, roomId);
+  connection.connect();
+  return () => connection.disconnect();
+}, [serverUrl, roomId]);
+```
+
+调试时记录 connect/disconnect 的 room id；依赖变化时若先出现新连接再关闭旧连接，清理顺序或闭包对象就错了。若目的是从 props 计算 `fullName`，直接在 render 里算，不要用 Effect 设置一份重复 state。React 官方定义见 [useEffect](https://react.dev/reference/react/useEffect)。
 
 !!! abstract "学完这一页你能"
 

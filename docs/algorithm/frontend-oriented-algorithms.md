@@ -1,6 +1,11 @@
 ---
 title: "前端场景算法：Diff、调度、LRU、虚拟滚动与文本处理"
-description: "把算法落到前端问题上"
+description: "把数组、树、图和缓存算法连接到前端业务，用菜单、依赖排序、搜索与列表更新说明数据结构选择。逐步分析输入输出、时间复杂度与失败边界，练习把算法迁移到真实交互需求。"
+tags: [algorithm, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 前端场景算法：Diff、调度、LRU、虚拟滚动与文本处理

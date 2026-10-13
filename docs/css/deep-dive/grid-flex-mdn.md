@@ -1,6 +1,11 @@
 ---
 title: "Grid 与 Flexbox：MDN 精读"
-description: "一维与二维布局的完整心智模型"
+description: "围绕 Grid 与 Flexbox 的轴、轨道和尺寸分配解释布局，比较内容驱动与二维区域布局。通过最小宽度、溢出、自动放置与响应式实例定位问题，并用浏览器观察实际计算结果。"
+tags: [css, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # Grid 与 Flexbox：MDN 精读

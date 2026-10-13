@@ -1,16 +1,47 @@
 ---
 title: "Day 2：程序入口与一次可观察的 Agent 运行"
 tags: [ai-agent, tutorial]
-date: 2026-10-11
-level: intermediate
-runnable: true
+date: 2026-10-13
+level: advanced
+runnable: false
 tested_with: [node@22.18.0, typescript@5.9.3]
-verified_at: 2026-10-12
+verified_at: 2026-10-13
 source_commit: Shyu-x/frontend-interview@4da5f302ef0ac69069e17543d795d82da3a42faa
-description: "从 demo.ts 追踪一次离线模型调用和工具结果"
+description: "写第一个助手时先不要加多 Agent。只固定一次模型调用的输入、输出和错误。入口解析用户文本，模型适配器把供应商事件转换成内部结果，展示层只处理 answer、tool-request 或 failure。"
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+implementation_source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Day 2：程序入口与一次可观察的 Agent 运行
+
+## 先让一次调用的输入输出固定下来 {#handwrite-single-call-adapter}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 Official function calling lifecycle checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+写第一个助手时先不要加多 Agent。只固定一次模型调用的输入、输出和错误。入口解析用户文本，模型适配器把供应商事件转换成内部结果，展示层只处理 answer、tool-request 或 failure。下面是控制流程伪代码，不依赖某个 SDK 的虚构类名，也不使用真实模型密钥。
+
+```pseudocode
+handleUserMessage(text, signal):
+    if trim(text) is empty: return ValidationFailure
+    input = {messages: [{role: user, content: text}]}
+    try:
+        raw = await providerAdapter.call(input, signal)
+        reply = providerAdapter.parse(raw)
+        if reply.kind == answer: return DisplayAnswer(reply.text)
+        if reply.kind == tool-request: return AwaitToolHandling(reply.calls)
+        return UnsupportedOutput(reply.kind)
+    catch error:
+        return Failure(classifyProviderError(error))
+```
+
+先验证空输入，再调用供应商。适配器单独测试，因为供应商的 call_id、参数编码和流事件可能不同。内部结果只能使用限定的 kind，不能让展示层判断一个任意对象里是否“看起来有文本”。工具请求只进入待处理状态，不在 UI 回调里直接执行。
+
+错误分类区分取消、认证失败、限流和未知网络错误。取消不显示成成功空答案，认证失败也不能无限重试。对输出大小设上限，展示时当作文本，不把模型返回的 HTML 直接插入页面。
+
+先用固定假适配器测试三个结果，再用 A006 进入多轮工具循环。接真实 SDK 前锁版本并核对官方签名；本页的伪代码不是跨供应商通用 API。验收时保存输入输出与失败类别，不需要为了单次控制流测试调用付费服务。
 
 ## 学习目标
 

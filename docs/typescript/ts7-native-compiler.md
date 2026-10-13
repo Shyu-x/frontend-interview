@@ -1,9 +1,28 @@
 ---
 title: "TypeScript 7.0：Go 原生编译器"
-description: "原生移植的架构、性能、并行与生态影响"
+description: "结合 TypeScript 7.0 正式发布说明核验 Go 原生编译器的工具兼容性、并行选项和迁移边界，区分正式能力与预览期数据。"
+tags: [typescript, compiler, migration]
+date: 2026-10-13
+level: advanced
+prerequisites: [TypeScript 6, tsconfig, TypeScript Compiler API]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # TypeScript 7.0：Go 原生编译器
+
+### 正式版边界：不要继续把 7.0 写成预览版 {#handwrite-ts7-release-boundary}
+
+TypeScript 官方博客于 2026-07-08 宣布 7.0 正式版，采用 Go 原生移植；截至 2026-10-13，预览阶段的 `@typescript/native-preview` 不是新用户应默认安装的稳定发布路径。当前官方说明也强调 7.0 与 6.0 并行使用时的包别名安排、compiler API 迁移计划和工具生态兼容性；不要把预览期 `tsgo` 命令、Beta 默认值或基准数字直接当稳定版承诺。[Announcing TypeScript 7.0](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/) 是本次核对依据。
+
+本文涉及编程 API 的结论只针对该发布说明公开的 7.0 能力。升级某个 bundler、IDE 插件或 lint 工具前，还要核对它自己的版本支持表；“CLI 能运行”不能推出“所有调用 TypeScript API 的工具都已兼容”。
+
+```typescript
+npm install --save-dev typescript@7
+npx tsc --noEmit
+```
+
+先在独立分支用 7.0 CLI 检查项目配置，再单独验证依赖 TypeScript Compiler API 的工具。若 ESLint parser、Vue SFC 检查或构建插件仍依赖 6.0 API，可按官方公告的 package alias 方案让旧工具使用 6.0，同时由 7.0 CLI 做检查；同一个工具链不要通过隐式 npm dedupe 随机获得两个版本。
 
 !!! abstract "核心结论"
 

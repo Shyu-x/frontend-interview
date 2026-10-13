@@ -1,6 +1,11 @@
 ---
 title: Promise 与 async/await
-description: 深入讲解 Promise 状态机与手写实现、async/await 原理、Promise 组合方法与错误处理。
+description: 从 Promise 状态与微任务推导异步链，再用请求序号和 AbortSignal 处理过期响应、取消及异常边界。通过失败输入观察组合器结算与底层操作终止的差别，检查资源是否真的释放。
+date: 2026-10-13
+level: intermediate
+prerequisites: [函数与闭包, 事件循环]
+runnable: false
+verified_at: 2026-10-13
 tags:
   - javascript
   - async
@@ -9,6 +14,24 @@ date: 2026-05-17
 ---
 
 # Promise 与 async/await
+
+### 业务边界：Promise.race 不会取消输掉的请求 {#handwrite-promise-cancellation}
+
+`Promise.race` 只决定哪个结果先被采用，不会停止其他 Promise 的底层工作。搜索框的旧请求仍可能继续占用连接并在稍后覆盖新结果，因此取消要传递 `AbortSignal`，提交结果时也用递增请求序号确认它仍是最新一次。这个区别来自 Promise 的状态与宿主 fetch 的取消协议，不是语法糖的行为。[MDN Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) 与 [MDN AbortController](https://developer.mozilla.org/en-US/docs/Web/API/AbortController) 是核对入口。
+
+实施时把“这条请求仍被用户需要吗”与“这个 Promise 已经 settle 吗”分成两个状态。前者通过 signal 表达，后者由 Promise 自己管理；只有取消路径时，结果回调仍可能正常触发，因此 reducer 还需要比对请求 id。测试不要只断言 race 返回值，而要让旧请求晚于新请求完成，检查旧结果未覆盖新状态。服务器端已经接收的写请求则必须用幂等键或补偿事务处理，客户端 abort 不能代替业务回滚。
+
+```js
+let latest = 0;
+async function search(query) {
+  const requestId = ++latest;
+  const result = await fetchResults(query);
+  if (requestId !== latest) return;
+  render(result);
+}
+```
+
+最小失败实验是先启动慢查询 A，再启动快查询 B，让 B 先完成；没有 requestId 时 A 最后返回并覆盖结果。加入 abort 后还要继续测试：mock 的旧接口忽略 signal 时，requestId 是否仍阻止过期提交。取消是资源优化，序号检查才是状态正确性的最终防线。
 
 ## 1. Promise 原理与三种状态
 

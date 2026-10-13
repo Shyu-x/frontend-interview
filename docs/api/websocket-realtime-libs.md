@@ -1,6 +1,11 @@
 ---
 title: "实时通信库：ws、Socket.IO、uWebSockets 与房间模型"
-description: "在 WebSocket 之上多了什么"
+description: "从连接建立、消息关联和重连状态理解实时通信库，区分 WebSocket 协议与业务确认机制。围绕重复消息、慢消费者、断网恢复和授权变化设计测试，选择适合应用的连接管理方式。"
+tags: [api, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 实时通信库：ws、Socket.IO、uWebSockets 与房间模型

@@ -1,6 +1,11 @@
 ---
 title: "Wasm 何时比 JS 快：性能模型与真实场景"
-description: "别把 wasm 当银弹"
+description: "按计算规模、数据搬运和启动成本判断是否使用 WebAssembly，区分单次微基准与真实页面收益。通过编译、内存复制和边界调用的测量设计实验，说明与 JavaScript、Worker 的取舍。"
+tags: [browser, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # Wasm 何时比 JS 快：性能模型与真实场景

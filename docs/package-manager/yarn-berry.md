@@ -1,10 +1,16 @@
 ---
 title: Yarn Berry 解析
-description: 详解 Yarn 4.x 的 Plug'n'Play (PnP) 机制、Zero-install 原理、插件系统及 TypeScript 配置。
+description: 说明 Yarn 4 的 Plug'n'Play 依赖解析器、缓存与 Zero-Install 的提交边界，逐步检查 packageManager 固定、immutable install 和非 PnP 工具对 node_modules 假设的兼容风险。
 tags:
   - package-manager
   - yarn
-date: 2026-05-17
+date: 2026-10-13
+level: advanced
+prerequisites: [Node.js module resolution, package manifests, workspaces]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 Yarn 4 PnP 及 immutable install 说明；未运行 Yarn。
 ---
 
 # Yarn Berry 解析
@@ -14,6 +20,37 @@ date: 2026-05-17
 ---
 
 ## 1. 版本演进
+
+## PnP 把依赖解析权交给项目生成的映射 {#handwrite-yarn-pnp-boundary}
+
+PnP 安装不会靠遍历 `node_modules` 搜索包，而是生成 loader 所用的依赖映射；因此读取私有依赖未声明的幽灵依赖会失败。某些原生工具或旧插件仍然扫描 `node_modules`，需要用 `nodeLinker: node-modules`、兼容插件或明确排除策略处理，而不是把 PnP 失败归结成解析器损坏。[Yarn PnP documentation](https://yarnpkg.com/features/pnp)
+
+Zero-Install 会把 `.yarn/cache` 和生成文件放进版本控制，CI 仍需用 `yarn install --immutable` 检查 lockfile 与缓存是否一致。缓存可复现不等于安装脚本可信；审查 `.yarnrc.yml` 中的 `enableScripts` 与依赖 allowlist。
+
+排查 PnP 错误时先确认报错的 issuer 是哪个 workspace，再查看其 package.json 是否显式声明目标依赖；不要从另一个 workspace 的依赖树猜测它“应该能找到”。`yarn why <name>` 证明包为何进入依赖图，但不能证明当前 workspace 有权 import；接着用 PnP loader 运行最小 import 脚本。
+
+```sh
+yarn --version
+yarn install --immutable
+yarn why react
+yarn node -e "import('react').then(m => console.log(Boolean(m.createElement)))"
+```
+
+如果 immutable install 失败，先检查 lockfile 是否需要提交，不要马上清理 cache；如果 import 因 undeclared dependency 拒绝，则在真正使用它的 workspace 声明依赖。只有旧工具无法经 PnP API 接入时才考虑 node-modules linker，并在 CI 跑同一测试矩阵。
+
+依赖定位的最小步骤：
+
+```pseudocode
+读取报错中的 issuer workspace 与 specifier
+打开 issuer 的 package.json 查找依赖声明
+运行 yarn why 确认依赖进入 lockfile 的路径
+若依赖未声明，在实际使用的 workspace 增加声明
+执行 yarn install --immutable 验证锁文件不需漂移
+再次从该 workspace import 依赖并运行测试
+若工具扫描 node_modules，再单独评估 linker 兼容性
+```
+
+`yarn why` 的输出回答“这个包从哪里被安装”，而 PnP resolver 回答“当前 issuer 是否被允许导入它”。把两个问题区分开，能避免通过复制缓存或手工创建 symlink 掩盖错误的依赖声明。
 
 | 版本 | 代号 | 关键特性 |
 |------|------|----------|

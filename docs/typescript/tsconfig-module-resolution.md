@@ -1,9 +1,31 @@
 ---
 title: "tsconfig 与模块解析全解"
-description: "module、moduleResolution 与现代工程配置"
+description: "根据代码由 Node 直接运行还是由 bundler 处理，配置 module 与 moduleResolution，并用 package exports 条件定位实际入口。"
+tags: [typescript, tsconfig, modules]
+date: 2026-10-13
+level: advanced
+prerequisites: [ES Modules, package.json exports, TypeScript]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # tsconfig 与模块解析全解
+
+### 先选运行环境，再配 TypeScript 的解析模型 {#handwrite-ts-resolution-runtime}
+
+`paths` 只告诉 TypeScript 到哪里找模块，不会自动改写 emit 后的 import。Node 直接运行要遵循 Node 的 package exports 与扩展名规则；bundler 项目则要让 TS resolution 与 bundler 的条件解析一致。新项目优先读当前 TypeScript 的 `bundler`、`node16` 或 `nodenext` 文档，旧 `node10`/`node` 模式是历史兼容选项。
+
+```typescript
+{
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true
+  }
+}
+```
+
+这只是由 bundler 接管输出的常见配置，不适用于 Node 原生运行项目。验证时从最终构建产物检查真实 import 目标，而不是只凭 IDE 跳转成功。参考 [TypeScript module reference](https://www.typescriptlang.org/docs/handbook/modules/reference.html)。
 
 !!! abstract "核心结论"
 

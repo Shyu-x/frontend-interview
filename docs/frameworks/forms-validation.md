@@ -1,9 +1,31 @@
 ---
 title: "表单与校验：受控、非受控与 Schema 校验"
-description: "react-hook-form、Formik、zod、valibot"
+description: "对比受控、非受控表单与 schema 校验，手写结构化错误路径解析，并把异步竞态、字段授权和键盘辅助技术提示纳入真实验收。"
+tags: [forms, validation, accessibility]
+date: 2026-10-13
+level: intermediate
+prerequisites: [JavaScript 对象与数组, 表单基础]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 表单与校验：受控、非受控与 Schema 校验
+
+### 手写 schema：错误路径作为结构化数据保留 {#handwrite-schema-parser}
+
+F007 把 schema 表示为接受 `(value, path)` 并返回 `{ ok, value }` 或 `{ ok, issues }` 的函数。`object` 在字段名上扩展路径，`array` 在索引上扩展路径，并累积错误而不是只报告第一个字段；渲染层再决定将路径映射成表单错误文本。源码见 [schema.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/schema.mjs)。
+
+```js
+const result = fieldSchema(input[field], [...path, field]);
+if (result.ok) output[field] = result.value;
+else issues.push(...result.issues);
+```
+
+先定义单值解析器，再让 object/array 只负责扩展 path 并组合结果；测试分别断言成功值和 `['tags', 1]` 这样的失败位置。
+
+运行 `node --test scripts/implementation-labs/frontend/schema.test.mjs`，检查根类型、对象字段与数组索引路径。这个迷你解析器没有 optional、union、默认值、异步 refinement、未知键策略和静态类型推导；生产表单仍需处理服务端校验、竞态取消、错误播报与焦点移动。
 
 !!! abstract "学完这一页你能"
 

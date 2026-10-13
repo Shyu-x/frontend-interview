@@ -1,36 +1,62 @@
 ---
-title: Bun 2.x 使用指南
-description: all-in-one JavaScript 运行时完全指南，涵盖原生 HTTP 服务、内置 SQLite/PostgreSQL/Redis 支持、测试框架、Node.js 迁移策略等核心功能。
+title: Bun 1.4 使用指南
+description: 以 Bun 1.4 为版本边界核对运行时、测试器、包管理与 Node.js 兼容面；区分已发布能力、实验选项和必须用项目测试验证的迁移假设。
 tags:
   - runtime
   - bun
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [JavaScript 模块, Node.js 基础]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对 Bun 1.4 发布状态说明；本机运行时为 1.3.14，未验证 1.4 API。
 ---
 
-# Bun 2.x 使用指南
+# Bun 1.4 使用指南
 
-> Bun 是一个 all-in-one 的 JavaScript 运行时、打包器、测试框架和包管理器，比 Node.js 更快更简单。
+> Bun 将 JavaScript 运行时、打包器、测试框架和包管理器放在同一发行版中。性能不能脱离版本、项目和测量负载作统一结论。
 
 ## 1. 核心特性概览
 
 ```mermaid
 graph LR
-    A[Bun 运行时] --> B[比 Node.js 快 4x]
-    A --> C[原生 TypeScript]
+    A[Bun 运行时] --> B[需按工作负载测量]
+    A --> C[TypeScript 转译与检查需区分]
     A --> D[内置打包器]
     A --> E[内置测试]
     A --> F[SQLite 支持]
-    A --> G[npm 100% 兼容]
+    A --> G[逐包验证 Node.js 兼容]
 ```
 
 ### 1.1 性能对比基准
 
-| 操作 | Node.js | Bun | 提升 |
-|------|---------|-----|------|
-| HTTP 服务 (req/s) | ~50,000 | ~200,000 | 4x |
-| npm install | 30s | 3s | 10x |
-| TypeScript 启动 | 2-5s | 0.1s | 20-50x |
-| 文件 I/O | 基准 | 1.5x | 1.5x |
+## 当前发布线与本机验证边界 {#handwrite-bun-release-status}
+
+截至 2026-10-13，官方发布页列出 Bun 1.4.3（2026-10-10）；本机可执行文件仍报告 1.3.14，因此本页只核对官方发布行为，没有声称本机验证了 1.4 功能。[Bun release notes](https://bun.sh/blog)
+
+本页旧基准图表只代表其原始测试记录，不能据此推导所有 Node.js 应用都更慢。迁移前固定 Bun 与 Node 版本、请求负载和预热次数，比较吞吐、P95/P99、RSS 与正确性测试；保留原始命令和样本数后再得出项目结论。
+
+版本验证分两步：先读取系统中实际 `bun --version`，再在锁文件固定且隔离的临时 checkout 执行项目 test/build。若本机输出仍是 1.3.14，就只能说“本机 1.3.14 验证通过”；不要引用 1.4.3 发布说明把它改写为测试事实。观察 Node API 兼容差异时保留最小复现、Bun/Node 两边版本和预期行为。
+
+```pseudocode
+bun --version
+bun install --frozen-lockfile
+bun test
+bun run build
+bun audit
+```
+
+若性能结果用于是否迁移的决策，额外采集 `process.memoryUsage()`、请求延迟直方图和错误比例；只能使用相同环境与相同并发脚本比较。官方博客 benchmark 说明单一工作负载下有测量结果，不足以替代目标服务的延迟/内存目标。
+
+| 维度 | 必须固定的输入 | 观察的结果 |
+|---|---|---|
+| HTTP 服务 | handler、请求体、并发、keep-alive、机器 | 吞吐、P50/P95/P99、错误率 |
+| 安装 | lockfile、registry、冷/暖缓存、生命周期脚本 | 总耗时、下载字节、脚本失败 |
+| TypeScript | 只转译或完整 typecheck、项目规模 | 冷启动、错误检查覆盖、增量耗时 |
+| 文件 I/O | 文件大小、并发度、文件系统与缓存 | 延迟分位数、吞吐、RSS |
+
+本表替代没有可追溯测试环境的旧提升倍数。性能倍数只能报告到写明硬件、版本和命令的实验记录中；转译速度不能和类型检查速度混为同一指标。
 
 ---
 

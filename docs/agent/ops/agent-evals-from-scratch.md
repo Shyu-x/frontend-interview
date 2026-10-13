@@ -1,9 +1,44 @@
 ---
 title: "Agent 评测从零搭建：任务集、轨迹与回归"
-description: "没有评测就没有进步"
+description: "助手最后说“已经取消”不证明它没有继续写文件。先为每个场景定义可观察结果，再记录工具调用、权限决定和最终状态。文本评分适合检查表达，但不能替代副作用断言。评估用假工具或独立临时环境，不能为了验证删除逻辑就删除真实项目内容。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Agent 评测从零搭建：任务集、轨迹与回归
+
+## 评估记录实际动作，不只看最终句子 {#handwrite-eval-observable-behavior}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 Official tool lifecycle documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+助手最后说“已经取消”不证明它没有继续写文件。先为每个场景定义可观察结果，再记录工具调用、权限决定和最终状态。文本评分适合检查表达，但不能替代副作用断言。评估用假工具或独立临时环境，不能为了验证删除逻辑就删除真实项目内容。
+
+```pseudocode
+runCase(testCase):
+    sandbox = createIsolatedFixture()
+    calls = []
+    tool = instrumentFixtureTool(sandbox, calls)
+    result = await runAssistant(testCase.input, tool, testCase.policy)
+    assert calls.count == testCase.expectedCallCount
+    assert sandbox.state == testCase.expectedState
+    assert result.stopReason == testCase.expectedStopReason
+    saveTrace(testCase.id, calls, result)
+    disposeFixtureEvenIfAssertionsFail()
+```
+
+先固定输入、策略和预期调用次数。拒绝场景必须得到零次副作用，而不只是一个带 sorry 的回答。预算场景要让假模型一直申请工具，检查循环到达上限。失败场景让工具抛错，检查是否保留错误而不是编造成功结果。
+
+如果使用真实模型，记录模型版本、参数和原始轨迹，并把确定性工具测试与统计性模型评估分开。一次模型碰巧给出正确回答不能说明实现稳定；多次运行还要统计成功率和失败分布。不能把测试用例中的预写数字相加当成运行证据。
+
+A005/A006 的行为测试是可执行基线。扩展评估时加入同名工具并发、恶意工具输出、审批取消和资源泄漏。失败报告应能回答哪条工具调用越过了哪一道边界，并保留可重放输入，避免只留下“整体分数下降”的空结论。
 
 !!! abstract "学完这一页你能"
     - 能定义一个可复现的 Agent 评测任务集，区分评测集与训练集。

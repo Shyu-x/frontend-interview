@@ -1,9 +1,43 @@
 ---
 title: "扩展层"
-description: "Agent 分层架构之扩展层：插件、技能与生态扩展机制。"
+description: "扩展层让系统增加能力，不应该让它绕过原来的输入和权限检查。先注册扩展描述，再计算本次启用的能力。扩展不支持时选择明确回退或拒绝，不能假装对方一定理解一个新字段。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 扩展层
+
+## 扩展能力要通过同一条执行边界 {#handwrite-extension-dispatch}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning)核对 MCP 2026-07-28 extensions negotiation。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+扩展层让系统增加能力，不应该让它绕过原来的输入和权限检查。先注册扩展描述，再计算本次启用的能力。扩展不支持时选择明确回退或拒绝，不能假装对方一定理解一个新字段。MCP 的扩展 capability map 与程序自己的插件注册表是两种结构，映射关系需要你显式写出来。
+
+```pseudocode
+dispatchExtension(request, negotiatedCapabilities):
+    extension = registry.get(request.extensionId)
+    if extension is missing: return UnknownExtension
+    if request.extensionId not in negotiatedCapabilities:
+        return extension.hasCoreFallback ? runCoreFallback(request) : Unsupported
+    args = validate(extension.schema, request.arguments)
+    approved = checkEffectivePermissions(extension, args)
+    if not approved: return Denied
+    return runExtensionWithinDeadline(extension, args)
+```
+
+先判断是否存在，再判断双方是否支持。没有协商能力时，不能靠“字段看起来能解析”进入扩展执行。能力信息随当前协议的请求上下文验证，不从旧的初始化全局状态里偷取。Tasks 和 MCP Apps 是扩展，不应混进所有服务必须实现的核心方法列表。
+
+插件注册的 ID 唯一性与 manifest 复制可用 A010 练习；执行之前的副作用边界可用 A005 练习。扩展返回的数据仍然是外部结果，不会自动获得修改权限策略的资格。每次加入一种扩展，都要定义失败时是否保留部分结果。
+
+测试不支持扩展的客户端、重复注册与审批拒绝。预期分别得到清楚的不支持、结构错误和零副作用。再测试 core fallback，要求它保留原请求的安全约束，不能用回退路径跳过资源作用域。
 
 !!! abstract "学完这一页你能"
 
@@ -41,7 +75,7 @@ flowchart TD
 
 你的 Agent 已经能对话了。现在产品要它读内部工单、查订单、按公司规范发周报。你要改核心推理代码吗？接第十个系统时，改十次吗？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：扩展层是核心层与外部世界之间的插座面板，核心层只认插座的形状，不认插头背后的设备。
 
@@ -258,7 +292,7 @@ console.log('插件记录 ->', registry.list('plugin').map((p) => `${p.id}@${p.v
 
 你为 GitHub 写了一个调用封装，为数据库又写一个。两个封装里都有请求 id、超时、错误处理。这些重复代码，第几个系统时你会受不了？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：MCP 把"调用外部能力"统一成一种消息信封，传输方式可以换，信封不变。
 
@@ -565,7 +599,7 @@ IDE 插件调用本地工具链。业务背景：插件要跑格式化、跑测�
 
 你想给 Agent 加一个审计功能：每次请求前记录操作人。直接改核心代码当然可以。但如果审计、脱敏、计费三个团队都要加，谁来排改代码的顺序？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：插件系统把"改核心代码"换成"在预留时机插一段函数"，顺序由注册顺序决定。
 
@@ -838,7 +872,7 @@ SaaS 产品的租户级功能开关。业务背景：不同租户要开不同的
 
 用户说"帮我总结这份文档"，系统怎么知道该走总结流程，而不是走翻译流程？如果只用一个 if 判断关键词，出现同义词时怎么办？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：技能系统先用触发条件给每个技能打分，取分最高的那个，再按步骤表执行。
 
@@ -1137,7 +1171,7 @@ console.log('跳过标记 ->', skipped.results[0].skipped);
 
 Agent 对外开放了三个接口，每个接口都要校验令牌、都要限制频率。如果每个处理函数里各写一遍，第三个月改令牌格式时你要改几处？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：网关是门口的保安加闸机，先验身份，再看今天进过几次，最后才放你进屋。
 
@@ -1410,7 +1444,7 @@ Agent 对外暴露的工具调用入口。业务背景：外部系统要调用 A
 
 四个扩展点都写好了，但它们谁先谁后？如果插件在认证之前执行，未认证的请求就能触发插件逻辑，这算不算漏洞？
 
-**!!! tip "心智模型"**
+### 核心模型
 
 一句话模型：一次请求的行为固定顺序是网关、插件、技能、工具，扩展层只在这条链上插装，不改变链的方向。
 

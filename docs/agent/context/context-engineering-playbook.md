@@ -1,6 +1,11 @@
 ---
 title: "上下文工程手册：给 agent 的信息该放哪、怎么放"
-description: "系统提示、工具定义、检索、记忆、笔记的分工"
+description: "把上下文拆成指令、任务状态、工具结果与外部资料，围绕检索、裁剪和压缩设计输入流程。通过预算、来源边界和失败恢复检查，判断模型真正收到什么，避免把历史堆积当成记忆能力。"
+tags: [agent, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 上下文工程手册：给 agent 的信息该放哪、怎么放

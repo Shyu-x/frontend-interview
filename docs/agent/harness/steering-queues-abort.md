@@ -1,9 +1,41 @@
 ---
 title: "运行中打断：steering、follow-up 与 abort"
-description: "队列注入时机的语义"
+description: "取消按钮首先表达“这个结果不再需要”，但不会自动停止任意函数。先区分取消等待、取消网络请求和终止子进程。一个 Promise 只代表结果，调用 reject 不会替你关闭它背后的文件、线程或远端操作。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 运行中打断：steering、follow-up 与 abort
+
+## 取消等待之后，工作由谁结束 {#abort-settles-promise}
+
+
+本节对照[官方资料](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal)核对 AbortSignal current documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+取消按钮首先表达“这个结果不再需要”，但不会自动停止任意函数。先区分取消等待、取消网络请求和终止子进程。一个 Promise 只代表结果，调用 reject 不会替你关闭它背后的文件、线程或远端操作。写取消逻辑时，要把信号传到真正拥有资源的那一层，同时保证等待者只结算一次。
+
+```js
+import { raceWithAbort } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const controller = new AbortController();
+const work = new Promise(resolve => setTimeout(() => resolve('late'), 20));
+const waiting = raceWithAbort(work, controller.signal);
+controller.abort(new Error('不再需要此结果'));
+try { await waiting; } catch (error) { console.log(error.message); }
+// 等待已取消，定时器仍会执行；这个函数没有接管定时器资源。
+```
+
+先处理信号在调用前已经中止的情况。随后注册一次性的 abort 监听，同时订阅工作成功和失败。两个入口都调用同一个 finish，先检查 settled，再移除监听，最后结算 Promise。工作先完成时移除 abort 监听；信号先到达时，迟到结果也不能再改变结算状态。
+
+真正的 fetch 还要把 signal 传给请求。子进程需要退出协议和最终终止手段。写入远端的操作则可能处于未知结果状态，取消等待后应查询结果，不能立即重新执行。不同层的动作不能用一个 cancelled 布尔值代替。
+
+A011 验证先完成、后取消、预先取消三个次序。下一步给 work 一个专门的 dispose 回调，要求它在任何退出路径只执行一次。将监听数量、资源关闭次数和副作用次数写进断言，才能分清“界面已停止转圈”和“后台已经停止工作”。
 
 !!! abstract "学完这一页你能"
 

@@ -1,13 +1,37 @@
 ---
 title: React 19 新特性
-description: 预览 React 19 核心新特性，包括 Actions、useOptimistic、use() Hook、文档元数据、资源预加载 API 与 React 编译器优化。
+description: 梳理 React 19 已稳定能力及后续版本新增项，按官方发布说明区分 Actions、useOptimistic、use()、资源 API 与实验功能。
 tags:
   - react
   - hooks
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [React 18, Hooks, Server Rendering]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # React 19 新特性
+
+### React 19 新能力要按发布版本标注 {#handwrite-react-features-current}
+
+旧说明把 React 19 的部分功能笼统标成“仍处于试验阶段”。截至 2026-10-13，React 官方 versions 页面列出最新稳定版 19.3.0。Actions、`useOptimistic` 与 `use` 属于 React 19 文档范围；19.2 加入 `<Activity>`、`useEffectEvent` 和 Performance Tracks；19.3 的 View Transitions、Fragment Refs 等是之后的次版本变化，不能混写为“19 初版都有”。[React Versions](https://react.dev/versions) 与 [React 19.2 release](https://react.dev/blog/2025/10/01/react-19-2) 是本次核对来源。
+
+```jsx
+const [optimisticTodos, addOptimistic] = useOptimistic(todos, (current, text) => [
+  ...current, { id: `pending-${text}`, text, pending: true },
+]);
+```
+
+这个例子只说明 React 19 API 的用途：真实 state 是基线，action pending 时计算乐观视图，action 完成后回到由真实数据决定的列表。它不是完整表单实现，也不能代替服务端确认与错误反馈；面试回答要说明 optimistic UI 与最终持久化之间有两份状态。当前版本表还需注明 API 来自哪次小版本，避免以 `react@19` 一个大版本号掩盖增量能力。
+
+升级清单先记录 lockfile 中的 react/react-dom 精确版本，再逐个问 API 是否 stable、是否要求特定渲染器或框架，以及行为属于哪次 release。否则面试回答里的“React 19 有 X”无法说明 X 在哪个版本可用。
+
+| 写法 | 发布边界 | 验证问题 |
+|---|---|---|
+| `useOptimistic` | React 19 API | action pending 和失败时回滚是否符合业务预期？ |
+| `<Activity>` | React 19.2 | hidden 模式会暂停更新并卸载 effects，是否符合缓存页面需要？ |
+| View Transitions | React 19.3 | 目标 renderer 和浏览器是否支持？ |
 
 > 本文档涵盖 React 19 的核心新特性，包括 Actions、新的 Hooks、资源预加载、错误边界改进等内容。
 >

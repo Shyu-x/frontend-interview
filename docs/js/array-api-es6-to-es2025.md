@@ -1,9 +1,28 @@
 ---
 title: "Array API 全景：ES6 到 ES2025 与手写 polyfill"
-description: "Array 新增方法的语义、复杂度与手写"
+description: "对比数组复制、查找、排序和迭代 API 的输入变更、稀疏数组及稳定排序边界，并区分标准语法与运行时支持。通过检测实际环境与测试回退函数，避免只按年份推断方法是否可用。"
+tags: [javascript, arrays, ecmascript]
+date: 2026-10-13
+level: intermediate
+prerequisites: [数组, ECMAScript 基础]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # Array API 全景：ES6 到 ES2025 与手写 polyfill
+
+### ES 年份不等于浏览器支持清单 {#handwrite-array-support-boundary}
+
+新数组方法要分别核对 ECMAScript 规范是否纳入、目标引擎何时实现以及项目构建目标是否保留该调用；Babel 转译语法不一定能补齐内建方法。跨浏览器代码优先用 [MDN Array reference](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array) 的兼容表对照目标矩阵，避免将“ES2025”直接等同于所有运行时都支持。
+
+```js
+const original = [3, 1, 2];
+const sortedCopy = original.toSorted((a, b) => a - b);
+console.log(original);   // [3, 1, 2]
+console.log(sortedCopy); // [1, 2, 3]
+```
+
+读 API 时先问它会不会修改接收者，再看 sparse array 对应位置是跳过还是读成 `undefined`，最后检查是否泛型地读取 `length`/属性。polyfill 要复制这些语义，不应只实现普通密集数组的 happy path；例如稀疏数组映射是否保留 hole，会影响依赖索引存在性的下游逻辑。
 
 !!! abstract "核心结论"
     - Array 新增方法几乎全部只是规范层"糖"：它们只依赖 `LengthOfArrayLike`、`Get`、`HasProperty`、`Set`、`CreateDataPropertyOrThrow` 这几个抽象操作，因此天然对类数组泛型；理解这五个操作就能推出所有行为差异。

@@ -1,6 +1,14 @@
 ---
 title: CSRF
-description: CSRF 原理、SameSite、Token 与 Referer 校验等防御。
+description: 以浏览器自动附带凭据的请求为起点分析 CSRF，比较 SameSite、同步令牌与 Origin 校验的覆盖边界，并说明跨站子域和登录状态切换时的失败情形。
+tags: [security, browser, csrf]
+date: 2026-10-13
+level: intermediate
+prerequisites: [Cookie, Origin 与站点概念, 表单提交]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 SameSite、token 与来源校验边界。
 ---
 
 # CSRF
@@ -23,6 +31,26 @@ CSRF（Cross-Site Request Forgery）利用用户已登录的身份，诱导用�
 | 6 | 用户毫不知情 |
 
 **恶意页面示例：**
+
+## SameSite 是默认防线，不是完整授权策略 {#handwrite-csrf-samesite-boundary}
+
+`SameSite=Lax` 通常阻止跨站子资源请求携带 Cookie，但顶级安全导航和站点定义会影响实际行为；同站不同源子域也不能简单等同跨站。对有副作用的请求仍应校验 CSRF token，并结合 `Origin` 或 `Referer` 做请求来源检查。[OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+
+验收时至少覆盖：无 token 的跨站表单拒绝、合法 token 的同站提交成功、登录后会话轮换时旧 token 失效。GET 不应修改业务状态，否则 SameSite 对顶级导航的限制无法承担安全边界。
+
+同步令牌方案通常先为会话生成不可预测 token，服务端把 token 绑定到 session，页面从安全的初始化接口获得 token，并在每个状态变更请求头中回传。服务端使用常量 API 比较 token 并验证 session；若框架将 CSRF token 暴露在可被 XSS 读取的 DOM 中，XSS 仍能绕过该防线，因此 token 防护不取代输出编码和 CSP。
+
+```pseudocode
+POST /transfer
+读取 session 中的 csrfSecret
+读取请求头 X-CSRF-Token
+若 token 缺失或不匹配: 返回 403，不执行副作用
+校验 Origin / Referer 与允许站点策略
+验证余额、收款人和重复提交键
+在事务中提交转账和审计记录
+```
+
+成功标准不是页面不显示错误，而是拒绝请求后数据库余额不变且审计记录标明拒绝原因；允许请求则只提交一次。SameSite 可能阻止某些请求自动带 Cookie，但它无法证明一次跨站请求在业务层绝对不会携带身份信息。
 ```html
 <html>
 <body onload='document.forms[0].submit()'>

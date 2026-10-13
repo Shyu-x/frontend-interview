@@ -1,18 +1,48 @@
 ---
 title: "子 Agent 编排：并发、预算与失败恢复"
 tags: [ai-agent, tutorial]
-date: 2026-10-11
-description: "基于仓库内 TypeScript 示例学习子 Agent 调度：校验写入所有权、限制并发、传播取消、保留部分成功，并通过可追踪证据验收结果。"
+date: 2026-10-13
+description: "并发写作首先决定谁能改哪份产物。把每个任务描述清楚，再检查所有权是否重叠，最后才交给并发执行器。任务启动成功不等于结果已经通过验证。"
 level: advanced
-prerequisites:
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
   - agent/multi/subagents-context-isolation.md
   - TypeScript 与 Promise
 runnable: false
-verified_at: 2026-10-11
+verified_at: 2026-10-13
 source_commit: 4da5f302ef0ac69069e17543d795d82da3a42faa
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+implementation_source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 子 Agent 编排：并发、预算与失败恢复
+
+## 调度先分配所有权，再启动并发 {#handwrite-owned-task-dispatch}
+
+
+本节对照[官方资料](https://nodejs.org/api/worker_threads.html)核对 Node.js worker_threads documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+并发写作首先决定谁能改哪份产物。把每个任务描述清楚，再检查所有权是否重叠，最后才交给并发执行器。任务启动成功不等于结果已经通过验证。主任务需要收集成功、失败和未完成状态，并确认依赖产物已经产生，不能看见一条完成消息就直接把文件当作可发布内容。
+
+```pseudocode
+owners = Map()
+for task in tasks:
+    for path in task.writablePaths:
+        if owners contains path: rejectOverlappingOwnership(path)
+        owners[path] = task.id
+results = await boundedFanout(tasks, concurrencyLimit)
+for task, result in zip(tasks, results):
+    verifyOnlyOwnedPathsChanged(task)
+    if result.failed: preservePartialArtifactsAndReport(task)
+    else runAcceptanceTests(task.outputs)
+publishOnlyAfterDependencyChecksAndAllRequiredTests()
+```
+
+所有权检查放在启动之前。允许所有人都改一个共享索引，会把冲突推迟到最难收拾的时候。共享文件由协调者处理，子任务只写自己的目录。并发执行器还要保证返回结果与输入任务索引一致，这正是 A009 的受限 fan-out 模块所验证的内容。
+
+失败后保留已经写入的文件和测试日志，不自动撤销其他任务的工作。决定是否重试前检查当前状态；重复启动同一任务可能产生重复副作用。工作停止、工具超时和观察超时是三种情况，不能把一次没有新消息当作任务已经退出。
+
+继续练时让第二个 worker 在完成一半后失败。要求第三个 worker 的产物保留，依赖第二个任务的发布步骤停住，并且失败报告指出缺少哪项验收。这个流程不仅适用于 Agent，也适用于构建图、批处理队列和多 Worker 数据处理。
 
 本文是三篇中的实现主线：前一篇定义是否采用多 Agent，另一篇定义交接合同；这里关注调度器怎样执行、怎样在失败时给出可复核结果。可运行实现位于 [`examples/minicode/src/subagents.ts`](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/src/subagents.ts)，对应测试为 [`examples/minicode/tests/subagents.test.ts`](https://github.com/Shyu-x/frontend-interview/blob/4da5f302ef0ac69069e17543d795d82da3a42faa/examples/minicode/tests/subagents.test.ts)。页面没有复制一套无法独立运行的伪实现。
 

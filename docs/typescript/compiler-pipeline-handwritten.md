@@ -1,9 +1,59 @@
 ---
 title: "编译器管线与手写迷你 TypeScript 转译器"
-description: "scanner→parser→binder→checker→emitter，及 TS 转译的本质"
+description: "从 scanner、递归下降 parser 到类型擦除推导编译阶段职责，并通过可运行的算术解析器观察优先级、位置错误与输入校验。"
+tags: [typescript, compiler, parser]
+date: 2026-10-13
+level: advanced
+prerequisites: [递归函数, 运算符优先级, TypeScript 编译流程]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 编译器管线与手写迷你 TypeScript 转译器
+
+### 手写算术表达式解析：优先级由调用层级表达 {#handwrite-expression-parser}
+
+F011 把语法拆成 `expression → product → primary`：加减循环只消费 `product`，乘除循环只消费 `primary`，因此乘除自然比加减先结合，括号递归回到 `expression`。词法扫描使用 sticky 正则并拒绝无法识别的字符，错误保留 UTF-16 源位置。源码 [expression-parser.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/expression-parser.mjs)。
+
+```text
+expression := product (('+' | '-') product)*
+product    := primary (('*' | '/') primary)*
+primary    := number | '(' expression ')'
+```
+
+先写 scanner 把字符切成 token 并保留位置，再按上述优先级实现三层函数，最后校验输入已完全消费；否则 `1 @ 2` 之类的非法尾部容易被静默忽略。
+
+先把调用层级写出来。下面是解析算法的伪代码，`peek` 不移动游标，`take` 移动一个 token，`failAt` 抛出含当前位置的语法错误。
+
+```pseudocode
+primary():
+    if peek is number: return take.numberValue
+    if peek is "(":
+        take()
+        value = expression()
+        if take is not ")": failAt(currentPosition)
+        return value
+    failAt(currentPosition)
+product():
+    value = primary()
+    while peek is "*" or "/":
+        operator = take()
+        right = primary()
+        value = apply(operator, value, right)
+    return value
+expression():
+    value = product()
+    while peek is "+" or "-":
+        operator = take()
+        value = apply(operator, value, product())
+    return value
+```
+
+循环保证 `8 - 3 - 1` 从左向右结合。括号回到整个表达式入口，而不是只回到数字解析器。顶层调用返回后仍要检查 EOF；不检查时，合法前缀后面的错误会被藏起来。
+
+运行 `node --test scripts/implementation-labs/frontend/expression-parser.test.mjs`。测试覆盖优先级、括号、左结合、尾随 token 与缺少操作数。该解析器只支持非负十进制字面量、二元 `+ - * /` 和圆括号；没有一元运算、指数、注释、类型语法或 AST 输出，不能据此声称实现了 TypeScript parser。
 
 !!! abstract "核心结论"
 - TypeScript 编译主管线是 scanner -> parser -> binder -> checker -> emitter；类型检查只发生在 checker，emit 阶段多数类型节点会被擦除。

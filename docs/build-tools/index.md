@@ -1,10 +1,17 @@
 ---
 title: 构建工具全景图
-description: 梳理前端构建工具的分类、定位对比与面试常考点，涵盖 Vite 8.x 新特性、Dev Server 原理与 HMR 机制。
+description: 建立构建工具、bundler 与 dev server 的职责地图，连接 Vite 8、Rolldown、插件兼容和可复现 benchmark 主题，避免把工具版本号与功能稳定性混为一谈。
 tags:
   - build-tools
   - vite
-date: 2026-05-17
+date: 2026-10-13
+level: reference
+prerequisites: [ES modules, JavaScript package scripts]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 Vite 支持策略说明。
+---
 
 # 构建工具全景图
 
@@ -12,6 +19,14 @@ date: 2026-05-17
 
 
 ## 1. 本章范围
+
+## 从主版本阅读到支持分支 {#handwrite-build-tool-release-boundary}
+
+学习工具架构时先读稳定版公告，再读当前支持版本表，最后核对项目锁定版本。Vite 的发行规则没有固定日历，支持状态会随时间变化；本页的 Vite 8 架构内容因此配合维护线核查，不把“8.x”理解成单一实现。[Vite releases](https://vite.dev/releases)
+
+本章阅读顺序对应三个不同任务：本页先识别开发服务器与 bundler 的职责；[Vite 深度解析](vite-deep-dive.md)跟随一次模块请求和热更新；[打包工具对比](bundler-comparison.md)则用同一 workload 评估插件、产物和构建时间。做面试讲解时从“问题现象—工具边界—测量证据”推进，不背一个无版本的工具排名。
+
+动手前检查 `package.json` 中 scripts 与 packageManager，再从 lockfile 确认真实版本；完成升级后单独跑 dev、build、preview。若只修复 dev server，不要一起更改生产 chunk 策略，避免无法归因。
 
 本章讲解前端构建工具：先建立工具分类与定位的全局认识，再深入 Vite 的 Dev Server、HMR 与插件机制，最后横向对比 Webpack、Rollup、Parcel、esbuild，并理解 Tree-shaking 与代码分割。
 

@@ -1,6 +1,11 @@
 ---
 title: "WebRTC：浏览器里的点对点通信"
-description: "信令、ICE 与媒体流"
+description: "把 WebRTC 拆成信令、连接协商、媒体传输与数据通道，说明 ICE、STUN 和 TURN 的作用。围绕候选乱序、连接失败、流关闭与权限拒绝设计交互，验证真实网络条件下的恢复流程。"
+tags: [web-apis, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # WebRTC：浏览器里的点对点通信

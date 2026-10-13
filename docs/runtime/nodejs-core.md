@@ -1,15 +1,40 @@
 ---
 title: Node.js 核心原理
-description: 深入剖析 Node.js 架构与核心原理，包括事件循环机制、libuv 工作原理、CommonJS vs ESM 模块系统、异步 I/O 与 Promise、Stream 与 Buffer 等。
+description: 深入剖析 Node.js 事件循环、libuv 工作池与 JS 主线程的边界，使用阻塞和异步 I/O 对照实验解释吞吐退化，并给出定位长回调与工作池饱和的证据路径。
 tags:
   - runtime
   - nodejs
-date: 2026-05-17
+date: 2026-10-13
+level: advanced
+prerequisites: [JavaScript event loop, Promise, process and thread basics]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 仅核查新增的事件循环与 libuv 工作池边界。
 ---
 
 # Node.js 核心原理
 
 > Node.js 是基于 Chrome V8 引擎的 JavaScript 运行时，采用事件驱动、非阻塞 I/O 模型。
+
+## 非阻塞 I/O 不会让 CPU 回调自动并行 {#handwrite-node-callback-budget}
+
+文件读取可以把等待交给 libuv 工作池，但完成后的 JavaScript callback 仍在事件循环线程执行。若 callback 里进行大规模 JSON.parse、正则回溯或同步压缩，它会阻塞该进程中的其他 JS 回调；把“异步 API”当作“CPU 并行”是常见的误判。[Node.js: Don't block the Event Loop](https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop)
+
+按以下步骤定位：先用 `monitorEventLoopDelay()` 记录 p95/p99 延迟；再对比相同输入下同步计算和 Worker Thread 的 CPU profile；最后把 I/O 等待时间与回调 CPU 时间分别标在 trace 上。`UV_THREADPOOL_SIZE` 只改变特定 libuv 工作池并发容量，不会扩展 JavaScript 主线程，也不能修复长时间同步回调。
+
+示意伪代码：
+
+```pseudocode
+开始本轮采样窗口
+记录 eventLoopDelay 的直方图
+发送固定数量的并发请求
+分别记录请求等待与 callback 执行时间
+如果 delay 上升且 CPU profile 指向 callback
+    将纯 CPU 计算移入 worker 或切分成有界任务
+否则检查文件系统、DNS、锁或外部服务等待
+重复同一请求集并对比 p95/p99 与总 CPU
+```
 
 ## 1. 架构概览
 

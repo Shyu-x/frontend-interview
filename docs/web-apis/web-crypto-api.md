@@ -1,6 +1,14 @@
 ---
 title: "Web Crypto API：浏览器里的密码学"
-description: "哈希、签名与对称加密"
+description: "区分 Web Crypto 的随机数、摘要、认证加密、签名与密钥派生用途，落实 getRandomValues 缓冲上限、AES-GCM nonce 唯一性和 JavaScript 不承诺恒时执行的边界。"
+tags: [web-apis, webcrypto, security]
+date: 2026-10-13
+level: advanced
+prerequisites: [ArrayBuffer, Promise, symmetric and public-key cryptography]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的随机数组限额和 JavaScript 时序保证说明。
 ---
 
 # Web Crypto API：浏览器里的密码学
@@ -13,6 +21,25 @@ description: "哈希、签名与对称加密"
     - 用 PBKDF2 从口令派生密钥、用 ECDSA 签名验证，并把公钥导出为 JWK 与 SPKI。
 
 ## 0. 知识地图
+
+## 密码学 API 不等于恒时应用代码 {#handwrite-webcrypto-timing-boundary}
+
+`crypto.getRandomValues` 为整数 typed array 填充密码学强随机数，单次请求的字节数上限为 65,536；超过时会抛出 `QuotaExceededError`。需要更多随机数据时应分块生成，而不是退回 `Math.random()`。[MDN: Crypto.getRandomValues](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)
+
+Web Crypto 并未提供通用的 JavaScript constant-time 比较保证。应用层自己写循环比较可能被 JIT、分支和运行时优化影响，因此不能把它宣传成恒时；对秘密校验优先使用经过审查的平台 API 或服务端密码学库，并避免将错误差异暴露给远端调用者。
+
+生成临时 nonce 时先创建符合算法要求的随机 buffer，再调用 `getRandomValues`；AES-GCM nonce 必须对同一密钥唯一，不能因为“随机碰撞概率很低”就重用固定 IV。大于 65,536 字节时分块生成，而密钥材料要保留为 `CryptoKey` 并按用途设置 extractable/usages，避免把原始密钥长期留在字符串或 localStorage。
+
+```js
+const nonce = crypto.getRandomValues(new Uint8Array(12));
+const ciphertext = await crypto.subtle.encrypt(
+  { name: 'AES-GCM', iv: nonce },
+  key,
+  new TextEncoder().encode(plaintext),
+);
+```
+
+验收至少包括已知 SHA-256 向量、AES-GCM 加解密往返、篡改密文后解密拒绝、以及 nonce 长度错误时失败。Web Crypto 的随机数或加密调用成功不能证明密钥管理策略安全；用户密码仍需合适的密码哈希/KDF、服务端 pepper 策略和轮换计划。
 
 ```mermaid
 flowchart TD

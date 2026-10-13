@@ -1,9 +1,44 @@
 ---
 title: "提示注入与致命三要素：从威胁模型到防御设计"
-description: "没有银弹，只有纵深"
+description: "检索片段、网页和工具结果都可能包含命令式文字。先保留它们的来源标签，再决定它们能参与什么步骤。资料可以帮助生成答案，但不能修改注册工具、权限策略或预算。仅用关键词删除“忽略之前”不能证明安全，攻击内容也可以不用这几个词表达同样的意思。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 提示注入与致命三要素：从威胁模型到防御设计
+
+## 工具返回文本不能变成执行指令 {#handwrite-untrusted-tool-output}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)核对 MCP 2026-07-28 tool trust guidance。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+检索片段、网页和工具结果都可能包含命令式文字。先保留它们的来源标签，再决定它们能参与什么步骤。资料可以帮助生成答案，但不能修改注册工具、权限策略或预算。仅用关键词删除“忽略之前”不能证明安全，攻击内容也可以不用这几个词表达同样的意思。
+
+```pseudocode
+acceptToolOutput(callId, text, source):
+    requireExistingApprovedCall(callId)
+    evidence = {kind: external_data, callId, source, text}
+    conversation.append(evidence)
+proposedAction(action):
+    tool = lookupTrustedRegistry(action.name)
+    args = validateArguments(tool.schema, action.arguments)
+    decision = evaluatePermissionFromTrustedPolicy(tool, args)
+    if not decision.allowed: rejectWithoutExecution()
+    else executeApprovedAction(tool, args)
+```
+
+先把来源保存下来，避免经过摘要之后丢掉“不可信资料”的标签。拟执行动作重新走受信注册表与权限门，不从刚刚读到的文章里加载可执行 handler。文本说“已获得用户同意”也只能作为文本，不能填充 trustedIdentity 或批准记录。
+
+输出 schema 和模型提示约束能降低错误概率，但它们不代替强制边界。读文件工具只读被批准范围；网络工具通过批准出口；写操作要求具体授权。即使模型被诱导申请危险工具，这些机制也要能够拒绝它。MCP 的 annotations 不是安全证书。
+
+用 A005 的零副作用断言作为防线。测试工具返回伪造批准、伪造系统消息和请求泄漏凭证三种文本，再检查所有候选动作仍经过权限门。评估最终回答的同时记录实际工具轨迹；只看到模型口头拒绝，不能证明它没有先执行危险调用。
 
 !!! abstract "学完这一页你能"
     - 区分直接注入与间接注入，并列出 3 个间接注入的真实入口。

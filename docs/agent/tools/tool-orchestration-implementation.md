@@ -1,9 +1,45 @@
 ---
 title: "工具编排：实现与高级话题"
-description: "工具编排的代码实现、高级话题与模式选择指南。"
+description: "工具调用超时只说明没有收到结果，不说明业务没有执行。先按操作性质决定恢复方式。纯读取可以在总预算内重试；写入需要稳定的操作 ID 和服务端幂等边界；扣款这类未知结果要先查询。取消等待和工具失败不能变成随意再次执行的许可。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 工具编排：实现与高级话题
+
+## 重试前先判断副作用是否已发生 {#handwrite-effect-safe-retries}
+
+
+本节对照[官方资料](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2)核对 RFC 9110 idempotency semantics。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+工具调用超时只说明没有收到结果，不说明业务没有执行。先按操作性质决定恢复方式。纯读取可以在总预算内重试；写入需要稳定的操作 ID 和服务端幂等边界；扣款这类未知结果要先查询。取消等待和工具失败不能变成随意再次执行的许可。
+
+```pseudocode
+invokeOperation(operation):
+    id = operation.stableId
+    try: return executeWithDeadline(operation, id)
+    catch Timeout:
+        if operation.isReadOnly: return boundedReadRetry(operation)
+        state = queryRemoteOperation(id)
+        if state == succeeded: return state.result
+        if state == pending: return AwaitReconciliation(id)
+        if state == definitelyAbsent and serverSupportsIdempotency:
+            return retryWithSameOperationId(operation, id)
+        return UnknownOutcome(id)
+```
+
+稳定 ID 在重试时保持不变。每次重新生成 ID，会让幂等服务也把它们看成不同操作。服务器必须把业务效果与幂等记录放进可靠提交边界，客户端保存一个 Map 不能证明重启后仍然幂等。UnknownOutcome 需要可恢复状态，不应该只是一条被吞掉的异常。
+
+A011 能取消本地等待，但不会回滚远端效果；A005 能在执行前拒绝，却不能替已经批准执行的操作撤销业务结果。这两层职责分开，才能解释哪些失败可以重试、哪些必须对账。
+
+测试在服务端执行完成后断开响应，再让客户端重试。检查服务端只有一次业务效果，同时客户端能找到原操作结果。再测试不支持查询与幂等的服务，此时应返回未知状态并请求人工处理，而不是在循环里继续执行。
 
 !!! abstract "学完这一页你能"
     - 独立写出 Kahn 拓扑排序，并用输出长度判断依赖图里有没有环。

@@ -1,16 +1,45 @@
 ---
 title: "Day 4：JSONL 会话恢复与上下文压缩"
 tags: [ai-agent, tutorial]
-date: 2026-10-11
-level: intermediate
-runnable: true
+date: 2026-10-13
+level: advanced
+runnable: false
 tested_with: [node@22.18.0, typescript@5.9.3]
-verified_at: 2026-10-12
+verified_at: 2026-10-13
 source_commit: Shyu-x/frontend-interview@4da5f302ef0ac69069e17543d795d82da3a42faa
-description: "用追加日志恢复消息，并明确教学版压缩的取舍"
+description: "上下文压缩不能在生成摘要之前先删掉原历史。先固定压缩的截止位置，保留正在执行的调用和必要授权记录，再生成候选摘要。验证摘要能引用关键事实后，才提交新版本。如果压缩中途失败，恢复旧版本继续工作，而不是留下一个没有工具结果的半段会话。"
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+implementation_source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # Day 4：JSONL 会话恢复与上下文压缩
+
+## 压缩完成之后再提交新历史 {#handwrite-compaction-boundary}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/compaction)核对 Official compaction documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+上下文压缩不能在生成摘要之前先删掉原历史。先固定压缩的截止位置，保留正在执行的调用和必要授权记录，再生成候选摘要。验证摘要能引用关键事实后，才提交新版本。如果压缩中途失败，恢复旧版本继续工作，而不是留下一个没有工具结果的半段会话。
+
+```pseudocode
+compact(session, expectedRevision):
+    prefix, protectedTail = splitAtSafeCompletedTurn(session)
+    candidate = summarizeAsData(prefix)
+    verifyRequiredFactsAndSourceReferences(candidate, prefix)
+    next = {summary: candidate, tail: protectedTail,
+            revision: expectedRevision + 1}
+    if currentRevision() != expectedRevision: return Conflict
+    commitSnapshotConditionally(next, expectedRevision)
+    return next
+```
+
+安全边界选在已完成轮次，不把工具调用留在旧前缀、工具结果留在新尾部。摘要保留事实来源，外部资料不能因为经过摘要就升级成系统指令。权限与预算由受信状态重新注入，不让摘要文本自行恢复批准。
+
+条件提交防止压缩期间新消息被覆盖。真实数据库用事务或 CAS，文件存储使用明确的单写者策略。A008 的快照校验只能确保格式，它不提供条件提交；把 JSON.stringify 写成功当作压缩事务完成，是两层概念混淆。
+
+供应商内置 compaction 与自己生成自然语言摘要不是同一个机制。接产品接口时核对当前官方返回结构，不伪造内部压缩内容。练习先用固定摘要器，再注入摘要失败、会话 revision 改变和未决工具三种情况，检查原历史始终可恢复。
 
 ## 学习目标
 

@@ -1,9 +1,32 @@
 ---
 title: "无障碍：可访问性树、ARIA 与键盘交互"
-description: "可访问性树的构建与组件无障碍实现"
+description: "从 DOM 到可访问性树推导名称、状态和焦点关系，并实现候选项键盘状态迁移、IME 边界与 ARIA 关联及行为验收测试。"
+tags: [html, accessibility, aria]
+date: 2026-10-13
+level: advanced
+prerequisites: [HTML 表单控件, 键盘事件, ARIA 基础]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 无障碍：可访问性树、ARIA 与键盘交互
+
+### 手写候选项状态迁移：组合输入时不抢方向键 {#handwrite-combobox-state}
+
+F012 把键盘处理写成纯状态迁移：输入是候选项、当前 active index、按键和 `composing` 状态，输出下一个索引。它跳过禁用项，Home/End 移到可用边界，并在 IME composition 期间保持状态不变。源码 [combobox.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/combobox.mjs) 只负责状态，DOM 层还必须同步 `aria-expanded`、`aria-activedescendant`、焦点与默认行为。
+
+```js
+if (event.isComposing) return;
+const next = moveActive(options, activeIndex, event.key);
+if (next !== activeIndex) event.preventDefault();
+setActiveIndex(next);
+```
+
+组件层还要确认 active id 仍在 DOM 中，并在候选列表关闭时清除 `aria-activedescendant`；本 Node 测试只验证状态，不声称验证了真实焦点或读屏播报。
+
+运行 `node --test scripts/implementation-labs/frontend/combobox.test.mjs`。测试覆盖禁用项、首尾循环、全禁用列表和 composition。自动化断言无法证明 NVDA、VoiceOver 等组合播报正确；需要目标浏览器与辅助技术的人工验收。此状态机也不是完整 ARIA APG combobox 模式，输入过滤、Escape、Enter、焦点恢复仍由组件层负责。
 
 !!! abstract "学完这一页你能"
     - 画出 DOM 到可访问性树的映射流程，并说清哪些节点会被排除。

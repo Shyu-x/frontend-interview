@@ -1,0 +1,72 @@
+{
+  "verified_at": "2026-10-14",
+  "baseline_commit": "433629bec6e4c2accbbcf85750a0e387ffdb1afb",
+  "source_commit": "c1a7d0be48d2601aa4d71b303fbc08921e77235d",
+  "scope": "Every page inventoried; substantive code teaching and dated claims checked for 94 named sections. Not a claim that all old snippets or external APIs were executed.",
+  "coverage": {
+    "pages": 540,
+    "substantive_pages": 94,
+    "topic_directories": 21,
+    "new_implementations": 36
+  },
+  "tests": {
+    "new_behavior": 221,
+    "coverage_gate": 16,
+    "legacy_node": 209,
+    "go": 36,
+    "go_race": "passed",
+    "legacy_content_labs": 14
+  },
+  "rendering": {
+    "markdown_pages": 540,
+    "regression_fixtures": 8,
+    "leaked_markers": 0,
+    "mermaid_parsed": 2245,
+    "mermaid_failures": 0,
+    "strict_build": "passed",
+    "link_warnings": 0,
+    "seo_errors": 0,
+    "seo_warnings": 0
+  },
+  "browser": {
+    "engine": "Chromium",
+    "native_api_checks": [
+      "XHR/fetch success, failure, abort and latest-wins",
+      "DOM delegation, focus restoration, combobox and image observer",
+      "native EventSource matches handwritten SSE under byte-split UTF-8, empty data, CRLF, multiline data and EOF"
+    ],
+    "layout_viewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        1024,
+        768
+      ],
+      [
+        390,
+        844
+      ],
+      [
+        320,
+        700
+      ]
+    ],
+    "revised_pages_at_desktop_and_mobile": [
+      "agent/mcp/mcp-integration",
+      "api/json-rpc-and-mcp",
+      "js/event-loop",
+      "browser/http-cache",
+      "coding/implementation-paths"
+    ],
+    "sidebar_back_icon_and_text_overlap": false
+  },
+  "primary_reference_check": {
+    "unique_urls": 94,
+    "broken_urls_found_and_corrected": 2,
+    "method": "HTTP availability plus official page review for changed claims; HTTP success alone is not factual verification"
+  },
+  "nextjs_independent_pr": "untouched",
+  "publication": "PR checks and main deployment must succeed before goal completion"
+}

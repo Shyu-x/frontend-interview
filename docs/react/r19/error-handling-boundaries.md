@@ -1,6 +1,11 @@
 ---
 title: "React 19 的错误处理：错误边界与根级回调"
-description: "错误怎么被捕获、上报与恢复"
+description: "区分 React 渲染错误、事件异常和异步请求失败，明确错误边界能捕获什么以及状态怎样恢复。通过重试、边界重置和错误上报组织交互，检查失败页面不会泄漏旧订阅或隐藏诊断。"
+tags: [react, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # React 19 的错误处理：错误边界与根级回调

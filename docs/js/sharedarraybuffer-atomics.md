@@ -1,9 +1,31 @@
 ---
 title: "SharedArrayBuffer、Atomics 与内存模型"
-description: "多线程共享内存、数据竞争与同步原语"
+description: "通过共享内存槽说明载荷写入、Atomics 发布序号和消费释放的顺序，并区分单生产者协议与真实多线程同步要求及 Worker 测试边界。"
+tags: [javascript, concurrency, atomics]
+date: 2026-10-13
+level: advanced
+prerequisites: [TypedArray, Worker 基础, 原子读写]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # SharedArrayBuffer、Atomics 与内存模型
+
+### 手写发布槽：先写载荷，再发布序号 {#handwrite-publish-slot}
+
+单生产者与单消费者共享两个 `Int32Array`：载荷数组存一个整数，序号数组以偶数表示空槽、奇数表示有待消费数据。生产者只有在偶数序号时写入载荷，再用 `Atomics.store` 把序号改成奇数；消费者读到奇数后读取载荷，并将序号推进为偶数释放槽位。源码 [atomic-slot.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/atomic-slot.mjs) 与 F002 测试覆盖空读、拒绝覆盖未读值、消费后复用。
+
+```js
+Atomics.store(payload, 0, value);      // 写入数据
+Atomics.store(sequence, 0, sequenceNo + 1); // 奇数：发布
+Atomics.notify(sequence, 0);
+```
+
+先定义空/满状态，再规定发布顺序，最后测试生产者试图覆盖未消费值时必须拒绝。
+
+从仓库根目录运行 `node --test scripts/implementation-labs/frontend/atomic-slot.test.mjs`。`Atomics.notify` 只唤醒等待者，本实现没有 Worker、`Atomics.wait`、等待超时或关闭协议，不能直接当作生产级队列；它也只适用于一个生产者和一个消费者。要扩展为多生产者，必须使用 CAS 预留槽位，不能复用这里“读序号后直接写”的步骤。
 
 !!! abstract "核心结论"
 

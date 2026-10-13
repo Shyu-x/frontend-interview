@@ -1,17 +1,43 @@
 ---
 title: "子 Agent 上下文隔离：定义可靠的交接边界"
 tags: [ai-agent, tutorial]
-date: 2026-10-11
-description: "理解子 Agent 的上下文隔离不是自动安全边界，学习为前端代码审查任务定义最小输入、写入所有权、预算、结构化结果和可核验证据。"
+date: 2026-10-13
+description: "把全部任务传给 Promise.all，并不会限制启动数量。先保留一个共享游标，再启动固定数量的执行槽。每个槽领取下一个索引，完成后才继续领取。结果使用原始索引保存，不能按完成顺序排序，否则第二个先完成的分析可能被误配给第一个文件。"
 level: advanced
-prerequisites:
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
   - agent/multi/single-vs-multi-agent.md
 runnable: false
-verified_at: 2026-10-11
+verified_at: 2026-10-13
 source_commit: 4da5f302ef0ac69069e17543d795d82da3a42faa
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+implementation_source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 子 Agent 上下文隔离：定义可靠的交接边界
+
+## 并发有上限，结果仍按输入归位 {#bounded-agent-fanout}
+
+
+本节对照[官方资料](https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise.all)核对 ECMAScript living specification checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+把全部任务传给 Promise.all，并不会限制启动数量。先保留一个共享游标，再启动固定数量的执行槽。每个槽领取下一个索引，完成后才继续领取。结果使用原始索引保存，不能按完成顺序排序，否则第二个先完成的分析可能被误配给第一个文件。这里的并发是异步工作重叠，不等于 JavaScript 在同一线程执行 CPU 并行计算。
+
+```js
+import { mapWithLimit } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const results = await mapWithLimit(['header', 'router', 'store'], 2,
+  async (part) => {
+    if (part === 'router') throw new Error('分析失败');
+    return { part, finding: 'ok' };
+  });
+console.log(results.map(result => result.ok)); // [true, false, true]
+```
+
+先验证 limit 是正整数。执行槽数取 limit 与任务数的较小值。领取索引的操作在同步段完成，随后才 await；单线程执行这个同步段时不会被另一个槽插入。结果记录成功值或失败信息，一个任务失败不应丢掉已经完成的其他任务。
+
+不同任务还需要上下文隔离。每个 worker 只接收自己的输入与必要只读资料，不把整个历史对象的可变引用共享给它。对文件写作任务则分配明确所有权，并发限制本身不能解决两个 worker 同时改同一文件的问题。
+
+A009 通过峰值计数和结果索引检查并发上限与部分失败。它未实现重试、取消或进程隔离。继续练时让队列中途取消，要求不再领取新索引，同时等待已经开始的工作释放资源。不要只让最终 Promise 提前返回却把其他任务留在后台继续写。
 
 这篇解释主 Agent 与子 Agent 之间应该传什么、结果如何交回。它不讨论多 Agent 是否值得使用，见[单 Agent 还是多 Agent](single-vs-multi-agent.md)；具体调度实现见[子 Agent 编排](../harness/subagents-orchestration.md)。
 

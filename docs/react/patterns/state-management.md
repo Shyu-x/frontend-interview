@@ -4,10 +4,31 @@ description: 系统梳理 React 状态管理从 useState 到 Redux Toolkit 的�
 tags:
   - react
   - state-management
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [React state 与订阅模式]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 状态管理方案
+
+### 手写外部 store：快照身份必须稳定 {#handwrite-stable-snapshot}
+
+外部 store 的 `getSnapshot` 不能每次都返回 `{ ...state }`：即使字段没变，新的对象身份也会让订阅层判断快照变化。F006 用版本号缓存不可变快照，并在真正写入时递增版本、通知订阅者；退订函数负责移除监听。实现见 [stable-snapshot.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/stable-snapshot.mjs)。
+
+```js
+function getSnapshot() {
+  if (cachedVersion !== version) { cachedVersion = version; snapshot = state; }
+  return snapshot;
+}
+```
+
+实现时先定义不可变写入入口，再按版本缓存读取结果，最后验证同一版本严格相等、更新后身份变化和退订行为。
+
+从仓库根目录运行 `node --test scripts/implementation-labs/frontend/stable-snapshot.test.mjs`。测试验证重复读取严格相等、更新后身份变化、相同引用 no-op 与退订。这个演示假设调用方用不可变值；若原地修改对象，store 无法从引用判断内部字段已变。React 集成还需要在 render/subscribe 的竞态窗口内重新检查快照。
 
 > 状态管理是 React 应用架构的核心议题。本文系统梳理从 useState 到 Redux Toolkit 的演进路径，并提供决策框架帮助在实际项目中做出合理选择。
 

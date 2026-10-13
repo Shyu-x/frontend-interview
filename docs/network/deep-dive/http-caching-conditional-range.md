@@ -1,6 +1,15 @@
 ---
 title: "HTTP 缓存、条件请求与范围请求：MDN 精读"
-description: "缓存语义的完整规则与手写缓存"
+description: "从 RFC 9111 年龄计算推进到 RFC 9110 条件与字节范围请求，区分 304、206 与 416 的响应证据，并标明 If-Range 回退边界。"
+tags: [network, http, cache]
+date: 2026-10-13
+level: advanced
+prerequisites: [HTTP 条件请求头, 表示体字节偏移]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 RFC 9110 单范围解析边界。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # HTTP 缓存、条件请求与范围请求：MDN 精读
@@ -812,4 +821,22 @@ CDN 和共享代理优先使用 `s-maxage` 决定新鲜期，`Age` 用于计算�
 - `If-Range` 不匹配时返回 200 完整文件。
 - `index.html` 的响应头包含 `no-cache`，未使用长周期缓存。
 - README 中记录至少 4 条请求响应头证据，并说明每个响应头对应本页哪个知识点。
+
+## Range 解析要先分清语法错误与无可满足范围 {#handwrite-range-parser}
+
+单范围 `bytes=a-b` 的闭区间终点不能超过表示长度；后缀形式 `bytes=-N` 表示最后 N 个字节。服务端对可满足范围返回 `206` 与 `Content-Range`，对无法满足的范围返回 `416`，并应报告 `bytes */length`。多范围请求需要 multipart 响应，本页的教学解析器明确拒绝多范围，不应拿它冒充完整 HTTP 实现。[RFC 9110 §14.1–14.4](https://www.rfc-editor.org/rfc/rfc9110.html#section-14)
+
+[`byte-range.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/byte-range.mjs) 把畸形语法作为 `TypeError`、越界范围作为 `null`。运行 `node --test scripts/implementation-labs/systems/byte-range.test.mjs`，覆盖尾部裁剪、后缀区间、空表示和多个区间拒绝。
+
+服务器接入时先读取确切表示长度，再解析 Range；解析成功后输出 `Content-Range: bytes start-end/size`，只发送 `end - start + 1` 字节。服务端对语法无法解析的请求可选择忽略 Range 返回完整 200；语法有效但不可满足时返回 416 与 `Content-Range: bytes */size`。收到 `If-Range` 后还要先比较实体标签或日期：验证器不匹配时应该忽略 Range 并返回完整表示，不能把新版本的前半段拼到旧缓存后面。
+
+```js
+const range = parseByteRange(req.headers.range, body.length);
+if (range === null) return send416(`bytes */${body.length}`);
+const chunk = body.subarray(range.start, range.end + 1);
+res.writeHead(206, { 'Content-Range': `bytes ${range.start}-${range.end}/${body.length}` });
+res.end(chunk);
+```
+
+这段处理仍需在它之前实现 If-Range，并在多范围请求时选择忽略或生成 multipart；不能把单区间函数放进公网服务器后就宣称支持完整 Range。验收对首字节、末字节、后缀和空文件分别比对状态码、Content-Range 与响应体长度。
 

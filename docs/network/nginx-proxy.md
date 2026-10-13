@@ -1,11 +1,40 @@
 ---
 title: nginx 代理与负载均衡
-description: 代理的类型、负载均衡策略、故障转移与静态资源缓存策略。
+description: 说明反向代理的请求转发、负载均衡与客户端地址边界，重点核对可信代理链、Host 转发和 WebSocket 升级配置，避免把客户端可控头当成身份凭据。
+tags: [network, nginx, proxy]
+date: 2026-10-13
+level: intermediate
+prerequisites: [HTTP 请求头, TLS 终止]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 real_ip 受信代理边界说明。
 ---
 
 # nginx 代理与负载均衡
 
 ## 1. nginx 正向代理 / 反向代理 / 负载均衡
+
+## 客户端地址要从可信代理边界推导 {#handwrite-proxy-trust-boundary}
+
+`X-Forwarded-For` 的值可以由外部请求方伪造；应用只有在网络边界能证明请求来自受信代理，并按受信代理链规则解析时，才能用它判断客户端地址。nginx 的 `real_ip` 指令必须配合明确的 `set_real_ip_from` 网段，否则任意来源都可能声明一个“真实地址”。[nginx realip module](https://nginx.org/en/docs/http/ngx_http_realip_module.html)
+
+复现实验应从直连源站和经过代理的两种路径分别发送自定义 `X-Forwarded-For`，并对照应用日志里的 socket peer。不要只看浏览器开发者工具显示的请求头；源站 peer 与转发头是两份独立证据。
+
+反向代理应先清理客户端传入的转发头，再由可信代理填入实际观测地址。nginx 默认的 `$proxy_add_x_forwarded_for` 会在已有头后追加 peer；因此仅靠该变量不等于已验证左侧的全部地址可信。应用要按受信代理拓扑从右向左解析，或让边界代理覆盖不可信客户端提供的值。
+
+```pseudocode
+set_real_ip_from 10.0.0.0/8;
+real_ip_header X-Forwarded-For;
+real_ip_recursive on;
+location /api/ {
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_pass http://app_backend;
+}
+```
+
+上线前确认 upstream 到源站的网络 ACL 只允许代理访问；否则攻击者可以绕过边界直接伪造头。验收记录直连路径、经过可信代理路径、以及从非可信网段发送同名头三种日志，预期只有可信代理能改变 nginx 计算的客户端地址。
 
 ### 1.1 定义/背景（一句话说清）
 

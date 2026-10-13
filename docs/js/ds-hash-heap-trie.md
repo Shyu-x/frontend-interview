@@ -1,6 +1,11 @@
 ---
 title: "手写数据结构（二）：哈希表、堆、Trie、并查集"
-description: "JS 实现并验证的非线性结构"
+description: "手写哈希表、堆与字典树的基本操作，解释冲突、顺序、前缀和优先级如何影响数据结构选择。通过搜索、任务调度和缓存场景分析复杂度，并用重复键、空输入与删除边界检验实现。"
+tags: [js, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 手写数据结构（二）：哈希表、堆、Trie、并查集

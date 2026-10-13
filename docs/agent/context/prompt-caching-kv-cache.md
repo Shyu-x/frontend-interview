@@ -1,9 +1,40 @@
 ---
 title: "提示缓存与 KV 缓存：让长上下文变便宜"
-description: "缓存命中率是 agent 的第一性能指标"
+description: "两台服务器都提供 search，不代表它们的工具列表或查询结果相同。即使 method 和参数完全相同，缓存键还要区分服务器身份。private 结果另外区分有效授权上下文，不能只凭用户名相同就共享。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 提示缓存与 KV 缓存：让长上下文变便宜
+
+## 先隔离缓存键，再考虑命中率 {#server-cache-scope}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)核对 MCP 2026-07-28 cacheable lists。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+两台服务器都提供 search，不代表它们的工具列表或查询结果相同。即使 method 和参数完全相同，缓存键还要区分服务器身份。private 结果另外区分有效授权上下文，不能只凭用户名相同就共享。先解决隔离，再讨论缓存寿命；否则一次看似成功的缓存命中可能把另一个租户的数据交给当前用户。
+
+```js
+import { cacheKey, cacheEntry } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const list = { resultType: 'complete', tools: [], ttlMs: 1000, cacheScope: 'private' };
+const entry = cacheEntry(list, 100);
+const first = cacheKey('notes-server', 'tools/list', {}, 'private', 'tenant-a:user-1');
+const second = cacheKey('notes-server', 'tools/list', {}, 'private', 'tenant-b:user-1');
+console.log(first === second, entry.expiresAt); // false 1100
+```
+
+先确定 serverIdentity，它来自可信的配置身份，不是服务器自报的展示名称。再加入方法和参数。最后加入缓存范围与授权上下文。共享缓存必须以服务端确实声明 public 为前提，客户端不能为了命中率把 private 升级成 public。参数规范化只能减少等价请求的重复键，不能省略任何会影响结果的字段。
+
+到期判断使用同一时钟来源，在 now 等于 expiresAt 时视为过期。缓存条目的 ttlMs 只是服务端允许的上限，还可以根据安全策略缩短。收到列表变更或身份变化时，相关缓存也要失效。不要把协议列表缓存、模型提示缓存和 KV cache 混成一个可以通用清空的对象。
+
+A004 运行时检查不同 server 和 principal 不串线，缺私有身份会拒绝构造缓存键。它只实现键与寿命记录，没有实现生产缓存和订阅失效服务。要继续练，可以加入角色变化、撤销授权和 schema 更新三个事件，先写“旧条目不得命中”的用例，再实现失效索引。
 
 !!! abstract "学完这一页你能"
     1. 解释 KV 缓存为什么只对前缀生效，并说出缓存写入、读取与 TTL 的价格倍率。

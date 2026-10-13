@@ -1,9 +1,43 @@
 ---
 title: "工具调用协议：模型是怎么'用工具'的"
-description: "tool use 的数据流、校验、并行与错误回灌"
+description: "模型产生参数，不等于工具已经执行。先解析参数字符串，再验证 schema，然后执行，最后用原调用编号返回结果。模型一次可能提出多个工具，响应顺序也可能不同。调用 ID 是关联关系，不是展示顺序；不能使用数组下标或工具名称作为唯一键。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 工具调用协议：模型是怎么'用工具'的
+
+## 工具结果必须带回原调用编号 {#handwrite-call-correlation}
+
+
+本节对照[官方资料](https://developers.openai.com/api/docs/guides/function-calling)核对 OpenAI function calling guide checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+模型产生参数，不等于工具已经执行。先解析参数字符串，再验证 schema，然后执行，最后用原调用编号返回结果。模型一次可能提出多个工具，响应顺序也可能不同。调用 ID 是关联关系，不是展示顺序；不能使用数组下标或工具名称作为唯一键。一个 search 工具可能在同一轮被调用两次。
+
+```pseudocode
+pending = Map()
+for proposal in modelOutput.toolCalls:
+    if pending contains proposal.callId: rejectDuplicateCallId()
+    arguments = parseAndValidate(proposal.arguments)
+    pending[proposal.callId] = {tool: proposal.name, arguments}
+for callId, work in pending:
+    result = await executeRegisteredTool(work)
+    outputs.append({call_id: callId, output: encodeResult(result)})
+sendOutputsInTheProviderRequiredFormat(outputs)
+```
+
+先确保每个 callId 唯一，再把结果和它配对。executeRegisteredTool 只查询注册表，未知名称返回明确工具失败。它还要处理权限、截止时间和资源清理；输出编码不能让循环引用或 BigInt 把整轮结果发送中断。生产实现应该对结果长度设上限，并保留失败原因。
+
+不同产品的输出结构不同。Responses API 的 function_call_output 使用 call_id；不要把 Chat Completions 的 tool 消息或内部 transcript 原样放进它。MCP 则使用 JSON-RPC 请求 ID，并在结果中携带 resultType。两层编号可以映射，但不能假装它们是同一个协议字段。
+
+用 A006 的内部循环先验证控制流，再给供应商适配器单独写测试。让同名工具的第二个结果先返回，检查每个输出仍然对应正确的参数。再制造重复 ID、坏 JSON 和未知工具三个失败输入。它们都不应触发未注册函数或使另一个调用永久等待。
 
 !!! abstract "学完这一页你能"
 

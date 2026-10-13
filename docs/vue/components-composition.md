@@ -1,9 +1,32 @@
 ---
 title: 组件与组合式 API
-description: keep-alive、Teleport/Suspense、Composition API、Vue3 性能与宏
+description: 用组件输入输出、生命周期与组合式函数设计可测试的 Vue 组件，并分清 Vue 3.5 新增能力和旧版本写法。通过模板引用与条件卸载检查 DOM 访问时机、监听绑定和资源清理。
+tags: [vue, components, composition-api]
+date: 2026-10-13
+level: intermediate
+prerequisites: [Vue 3, reactive 与 ref]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # 组件与组合式 API
+
+### 模板 ref 按版本提供：3.5+ 与旧写法并存 {#handwrite-vue-template-ref-version}
+
+Vue 3.5 新增 `useTemplateRef(name)`；若库要兼容 3.4，仍需使用变量名与静态 `ref` 对齐的旧方式。两者都不会在 setup 阶段就得到 DOM 元素：访问节点的逻辑必须在挂载后或对应 watcher 生命周期内执行，并在卸载时停止监听。
+
+```html
+<script setup>
+import { useTemplateRef, onMounted } from 'vue'
+const searchInput = useTemplateRef('search')
+onMounted(() => searchInput.value?.focus())
+</script>
+<template><input ref="search" /></template>
+```
+
+版本选择依据 [Vue 3.5 release notes](https://blog.vuejs.org/posts/vue-3-5)；迁移前还要核对 `vue` 与 `@vue/language-tools` 版本，不能只看编辑器补全是否出现。
+
+排查 ref 为 null 时，按顺序确认模板 ref 的字符串名完全匹配、代码确实在 mount 后读取、组件未处于 `v-if` 隐藏分支，以及 ref 目标没有刚被替换。`v-if` 切换会使旧元素卸载并令 ref 清空；如果只在 onMounted 读一次，之后的条件切换需要 watch 或组件生命周期配合。这个边界与调用哪种 ref API 无关。
 
 > 本页按「概念、原理、代码」逐题展开相关面试专题。
 

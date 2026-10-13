@@ -1,6 +1,11 @@
 ---
 title: "国际化工程：ICU MessageFormat、复数规则与字符串提取"
-description: "i18n 的数据流与格式化原理"
+description: "从变量、复数、选择分支与格式化理解国际化消息，把翻译文本与拼接代码分开。围绕语言差异、缺失键、占位参数和服务端渲染设计校验，让同一业务信息在不同地区保持正确含义。"
+tags: [engineering, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # 国际化工程：ICU MessageFormat、复数规则与字符串提取

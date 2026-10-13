@@ -1,13 +1,45 @@
 ---
 title: AI 开发工具与协议
-description: NPM Top 100 速览，以及 AI 编码助手、AI 原生应用、AI SDK 与 MCP 生态的新兴项目。
+description: "发现一个热门开发工具后，先固定 release 或 commit，再选择一个小任务验证。Star 数会变化，也不能告诉你它怎样恢复失败或限制权限。"
 tags:
   - open-source
   - tooling
-date: 2026-05-17
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # AI 开发工具与协议
+
+## 热度之后看可重放的工作流程 {#handwrite-project-evaluation}
+
+
+本节对照[官方资料](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)核对 GitHub releases documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+发现一个热门开发工具后，先固定 release 或 commit，再选择一个小任务验证。Star 数会变化，也不能告诉你它怎样恢复失败或限制权限。阅读源码要围绕一个问题展开，例如工具调用后为什么继续下一轮，或者并发任务失败后如何保留其他结果。不要把项目介绍翻译一遍就叫源码分析。
+
+```pseudocode
+snapshot = checkoutVerifiedTagOrCommit(project)
+fixture = createTemporaryRepository()
+recordVersionAndConfiguration(snapshot)
+runOneReadOnlyTask(fixture)
+collectToolCallsAndTerminalState()
+injectOneToolFailure()
+verifyBudgetAndPermissionBoundaries()
+compareObservedTraceWithOneSourcePath(snapshot)
+saveReproductionAndCleanFixture()
+```
+
+先做只读任务，避免研究过程改变真实项目。随后选择一个故障，而不是同时加入所有复杂条件。源码路径解释具体状态迁移，运行轨迹验证这条路径确实发生。找不到公开源码的内部模块只能作为产品观察，不编造函数名或架构。
+
+A006/A009 提供可以复现的循环与并发模型。将开源工具的轨迹与它们比较，记录控制权由宿主、SDK 还是服务端负责。MCP 2026-07-28 的无会话请求也与旧握手不同，核对项目对应协议版本后再描述互通能力。
+
+最后写清楚哪次发布、哪份输入、哪条源码路径支持结论。更新热度页面时保留历史快照含义，不把旧 benchmark 改一个日期就称为最新性能。趋势可以用于选研究对象，代码、测试和维护状态才是具体技术判断的依据。
 
 > 本文是「新兴趋势」系列第 1 篇（共 4 篇）。下一篇：[全栈、后端与响应式框架](fullstack-backend.md)
 
@@ -776,7 +808,7 @@ async function executeTask(page, task) {
 
 | 资源 | 为什么读 | 怎么读 |
 |---|---|---|
-| [MCP 规范（最新版本）](https://modelcontextprotocol.io/specification/latest) | MCP 唯一权威规范，版本变更与实现要求都以此为准。 | 读生命周期与工具章节，对照 SDK 确认协议版本，再回看自己服务器的握手流程。 |
+| [MCP 规范（最新版本）](https://modelcontextprotocol.io/specification/latest) | MCP 唯一权威规范，版本变更与实现要求都以此为准。 | 读版本选择与工具章节，对照 SDK 支持的协议年代；2026-07-28 每请求带元数据，旧握手只作迁移对照。 |
 | [Vercel AI SDK 文档](https://ai-sdk.dev/docs) | 流式 UI 与工具调用的官方指南，示例可直接跑通。 | 先跑 chat 示例，再加一个工具调用与流式输出，观察 UI 增量渲染过程。 |
 | [Claude 子 Agent 文档](https://docs.claude.com/en/docs/claude-code/sub-agents) | 子 Agent 与工具权限的官方说明，编码助手落地必读。 | 照文档创建只读审查 subagent，限制工具后跑一次，看权限如何生效。 |
 

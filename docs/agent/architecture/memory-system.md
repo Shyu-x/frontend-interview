@@ -1,9 +1,44 @@
 ---
 title: "记忆系统"
-description: "详细介绍 AI Agent 的记忆系统架构、实现模式和最佳实践，涵盖短期记忆和长期记忆。"
+description: "记忆系统不是一个没有边界的字符串列表。先给每条记忆标出所有者、来源会话、创建时间与失效状态。检索时先过滤租户和授权范围，再计算相关性。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 记忆系统
+
+## 记忆先绑定租户，再决定能否召回 {#handwrite-memory-ownership}
+
+
+本节对照[官方资料](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)核对 PostgreSQL row security documentation checked 2026-10-13。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+记忆系统不是一个没有边界的字符串列表。先给每条记忆标出所有者、来源会话、创建时间与失效状态。检索时先过滤租户和授权范围，再计算相关性。把所有文档召回后才删掉越权内容，会让向量缓存、重排服务和日志都可能接触不该看到的数据，不能认为最后答案没有引用就安全。
+
+```pseudocode
+writeMemory(identity, statement, source):
+    requireWritableTenant(identity.tenant)
+    memory = {tenant: identity.tenant, sourceId: source.id,
+              version: source.version, content: statement, revoked: false}
+    persistValidatedMemory(memory)
+readMemory(identity, query):
+    candidates = searchWithinAuthorizedTenant(identity, query)
+    candidates = removeRevokedAndExpired(candidates)
+    candidates = mergeByCanonicalSourceAndVersion(candidates)
+    return takeWithinContextBudget(candidates)
+```
+
+来源版本让你能撤销一条错误记忆。只保存摘要文本时，后来无法判断它来自哪次用户更正，也无法区分旧版本和新版本。写入还要区分用户明确偏好、工具返回资料与模型推测；不能把模型推测自动升级成用户事实。
+
+A012 演示去重排序的局部机制，但它不做身份验证，也不负责持久化。把该函数放在授权过滤之后。数据库可用行级策略作第二道防护，服务层仍然检查调用身份与权限。数据库连接池如果错误复用身份上下文，行级策略也可能使用错误的角色。
+
+先测两个租户拥有同名文档，再测撤销、到期与版本更新。每次召回的 ID 都必须来自当前授权范围。接着记录来源命中和预算截断，检查一段错误记忆被撤销后，不会继续藏在热缓存或重排结果里。
 
 !!! abstract "学完这一页你能"
     - 说清工作记忆、对话记忆、向量记忆、图谱记忆、情景记忆、程序记忆分别解决哪一类问题，并说明选择依据。

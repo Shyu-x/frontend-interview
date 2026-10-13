@@ -1,8 +1,8 @@
 ---
 title: "浏览器 SQL 引擎：查询计划、结果物化与持久化边界"
-description: "用 PGlite、DuckDB-Wasm 与 SQLite Wasm 对比浏览器 SQL 从解析、优化、执行到结果物化和持久化的路径，掌握 Arrow 批次、索引下推、OPFS 多标签锁、事务耐久性、迁移与配额回收，并通过固定版本的 PGlite 实验识别可验证范围及客户端鉴权边界。"
+description: "比较 PGlite、DuckDB-Wasm 与 SQLite Wasm 的查询计划、结果物化和持久化路径；用固定数据与 EXPLAIN 检查索引、行数和浏览器端传输成本。"
 tags: [browser, wasm, database, storage, performance]
-date: 2026-10-12
+date: 2026-10-13
 level: advanced
 prerequisites:
   - SQL 的 SELECT、WHERE、JOIN、索引和事务基础
@@ -12,7 +12,8 @@ runnable: true
 tested_with:
   - node@24.16.0
   - '@electric-sql/pglite@0.5.8'
-verified_at: 2026-10-12
+verified_at: 2026-10-13
+verified_scope: 仅核对新增的 EXPLAIN 操作步骤；其他代码仍按 source_commit 核验。
 source_commit:
   repository_baseline: 707ea4929bbb84c67bd637f92360b002a2b23cf7
   pglite: d9eadc63cf16db6d40fd13b5cf2c06e2e645fbd9
@@ -22,6 +23,34 @@ source_commit:
 ---
 
 # 浏览器 SQL 引擎：查询计划、结果物化与持久化边界
+
+## 用 EXPLAIN 验证索引是否真的进入物理计划 {#handwrite-browser-sql-explain}
+
+写了索引不代表查询就使用索引。应先建立足够大的确定性数据集，再用 `EXPLAIN` 看优化后的物理算子，最后用 `EXPLAIN ANALYZE` 检查实际扫描行数与执行计划；小表上优化器选择 sequential scan 可能是合理决策，不能把一次 plan 文本匹配当成性能结论。[DuckDB EXPLAIN](https://duckdb.org/docs/stable/guides/meta/explain)
+
+练习步骤：先在固定 seed 下插入 100 万条订单，再分别建立和删除 `customer_id` 索引；对相同谓词记录物理计划、实际行数和 wall time。每次先做预热、重复多轮并报告中位数与离散度。若浏览器 Worker 传回大量行，SQL 执行时间可能很短但结果物化成为瓶颈；这时比较 Arrow batch 或 cursor 结果，而不是继续调整索引。
+
+| 观察项 | 解释 | 不能推出 |
+| --- | --- | --- |
+| `SEQ_SCAN` | 计划扫描关系行 | 一定慢 |
+| `INDEX_SCAN` | 计划使用索引路径 | 查询更快 |
+| 低扫描行数 | 过滤下推减少候选行 | 网络/拷贝时间很小 |
+
+真正的验收同时检查计划和耗时，并把引擎版本、数据库体积、浏览器、Worker 位置、物化策略写入记录。这里的计划格式属于引擎输出，不应由课程测试锁死整段文本；测试应验证结果集合一致和边界查询结果正确。
+
+```sql
+CREATE INDEX orders_customer ON orders(customer_id);
+EXPLAIN SELECT order_id, total
+FROM orders
+WHERE customer_id = 42
+ORDER BY created_at DESC
+LIMIT 50;
+EXPLAIN ANALYZE SELECT count(*)
+FROM orders
+WHERE customer_id = 42;
+```
+
+先解释不带索引和带索引的计划差异，再用 analyze 观察实际执行行数；如果引擎选择顺序扫描，增加数据规模并确认统计信息刷新后再判断。查询结果、排序顺序和 LIMIT 边界必须一致，否则计划速度无比较价值。两次测量还要分别计时数据库执行与从 Worker 向 UI 拷贝结果的时间，这能区分查询算子成本和 JS 对象分配成本。
 
 设想一个离线报表页要筛选 20 万行本地数据。`SELECT` 语句看起来只有一行，但成本可能来自 Wasm 执行、Arrow 到 JS 的对象转换、主线程渲染、OPFS 检查点或两个标签争锁。优化 SQL 之前，先找出数据在哪一层被扫描、复制、物化和持久化。
 

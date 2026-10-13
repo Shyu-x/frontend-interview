@@ -1,11 +1,41 @@
 ---
 title: CORS 与跨源隔离
-description: CORS 简单请求与预检、响应头与凭证，以及 CORB/CORP/COEP/COOP 与 Spectre。
+description: 解释 Fetch 的 CORS 请求与预检缓存、凭证通配符限制和跨源隔离响应头，逐步排查浏览器控制台、OPTIONS 响应与真实资源请求之间的差异。
+tags: [security, browser, cors]
+date: 2026-10-13
+level: advanced
+prerequisites: [HTTP 请求头, 同源策略, Cookie]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的预检、credentials 与 Vary 组合说明。
 ---
 
 # CORS 与跨源隔离
 
 ## 1. CORS 原理
+
+## 预检通过不等于实际响应可被脚本读取 {#handwrite-cors-preflight-boundary}
+
+预检响应只表示浏览器允许尝试对应的方法和请求头；实际响应还必须通过 CORS 检查。携带凭证时，服务器不能把 `Access-Control-Allow-Origin` 设为 `*`，必须回显精确允许的 origin 并设置 `Access-Control-Allow-Credentials: true`。动态 origin 响应还应使用 `Vary: Origin`，避免共享缓存把一个来源的许可响应复用给另一个来源。[Fetch Standard：CORS protocol](https://fetch.spec.whatwg.org/#cors-protocol)
+
+排错时分别保存 OPTIONS 和实际请求两组响应头，并检查浏览器是否缓存了预检结果。`Access-Control-Max-Age` 的有效期限受浏览器内部上限约束；设置较大的数字不保证跨浏览器精确生效。
+
+请求发送和读取授权可按这个顺序验证：先看真实请求是否带 `Origin`；若请求方法或头触发预检，再检查 OPTIONS 是否允许该 origin、method、headers；最后检查实际响应的 `Access-Control-Allow-Origin` 和凭证组合。服务器应从显式白名单匹配 origin，不能把任意 `Origin` 原样反射回去。
+
+```pseudocode
+origin = request.headers.Origin
+if origin 在白名单中:
+    response.Access-Control-Allow-Origin = origin
+    response.Vary 增加 Origin
+否则:
+    不授予跨源读取权限
+若凭证模式启用:
+    只允许精确 origin，不使用星号
+    response.Access-Control-Allow-Credentials = true
+```
+
+反例是“OPTIONS 成功，所以 API 安全”。浏览器可能允许页面发出实际请求，随后只阻止脚本读取响应；副作用仍然已经到达后端。因此必须在服务端做用户授权、CSRF 检查和数据校验，不能把 CORS 当成 API 访问控制。
 
 ### 1.1 定义/背景（一句话说清）
 

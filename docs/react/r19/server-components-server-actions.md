@@ -1,9 +1,31 @@
 ---
 title: "Server Components 与 Server Actions：边界、序列化与安全"
-description: "RSC 的架构与使用边界"
+description: "从模块边界、序列化输入和服务端授权解释 React Server Components 与 Server Actions，并区分 React 协议能力和框架部署责任。"
+tags: [react, server-components, security]
+date: 2026-10-13
+level: advanced
+prerequisites: [React Server Rendering, 模块边界, HTTP 请求]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # Server Components 与 Server Actions：边界、序列化与安全
+
+### RSC 是 React 能力，生产协议由框架与 bundler 对接 {#handwrite-rsc-boundary}
+
+本页早期代码样例将构建时执行、请求时执行和服务端组件描述混在一起，读者不能由 `use client` 推出“组件一定在某台服务器运行”。RSC 的传输格式与构建集成要求由框架或 bundler 实现；示例是否能直接部署，取决于具体框架版本、运行时和缓存配置。React 官方文档将 RSC 文档标记为面向框架/bundler 作者的实现说明，并建议框架集成使用匹配版本。[React Server Components 文档](https://react.dev/reference/rsc/server-components) 与 [React 19 发布说明](https://react.dev/blog/2024/12/05/react-19) 是核对入口。
+
+页面里的教程代码块以解释边界为目的，不作为无配置即可运行的 Node 服务。生产上线仍需逐个验证序列化协议、缓存隔离、授权和错误响应；安全公告中的受影响版本应以公告列出的补丁版本为准。
+
+```jsx
+'use server';
+export async function saveProfile(formData) {
+  const user = await requireAuthenticatedUser();
+  return updateProfile(user.id, String(formData.get('name') ?? ''));
+}
+```
+
+`requireAuthenticatedUser` 是应用提供的授权检查，不是 React 自动注入的保护。即便 action 只从已登录 UI 暴露，它仍是可调用入口，必须验证身份、权限、字段形状、CSRF/请求来源策略与业务幂等性。测试应绕过 UI 直接构造无权限请求，确认数据库更新没有发生；“按钮被隐藏”不是安全边界。
 
 !!! abstract "学完这一页你能"
     - 准确说出 `'use client'` 与 `'use server'` 各自标记的对象，以及它们在模块依赖树中产生的边界。
@@ -1058,7 +1080,7 @@ console.log('验证通过：参数校验与授权都在服务端执行');
     日常类比：汽车厂商发布了一款稳定车型，但发动机内部零件规格还在调整，普通车主不该直接打开引擎盖改装。
     类比不成立的地方：汽车零件不对车主可见，但底层 API 对打包器开发者可见，需要专门团队跟踪。
 
-!!! note "术语：semver（语义化版本）
+### semver 与框架集成版本
     用主版本.次版本.修订号表示软件版本。小版本内只应增加向后兼容功能。官方文档指出 RSC 底层 API 不遵循这一规则。
 
 **图解**

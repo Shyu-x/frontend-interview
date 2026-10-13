@@ -1,13 +1,40 @@
 ---
 title: 图论题型
-description: LeetCode Hot 100 图论题目：拓扑排序、岛屿数量、克隆图、水流问题与并查集。
+description: 通过拓扑排序、岛屿搜索和带路径 BFS 练习图遍历，推导队列、访问标记、前驱回溯与环检测，并恢复最短边数路径及复杂度边界。
+tags: [algorithm, graph, bfs]
+date: 2026-10-13
+level: intermediate
+prerequisites: [Map, 队列, 图的邻接表表示]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
 tags:
   - algorithm
   - leetcode
 date: 2026-05-17
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 图论题型
+
+### 手写 BFS 最短路径：入队时写入 parent {#handwrite-bfs-path}
+
+F010 在节点首次入队时写入 `parent`。这样既能避免环让节点重复入队，也能保证第一次发现的路径边数最少；目标首次出队后沿 parent 反向回溯即可。源码 [graph-bfs.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/graph-bfs.mjs) 用数组加 head 指针作为队列，避免频繁 `shift()` 搬移元素。
+
+```js
+const queue = [start];
+const parent = new Map([[start, null]]);
+for (let head = 0; head < queue.length; head++) {
+  const node = queue[head];
+  for (const next of graph.get(node) ?? []) if (!parent.has(next)) {
+    parent.set(next, node); queue.push(next);
+  }
+}
+```
+
+当目标第一次被发现时即可停止后续扩展；回溯 parent 再反转，得到从起点到终点的最少边数路径。
+
+运行 `node --test scripts/implementation-labs/frontend/graph-bfs.test.mjs`。测试覆盖最短路、起点等于终点、不可达节点与环。邻接表只接受 `Map<Node, Iterable<Node>>`，节点身份按 Map 的 SameValueZero 比较；它不验证输入图的对称性，也不处理权重边，权重边应换 Dijkstra 等算法。
 
 ## 1. #207 课程表
 

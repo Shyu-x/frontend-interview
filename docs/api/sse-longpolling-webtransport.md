@@ -1,6 +1,15 @@
 ---
 title: "SSE、长轮询与 WebTransport：单向推送与新协议"
-description: "选对实时通道"
+description: "比较 SSE、长轮询和 WebTransport 的传输边界，逐字段解释事件流格式，并用增量 UTF-8 解析器处理拆分字符、多行 data 与断线续传游标。"
+tags: [api, sse, realtime]
+date: 2026-10-13
+level: advanced
+prerequisites: [HTTP 响应流, UTF-8, ReadableStream]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 SSE 分块解析与事件 dispatch 行为。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # SSE、长轮询与 WebTransport：单向推送与新协议
@@ -1888,3 +1897,22 @@ SSE 在 CDN 链路上的默认行为（需核对官方文档：具体核对代�
 - RFC 7838，章节：HTTP Alternative Services 的 Alt-Svc 头语法
 - nginx 文档 `ngx_http_proxy_module`，指令：proxy_buffering、proxy_read_timeout、proxy_buffer_size
 - Chrome 官方文档，章节：HTTP/3 支持与 Alt-Svc 协商说明
+
+## SSE 必须先增量解码，再识别行结束符 {#handwrite-sse-fragment-parser}
+
+HTTP 分块边界与 SSE 行边界没有对应关系，UTF-8 多字节字符也可能被拆到两个 chunk。先以 `TextDecoder` 的 `{ stream: true }` 模式解码，再按 LF、CRLF 或 CR 组行；连续 `data:` 行以换行符拼接，空 `data` 缓冲区不触发 message dispatch。字段行以冒号后的一个可选空格开头。[WHATWG HTML：Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream)
+
+[`sse-parser.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/sse-parser.mjs) 可跨字节块接收编码文本并在 final flush 时处理尾行。运行 `node --test scripts/implementation-labs/systems/sse-parser.test.mjs`，覆盖 UTF-8 拆字、多行数据、注释、空数据和未终止尾行；它尚未处理浏览器自动重连和 Last-Event-ID 持久化。
+
+解析状态必须跨 `ReadableStream.read()` 保存。收到字节先交给流式 `TextDecoder`，再扫描 CR、LF 与 CRLF 行结束符；如果 chunk 恰好以 CR 结尾，要暂存它，等下一个 chunk 确认后是否吞掉随后的 LF。遇到空行才 dispatch，不能因为一次 `read()` 结束就发送不完整事件。EOF 时丢弃没有空行终止的 data buffer，自动重连要由上层拿最后的 `id` 重新构造请求。
+
+```js
+const { value, done } = await reader.read();
+const events = parser.push(value ?? new Uint8Array(), { final: done });
+for (const event of events) {
+  if (event.id) lastEventId = event.id;
+  deliver(event);
+}
+```
+
+上面的调用循环只展示所有权边界：parser 拥有分片残留，消费层拥有业务回调与 Last-Event-ID。若 fetch abort 或解析器遇到超出内存上限的单行，应关闭 reader、停止重连计时器并决定是否丢弃未完成事件；无限缓冲一条没有换行的 data 行会成为内存拒绝服务入口。

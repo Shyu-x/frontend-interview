@@ -1,6 +1,15 @@
 ---
 title: "依赖管理与供应链安全"
-description: "lockfile、完整性校验、provenance 与审计"
+description: "区分依赖图锁定、tarball 来源与 Subresource Integrity 摘要校验，说明生命周期脚本和 provenance 的不同信任边界，并用强摘要优先规则检验下载字节。"
+tags: [engineering, supply-chain, security]
+date: 2026-10-13
+level: advanced
+prerequisites: [npm lockfile, SHA digest, package lifecycle scripts]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 npm lockfile 字段和教学 SRI 模型。
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 依赖管理与供应链安全
@@ -13,6 +22,23 @@ description: "lockfile、完整性校验、provenance 与审计"
     - provenance / SLSA / 2FA / 最小权限发布解决的是"**这个包是谁、用什么构建出来的、能不能被冒名发布**"；它们不能替代 integrity，二者是不同层面的信任锚。
 
 ## 1. semver：从范围字符串到可判定集合
+
+## 完整性摘要必须绑定到下载到的确切字节 {#handwrite-lockfile-integrity-check}
+
+lockfile 中的 `integrity` 值用于验证获取到的包归档字节；它本身不证明发布者身份、构建工作流可信或依赖图没有恶意代码。npm 的 lockfile 格式将 resolved 地址和 integrity 字段分别记录，二者共同帮助复现解析和验证内容。[npm package-lock.json](https://docs.npmjs.com/cli/v11/configuring-npm/package-lock-json)
+
+[`integrity-check.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/systems/integrity-check.mjs) 在摘要并存时按支持的最强 SHA 算法比对。运行 `node --test scripts/implementation-labs/systems/integrity-check.test.mjs`，测试字节被篡改和较弱摘要相符、强摘要不符时的拒绝。该教学函数没有下载、解包或安全处理 archive 路径。
+
+完整性验收把 lockfile 中的 digest 作为预期值，把 registry 取回的 tarball 原始字节作为输入，验证后才进入解包。SRI 列表里可存在多个算法摘要；如果有更强且支持的摘要，必须至少匹配这个最强算法集合，不能因为较弱摘要命中就放行。摘要比较使用等长 `timingSafeEqual`，长度不等时应在调用前拒绝，因为 Node API 要求 buffer 长度相同。
+
+```js
+const actual = createHash(algorithm).update(tarball).digest();
+const expected = Buffer.from(encodedDigest, 'base64');
+if (expected.length !== actual.length) return false;
+return timingSafeEqual(expected, actual);
+```
+
+验证失败时不要自动更新 lockfile 中的完整性值；那会把检测结果变成覆盖证据。先保留失败的下载和原 lockfile hash，确认 registry、代理缓存和本地磁盘中的 tarball 是否一致，再通过可信发布流程处理。安装脚本是否执行另由许可配置决定，digest 匹配也不证明包的代码行为安全。
 
 ### 1.1 版本号语法与比较算法
 

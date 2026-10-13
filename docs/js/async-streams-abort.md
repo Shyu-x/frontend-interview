@@ -1,9 +1,29 @@
 ---
 title: "异步编程进阶：AbortController 与 Streams API"
-description: "取消、超时、背压与流式处理"
+description: "用 fetch 响应体逐块消费 ReadableStream，并通过 AbortSignal 区分请求取消、响应读取失败、HTTP 错误和服务端副作用。"
+tags: [javascript, fetch, streams]
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise, ReadableStream, HTTP]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # 异步编程进阶：AbortController 与 Streams API
+
+### 取消响应体读取不是“回滚服务端请求” {#handwrite-stream-abort-boundary}
+
+Fetch 的 abort signal 可以在请求阶段或读取响应体阶段取消客户端操作；它不保证服务端业务已经停止，也不撤销已经发生的写入。若消费端使用 reader，错误路径仍要释放锁或取消 reader，并区分 HTTP 非 2xx 响应与网络拒绝：`fetch()` 收到 404 通常仍会 fulfill。行为定义见 [Fetch Standard](https://fetch.spec.whatwg.org/) 与 [Streams Standard](https://streams.spec.whatwg.org/)。
+
+```js
+const response = await fetch(url, { signal: controller.signal });
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+const reader = response.body.getReader();
+try { while (true) { const { value, done } = await reader.read(); if (done) break; consume(value); } }
+finally { reader.releaseLock(); }
+```
+
+第一步检查 `response.ok`，否则 404 JSON 会被误当作成功数据。第二步在循环内尊重 `done`，不能假设每次 read 都有一块数据；最后无论 decode 成功、异常还是 abort 都释放锁。需要停止数据源时再调用 `reader.cancel()`，但即使客户端关闭读取，服务端已经完成的业务写入也不会自动撤回。
 
 !!! abstract "核心结论"
 - AbortController/AbortSignal 是平台级取消原语：`abort()` 同步置位标志并派发 `abort` 事件，reason 沿 `AbortSignal.any` 透传；而 Promise 本身不可取消，取消只能通过外层竞态与显式清理实现。

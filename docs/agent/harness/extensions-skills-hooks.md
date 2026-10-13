@@ -1,9 +1,42 @@
 ---
 title: "可扩展性：Extensions、Skills 与 Hooks"
-description: "把能力做成插件"
+description: "插件 manifest 描述它想做什么，不说明宿主已经允许它做什么。先解析名字和权限声明，检查名字是否重复，再注册处理器。真正执行时还要把声明权限与宿主批准的权限求交集。"
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise 与 async/await, JSON 对象与输入校验]
+runnable: false
+verified_at: 2026-10-13
+verified_scope: "仅核对本次新增手写章节及明确的协议更正；旧例的运行状态不扩展为全页验证。"
+tags: [agent, implementation, tutorial]
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 可扩展性：Extensions、Skills 与 Hooks
+
+## 插件声明不是插件授权 {#plugin-manifest-boundary}
+
+
+本节对照[官方资料](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)核对 MCP 2026-07-28 trust boundary。
+完整实现与行为测试在 [mcp-mini.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.mjs) 和 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/agent/mcp-mini.test.mjs)。从仓库根目录运行 node --test scripts/implementation-labs/agent/mcp-mini.test.mjs。
+
+插件 manifest 描述它想做什么，不说明宿主已经允许它做什么。先解析名字和权限声明，检查名字是否重复，再注册处理器。真正执行时还要把声明权限与宿主批准的权限求交集。把 permissions 字段保存到 Map，不能据此宣布插件已经被沙箱隔离或获得访问文件的资格。
+
+```js
+import { registerPlugin } from './scripts/implementation-labs/agent/mcp-mini.mjs';
+const registry = new Map();
+registerPlugin(registry,
+  { id: 'issue-reader', permissions: ['issues:read'] },
+  async () => [{ id: 7 }],
+);
+console.log(registry.get('issue-reader').manifest.permissions);
+// ['issues:read']，这是申请范围，不是授权结果。
+```
+
+先约束 ID 字符和长度，避免将路径或任意命令混进名字。再检查 handler 可调用。注册时复制 manifest，防止调用者随后改动原对象。重复名字应该明确失败，不能默默覆写已经注册的可信处理器。这几步保证注册表结构可靠，仍没有证明插件代码安全。
+
+执行层接收独立的 effectivePermissions，资源访问只看这个集合。钩子只能返回建议结果，不能在完成通知里自行提升权限。需要不可信代码隔离时，另外选择进程、容器或操作系统沙箱，并验证文件和网络出口。技能文本也应与用户指令区分，它是被加载的资料，不是自动获得最高优先级的命令。
+
+A010 验证合法注册、重复 ID 和非法名字。进一步练习时添加未知权限名称、manifest 被修改、插件要求未批准写权限三个失败用例。测试通过的条件是拒绝前后注册表没有变化，且未批准操作的副作用次数保持零。
 
 !!! abstract "学完这一页你能"
     - 说清扩展宿主的四个职责：发现扩展文件、调用扩展工厂、保存注册结果、分发生命周期事件。

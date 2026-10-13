@@ -1,6 +1,14 @@
 ---
 title: "跨上下文通信：postMessage、BroadcastChannel 与 SharedWorker"
-description: "iframe、标签页与 Worker 之间怎么传数据"
+description: "比较 iframe、Worker、标签页之间的结构化克隆、Transferable 和共享内存通信，逐步追踪 ArrayBuffer 转移后源端的 detached 状态与消息 origin 校验责任。"
+tags: [web-apis, workers, messaging]
+date: 2026-10-13
+level: advanced
+prerequisites: [Promise, ArrayBuffer, origin and iframe basics]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 transferable 所有权与 targetOrigin 说明。
 ---
 
 # 跨上下文通信：postMessage、BroadcastChannel 与 SharedWorker
@@ -12,6 +20,23 @@ description: "iframe、标签页与 Worker 之间怎么传数据"
     - 用 Web Locks 或 BroadcastChannel 写出一个跨标签页的领导者选举，并断言任意时刻只有一个领导者。
 
 ## 0. 知识地图
+
+## Transferable 是所有权转移，不是复制优化提示 {#handwrite-transfer-ownership}
+
+把 `ArrayBuffer` 放进 transfer list 后，接收方获得可用的 buffer，发送方的原 buffer 被 detach，`byteLength` 变为 0。这个状态变化能避免复制大块像素数据，但发送方之后不能继续读取该内存；如果需要两端都保留数据，就必须显式复制。[HTML Standard：Transferable objects](https://html.spec.whatwg.org/multipage/structured-data.html#transferable-objects)
+
+[`transfer-ownership.mjs`](https://github.com/Shyu-x/frontend-interview/blob/433629bec6e4c2accbbcf85750a0e387ffdb1afb/scripts/content-labs/systems/transfer-ownership.mjs) 演示克隆与转移，已在本轮内容实验中运行。向 iframe 使用 `postMessage` 时仍要使用精确 `targetOrigin`，接收侧验证 `event.origin` 和消息结构；transfer list 不构成来源授权。
+
+所有权转移适合把大块数据交给 Worker 做计算，因为发送端不用再付一份复制的内存成本；它也意味着发送端的 view 立即失效。步骤是新建 ArrayBuffer、写入后只转一次、接收端基于新 buffer 创建 typed view、发送端只保留任务 ID 等元数据。多次转移同一个已 detach 的 buffer 会送出不可用数据，因此要在任务状态中记录 owner。
+
+```js
+const pixels = new Uint8Array(width * height * 4);
+const buffer = pixels.buffer;
+worker.postMessage({ type: 'filter', buffer }, [buffer]);
+console.log(buffer.byteLength); // 0: ownership moved to the worker
+```
+
+跨 window 消息用明确的 targetOrigin，而不是 `*`；接收方即使 origin 匹配也需要验证 `type`、版本和 payload 长度。BroadcastChannel 没有 targetOrigin 参数，同源页面都可以加入频道，所以敏感操作不要把同源视作可信身份，应在 server API 再校验用户权限。
 
 ```mermaid
 flowchart TD

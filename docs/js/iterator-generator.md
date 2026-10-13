@@ -1,13 +1,36 @@
 ---
 title: 迭代器与生成器
-description: 讲解迭代器协议与可迭代协议、Generator 函数、异步迭代器及实际应用场景。
+description: 讲解迭代器协议、Generator 与异步迭代，并手写可由 AbortSignal 或 return 关闭的深度优先树遍历。
 tags:
   - javascript
   - iterator
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [数组与对象, Generator 基本语法]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 迭代器与生成器
+
+### 手写可取消 DFS：消费端能关闭遍历 {#handwrite-cancellable-tree-walk}
+
+F008 用显式栈做深度优先遍历：反向压入子节点，弹栈时仍得到从左到右的顺序。每次产出前检查 `AbortSignal`，而生成器消费者还可以调用 `return()` 立刻结束当前迭代。源码 [tree-walk.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/tree-walk.mjs) 另用 `Set` 防止共享子树或环导致重复访问。
+
+```js
+const stack = [root];
+while (stack.length) {
+  if (signal?.aborted) return;
+  const node = stack.pop(); yield node;
+  for (const child of [...(node.children ?? [])].reverse()) stack.push(child);
+}
+```
+
+先用迭代栈替代递归，再加入环检测，最后在消费端分别验证 `return()` 和 `AbortController.abort()` 的停止点。
+
+执行 `node --test scripts/implementation-labs/frontend/tree-walk.test.mjs`。测试逐项拉取节点、提前关闭、发出 abort 和构造环。这个同步遍历在 yield 点才响应取消；若单个节点的处理本身长时间阻塞，signal 无法中断那段同步代码。异步分页需要另外实现 `AsyncGenerator` 和请求清理。
 
 ## 1. 迭代器协议与可迭代协议
 

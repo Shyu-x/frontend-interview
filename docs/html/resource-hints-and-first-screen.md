@@ -1,9 +1,31 @@
 ---
 title: 资源提示与首屏 HTML 优化
-description: preload、prefetch、preconnect、dns-prefetch 的区别，以及 favicon 与首屏 HTML 优化。
+description: 依据资源是否已知、何时需要和如何复用连接，选择 preload、prefetch、preconnect 与 modulepreload，并在网络面板识别重复请求。
+tags: [html, performance, resource-hints]
+date: 2026-10-13
+level: intermediate
+prerequisites: [HTML head, HTTP 缓存, 浏览器 Network 面板]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # 资源提示与首屏 HTML 优化
+
+### 资源提示是提示，不是下载承诺 {#handwrite-resource-hint-boundary}
+
+选择 hint 时先问浏览器是否已能从 HTML/CSS/模块图发现资源。`preload` 指定当前导航很快会用到的资源，错误的 `as` 或凭空猜测 URL 会造成重复下载；`prefetch` 面向可能的后续导航，浏览器可以因省流量或优先级策略不执行；`preconnect` 只提前建连接，不会获取文件。MDN 的 [preload](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel/preload) 与 [prefetch FAQ](https://developer.mozilla.org/en-US/docs/Web/HTML/Link_types/prefetch) 是按关系定义行为的参考。
+
+旧稿里“preload 一定进内存缓存”“prefetch 会在网络空闲时执行”“模块 preload 总能显著提速”等表述过度保证；判断是否重复或有收益，应在目标浏览器的 Network 面板检查 initiator、缓存命中与优先级。本页中的毫秒示例是示意预算，不是浏览器保证值。
+
+一个实际决策顺序是：先选出确定影响首屏的 LCP 图片或字体，再确认浏览器是否能从文档自然发现；只有延迟发现才考虑 preload。加完后用 Network 面板确认只请求一次、`as` 与真实用途一致、优先级符合预期。若用户常走下一路由，再针对那个路由考虑 prefetch，并观察低带宽或省流量模式的表现。
+
+```html
+<link rel="preload" href="/hero.webp" as="image" fetchpriority="high">
+<link rel="preconnect" href="https://api.example.test" crossorigin>
+<link rel="prefetch" href="/next-route-data.json" as="fetch" crossorigin>
+```
+
+三条声明的意图不同：首屏图已确定并立即需要，API 只确定会连某域但资源未知，下一路由数据只是可能有用。删除任意一条后做同条件瀑布对比，确认关键请求没有被低价值 hint 挤到后面；如果没有稳定收益，应删掉提示，减少额外连接和下载。
 
 ## 1. preload/prefetch/preconnect 区别
 

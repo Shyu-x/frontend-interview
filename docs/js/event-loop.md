@@ -1,13 +1,38 @@
 ---
 title: 事件循环与定时器
-description: 讲解宏任务与微任务、浏览器与 Node.js 事件循环差异、setTimeout 精度与 requestAnimationFrame，以及定时器调度。
+description: 用可控队列区分同步代码、微任务与 task，并核对浏览器和 Node.js 的宿主边界，避免把渲染时机或定时器精度背成固定顺序。
 tags:
   - javascript
   - event-loop
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [Promise 与 async/await, JavaScript 函数调用栈]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 事件循环与定时器
+
+先把“微任务永远先于宏任务”改成可核验的规则：浏览器完成一个 task 后会清空微任务队列，清空时新加入的微任务也会继续执行；之后浏览器可以更新渲染。渲染不是一类可与定时器排队比较的普通 task，宿主也可以在事件循环中选择合适时机更新画面。Node 的 `process.nextTick` 与浏览器微任务不能混成一条跨宿主队列。
+
+### 手写队列模拟：只模拟题目声明的调度规则 {#handwrite-queue-simulator}
+
+本实验只实现一个 task FIFO 和一个 microtask FIFO。每次 task 结束后先清空微任务队列，微任务回调中新入队的工作也要清空；它不模拟浏览器渲染、I/O task source、定时器节流、Node 的 `nextTick` 或 libuv 阶段。
+
+```js
+while (tasks.length > 0) {
+  tasks.shift()();
+  while (microtasks.length > 0) microtasks.shift()();
+}
+```
+
+从同步队列入手，再把“task 结束时排空微任务”作为单独状态迁移，最后加入微任务再入队的测试；源码是本规则的完整实现。
+
+从仓库根目录运行 `node --test scripts/implementation-labs/frontend/queues.test.mjs`。源码在 [`queues.mjs`](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/queues.mjs)，目录下 `catalog.json` 的 F001 固定了输入场景和测试路径。测试检查同步段先完成、微任务递归入队仍先于下一 task，以及两个队列各自的 FIFO 顺序。
+
+边界是刻意收窄的：真实浏览器还有多个 task source，用户代理可选择不同来源的下一个 task；微任务无限自我入队会饿死后续 task。本模拟器不提供“任意两段浏览器代码的完整时间顺序”证明。
 
 ## 1. 宏任务 vs 微任务
 
@@ -26,14 +51,15 @@ flowchart TB
         M2["queueMicrotask"]
         M3["MutationObserver"]
     end
-    subgraph 宏任务["宏任务队列"]
+    subgraph tasks["task 队列（多个来源）"]
         T1["setTimeout/setInterval"]
         T2["I/O 回调"]
-        T3["UI Rendering"]
-        T4["requestAnimationFrame"]
+        T3["用户输入事件"]
+        T4["其他宿主 task source"]
     end
-    S1 --> M1 --> M2 --> M3
-    S2 --> T1 --> T2 --> T3 --> T4
+    S1 --> T1 --> M1 --> M2
+    T1 --> T2 --> T3 --> T4
+    M2 --> R["用户代理可更新渲染"]
 ```
 
 ### 1.2 微任务 vs 宏任务 完整对比
@@ -43,12 +69,12 @@ flowchart TB
 | 微任务 | `Promise.then/catch/finally` | resolve/reject 后入队 |
 | 微任务 | `queueMicrotask()` | 手动入队微任务 |
 | 微任务 | `MutationObserver` | DOM 变化微任务 |
-| 微任务 | `process.nextTick` (Node) | 比 Promise 微任务优先级更高 |
+| Node 专用队列 | `process.nextTick` | CommonJS 顶层常先于 Promise 微任务；ESM 顶层顺序不同，见 Node 官方说明 |
 | 宏任务 | `setTimeout / setInterval` | 定时器宏任务 |
 | 宏任务 | `I/O` | 文件读写、网络请求回调 |
-| 宏任务 | `UI rendering` | 浏览器每帧渲染 |
-| 宏任务 | `requestAnimationFrame` | 每帧动画回调 |
-| 宏任务 | `requestIdleCallback` | 空闲时低优先级任务 |
+| 渲染机会 | 浏览器更新渲染 | task 与微任务清空后，用户代理可选择更新，不是脚本可入队的 task |
+| 渲染回调 | `requestAnimationFrame` | 在一次渲染机会中、绘制前运行；是否有帧由用户代理决定 |
+| 空闲回调 | `requestIdleCallback` | 用户代理报告有空闲预算时运行，不能用作准时定时器 |
 | 宏任务 | `setImmediate` (Node) | I/O 回调后执行 |
 | 宏任务 | 事件回调 | click, keydown 等 |
 
@@ -126,7 +152,7 @@ flowchart TB
 | 渲染 | 每帧渲染 | 无 UI 渲染（Node 服务端） |
 
 ```javascript
-// Node 中 nextTick 优先级高于 Promise 微任务
+// CommonJS 顶层：nextTick 通常先于 Promise 微任务；ESM 模块评估需单独核对。
 process.nextTick(() => console.log('nextTick'));
 Promise.resolve().then(() => console.log('microtask'));
 // 输出：nextTick, microtask
@@ -143,17 +169,15 @@ fs.readFile(__filename, () => {
 ## 5. setTimeout(fn, 0) 不精确的原因
 
 ```javascript
-// setTimeout(fn, 0) 不保证立即执行，因为：
-// 1. 要等当前同步代码和微任务队列清空
-// 2. 要等浏览器渲染（如果需要）
-// 3. 后台标签页（Chrome）最低精度降到 1 秒
+// setTimeout(fn, 0) 表示请求一个不早于允许时刻的回调，不承诺精确时间。
+// 当前 task、微任务、嵌套定时器钳制、后台节流与系统负载都会影响实际延迟。
 
 // 为什么 requestAnimationFrame 比 setTimeout 更适合动画？
-// - rAF：每帧渲染前执行，浏览器统一调度，不掉帧
-// - setTimeout(..., 16.7)：不管渲染时机，可能在渲染期间执行，导致重复渲染
+// - rAF：浏览器提供渲染机会时、绘制前回调；它不保证动画一定不掉帧。
+// - setTimeout(..., 16.7)：独立计时请求，不与刷新率或绘制时机绑定。
 
-// 更精确的定时：Web Worker 中没有渲染，精度更高
-// 或者使用 MessageChannel
+// Worker 没有 DOM 渲染职责，但其中的计时器也受宿主调度与节流影响。
+// MessageChannel 可安排另一条 task，不提供精确计时保证。
 const channel = new MessageChannel();
 channel.port1.postMessage(null); // 产生一个宏任务（不涉及渲染）
 ```
@@ -203,8 +227,8 @@ function onScroll() {
 | 在微任务中创建大量微任务 | 可能在微任务处理中又添加微任务，导致队列不断增长 | 避免在 `.then()` 中直接创建大量同步 Promise |
 | `setTimeout(0)` 滥用 | 不精确，会阻塞渲染 | 需要精确时用 `requestAnimationFrame` |
 | 混淆微任务和宏任务优先级 | `await` 后面跟着的代码优先级低于其他同步代码 | 理解 `await` 等价于 `.then()` 的微任务性质 |
-| 动画用 setTimeout 而非 rAF | 可能掉帧或重复渲染 | 动画统一使用 `requestAnimationFrame` |
-| 后台页面 setTimeout 精度丢失 | Chrome 后台化标签页降低定时器精度到 1 秒 | 使用 `visibilitychange` 暂停不必要的定时器 |
+| 用定时器代替逐帧绘制 | 定时器回调不与屏幕刷新同步 | 视觉逐帧更新使用 `requestAnimationFrame`，再检查帧时间 |
+| 假定后台定时器有固定精度 | 浏览器会按页面状态和节能策略节流 | 监听 `visibilitychange` 暂停非必要工作，不依赖固定钳制值 |
 
 ## 8. 面试追问
 
@@ -244,7 +268,7 @@ function nextTick(fn) {
 ```
 
 **Q3: Node.js 和浏览器事件循环的主要区别是什么？**
-Node.js 有多个阶段（timers → poll → check），且 `process.nextTick` 优先级高于 Promise 微任务。浏览器只有单一宏任务队列和微任务队列，且有渲染阶段。
+Node.js 有多个阶段（timers → poll → check），并维护 `process.nextTick` 队列与 Promise 微任务；其相对顺序需同时说明模块格式和执行上下文。浏览器有多个 task source、微任务检查点与用户代理控制的渲染机会，不能简化成“单一宏任务队列”。
 
 ## 9. 定时器与调度
 
@@ -253,23 +277,21 @@ Node.js 有多个阶段（timers → poll → check），且 `process.nextTick` 
 ```javascript
 // setTimeout(callback, 0) 不保证立即执行
 // 因为事件循环中要等当前任务和微任务队列清空
-// 再加上渲染（如果需要），才有空执行宏任务
+// 后续 task 的启动还受宿主任务队列选择与定时器钳制影响。
 
 setTimeout(() => console.log('timeout'), 0);
 console.log('sync');
 // 输出：sync, timeout（即使delay=0也要等同步代码完成）
 
 // setTimeout实现机制：
-// 浏览器：主线程执行 → 等微任务清空 → 渲染 → 执行宏任务
-// setTimeout只是把回调注册到宏任务队列，并不是精确延时
+// 浏览器：当前 task 结束 → 清空微任务 → 用户代理可更新渲染 → 选择下一个 task
+// timer 到期后只是变为可执行，不保证该回调立即获得运行机会。
 
 // 原因1：事件循环非空闲时，要等待
-// 原因2：渲染优先级：微任务 → 渲染 → setTimeout
-// 原因3：后台页面（浏览器tab不可见）会降低精度（Chrome最低1s）
+// 原因2：渲染与下一个 task 的时机由用户代理决定，不是固定优先级。
+// 原因3：后台节流策略依浏览器、页面状态与耗电策略而异，没有通用的固定最低值。
 
-// 精确延迟实现（不完美但比setTimeout好）：
-// Web Worker中没有UI渲染，可以更精确
-// 或者使用 MessageChannel + performance.now() 测量
+// Worker / MessageChannel 不提供精确定时保证；用 performance.now() 只能测量实际延迟。
 
 // setInterval问题：
 // 如果回调执行时间超过delay，下一个回调会跳过（不排队）
@@ -286,11 +308,11 @@ setInterval(() => {
 
 ```javascript
 // requestAnimationFrame：在下次屏幕刷新前调用
-// 每秒约60次（约16.67ms），与屏幕刷新率同步
+// 回调在可用的渲染机会之前执行；频率由显示刷新率、页面可见性与负载影响。
 
 // 与setTimeout(..., 16.7) 的区别：
 // setTimeout：不管浏览器是否在渲染，到时间就执行
-// rAF：一定在渲染前，浏览器统一调度，避免掉帧
+// rAF：浏览器准备渲染时执行，但不保证每帧都赶上，也不自动避免掉帧。
 
 // rAF使用场景：
 // 1. 动画（CSS动画用transform/opacity，无需rAF）
@@ -298,9 +320,8 @@ setInterval(() => {
 // 3. 滚动相关计算（用rAF同步到渲染）
 
 // rAF调用时机（在事件循环中）：
-// 每次event loop，浏览器检查是否有rAF回调
-// 有的话，在渲染（paint）之前执行（按注册的顺序）
-// 然后渲染，更新屏幕
+// 在一次渲染更新流程中，浏览器调用待处理的 rAF 回调，然后继续渲染步骤。
+// 若页面被冻结或没有渲染机会，回调节奏可能暂停或降低。
 
 // 节流动画的rAF写法：
 let pending = false;
@@ -356,9 +377,7 @@ requestIdleCallback((deadline) => {
 // 事件循环顺序：
 // 1. 执行同步代码（宏任务）
 // 2. 执行所有微任务（Promise.then, MutationObserver, queueMicrotask）
-// 3. 执行一个宏任务（setTimeout, setInterval, I/O, UI rendering）
-// 4. 循环微任务
-// 5. 执行下一个宏任务
+// 3. 用户代理可选择渲染更新，再从可运行的 task source 选取后续 task。
 // ...
 
 console.log('1');
@@ -372,16 +391,11 @@ console.log('5');
 // - Promise.then/.catch/.finally
 // - queueMicrotask()
 // - MutationObserver（DOM变化观察）
-// - IntersectionObserver（进入视口）
-// - ResizeObserver
-// - PerformanceObserver
+// Observer 回调由各自规范定义的交付时机运行，不应全部归为微任务。
 
 // 宏任务列表：
 // - setTimeout / setInterval
 // - I/O操作（文件读写、网络请求）
-// - UI渲染
-// - requestAnimationFrame
-// - requestIdleCallback
 // - setImmediate（Node.js）
 // - 事件回调
 
@@ -397,8 +411,8 @@ console.log('5');
 // 浏览器Event Loop完整流程：
 // 1. 执行同步代码（call stack）
 // 2. 清空微任务队列（microtask queue）
-// 3. 执行一个宏任务（macrotask queue）
-// 4. 重复2-3
+// 3. 用户代理可以渲染，然后选择一个可运行的 task source 取下一项
+// 4. 重复这个宿主循环
 
 console.log('A');
 setTimeout(() => console.log('B'), 0);
@@ -444,8 +458,7 @@ console.log('D');
 //
 // Node特点：
 // 1. setImmediate 在 I/O 回调之后、check阶段执行
-// 2. process.nextTick 在当前阶段结束后、下个阶段前执行（优先级高于微任务）
-// 3. 微任务：Promise.then + process.nextTick
+// 2. Node 在适用的回调边界处理 nextTick 与 Promise 微任务队列
 
 // setTimeout vs setImmediate：
 setTimeout(() => console.log('timeout'));
@@ -453,7 +466,7 @@ setImmediate(() => console.log('immediate'));
 // 在主脚本中：顺序不确定（取决于性能）
 // 在I/O回调中：immediate 先于 timeout
 
-// process.nextTick 优先级高于微任务：
+// CommonJS 文件顶层：nextTick 回调早于 Promise reaction；不要外推到 ESM。
 process.nextTick(() => console.log('nextTick'));
 Promise.resolve().then(() => console.log('microtask'));
 // 输出：nextTick, microtask
@@ -483,9 +496,8 @@ document.body.appendChild(document.createElement('div'));
 document.body.appendChild(document.createElement('span'));
 // 如果是宏任务，会有延迟；作为微任务，立即响应
 
-// requestAnimationFrame：在渲染前（每帧）执行，属于宏任务
-// requestIdleCallback：在浏览器空闲时执行，属于宏任务
-// 可以使用MessageChannel创建宏任务：
+// rAF 与 idle callback 是各自定义时机的回调，不属于统一的“宏任务队列”。
+// MessageChannel 消息回调会排入相应的 task source：
 const channel = new MessageChannel();
 channel.port1.postMessage(null); // 产生宏任务
 ```

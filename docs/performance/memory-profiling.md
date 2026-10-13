@@ -1,6 +1,14 @@
 ---
 title: "内存分析：Heap Snapshot、分配时间线与泄漏定位"
-description: "找出到底谁在占内存"
+description: "通过 Node.js heapUsed、RSS、快照与分配采样区分 JS 保留对象和原生内存，建立可复现的增长实验，并约束快照生成对线上进程的暂停与敏感数据风险。"
+tags: [performance, memory, node]
+date: 2026-10-13
+level: advanced
+prerequisites: [V8 堆与垃圾回收, Node.js 进程指标]
+runnable: false
+tested_with: []
+verified_at: 2026-10-13
+verified_scope: 只核对新增的 Node.js v24 snapshot 和 RSS/heap 区分说明。
 ---
 
 # 内存分析：Heap Snapshot、分配时间线与泄漏定位
@@ -1438,3 +1446,23 @@ Node 内置的快照写入接口，可以在阈值触发或信号触发时落盘
 - Node.js 官方文档：`v8` 模块的 `writeHeapSnapshot()`、`getHeapStatistics()`、`getHeapSpaceStatistics()`
 - Node.js 官方文档：命令行选项的 `--heapsnapshot-signal`、`--heapsnapshot-near-heap-limit`、`--trace-gc`、`--max-semi-space-size`、`--max-old-space-size`、`--expose-gc`
 - Node.js 官方文档：`inspector` 模块的 `HeapProfiler.startSampling` 与 `HeapProfiler.stopSampling`
+
+## Heap 快照既会暂停进程，也可能包含用户数据 {#handwrite-heap-snapshot-risk}
+
+Heap snapshot 会遍历堆并可能明显增加临时内存，快照文件还可能包含字符串、请求内容和凭据。Node.js 文档明确提示生成快照需要额外内存，并可能导致 OOM；生产采集前要确认磁盘权限、保留期限和下载访问控制。[Node.js v24 V8 API](https://nodejs.org/docs/latest-v24.x/api/v8.html#v8writeheapsnapshotfilename-options)
+
+`heapUsed` 只描述 V8 堆已使用部分，RSS 还包括代码页、栈和原生分配。若 RSS 上升而 heapUsed 平稳，应进一步观察 `external`、`arrayBuffers` 和原生 addon，而不是把全部增长称作“JS 泄漏”。
+
+复现时每轮采用固定工作量：启动进程、执行一批相同请求、等待 GC 自然发生、记录 `heapUsed/external/arrayBuffers/rss`，再重复至少三轮。Heap snapshot 要离线写到受控目录，并确认目录权限、剩余磁盘空间和是否包含用户敏感字符串。比较快照时先按 constructor 聚合，再沿 Retainers 找到谁持有对象；仅看对象数量增长不能证明根因。
+
+```js
+import v8 from 'node:v8';
+import { writeFileSync } from 'node:fs';
+const { heapUsed, external, arrayBuffers, rss } = process.memoryUsage();
+console.log({ heapUsed, external, arrayBuffers, rss });
+writeFileSync('heap.json', JSON.stringify(v8.getHeapStatistics()));
+// 只在隔离的复现场景写快照，避免生产请求路径生成大文件。
+v8.writeHeapSnapshot('./artifacts/heap.heapsnapshot');
+```
+
+若 heapUsed 平稳但 RSS 持续升高，继续比较 Node Buffer、WebAssembly linear memory 和 native addon 持有量；若所有指标都平稳但容器 OOM，则查看进程外缓存、子进程和 cgroup memory pressure。快照有暂停和额外内存成本，不能把“打开快照后对象可见”误认为线上无风险的取证步骤。

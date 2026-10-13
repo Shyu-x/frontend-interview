@@ -1,9 +1,32 @@
 ---
 title: "并发特性：Transition、useDeferredValue、Suspense 与 Activity"
-description: "让界面在忙碌时依然保持响应"
+description: "区分同步输入更新与可中断的非紧急渲染，理解 startTransition 的优先级语义、pending 状态和异步边界。"
+tags: [react, concurrency, transitions]
+date: 2026-10-13
+level: advanced
+prerequisites: [React state, render 与 commit]
+runnable: false
+verified_at: 2026-10-13
 ---
 
 # 并发特性：Transition、useDeferredValue、Suspense 与 Activity
+
+### Transition 不能抢占正在执行的同步 JavaScript {#handwrite-transition-boundary}
+
+用户输入的受控 state 要同步更新，否则输入光标会落后。昂贵列表的筛选 state 可作为 transition 更新，让 React 在渲染期间有机会让出，再优先处理新的输入。`startTransition` 回调本身仍同步执行，包住 `filterLargeArray()` 不会把计算送到后台线程；若那段计算占住主线程，界面仍然卡住，应先把纯计算移入 Worker 或分片。
+
+```jsx
+const [query, setQuery] = useState('');
+const [filter, setFilter] = useState('');
+const [pending, startTransition] = useTransition();
+function onChange(event) {
+  const next = event.target.value;
+  setQuery(next); // 紧急输入反馈
+  startTransition(() => setFilter(next)); // 可中断的列表更新
+}
+```
+
+观察时同时看输入是否及时更新、过渡是否被新输入替换，以及 pending 是否只覆盖非紧急结果。React 19.2 Performance Tracks 可用来检查 scheduler 工作轨迹；文档和诊断见 [useTransition](https://react.dev/reference/react/useTransition) 与 [19.2 发布说明](https://react.dev/blog/2025/10/01/react-19-2)。
 
 !!! abstract "学完这一页你能"
     - 能解释并发渲染是主线程上的可中断渲染，并能说出它与多线程的区别。

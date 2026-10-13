@@ -1,6 +1,11 @@
 ---
 title: "Astro 岛屿架构与 Remix/React Router"
-description: "内容站与全栈框架的两条路"
+description: "比较岛屿架构与全栈路由的数据流，说明 HTML 输出、局部交互、表单提交和客户端接管的边界。按页面需求选择加载策略，检查序列化、错误处理、导航与缓存是否保持一致。"
+tags: [frameworks, tutorial]
+date: 2026-10-14
+level: intermediate
+prerequisites: [JavaScript 函数与对象, Promise 与事件处理]
+runnable: false
 ---
 
 # Astro 岛屿架构与 Remix/React Router

@@ -73,13 +73,7 @@ jobs:
 
       - name: Build site
         run: |
-          uv run mkdocs build --clean > build.log 2>&1 || { cat build.log; exit 1; }
-          LINK_WARNINGS=$(grep -c "contains a link" build.log || echo "0")
-          if [ "$LINK_WARNINGS" -gt 0 ]; then
-            echo "✗ Build has $LINK_WARNINGS link warning(s)"
-            grep "contains a link" build.log | head -5
-            exit 1
-          fi
+          uv run mkdocs build --strict --clean > build.log 2>&1 || { cat build.log; exit 1; }
           echo "✓ Build successful with 0 link warnings"
 
       - name: SEO / GEO check

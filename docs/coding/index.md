@@ -4,7 +4,7 @@ description: 从经典 JavaScript 到浏览器交互、Node.js 服务与 Go 并�
 tags:
   - coding
   - interview
-date: 2026-05-17
+date: 2026-10-13
 level: reference
 prerequisites:
   - JavaScript 函数、数组、对象和 Promise
@@ -16,6 +16,8 @@ source_commit: a489bf9bbebe96c3653c0dbe6bf1e97343aaf655
 # 手写代码概览
 
 从一个具体需求开始。先手算例子，再写状态和函数，最后跑测试。想提高独立编码能力，先读[怎样练得自然](coding-fluency.md)。想选题，打开[练习与题解入口](handwritten-practice-360.md)。
+
+想把分散的知识用在一起，读[把原理串成可以交付的代码](implementation-paths.md)。从订单搜索、离线笔记和工具助手开始，把并发、缓存、协议、权限与清理接成完整流程。
 
 新增实战有 106 道完整题解。Web 40 道，Node 30 道，Go 36 道。代码带注释，每题有测试。360 道限时练习另按 H 编号保留，不把题面数量当成已完成题解数量。
 

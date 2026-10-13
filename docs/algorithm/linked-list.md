@@ -1,13 +1,36 @@
 ---
 title: 链表题型
-description: LeetCode Hot 100 链表类题目：反转、合并、环形检测、删除节点、相交与 K 路合并。
+description: 用反转、合并、环形检测与哨兵双向链表推导指针不变量，覆盖删除边界、重复删除、引用断开和 O(1) 链接更新及测试验收方法。
 tags:
   - algorithm
   - leetcode
-date: 2026-05-17
+date: 2026-10-13
+level: intermediate
+prerequisites: [对象引用, 指针更新顺序]
+runnable: true
+tested_with: [node@24.16.0]
+verified_at: 2026-10-13
+source_commit: c1a7d0be48d2601aa4d71b303fbc08921e77235d
 ---
 
 # 链表题型
+
+### 手写哨兵双向链表：头尾删除走同一条路径 {#handwrite-sentinel-list}
+
+F009 用一个同时指向自身前后方的哨兵表示空表。插入只需改动相邻两条链接，删除时先接通前后节点，再把被删节点的 `prev/next` 置空，避免调用方继续沿失效链访问。源码见 [linked-list.mjs](https://github.com/Shyu-x/frontend-interview/blob/c1a7d0be48d2601aa4d71b303fbc08921e77235d/scripts/implementation-labs/frontend/linked-list.mjs)。
+
+```js
+item.prev.next = item.next;
+item.next.prev = item.prev;
+item.prev = null;
+item.next = null;
+```
+
+按“连接邻居、断开被删节点、更新长度”的顺序实现删除；哨兵消除了头尾特殊分支，但仍要拒绝删除哨兵或已移除节点。
+
+失败时先检查 size 与遍历所得的节点数是否一致，再检查首节点 `prev` 与尾节点 `next` 是否回指哨兵；这两项不变量能迅速发现只改了一个方向的断链。不要在还未接通邻居前就清空 `item.next`，否则会丢失修复链所需的指针。该结构的删除是 O(1)，遍历是 O(n)，但这不代表它比数组更适合所有场景：小列表通常更看重连续内存和简单 API。
+
+运行 `node --test scripts/implementation-labs/frontend/linked-list.test.mjs`。覆盖头尾添加、删除首尾、空表状态和重复删除。此结构不负责节点所有权：调用方仍需避免把已属于另一条链的节点插入；教学 API 只公开 push/unshift/remove，不包括迭代器和并发修改保护。
 
 ## 1. 反转链表
 
