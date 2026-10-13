@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-13",
+  "baseline_commit": "a489bf9bbebe96c3653c0dbe6bf1e97343aaf655",
+  "audit": {
+    "existing_bank": 360,
+    "gap": "Many existing entries specify practice contracts without complete stepwise implementations. No Go exercises existed at baseline. Node lacked a systematic executable HTTP/worker/storage workshop.",
+    "rendering_root_cause": "pymdownx.betterem smart_enable=all treats punctuation-adjacent strong asterisk labels as literal text; smart underscores preserve snake_case without rejecting CJK labels.",
+    "navigation_root_cause": "Desktop .md-nav__title padding overrides the mobile back-arrow gutter; mobile headers need an explicit reserved icon column.",
+    "curriculum": ["language and task composition", "network and cancellation", "DOM and accessibility", "business state and recovery", "cache, parsing and graphics", "real CPU workers and stream backpressure", "HTTP and lifecycle", "upload and file publication", "idempotency and resilience", "build graphs and configuration", "Go concurrency", "Go HTTP", "Go streams and files", "Go structures", "Go synchronization and shutdown"],
+    "minimum_acceptance": {"complete_web_exercises":40,"complete_node_exercises":30,"complete_go_exercises":30,"concrete_scenarios":40,"companies":15}
+  },
+  "company_sources": [
+    {"company":"字节跳动","url":"https://www.nowcoder.com/discuss/762390659880734720","topics":["Promise.all","reduce map","frequency selection"]},
+    {"company":"网易","url":"https://www.nowcoder.com/discuss/762390659880734720","topics":["Canvas","editor parsing","event delegation"]},
+    {"company":"京东","url":"https://www.nowcoder.com/discuss/762390659880734720","topics":["array grouping","HTTP versus WebSocket"]},
+    {"company":"腾讯","url":"https://www.nowcoder.com/feed/main/detail/2c141f34992d47f7a2492bfe3648846b","topics":["async addition","big integer","word lookup"]},
+    {"company":"拼多多","url":"https://www.nowcoder.com/feed/main/detail/f184630a893040e4acbf929f8eb0f2c5","topics":["request restart","version comparison","subarrays"]},
+    {"company":"美团","url":"https://www.nowcoder.com/discuss/689797806030163968","topics":["infinite scrolling","viewport observation"]},
+    {"company":"快手","url":"https://www.nowcoder.com/discuss/524599136524558336","topics":["flat","retry","new","permutation"]},
+    {"company":"滴滴","url":"https://www.nowcoder.com/discuss/455374820369276928","topics":["binary search","deep clone","delegation"]},
+    {"company":"携程","url":"https://www.nowcoder.com/discuss/679282678595608576?sourceSSR=subject","topics":["Promise.race","clone","routing"]},
+    {"company":"百度","url":"https://www.nowcoder.com/discuss/389080636894572544","topics":["rating component","pubsub","template parsing","Pick"]},
+    {"company":"小米","url":"https://www.nowcoder.com/discuss/372064176255107072","topics":["intersection","daily reminder","viewport entry","pagination"]},
+    {"company":"小红书","url":"https://www.nowcoder.com/discuss/801727788586696704","topics":["array to tree","semaphore"]},
+    {"company":"哔哩哔哩","url":"https://www.nowcoder.com/discuss/353159092741021696","topics":["debounce","event loop","cross origin"]},
+    {"company":"阿里","url":"https://www.nowcoder.com/feed/main/detail/dbf40616a89d41bf82409a6c2864eabe","topics":["deep clone","state toggle"]},
+    {"company":"蚂蚁集团","url":"https://www.nowcoder.com/discuss/353159343954665472","topics":["array or object callback traversal"]},
+    {"company":"Shopee","url":"https://www.nowcoder.com/discuss/666740466037121024","topics":["safeGet","sleep","Node endpoint"]},
+    {"company":"顺丰科技","url":"https://www.nowcoder.com/discuss/353158617958391808","topics":["big integer addition","case conversion","loader"]},
+    {"company":"360","url":"https://www.nowcoder.com/discuss/353159040438050816","topics":["duplicate array elements"]},
+    {"company":"万兴科技","url":"https://www.nowcoder.com/discuss/865618997453123584","topics":["collaborative image editing"]}
+  ],
+  "references": ["https://bigfrontend.dev/problem/create-lazyman","https://www.greatfrontend.com/questions","https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest","https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API","https://nodejs.org/docs/latest-v24.x/api/worker_threads.html","https://nodejs.org/docs/latest-v24.x/api/stream.html","https://go.dev/doc/effective_go","https://go.dev/blog/pipelines","https://go.dev/doc/articles/race_detector"],
+  "unverified_leads": [{"topic":"PDD animation engine","year":2026,"session":"first autumn session","origin":"user report","exact_question_found":false}],
+  "source_boundary": "Published interview recollections and indexed public excerpts describe topic reports, not official complete examinations. Unknown fields remain in the existing provenance ledger; tutorial examples and variations are not attributed as exact company questions."
+}

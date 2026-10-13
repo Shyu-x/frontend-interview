@@ -80,6 +80,24 @@ text = text.replace(/^title: .+$/m, 'title: 手写练习参考资料');
 text = text.replace(/# 手写题来源与证据[^\n]*\n[\s\S]*?(?=## 公开练习入口)/,
   '# 手写练习参考资料\n\n按主题查规范、项目文档和公开练习。企业题型见[企业索引](company-question-playbook.md)，具体面经记录保存在[登记表](../assets/research/interview-provenance-20261012.json)。\n\n');
 writeFileSync(sources, text);
+const animation = new URL('animation-engine-handwritten.md', folder);
+text = readFileSync(animation, 'utf8');
+text = text.replace(/## 先说清练习来源\n[\s\S]*?(?=## 一个具体问题)/,
+  '先写一个数值动画。给它起点、终点和时长，让时间决定当前值。接着加暂停、恢复、取消和完成，再让多个动画共用一条时间线。\n\n这里运行的是 Node 数值模型。浏览器接入 rAF 后，还需要单独检查绘制和合成。\n\n');
+text = text.replace('| 把练习代码说成公司原题 | 混淆用户线索、公开题面与作者设计 | 说明出处状态，勿伪造年份或 OJ 协议 |',
+  '| 完成前先调用用户回调 | 回调重入时可能重复完成 | 先进入 finished 并移除活动记录 |');
+writeFileSync(animation, text);
+const algorithms = new URL('autumn-exam-algorithms.md', folder);
+text = readFileSync(algorithms, 'utf8');
+text = text.replace(/^description: .+$/m, 'description: 从不重复子数组和版本排序两类问题开始，分别写出最长区间、合法区间计数和 SemVer 优先级比较。逐步解释窗口与分段规则，再用独立穷举、非法输入和资源边界测试检查实现，练习把题目要求变成可运行代码。');
+text = text.replace(/## 1\. 来源边界[^\n]*\n[\s\S]*?(?=## 2\.)/,
+  '## 1. 先确定要算什么\n\n子数组练两种目标。一种找最长的不重复区间，另一种统计所有不重复区间。版本题按 SemVer 2.0.0 比较优先级，不解析范围表达式。并发重启可继续读[场景专题](real-interview-scenarios.md)。\n\n');
+text = text.replace(/<details><summary>公开回忆只写了题名[\s\S]*?<\/details>/,
+  '<details><summary>如何找到窗口实现的最小反例？</summary>\n\n从短数组开始穷举。用朴素枚举分别计算长度和数量，再和窗口实现逐项比较。第一次不一致时，保存输入和左右边界，而不是只记一个总测试数。\n\n</details>');
+text = text.replace('3. **验证变化**：没有官方题面时，哪些结论只能写为作者练习？怎样设计独立 oracle？',
+  '3. 先写独立枚举器，再比较窗口实现。预期值不能来自同一个优化算法。');
+text = text.replace('Q[原始题名与来源]', 'Q[输入与预期结果]');
+writeFileSync(algorithms, text);
 const bank = loadBank();
 if (bank.errors.length) throw new Error(bank.errors.join('\n'));
 writeFileSync(new URL('../docs/assets/research/handwritten-bank-360.json', import.meta.url), `${JSON.stringify(makeManifest(bank.questions), null, 2)}\n`);

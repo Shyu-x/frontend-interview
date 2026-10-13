@@ -172,7 +172,7 @@ node scripts/content-labs/run.mjs --integrations --interview
 
 ## 6. 广度继续发散，但不把计划冒充交付
 
-本轮追加的 360 题入口与 12 个前端/全栈/系统题册已经写入仓库；[来源页](../coding/handwritten-practice-sources.md)登记 34 个参考入口，[机器清单](../coding/handwritten-practice-360.md#可复现清单与真实验收)检查 ID、合同字段和索引漂移。加入新代表模型时执行 `node scripts/content-labs/run.mjs --integrations --interview --challenges`，输出应为 `PASS 14 content labs on v24.16.0`。这个数量是聚合入口，不是全部练习已解答的数量。
+360 道练习分成 12 个题册。[参考资料](../coding/handwritten-practice-sources.md)提供规范入口，[机器清单](../assets/research/handwritten-bank-360.json)保存题号与索引。想跟着完整代码学习，可从[实战题解](../coding/handwritten-practice-360.md)开始。新增 Web 40 题、Node 30 题、Go 36 题，各有实现和测试。原有系统实验仍可运行 `node scripts/content-labs/run.mjs --integrations --interview --challenges`，预期输出 `PASS 14 content labs on v24.16.0`。
 
 以下是下一轮研究候选，不是本轮已完成的教程。每项明确一个机制问题和验收产物，避免“再加几十个名词”。
 

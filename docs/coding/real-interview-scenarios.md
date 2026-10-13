@@ -17,13 +17,13 @@ source_commit: 707ea4929bbb84c67bd637f92360b002a2b23cf7
 
 # 大厂前端真实场景题：从面经到可验证实现
 
-面经里的“一道场景题”通常只记录一句话，真正要评估的却是你如何补齐约束、找到竞态或资源边界、写出可检查的实现。本文把七道公开记录过的前端面试场景重构成练习题。原始报告是候选人个人回忆，不代表公司官方题库；题干的补充限制、图、追问树和验收标准是本文为练习所作的改写，不冒称面试原话。
+这七个练习从公开面经中的场景出发，逐步补齐状态、资源和失败边界。先看题目主题，再沿代码与测试推导工程方案。出处在文末，扩展约束是本页练习设定。
 
 配套手写异步实验位于仓库文件 `scripts/content-labs/interview/stale-generation.mjs`。它覆盖“新请求先返回、旧请求后返回”的常见竞态，并用手动 deferred 控制时序，无需 sleep 或外部服务。
 
-## 0. 阅读地图与证据边界
+## 0. 阅读地图
 
-图中实线节点代表原始面经实际出现过的主题；下面的具体验收输入和追问树是教学重构，用于把模糊记录变成可练习的题目。
+左侧是面经记录过的主题，右侧是本文要推导的工程问题。
 
 ```mermaid
 flowchart TD
@@ -37,7 +37,7 @@ flowchart TD
     WXS["万兴：多人图片编辑同步"] --> COLLAB["协同状态与离线冲突"]
 ```
 
-读图时先由左侧的公开回忆确认“实际报告过什么”，再沿箭头看本文抽取的工程主题。图不表示各公司采用了本文方案，也不表示这些追问都曾在该场面试中出现。
+<!-- 来源登记保留原有日期和岗位细节，正文不重复展开。
 
 | 公开报告 | 日期、岗位与轮次（按正文核对） | 报告中确实出现的题目线索 | 原始来源 |
 |---|---|---|---|
@@ -50,11 +50,13 @@ flowchart TD
 | 快手前端面经 | 页面当前显示 2023-05-24（已编辑）；作者职业标签为前端工程师；正文列出 4/4 一面、4/10 二面、4/17 三面，轮次日期未单独标年份 | 实现最大并发数为 5 的 `addTask` 类 | [《非科班前端的春招结束了》](https://www.nowcoder.com/discuss/479016572799942656?sourceSSR=subject) |
 | 万兴科技前端面经 | 页面显示 03-23；前端一面；年份未在可访问正文顶部完整显示 | 图库协同编辑，以及不使用 WebSocket 时是否还能保持图片状态一致 | [《万兴科技前端一面》](https://www.nowcoder.com/discuss/865618997453123584?sourceSSR=enterprise) |
 
-日期只代表原帖页面给出的发布时间或面试时间，不推断招聘届别。最后一条的来源时间字段在可访问页面中不含年份，因此明确保留为未知。报告者经历属于第一人称回忆，不是公司发布的正式题目说明。
+日期只代表原帖页面给出的发布时间或面试时间，不推断招聘届别。最后一条的来源时间字段在可访问页面中不含年份，因此明确保留为未知。报告者经历属于第一人称回忆，不是公司发布的正式题目说明。 -->
+
+每题先把输入和承诺讲清楚，再看状态图、实现取舍与失败路径。本文新增的验收参数是练习标准，不是面经原话。
 
 ## 1. 异步代次：重新搜索后旧响应不能覆盖新结果
 
-**真实题目线索：** 拼多多 2026-09-13 的公开记录明确写到“Promise 并发重启与老结果作废”。这里把它作为竞态控制练习，不声称这段详细规格出现在原题中。
+<!-- S01 · **真实题目线索：** 拼多多 2026-09-13 的公开记录明确写到“Promise 并发重启与老结果作废”。这里把它作为竞态控制练习，不声称这段详细规格出现在原题中。 -->
 
 ### 先问清输入和保证
 
@@ -92,6 +94,29 @@ sequenceDiagram
 ```
 
 不变量是“可提交的代次始终只有一个”。只在 `await` 之后核对代次，能防止旧成功结果覆盖状态；在 `catch` 里做同样检查，能防止旧错误覆盖新成功；在 `finally` 里比较请求 ID，能防止旧任务清理掉新任务的活动标记。
+
+先把代次检查放在所有状态写入前。`finally` 也要比对代次，因为旧请求可能晚于新请求结束。
+
+```js
+let generation = 0;
+let activeController;
+
+async function search(query) {
+  const mine = ++generation;
+  activeController?.abort();
+  const controller = activeController = new AbortController();
+  try {
+    const result = await fetchResults(query, { signal: controller.signal });
+    if (mine === generation) render(result);
+  } catch (error) {
+    if (mine === generation) showError(error);
+  } finally {
+    if (mine === generation) activeController = undefined;
+  }
+}
+```
+
+代次递增发生在 `abort()` 之前，所以即使旧请求立刻拒绝，它也已失去更新页面的资格。
 
 ### 手写实现的取舍
 
@@ -137,15 +162,36 @@ Node 的 `assert/strict` 会在任一行为不符时抛错并返回非零退出�
 | 取消语义 | 任务先计数一次外部副作用，再取消并完成 | UI 不提交；副作用计数不回滚 | 声称取消“撤销”了副作用 |
 | 并发上限 | 5 个任务、限制值 2 | 峰值活动数为 2，返回数组仍按输入顺序 | 峰值超过 2 或结果错位 |
 
+想把竞态带到可运行练习，可以看[浏览器异步专题](workshop-web-async.md)和[Node 请求取消 N010](workshop-node-http-lifecycle.md#n010)。
+
 ## 2. 图片批量加载：单张超时、整体失败与停止轮询
 
-**真实题目线索：** 拼多多前端一面回忆包含“一组图片加载，超时抛错”；二面记载了“写可停止的 setTimeout 循环”和“超时请求错误”。本文将这些记录组合为两阶段练习。原帖没有说明并发策略、超时范围或成功率指标。
+<!-- S02 · **真实题目线索：** 拼多多前端一面回忆包含“一组图片加载，超时抛错”；二面记载了“写可停止的 setTimeout 循环”和“超时请求错误”。本文将这些记录组合为两阶段练习。原帖没有说明并发策略、超时范围或成功率指标。 -->
 
 ### 澄清批次的失败策略
 
 先问图片要全部成功，还是允许部分成功。对于头像墙或商品卡片，常见策略是单图超时后记录失败占位，其他图片继续；对于必须齐全的拼图预览，才可能使用整体失败。还要问是否限制并发、是否要保留输入顺序，以及“停止”是停止创建未来计时器、取消正在进行的请求，还是只忽略未来回调。
 
 逐张 `Promise.race([load(), timeout()])` 只决定哪个结果先被观察，不会自动清除 timeout，也不必然停止 `load()`。超时拒绝后任务仍可能继续工作；应清理计时器，并在底层支持时传 AbortSignal。
+
+先把单张计时器包起来，并确保无论谁先结束都会清理它。这里的超时会拒绝调用方，不会替不支持取消的加载器停工。
+
+```js
+function withTimeout(start, ms) {
+  const controller = new AbortController();
+  let timer;
+  const work = start(controller.signal);
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`timed out after ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
+```
+
+如果 `start` 抛同步异常，定时器还没创建，调用方会直接收到异常；生产封装可再用 `Promise.resolve().then(() => start(signal))` 统一成异步失败。
 
 ```mermaid
 flowchart LR
@@ -174,6 +220,8 @@ flowchart LR
 | 图片数很多吗？ | 很多则限并发、按优先级或视口加载；不多则批次加载 | 每张都要超时与清理；离屏暂停应避免无意重启 |
 | 定时轮询能停止吗？ | 正在 schedule 时保存 timer id，stop 后不再 schedule | 已排队 callback 执行时也检查 stopped token |
 
+真实超时与取消边界可继续看[浏览器异步专题](workshop-web-async.md)和[本地 fetch deadline N025](workshop-node-http-lifecycle.md#n025)。
+
 30 秒回答：“我先确定批次是全成功还是允许部分成功。单张加载封装超时并在 finally 清 timer，批量层再加并发上限；如果支持 AbortSignal 就传给底层。停止循环要阻止下一次 schedule，也要让已排队的回调检查 stopped 标记。”
 
 2 分钟回答：“Promise.race 只是让调用方先拿到超时结果，本身不会取消慢任务。单张超时、批次失败、整体 stop 是三个层次；需要分别定义状态与清理。结果按输入索引保存，避免完成顺序造成错位。验收时要同时造出快图、慢图和失败图，并确认超时误差、计时器清理、并发峰值及 stop 后不再发起任务。”
@@ -184,7 +232,7 @@ flowchart LR
 
 ## 3. 无限滚动：观察触底、分页去重与加载背压
 
-**真实题目线索：** 美团前端一面报告在 2024-11-23 发布，作者将这题列入其“4.15”实习前端一面题目，其中明确追问如何实现无限滚动、如何判断元素在视口内、用什么 API。本文将游标分页、重复请求与反压补充为工程化扩展。
+<!-- S03 · **真实题目线索：** 美团前端一面报告在 2024-11-23 发布，作者将这题列入其“4.15”实习前端一面题目，其中明确追问如何实现无限滚动、如何判断元素在视口内、用什么 API。本文将游标分页、重复请求与反压补充为工程化扩展。 -->
 
 ### 先明确分页协议
 
@@ -264,9 +312,11 @@ async function loadNext() {
 
 2 分钟回答需补充可观察指标：按设备测首屏时间、每页返回量、重复触发数、重复 ID 数和 DOM 节点数；例如测试目标可定为 20 页滚动中每个 cursor 最多发一次请求，重复 ID 为 0，列表 DOM 节点保持在虚拟窗口上限加缓冲范围内。具体阈值应由产品目标给出，面试中明确这是建议验收值而不是原题要求。
 
+继续练习[购物车与分页状态](workshop-web-business.md)和[IntersectionObserver、虚拟列表](workshop-web-dom.md)。
+
 ## 4. SSR 与登录态：首屏、缓存隔离和水合一致
 
-**真实题目线索：** 字节前端公开经验总结记录了 SSR 原理、解决的问题以及 CPU/内存、缓存、TTFB 等风险；携程 2026-08-13 的实习前端面经直接列出 SSR/CSR、使用场景及“登录态为什么不适合 SSR”。下面把两条回忆合成一个系统设计练习。
+<!-- S04 · **真实题目线索：** 字节前端公开经验总结记录了 SSR 原理、解决的问题以及 CPU/内存、缓存、TTFB 等风险；携程 2026-08-13 的实习前端面经直接列出 SSR/CSR、使用场景及“登录态为什么不适合 SSR”。下面把两条回忆合成一个系统设计练习。 -->
 
 ### 约束澄清
 
@@ -302,6 +352,19 @@ sequenceDiagram
 
 同一个服务进程可能同时处理多个用户，因此请求对象、缓存 key、数据加载器不能放在未经隔离的全局可变状态里。缓存公共 HTML 时要证明其中没有个性化字段；缓存私有响应则应按框架、CDN 和代理的实际规则配置并验证，不能只靠口头约定。
 
+请求级身份应一路传给数据加载器，缓存策略也要和响应内容一致。下面的骨架刻意不把用户数据放进模块级变量。
+
+```js
+async function renderPage(req, res) {
+  const user = await sessionFromCookie(req.headers.cookie);
+  const page = await loadPage({ userId: user?.id ?? null });
+  res.setHeader('Cache-Control', user ? 'private, no-store' : 'public, max-age=60');
+  res.end(renderHtml(page));
+}
+```
+
+真实框架还要验证 cookie、错误路径和代理缓存行为；`private` 也不能修复被错误配置的共享 CDN。
+
 ### 性能权衡和反例
 
 SSR 把一部分渲染工作移到服务器，可能提升可见文本首屏，却增加服务端 CPU 和内存；数据必须串行拉取时 TTFB 可能上升，服务器故障也可能让用户直接遇到白屏。静态生成适合变化频率低且不含私有数据的页面；流式 SSR 能更早发送部分 HTML，但要处理边界加载、错误与 hydration 对齐。
@@ -320,9 +383,11 @@ SSR 把一部分渲染工作移到服务器，可能提升可见文本首屏，�
 
 2 分钟回答补指标：“对匿名页面看 TTFB、LCP 和 HTML 缓存命中；对私有页面检查跨用户缓存串读为 0、认证失败无私有片段、服务端内存和 CPU 在目标并发下留有余量。压测两种不同账号并检查 CDN 响应头和正文；再用禁用 JS、启用 JS 的截图对比水合前后内容一致。SSR 的选择最终由 SEO、首屏、服务端容量与个性化边界共同决定。”
 
+配合练习可以看[业务状态专题](workshop-web-business.md)和[HTTP 服务生命周期](workshop-node-http-lifecycle.md)。
+
 ## 5. 海量图表：五万条数据、Canvas 命中和帧预算
 
-**真实题目线索：** 牛客《五年前端面试总结》的京东部分记录了长列表优化、ECharts 五万条数据、Canvas/SVG、离屏渲染、性能监控等问题。报告没有说明数据形状、目标设备或实际图表类型。以下验收参数是练习设定，不声称来自该面试。
+<!-- S05 · **真实题目线索：** 牛客《五年前端面试总结》的京东部分记录了长列表优化、ECharts 五万条数据、Canvas/SVG、离屏渲染、性能监控等问题。报告没有说明数据形状、目标设备或实际图表类型。以下验收参数是练习设定，不声称来自该面试。 -->
 
 ### 先定义“支持五万条”
 
@@ -347,6 +412,23 @@ flowchart LR
 
 50,000 点数仅是数据输入规模。验收对象是经过视口裁剪和像素级降采样后绘制了多少图元、一次交互检查了多少候选，以及屏幕更新是否在预算内。
 
+降采样时每个像素桶保留局部极值，比简单取固定间隔更不容易抹掉尖峰。
+
+```js
+function minMaxByPixel(points, width, xOf, yOf) {
+  const bins = Array.from({ length: width }, () => ({ min: Infinity, max: -Infinity }));
+  for (const point of points) {
+    const x = Math.floor(xOf(point));
+    if (x < 0 || x >= width) continue;
+    bins[x].min = Math.min(bins[x].min, yOf(point));
+    bins[x].max = Math.max(bins[x].max, yOf(point));
+  }
+  return bins.filter(bin => bin.min !== Infinity);
+}
+```
+
+这段只生成绘图摘要，原始点仍需保留或可按区间重新读取，才能支持精确 tooltip。
+
 ### 可比较的实现方案
 
 Canvas 将大量图元集中画在位图上，DOM 数量低，但浏览器不会替每个点做 DOM 事件分发。简单 hover 可以在鼠标移动时做网格候选查询，再进行精确距离平方比较。SVG 每个点独立表达、易绑定语义和事件，但五万元素的 DOM 和布局/绘制成本需要实测。WebGL 适用于更大量且批量 GPU 绘制的场景，但开发复杂度和上下文丢失恢复也要计入。
@@ -370,15 +452,36 @@ Canvas 将大量图元集中画在位图上，DOM 数量低，但浏览器不会
 
 在 1280×720 CSS 像素、DPR=1 和 DPR=2 的浏览器环境加载 50,000 点固定种子数据，分别运行 SVG、Canvas 与降采样 Canvas。练习阈值设为：连续 10 秒拖动缩放期间帧耗时 p95 不高于 16.7 ms；点命中查询 p95 不高于 8 ms；误差半径 6 CSS px 内命中率至少 99%；输出显示图元数、DOM 节点数、脚本耗时与帧分布。阈值是本练习基准，应按业务设备重定，不是原帖要求。关闭页面并清除观察器、Worker 和动画帧。
 
+Canvas 命中与帧预算延伸见[前端工程专题](workshop-web-engineering.md)。
+
 ## 6. 并发任务池：限制同时开始的工作数
 
-**真实题目线索：** 拼多多二面记录可停止的定时循环和 timeout 请求；快手前端二面记录“实现 addTask 类，最大并发量 5”。本节把它们区分为“限制同时执行的任务数”和“可以停止后续调度”两个可组合能力。
+<!-- S06 · **真实题目线索：** 拼多多二面记录可停止的定时循环和 timeout 请求；快手前端二面记录“实现 addTask 类，最大并发量 5”。本节把它们区分为“限制同时执行的任务数”和“可以停止后续调度”两个可组合能力。 -->
 
 ### 约束和顺序
 
 需要先定义任务何时启动、失败后是否继续、返回结果是按完成顺序还是输入顺序，以及 stop 对运行中任务和队列中任务分别意味着什么。并发上限约束活动任务数；它不自动限制任务总量、内存占用、重试风暴或请求速率。
 
 一个最小池维护 `nextIndex` 和固定 worker 数。worker 每完成一个任务就领取下一个索引，任务从而按输入顺序分配，但结束顺序可以不同。结果数组用原始索引写入，才能保留输入顺序。
+
+下面的最小循环展示的是 I/O Promise 并发，不会创建操作系统线程。每个 worker 领一个索引并把结果写回同一位置。
+
+```js
+async function runPool(tasks, limit) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const index = next++;
+      results[index] = await tasks[index]();
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
+}
+```
+
+这个版本遇错即拒绝，但其余 worker 可能继续领任务。若要停止新调度，需要共享停止标记；真正 CPU 隔离则用 Node `worker_threads`，见 N001。
 
 ```mermaid
 flowchart LR
@@ -411,9 +514,11 @@ flowchart LR
 
 2 分钟回答：“需要分别定义池的三类状态：排队、运行、完成/失败。stop 通常只阻止领取新任务；对运行任务，要看底层 API 能否 abort。并行 Promise.all 的拒绝不是 cancellation，fail-fast 要显式通知其他 worker。测试用 deferred 同步放行任务，观察活跃计数峰值、结果顺序、异常后是否补槽及 stop 后启动数。”
 
+线程池与普通异步任务队列不同，参见[真实 Worker 线程池 N001](workshop-node-workers-streams.md#n001)、[有界后台队列 N028](workshop-node-service-resilience.md#n028)和[Go 并发专题](workshop-go-concurrency.md)。
+
 ## 7. 协同图片编辑：传输、并发修改与恢复
 
-**真实题目线索：** 万兴科技前端一面公开回忆写到图库项目的协同编辑功能，并问“不用 WebSocket 能否让多个用户图片状态一致”。作者还记录了 WebSocket 的缺点与图片裁剪/旋转。本文只把这些作为面试主题证据；CRDT/OT 比较、断线协议和验收均为教学扩展。
+<!-- S07 · **真实题目线索：** 万兴科技前端一面公开回忆写到图库项目的协同编辑功能，并问“不用 WebSocket 能否让多个用户图片状态一致”。作者还记录了 WebSocket 的缺点与图片裁剪/旋转。本文只把这些作为面试主题证据；CRDT/OT 比较、断线协议和验收均为教学扩展。 -->
 
 ### 先把“一致”说具体
 
@@ -438,6 +543,19 @@ flowchart LR
 
 常见扩展方案包括：单服务器为操作编号并串行广播；以操作日志重放并用版本检测冲突；允许离线并发编辑时用 OT 或 CRDT 一类合并模型。选择前需评估冲突语义、存储增长、离线要求和实现复杂度。
 
+消息至少要带文档版本和唯一操作 ID。接收方先去重，再判断版本能否直接应用。
+
+```js
+function applyRemote(state, message, seen) {
+  if (seen.has(message.opId)) return state;
+  if (message.baseVersion !== state.version) return requestResync(state.version);
+  seen.add(message.opId);
+  return { ...applyOperation(state, message.operation), version: state.version + 1 };
+}
+```
+
+去重集合需有文档作用域和保留期限；遇到版本缺口时不能假装成功，应补日志或拉取快照。
+
 ### 失败反例与追问树
 
 盲目使用“最后写入胜出”会让较早但后到网络的操作覆盖新操作。断线重连直接发送全部本地快照可能覆盖别人刚保存的数据；至少要带文档版本或操作 ID，服务端识别重复消息。只广播而不持久化会丢失刷新后的状态；只保存最终图片 URL 又无法恢复可编辑对象模型。
@@ -453,6 +571,8 @@ flowchart LR
 30 秒回答：“WebSocket 只提供双向传输，不负责合并冲突。不用它也能借 SSE、轮询或长轮询同步，只是延迟、连接成本和服务端复杂度不同。先定义对象模型、同时编辑范围、断线恢复和一致性目标，再决定服务端版本排序还是 OT/CRDT。”
 
 2 分钟回答补故障处理：“每个操作带文档 ID、客户端 ID、单调操作序号和基础版本；服务端校验权限、去重、持久化后广播。客户端发现序号缺口时请求补齐或拉快照。重连补发操作日志，不直接覆盖全量快照。验收多浏览器并发修改、重复消息、乱序消息、断网恢复和服务端重启，检查最终状态一致、操作不丢失且不会重复应用。”
+
+继续看[业务状态与冲突处理](workshop-web-business.md)、[Node SSE N007–N008](workshop-node-http-lifecycle.md#n007)和[Go HTTP 服务](workshop-go-http.md)。
 
 ## 8. 把面试题答成一套可检查的交付物
 
@@ -516,4 +636,18 @@ node scripts/content-labs/interview/stale-generation.mjs
 - [浏览器特性手写](browser-features.md)：读 IntersectionObserver 与虚拟列表实现，查看浏览器资源释放的代码路径。
 - [手写工具函数](utility-functions.md)：复习缓存、数组结构及如何给工具补上边界行为。
 - [真实前端面试题库：按公司与轮次复盘](../resources/real-interview-question-bank.md)：对照更广的题目目录，查看来源类别和轮次披露边界。
-- [面经来源与证据清单](../assets/research/interview-provenance-20261012.json)：核对公开帖子、日期、岗位、轮次与正文锚点。
+
+## 面经来源
+
+编号与上文的隐藏记录对应。帖子只用于确认主题，不代表官方题库。
+
+| 编号 | 主题 | 原帖 |
+|---|---|---|
+| S01 | PDD 笔试重启 | [拼多多笔试原文](https://www.nowcoder.com/feed/main/detail/f184630a893040e4acbf929f8eb0f2c5) |
+| S02 | 图片超时与停止循环 | [非科班前端春招面经](https://www.nowcoder.com/discuss/479016572799942656?sourceSSR=subject) |
+| S03 | 美团无限滚动 | [美团前端一面](https://www.nowcoder.com/discuss/689797806030163968) |
+| S04a | 字节 SSR 风险 | [字节前端面经](https://www.nowcoder.com/discuss/353156391919624192) |
+| S04b | 携程登录态与 SSR | [携程前端面经](https://www.nowcoder.com/feed/main/detail/77fd82067ded4d09a8fe21682d6d5204) |
+| S05 | 京东五万点图表 | [五年前端面试总结](https://www.nowcoder.com/discuss/792083064158507008) |
+| S06 | 快手最大并发 5 | [非科班前端春招面经](https://www.nowcoder.com/discuss/479016572799942656?sourceSSR=subject) |
+| S07 | 万兴协同编辑 | [万兴科技前端一面](https://www.nowcoder.com/discuss/865618997453123584?sourceSSR=enterprise) |

@@ -46,7 +46,7 @@ try {
   check('document.querySelector("#city").getAttribute("aria-activedescendant") === "city-0"');
   run('scrollintoview', '#lazy-image');
   wait('document.querySelector("#lazy-image").hasAttribute("src")');
-  check('await import("/scripts/teaching-labs/web/core.mjs").then(({deepClone}) => deepClone(document.querySelector("#toggle")) === document.querySelector("#toggle"))');
+  check('(async () => { const {deepClone} = await import("/scripts/teaching-labs/web/core.mjs"); return deepClone(document.querySelector("#toggle")) === document.querySelector("#toggle"); })()');
   console.log('PASS native DOM: delegation, disclosure, dialog focus, combobox, IntersectionObserver');
 
   for (const [width, height] of [[1440, 1000], [1024, 768], [390, 844], [320, 700]]) {

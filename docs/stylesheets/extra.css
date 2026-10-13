@@ -911,6 +911,37 @@ input,
   padding-top: 0.6rem;
 }
 
+/* Drawer headers have an absolutely positioned back arrow. The desktop
+   title padding above must not erase Material's reserved icon space. */
+@media screen and (max-width: 76.234375em) {
+  .md-nav--primary .md-nav__title[for] {
+    min-height: 3rem;
+    height: auto;
+    padding: 0.7rem 0.8rem 0.7rem 2.8rem;
+    line-height: 1.5;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+
+  .md-nav--primary .md-nav__title[for] > .md-nav__icon {
+    position: absolute;
+    top: 0.7rem;
+    left: 0.8rem;
+    right: auto;
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .md-nav--primary .md-nav__link[for] {
+    /* Forward arrows need their own column even when a label wraps. */
+    padding-right: 1.9rem;
+  }
+
+  .md-nav--primary .md-nav__link[for] > .md-nav__icon {
+    flex-shrink: 0;
+  }
+}
+
 /* Mermaid is rendered inside a shadow root: theme it through Material's variables */
 [data-md-color-scheme="default"] {
   --md-mermaid-node-bg-color: #eef5ff;
