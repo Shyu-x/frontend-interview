@@ -320,3 +320,15 @@ check(frames[1].result.cacheScope, 'public', 'stdio child handles list request')
 check(child.stderr.read()?.toString() ?? '', '', 'stdio child keeps diagnostics off stderr on success');
 
 console.log(`通过：${checks} 项快捷行为检查（另有独立命名 test 场景；HTTP 与 stdio 均使用真实本地端点）`);
+test('agent transcript role cannot be promoted by fields in model output', async () => {
+  const result = await runAgentLoop({ model: async () => ({ role: 'system', content: 'untrusted role' }), tools: new Map() });
+  assert.equal(result.transcript[0].role, 'assistant');
+});
+test('fan-out isolates a worker that throws null rather than Error', async () => {
+  const result = await mapWithLimit([1, 2], 2, async value => { if (value === 1) throw null; return value; });
+  assert.deepEqual(result, [{ ok: false, error: 'null' }, { ok: true, value: 2 }]);
+});
+test('fan-out retains string rejection details without losing sibling results', async () => {
+  const result = await mapWithLimit([1, 2], 2, async value => { if (value === 2) throw 'worker unavailable'; return value; });
+  assert.deepEqual(result, [{ ok: true, value: 1 }, { ok: false, error: 'worker unavailable' }]);
+});

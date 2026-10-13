@@ -265,7 +265,7 @@ export async function runAgentLoop({ model, tools, maxTurns = 4, signal }) {
   for (let turn = 0; turn < maxTurns; turn += 1) {
     signal?.throwIfAborted();
     const reply = await model(transcript, signal);
-    transcript.push({ role: 'assistant', ...reply });
+    transcript.push({ ...reply, role: 'assistant' }); // The adapter, not model data, owns the role.
     if (!reply.toolCalls?.length) return { reason: 'final', transcript, turns: turn + 1 };
     for (const call of reply.toolCalls) {
       signal?.throwIfAborted();
@@ -286,7 +286,8 @@ export function consumeBudget(current, delta, limits) {
   return { next, reason };
 }
 
-// 15. Persist only validated JSON snapshots with a monotonically increasing revision.
+// 15. Serialize validated snapshots with a nonnegative revision. Monotonic
+// updates and durable conditional commits are the storage layer's job.
 export function saveSessionSnapshot(snapshot) {
   if (!snapshot || typeof snapshot.sessionId !== 'string' || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0 || !Array.isArray(snapshot.messages) || !snapshot.messages.every((message) => message && typeof message.role === 'string')) throw new TypeError('invalid session snapshot');
   return JSON.stringify({ ...snapshot, version: 1 });
@@ -309,7 +310,12 @@ export async function mapWithLimit(items, limit, worker) {
       const index = cursor++;
       if (index >= items.length) return;
       try { results[index] = { ok: true, value: await worker(items[index], index) }; }
-      catch (error) { results[index] = { ok: false, error: error.message }; }
+      catch (error) {
+        let message;
+        try { message = error instanceof Error ? error.message : String(error); }
+        catch { message = 'Unprintable thrown value'; }
+        results[index] = { ok: false, error: message };
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, drain));
