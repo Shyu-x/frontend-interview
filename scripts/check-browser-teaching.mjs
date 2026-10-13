@@ -46,6 +46,7 @@ try {
   check('document.querySelector("#city").getAttribute("aria-activedescendant") === "city-0"');
   run('scrollintoview', '#lazy-image');
   wait('document.querySelector("#lazy-image").hasAttribute("src")');
+  check('await import("/scripts/teaching-labs/web/core.mjs").then(({deepClone}) => deepClone(document.querySelector("#toggle")) === document.querySelector("#toggle"))');
   console.log('PASS native DOM: delegation, disclosure, dialog focus, combobox, IntersectionObserver');
 
   for (const [width, height] of [[1440, 1000], [1024, 768], [390, 844], [320, 700]]) {
@@ -56,14 +57,20 @@ try {
     if (width <= 1024) {
       click('.md-header__button[for="__drawer"]');
       wait('document.querySelector("#__drawer").checked');
-      check(`Array.from(document.querySelectorAll('label.md-nav__title')).filter(x => {
+      wait('Math.abs(document.querySelector(".md-sidebar--primary").getBoundingClientRect().left) < 1');
+      check(`(() => { const headers=Array.from(document.querySelectorAll('label.md-nav__title')).filter(x => {
         const r=x.getBoundingClientRect(); return r.width>0 && r.left>=0 && r.left<innerWidth;
-      }).every(x => {
+      }); return headers.length>0 && headers.every(x => {
         const icon=x.querySelector('.md-nav__icon'); if(!icon) return true;
         const range=document.createRange(); const node=Array.from(x.childNodes).find(n=>n.nodeType===3 && n.textContent.trim());
         if(!node) return true; range.selectNode(node);
         return range.getBoundingClientRect().left >= icon.getBoundingClientRect().right + 5;
-      })`);
+      }); })()`);
+      const backTarget = JSON.parse(run('eval', `Array.from(document.querySelectorAll('label.md-nav__title[for]'))
+        .find(x => x.textContent.includes('前端与全栈进阶题册'))?.getAttribute('for')`));
+      assert.ok(backTarget, 'expected nested navigation back control');
+      click(`label.md-nav__title[for="${backTarget}"]`);
+      check(`document.getElementById(${JSON.stringify(backTarget)}).checked === false`);
     }
     console.log(`PASS site layout and prose at ${width}x${height}`);
   }

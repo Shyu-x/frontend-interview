@@ -35,6 +35,9 @@ for (const file of readdirSync(folder).filter(name => /^practice-.*\.md$/.test(n
   text = text.replace(/题目为作者原创的机制练习，不是公司真题，也不提供生产级 HTTP 或安全库。/g, '');
   text = text.replace(/本页为作者原创派生练习，题目未实现、未运行，也不代表任何公司的真实面试题。/g, '');
   text = text.replace(/^- S03\/S04 是机制参考标签；[^\n]+\n/gm, '');
+  text = text.replace(/^- 题目来源标签 S03、S05[^\n]+\n/gm, '');
+  text = text.replace(/本页是原创派生练习，不代表真实面试题；只有 H283 对应另页实跑实现，其余题目未实现、未实跑。/g, 'H283 的拆帧实现见[完整题解](handwritten-challenge-solutions.md)。');
+  text = text.replace(/本页是原创派生练习，未实现、未实跑，不代表招聘真题。/g, '');
   text = text.replace(/\n## (?:实际验收边界|未实现题面的验收边界|面试作答)\n[\s\S]*?(?=\n## |$)/g, '\n');
   if (!text.includes('<!-- Solution routes -->')) {
     const route = routes[file.slice('practice-'.length, -'.md'.length)];

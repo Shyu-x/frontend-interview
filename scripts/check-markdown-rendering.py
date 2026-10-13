@@ -45,7 +45,7 @@ def main():
         if expected not in html:
             failures.append(f"fixture {source!r}: expected {expected}, got {html}")
     # Ignore literal code examples. A label leaking ** in prose is a regression.
-    pattern = re.compile(r"\*\*[^*\n]{1,70}[：:]\*\*")
+    pattern = re.compile(r"\*\*[^*\n]{1,70}\*\*")
     pages = list(Path(config["docs_dir"]).rglob("*.md"))
     for page in pages:
         source = page.read_text(encoding="utf-8")

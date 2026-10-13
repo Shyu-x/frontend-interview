@@ -1,12 +1,53 @@
-// W001 — LazyMan: queue every action before starting, so sleepFirst works even
-// though the public API is called synchronously in a chain.
-export function lazyMan(name, { log = () => {}, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
-  const jobs = [];
+// W001 — Both public variations share one queue runner. The greeting is a job
+// too, so a priority wait can be placed ahead of it before the first microtask.
+function createManRunner(greeting, { log = console.log, wait = ms => new Promise(resolve => setTimeout(resolve, ms)), autoStart = true } = {}) {
+  const jobs = [() => log(greeting)];
+  let runPromise;
+
+  function done() {
+    // Cache the first run before yielding; repeated done() calls observe one run.
+    if (runPromise) return runPromise;
+    runPromise = Promise.resolve().then(async () => {
+      // Await each task in order. A rejection exits here and leaves later jobs unrun.
+      for (const job of jobs) await job();
+    });
+    // Auto-start has no caller awaiting it. Mark rejection handled internally,
+    // while returning the original promise so an explicit done() can observe it.
+    runPromise.catch(() => {});
+    return runPromise;
+  }
+
+  if (autoStart) queueMicrotask(done);
+  return {
+    enqueue(job) { jobs.push(job); },
+    prioritize(job) { jobs.unshift(job); },
+    done,
+    log,
+    wait,
+  };
+}
+
+export function lazyMan(name, options = {}) {
+  const runner = createManRunner(`Hi, I'm ${name}`, options);
   const api = {
-    eat(food) { jobs.push(async () => log(`Eat ${food}`)); return api; },
-    sleep(ms) { jobs.push(async () => { await wait(ms); log(`Wake after ${ms}`); }); return api; },
-    sleepFirst(ms) { jobs.unshift(async () => { await wait(ms); log(`Wake first after ${ms}`); }); return api; },
-    done() { return (async () => { log(`Hi, I'm ${name}`); for (const job of jobs) await job(); })(); },
+    eat(food) { runner.enqueue(() => runner.log(`Eat ${food}`)); return api; },
+    sleep(ms) { runner.enqueue(async () => { await runner.wait(ms); runner.log(`Wake after ${ms}`); }); return api; },
+    // It may be called last in the synchronous chain, but it must run first.
+    sleepFirst(ms) { runner.prioritize(async () => { await runner.wait(ms); runner.log(`Wake first after ${ms}`); }); return api; },
+    done: runner.done,
+  };
+  return api;
+}
+
+// This lesson's QQMan variation uses play/rest/restFirst; it shares the queue
+// contract without claiming to reproduce any separately published original.
+export function qqMan(name, options = {}) {
+  const runner = createManRunner(`Hi, I'm ${name}`, options);
+  const api = {
+    play(game) { runner.enqueue(() => runner.log(`Play ${game}`)); return api; },
+    rest(ms) { runner.enqueue(async () => { await runner.wait(ms); runner.log(`Rested ${ms}`); }); return api; },
+    restFirst(ms) { runner.prioritize(async () => { await runner.wait(ms); runner.log(`Rested first ${ms}`); }); return api; },
+    done: runner.done,
   };
   return api;
 }
@@ -16,7 +57,14 @@ export function lazyMan(name, { log = () => {}, wait = ms => new Promise(resolve
 export function promiseAll(iterable) {
   return new Promise((resolve, reject) => {
     let values;
-    try { values = Array.from(iterable); } catch (error) { reject(error); return; }
+    try {
+      // Promise.all consumes the iterable protocol, not Array.from's array-like
+      // fallback. Save the getter result once, then let Array.from consume it.
+      const iteratorMethod = iterable?.[Symbol.iterator];
+      if (typeof iteratorMethod !== 'function') throw new TypeError('Expected an iterable');
+      const iterator = iteratorMethod.call(iterable);
+      values = Array.from({ [Symbol.iterator]: () => iterator });
+    } catch (error) { reject(error); return; }
     if (values.length === 0) { resolve([]); return; }
     const result = new Array(values.length);
     let remaining = values.length;
@@ -31,8 +79,10 @@ export function promiseAll(iterable) {
 export function deepClone(value, seen = new WeakMap()) {
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return seen.get(value);
-  if (value instanceof Date) return new Date(value.getTime());
-  if (value instanceof RegExp) return new RegExp(value.source, value.flags);
+  // DOM nodes are host objects with browser-owned state; keep their identity.
+  if (typeof Node !== 'undefined' && value instanceof Node) return value;
+  if (value instanceof Date) { const copy = new Date(value.getTime()); seen.set(value, copy); return copy; }
+  if (value instanceof RegExp) { const copy = new RegExp(value.source, value.flags); copy.lastIndex = value.lastIndex; seen.set(value, copy); return copy; }
   if (value instanceof Map) { const copy = new Map(); seen.set(value, copy); for (const [k, v] of value) copy.set(deepClone(k, seen), deepClone(v, seen)); return copy; }
   if (value instanceof Set) { const copy = new Set(); seen.set(value, copy); for (const v of value) copy.add(deepClone(v, seen)); return copy; }
   if (ArrayBuffer.isView(value)) {
@@ -43,7 +93,7 @@ export function deepClone(value, seen = new WeakMap()) {
     seen.set(value, copy);
     return copy;
   }
-  if (value instanceof ArrayBuffer) return value.slice(0);
+  if (value instanceof ArrayBuffer) { const copy = value.slice(0); seen.set(value, copy); return copy; }
   const copy = Array.isArray(value) ? [] : Object.create(Object.getPrototypeOf(value));
   seen.set(value, copy);
   for (const key of Reflect.ownKeys(value)) {
