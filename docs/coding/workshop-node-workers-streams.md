@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Node Worker 与流式数据实验
@@ -36,7 +36,7 @@ flowchart LR
 
 先把“单次计算”放到 Worker 文件，再让主线程保留 `resolve/reject` 回调；消息只携带可结构化克隆的数据。每个 slot 同时最多占用一个任务，池满时在入口拒绝，避免无限排队。最后关闭时拒绝未开始的任务、等在途任务结束、逐个 `terminate()`。
 
-关键片段（完整实现见 [WorkerPool](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/labs.mjs) 与 [Worker 入口](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/workers/compute-worker.mjs)）：
+关键片段（完整实现见 [WorkerPool](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/labs.mjs) 与 [Worker 入口](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/workers/compute-worker.mjs)）：
 
 ```js
 const task = this.queue.shift();
@@ -100,4 +100,4 @@ await pipeline(
 
 在仓库根目录运行 `node --test scripts/teaching-labs/node/labs.test.mjs`。预期末尾为 `tests 30`、`pass 30`、`fail 0`。N001 创建的每个 Worker 在测试结束时 `terminate()`；N004 的临时文件由测试 `t.after` 删除。
 
-输入边界包括错误类型、满队列、Worker 操作失败、只读错误路径、已存在目标文件和慢 Writable；这些证据分别由 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/labs.test.mjs) 的 N001–N004 测试直接断言。API 核对入口集中在[参考资料](workshop-node-sources.md#nodejs-官方文档)。
+输入边界包括错误类型、满队列、Worker 操作失败、只读错误路径、已存在目标文件和慢 Writable；这些证据分别由 [测试文件](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/labs.test.mjs) 的 N001–N004 测试直接断言。API 核对入口集中在[参考资料](workshop-node-sources.md#nodejs-官方文档)。

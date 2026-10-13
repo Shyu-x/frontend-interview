@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - go@1.27.1
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Go 文件与流处理 边界、校验与安全落盘
@@ -54,7 +54,7 @@ s.Buffer(make([]byte, 4096), 1024*1024)
 if strings.TrimSpace(s.Text()) != "" { n++ }
 ~~~
 
-完整实现见 [CountNonEmptyLines](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG019CountLines](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio_test.go)。容易出错的是 Scanner 默认 token 上限不适合未评估过的长日志行。下一步可以返回非空字节数和行数，并用 bufio.Reader 支持超长行。
+完整实现见 [CountNonEmptyLines](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG019CountLines](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio_test.go)。容易出错的是 Scanner 默认 token 上限不适合未评估过的长日志行。下一步可以返回非空字节数和行数，并用 bufio.Reader 支持超长行。
 
 ### G020 读取不规则 CSV {#g020}
 
@@ -69,7 +69,7 @@ cr := csv.NewReader(r)
 cr.FieldsPerRecord = -1 // 宽度校验由业务 schema 决定
 ~~~
 
-完整实现见 [ParseCSV](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG020ParseCSV](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio_test.go)。容易出错的是对外部 CSV 假设按逗号切字符串，会错误拆开引号内逗号。下一步可以实现表头到字段名的映射，并报告缺列和重复列。
+完整实现见 [ParseCSV](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG020ParseCSV](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio_test.go)。容易出错的是对外部 CSV 假设按逗号切字符串，会错误拆开引号内逗号。下一步可以实现表头到字段名的映射，并报告缺列和重复列。
 
 ### G021 原子替换任务检查点 {#g021}
 
@@ -85,7 +85,7 @@ if err != nil { return err }
 return os.Rename(tmp, path)
 ~~~
 
-完整实现见 [AtomicWriteFile](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG021AtomicWrite](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio_test.go)。容易出错的是先截断目标再写新内容，写入失败会丢失上一个有效版本。下一步可以补上目录 fsync，并说明它依赖的平台语义与错误处理。
+完整实现见 [AtomicWriteFile](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG021AtomicWrite](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio_test.go)。容易出错的是先截断目标再写新内容，写入失败会丢失上一个有效版本。下一步可以补上目录 fsync，并说明它依赖的平台语义与错误处理。
 
 ### G022 流式复制并计算 SHA-256 {#g022}
 
@@ -100,7 +100,7 @@ n, err := io.Copy(io.MultiWriter(dst, h), io.LimitReader(src, max))
 if err != nil { return n, "", err }
 ~~~
 
-完整实现见 [CopyHash](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG022CopyHash](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio_test.go)。容易出错的是先无限复制再计算摘要会在拒绝文件前已经写出全部内容。下一步可以把摘要算法抽象为 hash.Hash，并支持调用方选择 SHA-256 或 SHA-512。
+完整实现见 [CopyHash](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG022CopyHash](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio_test.go)。容易出错的是先无限复制再计算摘要会在拒绝文件前已经写出全部内容。下一步可以把摘要算法抽象为 hash.Hash，并支持调用方选择 SHA-256 或 SHA-512。
 
 ### G023 逐行解析 JSONL {#g023}
 
@@ -116,7 +116,7 @@ if err := json.Unmarshal(raw, &v); err != nil {
 }
 ~~~
 
-完整实现见 [ParseJSONLines](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG023JSONLines](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio_test.go)。容易出错的是将整份 JSONL 当成一个 JSON 数组解码会破坏逐条流式处理。下一步可以支持跳过坏行但返回每个坏行的行号和错误。
+完整实现见 [ParseJSONLines](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG023JSONLines](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio_test.go)。容易出错的是将整份 JSONL 当成一个 JSON 数组解码会破坏逐条流式处理。下一步可以支持跳过坏行但返回每个坏行的行号和错误。
 
 ### G024 清理上传文件名 {#g024}
 
@@ -131,7 +131,7 @@ name = strings.ReplaceAll(name, "\\", "/")
 base := filepath.Base(name)
 ~~~
 
-完整实现见 [SafeUploadName](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG024SafeUploadName](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/dataio_test.go)。容易出错的是直接用用户提供路径拼目标目录可覆盖目录外文件。下一步可以生成服务端随机存储名，同时把原始显示名作为单独元数据保存。
+完整实现见 [SafeUploadName](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio.go)，对应测试见 [TestG024SafeUploadName](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/dataio_test.go)。容易出错的是直接用用户提供路径拼目标目录可覆盖目录外文件。下一步可以生成服务端随机存储名，同时把原始显示名作为单独元数据保存。
 
 ## 面试回答、真实验收与案例
 

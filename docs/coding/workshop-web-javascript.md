@@ -11,12 +11,12 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # JavaScript 手写题解 队列、Promise 与对象图 W001–W008
 
-下面每题都从一个可观察的调用开始。完整实现和可复制测试在 [`core.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/core.mjs) 与 [`core.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/core.test.mjs)。在仓库根目录运行 `node --test scripts/teaching-labs/web/core.test.mjs`，23 项测试应通过。
+下面每题都从一个可观察的调用开始。完整实现和可复制测试在 [`core.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/core.mjs) 与 [`core.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/core.test.mjs)。在仓库根目录运行 `node --test scripts/teaching-labs/web/core.test.mjs`，23 项测试应通过。
 
 ## W001 LazyMan 链式调用为何先收集再执行 {#w001}
 

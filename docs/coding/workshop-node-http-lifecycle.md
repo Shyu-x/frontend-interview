@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Node HTTP 服务与连接生命周期
@@ -187,10 +187,10 @@ const cleanup = () => {
 };
 ```
 
-测试分别触发正常事件和 abort，检查结果及 listenerCount。完整实现在 [onceEvent](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/labs.mjs)，验收在 [N027 测试](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/labs.test.mjs)。
+测试分别触发正常事件和 abort，检查结果及 listenerCount。完整实现在 [onceEvent](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/labs.mjs)，验收在 [N027 测试](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/labs.test.mjs)。
 
 ## 实际运行与验收
 
 运行 `node --test scripts/teaching-labs/node/labs.test.mjs`。测试通过阈值是 `pass 30 / fail 0`；失败证据包括超限 413、SSE 字段注入拒绝、超时 Abort、handler 错误状态和 close 后 server 不再 listening。N005、N010、N019、N025 都开真实 loopback server；测试完成关闭各自 server。
 
-实现和每题测试入口见 [catalog.json](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/catalog.json)。Node API 版本和 Fastify/Express/Undici 的工程依据集中列在[参考资料](workshop-node-sources.md)。
+实现和每题测试入口见 [catalog.json](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/catalog.json)。Node API 版本和 Fastify/Express/Undici 的工程依据集中列在[参考资料](workshop-node-sources.md)。

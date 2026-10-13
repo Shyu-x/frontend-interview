@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - go@1.27.1
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Go 并发实战 工作池、流水线与共享状态
@@ -103,7 +103,7 @@ for _, err := range errs {
 return out, nil
 ~~~
 
-完整实现见 [WorkerMap](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG001WorkerMap](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。让每个 goroutine append 同一个切片会产生数据竞争，也会按完成顺序改变输出。下一步可让某个 worker 失败后取消剩余订单处理。
+完整实现见 [WorkerMap](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG001WorkerMap](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。让每个 goroutine append 同一个切片会产生数据竞争，也会按完成顺序改变输出。下一步可让某个 worker 失败后取消剩余订单处理。
 
 ### G002 多源遥测合流 {#g002}
 
@@ -158,7 +158,7 @@ go func() {
 }()
 ~~~
 
-完整实现见 [FanIn](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG002FanIn](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。若每个转发者都关闭 out，第二个完成者会 panic。下一步可在转发值中加入数据源名称，便于定位异常分区。
+完整实现见 [FanIn](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG002FanIn](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。若每个转发者都关闭 out，第二个完成者会 panic。下一步可在转发值中加入数据源名称，便于定位异常分区。
 
 ### G003 供应商报价扇出 {#g003}
 
@@ -234,7 +234,7 @@ for _, ok := range seen {
 return out, nil
 ~~~
 
-完整实现见 [FanOut](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG003FanOut](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。只取消、不等待会让函数返回后仍有下游工作。下一步可规定多个供应商同时失败时是返回首错还是聚合错误。
+完整实现见 [FanOut](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG003FanOut](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。只取消、不等待会让函数返回后仍有下游工作。下一步可规定多个供应商同时失败时是返回首错还是聚合错误。
 
 ### G004 并发处理但保持报表顺序 {#g004}
 
@@ -266,7 +266,7 @@ close(indices)
 wg.Wait()
 ~~~
 
-完整实现见 [OrderedMap](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG004OrderedMap](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。append 会按完成顺序改变结果。下一步可给每项结果保存原始输入 ID，方便定位处理失败的报表行。
+完整实现见 [OrderedMap](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG004OrderedMap](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。append 会按完成顺序改变结果。下一步可给每项结果保存原始输入 ID，方便定位处理失败的报表行。
 
 ### G005 可取消的流水线 {#g005}
 
@@ -302,7 +302,7 @@ for {
 }
 ~~~
 
-完整实现见 [PipelineSum](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG005PipelineSum](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是消费者只取一条后返回、生产者又没有取消分支，生产者会卡在下一次发送。下一步可以把求和替换成按批次聚合，并规定批次边界。
+完整实现见 [PipelineSum](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG005PipelineSum](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是消费者只取一条后返回、生产者又没有取消分支，生产者会卡在下一次发送。下一步可以把求和替换成按批次聚合，并规定批次边界。
 
 ### G006 带截止时间的后端查询 {#g006}
 
@@ -328,7 +328,7 @@ case value := <-reply:
 }
 ~~~
 
-完整实现见 [WithDeadline](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG006Deadline](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是把请求 context 存进长期服务对象会把不同请求的生命周期混在一起。下一步可以让回调检查剩余 deadline，在预算不足时不启动昂贵查询。
+完整实现见 [WithDeadline](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG006Deadline](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是把请求 context 存进长期服务对象会把不同请求的生命周期混在一起。下一步可以让回调检查剩余 deadline，在预算不足时不启动昂贵查询。
 
 ### G007 登录接口令牌桶 {#g007}
 
@@ -343,7 +343,7 @@ b.tokens += now.Sub(b.last).Seconds() * b.rate
 if b.tokens > b.capacity { b.tokens = b.capacity }
 ```
 
-完整实现见 [TokenBucket](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG007TokenBucket](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是无上限地累计令牌会令长时间空闲后的突发无限放大。下一步可以为 `Allow` 增加下一次可重试时间。
+完整实现见 [TokenBucket](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG007TokenBucket](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是无上限地累计令牌会令长时间空闲后的突发无限放大。下一步可以为 `Allow` 增加下一次可重试时间。
 
 ### G008 过期缓存 {#g008}
 
@@ -357,7 +357,7 @@ if b.tokens > b.capacity { b.tokens = b.capacity }
 if !c.now().Before(e.expires) { delete(c.items, key); return zero, false }
 ```
 
-完整实现见 [TTLCache](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG008TTLCache](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是仅用 `RWMutex` 读 map，却在过期命中时不加写锁删除，会产生竞态。下一步可以添加定时清扫，但保证读取仍会检查 TTL。
+完整实现见 [TTLCache](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG008TTLCache](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是仅用 `RWMutex` 读 map，却在过期命中时不加写锁删除，会产生竞态。下一步可以添加定时清扫，但保证读取仍会检查 TTL。
 
 ### G009 合并相同键的并发回源 {#g009}
 
@@ -390,7 +390,7 @@ g.mu.Unlock()
 return c.value, c.err
 ~~~
 
-完整实现见 [CallGroup](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG009CallGroup](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是将已完成结果永久保留会把“合并并发请求”误变成“无过期缓存”。下一步可以增加调用方取消等待，但不能误取消共享回源。
+完整实现见 [CallGroup](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG009CallGroup](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是将已完成结果永久保留会把“合并并发请求”误变成“无过期缓存”。下一步可以增加调用方取消等待，但不能误取消共享回源。
 
 ### G010 外部 RPC 并发信号量 {#g010}
 
@@ -404,7 +404,7 @@ return c.value, c.err
 select { case s.slots <- struct{}{}: return nil; case <-ctx.Done(): return ctx.Err() }
 ```
 
-完整实现见 [Semaphore](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG010Semaphore](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是忘记 `Release` 会永久耗尽名额；可在调用点用 `defer` 绑定释放。下一步可以实现一个 `WithPermit(ctx, func() error)`，保证所有返回路径释放。
+完整实现见 [Semaphore](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency.go)，对应测试见 [TestG010Semaphore](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/concurrency_test.go)。容易出错的是忘记 `Release` 会永久耗尽名额；可在调用点用 `defer` 绑定释放。下一步可以实现一个 `WithPermit(ctx, func() error)`，保证所有返回路径释放。
 
 ## 面试回答与真实场景
 

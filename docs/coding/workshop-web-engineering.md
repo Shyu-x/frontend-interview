@@ -11,12 +11,12 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # 缓存、表达式解析与 Canvas 手写题解 W033–W040
 
-这些题连接业务缓存、编译器基础和图形坐标。源码在 [`engineering.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/engineering.mjs)，测试在 [`engineering.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/engineering.test.mjs)；运行 `node --test scripts/teaching-labs/web/engineering.test.mjs`。Node 测试验证确定性模型，不测真实 GPU、帧率或浏览器布局。
+这些题连接业务缓存、编译器基础和图形坐标。源码在 [`engineering.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/engineering.mjs)，测试在 [`engineering.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/engineering.test.mjs)；运行 `node --test scripts/teaching-labs/web/engineering.test.mjs`。Node 测试验证确定性模型，不测真实 GPU、帧率或浏览器布局。
 
 ## W033 LRU Map 顺序就是最近使用顺序 {#w033}
 

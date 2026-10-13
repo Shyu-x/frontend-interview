@@ -11,12 +11,12 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # 浏览器异步手写题解 XHR、Fetch、取消与流 W009–W016
 
-完整源码在 [`async.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/async.mjs)，对应的 Node adapter 测试在 [`async.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/async.test.mjs)。运行 `node --test scripts/teaching-labs/web/async.test.mjs`。这些测试只证明适配器调用合同；下方提供独立真实网络页，XHR/Fetch 行为需要在浏览器里实际操作。
+完整源码在 [`async.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/async.mjs)，对应的 Node adapter 测试在 [`async.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/async.test.mjs)。运行 `node --test scripts/teaching-labs/web/async.test.mjs`。这些测试只证明适配器调用合同；下方提供独立真实网络页，XHR/Fetch 行为需要在浏览器里实际操作。
 
 ## W009 XHR Promise 适配器 保留进度能力 {#w009}
 
@@ -125,7 +125,7 @@ onProgress({ loaded: event.loaded, total, percent: total ? event.loaded / total 
 
 ## 在浏览器里发真实请求
 
-另开终端从仓库根目录执行 `node scripts/teaching-labs/browser-server.mjs`，然后打开 [`network-demo.html`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/network-demo.html) 对应的 `http://127.0.0.1:8123/scripts/teaching-labs/web/network-demo.html`。页面使用真实 XHR 和 Fetch 请求本地 API，不用网络 mock。
+另开终端从仓库根目录执行 `node scripts/teaching-labs/browser-server.mjs`，然后打开 [`network-demo.html`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/network-demo.html) 对应的 `http://127.0.0.1:8123/scripts/teaching-labs/web/network-demo.html`。页面使用真实 XHR 和 Fetch 请求本地 API，不用网络 mock。
 
 先分别按 `XHR 加载订单` 与 `Fetch 加载订单`，两者都应返回带 `query: "ready"` 的 JSON。XHR 失败按钮请求 `/api/error`，显示 HTTP 503 和响应正文；Fetch 失败按钮请求不存在的 `/api/missing`，helper 显示 `HTTP 404`，因为它主动把非 2xx 转成 reject。慢请求按钮配合取消按钮应显示 `XHR 已取消。` 或 `Fetch 已取消。`。
 

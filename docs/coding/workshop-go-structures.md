@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - go@1.27.1
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Go 数据结构实战 缓存、前缀检索与区间算法
@@ -56,7 +56,7 @@ func (c *LRU[K, V]) Get(k K) (V, bool) {
   n := c.order.items[k]
 ~~~
 
-完整实现见 [LRU](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG025LRU](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures_test.go)。容量为 0 在构造时拒绝。若只更新 map、不移动链表，热键会被错误淘汰。下一步可以增加删除键方法，并检查头尾指针在删唯一节点时的状态。
+完整实现见 [LRU](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG025LRU](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures_test.go)。容量为 0 在构造时拒绝。若只更新 map、不移动链表，热键会被错误淘汰。下一步可以增加删除键方法，并检查头尾指针在删唯一节点时的状态。
 
 ### G026 中文站点名称前缀树 {#g026}
 
@@ -73,7 +73,7 @@ for _, r := range word {
 }
 ~~~
 
-完整实现见 [Trie](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG026Trie](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures_test.go)。空串在未插入时不算词。直接按字节切字符串会把多字节字符切成无效片段。下一步可以实现删除词，同时保留仍属于其他词前缀的节点。
+完整实现见 [Trie](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG026Trie](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures_test.go)。空串在未插入时不算词。直接按字节切字符串会把多字节字符切成无效片段。下一步可以实现删除词，同时保留仍属于其他词前缀的节点。
 
 ### G027 价格表里的最小 K 项 {#g027}
 
@@ -90,7 +90,7 @@ if v < h[0] {
 }
 ~~~
 
-完整实现见 [KSmallest](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG027KSmallest](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures_test.go)。对所有 N 项完整排序需要 O(N log N)，当 K 远小于 N 时做了多余工作。下一步可以把结果改成最大的 K 项，并支持价格相同时按商品 ID 排序。
+完整实现见 [KSmallest](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG027KSmallest](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures_test.go)。对所有 N 项完整排序需要 O(N log N)，当 K 远小于 N 时做了多余工作。下一步可以把结果改成最大的 K 项，并支持价格相同时按商品 ID 排序。
 
 ### G028 合并维护时间段 {#g028}
 
@@ -108,7 +108,7 @@ if n == 0 || v.Start > out[n-1].End {
 }
 ~~~
 
-完整实现见 [MergeIntervals](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG028MergeIntervals](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures_test.go)。若业务用半开区间，接触边界的合并规则要重新定义。下一步可以输入区间改成半开，写一组恰好相接的反例。
+完整实现见 [MergeIntervals](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG028MergeIntervals](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures_test.go)。若业务用半开区间，接触边界的合并规则要重新定义。下一步可以输入区间改成半开，写一组恰好相接的反例。
 
 ### G029 保留首次选择顺序的去重 {#g029}
 
@@ -124,7 +124,7 @@ seen[v] = struct{}{}
 out = append(out, v)
 ~~~
 
-完整实现见 [StableUnique](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG029StableUnique](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures_test.go)。slice、map 等不可比较类型不能直接作为元素类型。下一步可以传入 key 提取函数，为不可比较结构体按业务 ID 去重。
+完整实现见 [StableUnique](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG029StableUnique](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures_test.go)。slice、map 等不可比较类型不能直接作为元素类型。下一步可以传入 key 提取函数，为不可比较结构体按业务 ID 去重。
 
 ### G030 查找首个达标价格 {#g030}
 
@@ -138,7 +138,7 @@ out = append(out, v)
 if values[mid] < target { lo = mid + 1 } else { hi = mid }
 ~~~
 
-完整实现见 [LowerBound](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG030LowerBound](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/structures_test.go)。输入未排序时二分结论无效。下一步可以用两个 lower bound 找出等于目标的完整索引范围。
+完整实现见 [LowerBound](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures.go)，对应测试见 [TestG030LowerBound](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/structures_test.go)。输入未排序时二分结论无效。下一步可以用两个 lower bound 找出等于目标的完整索引范围。
 
 ## 面试回答、真实验收与案例
 

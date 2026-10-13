@@ -8,7 +8,7 @@ prerequisites:
   - Node.js 24.16.0
 runnable: false
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Node 工程实验参考资料
@@ -32,4 +32,4 @@ source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
 
 ## 对应实现与验收
 
-所有题解在 [labs.mjs](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/labs.mjs)，Worker 入口在 [compute-worker.mjs](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/workers/compute-worker.mjs)，完整自动验收在 [labs.test.mjs](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/labs.test.mjs)。在仓库根目录运行 `node --test scripts/teaching-labs/node/labs.test.mjs`；测试仅使用临时目录、临时端口和测试创建的 Worker，结束时关闭并清理。
+所有题解在 [labs.mjs](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/labs.mjs)，Worker 入口在 [compute-worker.mjs](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/workers/compute-worker.mjs)，完整自动验收在 [labs.test.mjs](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/labs.test.mjs)。在仓库根目录运行 `node --test scripts/teaching-labs/node/labs.test.mjs`；测试仅使用临时目录、临时端口和测试创建的 Worker，结束时关闭并清理。

@@ -11,12 +11,12 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Web 手写题解工作坊 40 道题的实现与验收入口
 
-每页按题目解释输入输出、数据结构、关键代码和失败边界。完整映射另见 [`catalog.json`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/catalog.json)，源码与测试都在 [`scripts/teaching-labs/web/`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/)。
+每页按题目解释输入输出、数据结构、关键代码和失败边界。完整映射另见 [`catalog.json`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/catalog.json)，源码与测试都在 [`scripts/teaching-labs/web/`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/)。
 
 | 主题 | 教学页 | 题目范围 | 对应源码 | 定向测试 |
 |---|---|---:|---|---|
@@ -36,7 +36,7 @@ node --test scripts/teaching-labs/web/*.test.mjs
 
 40 题共 90 个自动测试。每题都测试正常结果和失败或边界。至少 24 道直接放进产品场景，包括表单、订单、搜索、分页、上传、离线草稿、结算和图表调度。
 
-[`demo.html`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/demo.html)使用真实 DOM。[`network-demo.html`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/network-demo.html)使用真实 XHR 与 Fetch。Node 中注入对象的测试只检查适配器。CORS、上传事件和真实 Canvas 布局需要各自的浏览器用例。
+[`demo.html`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/demo.html)使用真实 DOM。[`network-demo.html`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/network-demo.html)使用真实 XHR 与 Fetch。Node 中注入对象的测试只检查适配器。CORS、上传事件和真实 Canvas 布局需要各自的浏览器用例。
 
 ## 题型来源
 

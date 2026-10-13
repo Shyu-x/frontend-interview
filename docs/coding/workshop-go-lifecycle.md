@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - go@1.27.1
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Go 并发安全与资源生命周期
@@ -55,7 +55,7 @@ func (c *AtomicCounter) Add(delta int64) int64 { return c.value.Add(delta) }
 func (c *AtomicCounter) Load() int64           { return c.value.Load() }
 ~~~
 
-完整实现见 [AtomicCounter](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG031AtomicCounter](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle_test.go)。当更新必须和时间戳、标签等其他字段一起保持一致时，多个独立原子操作并不构成一个事务。可以练习把计数改为“状态与更新时间”快照。
+完整实现见 [AtomicCounter](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG031AtomicCounter](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle_test.go)。当更新必须和时间戳、标签等其他字段一起保持一致时，多个独立原子操作并不构成一个事务。可以练习把计数改为“状态与更新时间”快照。
 
 ### G032 防止并发超卖 {#g032}
 
@@ -72,7 +72,7 @@ if count > i.available {
 i.available -= count
 ~~~
 
-完整实现见 [Inventory](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG032Inventory](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle_test.go)。若只给 available 的读取加锁、写操作不加锁，map-free 也仍有数据竞争和超卖。下一步可把 Reserve 改为预留 token，使调用方能确认或释放预留。
+完整实现见 [Inventory](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG032Inventory](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle_test.go)。若只给 available 的读取加锁、写操作不加锁，map-free 也仍有数据竞争和超卖。下一步可把 Reserve 改为预留 token，使调用方能确认或释放预留。
 
 ### G033 多条清理路径只关闭一次 {#g033}
 
@@ -89,7 +89,7 @@ c.once.Do(func() {
 return c.err
 ~~~
 
-完整实现见 [OnceCloser](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG033OnceCloser](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle_test.go)。不要把 Once 当作普通可重试锁；第一次关闭失败仍不会再次调用 closeFn。下一步可以区分“关闭失败是否可以重试”和“底层资源可能已部分关闭”的契约。
+完整实现见 [OnceCloser](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG033OnceCloser](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle_test.go)。不要把 Once 当作普通可重试锁；第一次关闭失败仍不会再次调用 closeFn。下一步可以区分“关闭失败是否可以重试”和“底层资源可能已部分关闭”的契约。
 
 ### G034 后台任务失败时取消同组任务 {#g034}
 
@@ -105,7 +105,7 @@ if err := task(g.ctx); err != nil {
 }
 ~~~
 
-完整实现见 [TaskGroup](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG034TaskGroup](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle_test.go)。如果任务忽略 context 且永久阻塞，Wait 也会一直等；Go 不会强行终止 goroutine。下一步可以增加启动错误后拒绝新的 Go 调用。
+完整实现见 [TaskGroup](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG034TaskGroup](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle_test.go)。如果任务忽略 context 且永久阻塞，Wait 也会一直等；Go 不会强行终止 goroutine。下一步可以增加启动错误后拒绝新的 Go 调用。
 
 ### G035 热更新只读路由配置 {#g035}
 
@@ -120,7 +120,7 @@ func (s *Snapshot[T]) Store(v *T) { s.value.Store(v) }
 func (s *Snapshot[T]) Load() *T   { return s.value.Load() }
 ~~~
 
-完整实现见 [Snapshot](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG035Snapshot](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle_test.go)。若 Store 后继续修改 map，读者仍可能发生数据竞争。下一步可以封装复制构造函数，避免调用者保留并改写底层 map。
+完整实现见 [Snapshot](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG035Snapshot](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle_test.go)。若 Store 后继续修改 map，读者仍可能发生数据竞争。下一步可以封装复制构造函数，避免调用者保留并改写底层 map。
 
 ### G036 优雅关闭 HTTP 服务 {#g036}
 
@@ -138,7 +138,7 @@ if err := server.Shutdown(ctx); err != nil {
 }
 ~~~
 
-完整实现见 [ShutdownHTTP](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG036ShutdownHTTP](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/lifecycle_test.go)。只取消业务 context 而不停止 listener，进程仍会继续接收请求。下一步可以为 handler 增加一个有界活动请求，并分别验证排空和超时强制关闭。
+完整实现见 [ShutdownHTTP](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle.go)，对应测试见 [TestG036ShutdownHTTP](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/lifecycle_test.go)。只取消业务 context 而不停止 listener，进程仍会继续接收请求。下一步可以为 handler 增加一个有界活动请求，并分别验证排空和超时强制关闭。
 
 ## 面试回答与真实验收
 

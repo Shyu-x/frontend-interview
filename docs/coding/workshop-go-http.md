@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - go@1.27.1
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Go HTTP 工程题 重试、中间件与输入边界
@@ -75,7 +75,7 @@ case <-timer.C:
 }
 ~~~
 
-完整实现见 [RetryGET](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG011RetryGET](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是对付款 POST 自动重试可能重复扣款；需要幂等键和服务端去重。下一步可以对 429 支持 Retry-After，并对退避加上随机抖动。
+完整实现见 [RetryGET](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG011RetryGET](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是对付款 POST 自动重试可能重复扣款；需要幂等键和服务端去重。下一步可以对 429 支持 Retry-After，并对退避加上随机抖动。
 
 ### G012 传播请求 ID {#g012}
 
@@ -90,7 +90,7 @@ ctx := context.WithValue(r.Context(), requestIDKey{}, id)
 next.ServeHTTP(w, r.WithContext(ctx))
 ~~~
 
-完整实现见 [RequestID](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG012RequestID](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是包级可变 currentRequestID 会让并发请求互相覆盖。下一步可以用 crypto/rand 生成缺省 ID，并限制客户端 ID 长度和字符集。
+完整实现见 [RequestID](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG012RequestID](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是包级可变 currentRequestID 会让并发请求互相覆盖。下一步可以用 crypto/rand 生成缺省 ID，并限制客户端 ID 长度和字符集。
 
 ### G013 限额读取 JSON 上传 {#g013}
 
@@ -117,7 +117,7 @@ if err := dec.Decode(&extra); err != io.EOF {
 }
 ~~~
 
-完整实现见 [DecodeJSONLimit](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG013DecodeJSONLimit](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是 io.LimitReader 到上限后会表现为 EOF，调用方可能误以为截断 JSON 合法。下一步可以把超限错误映射成 413，把语法错误映射成 400。
+完整实现见 [DecodeJSONLimit](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG013DecodeJSONLimit](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是 io.LimitReader 到上限后会表现为 EOF，调用方可能误以为截断 JSON 合法。下一步可以把超限错误映射成 413，把语法错误映射成 400。
 
 ### G014 严格配置 JSON {#g014}
 
@@ -142,7 +142,7 @@ if err := dec.Decode(&extra); err != io.EOF {
 }
 ~~~
 
-完整实现见 [DecodeStrictJSON](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG014StrictJSON](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是只调用一次 Decode 会接受 {} {} 的第一个值并忽略剩余字节。下一步可以区分 io.EOF、*json.SyntaxError 与未知字段错误，映射不同 API 错误码。
+完整实现见 [DecodeStrictJSON](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG014StrictJSON](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是只调用一次 Decode 会接受 {} {} 的第一个值并忽略剩余字节。下一步可以区分 io.EOF、*json.SyntaxError 与未知字段错误，映射不同 API 错误码。
 
 ### G015 越界安全分页 {#g015}
 
@@ -158,7 +158,7 @@ start := (page - 1) * size
 if start >= len(items) { return []T{}, nil }
 ~~~
 
-完整实现见 [Page](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG015Page](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是 start := (page-1)*size 可能先溢出，再得到负索引。下一步可以为总页数计算补上加法溢出边界。
+完整实现见 [Page](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG015Page](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是 start := (page-1)*size 可能先溢出，再得到负索引。下一步可以为总页数计算补上加法溢出边界。
 
 ### G016 解析 Content-Length {#g016}
 
@@ -173,7 +173,7 @@ n, err := strconv.ParseInt(raw, 10, 64)
 if err != nil || n < 0 { return 0, errors.New("invalid content length") }
 ~~~
 
-完整实现见 [ParseContentLength](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG016ContentLength](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是 Atoi 后忽略错误会把溢出输入当作零。下一步可以说明为什么实际 HTTP handler 仍应以读取时限制为准，不能只信请求头。
+完整实现见 [ParseContentLength](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG016ContentLength](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是 Atoi 后忽略错误会把溢出输入当作零。下一步可以说明为什么实际 HTTP handler 仍应以读取时限制为准，不能只信请求头。
 
 ### G017 读取供应商响应且限制字节数 {#g017}
 
@@ -188,7 +188,7 @@ data, err := io.ReadAll(io.LimitReader(resp.Body, max+1))
 if int64(len(data)) > max { return nil, errors.New("response body too large") }
 ~~~
 
-完整实现见 [ReadHTTPBody](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG017ReadHTTPBody](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是只限请求体、不限对端响应仍可能耗尽客户端进程内存。下一步可以支持内容压缩时，明确限制压缩前还是解压后的字节。
+完整实现见 [ReadHTTPBody](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG017ReadHTTPBody](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是只限请求体、不限对端响应仍可能耗尽客户端进程内存。下一步可以支持内容压缩时，明确限制压缩前还是解压后的字节。
 
 ### G018 区分存活与就绪 {#g018}
 
@@ -202,7 +202,7 @@ if int64(len(data)) > max { return nil, errors.New("response body too large") }
 if r.URL.Path == "/live" { w.WriteHeader(http.StatusNoContent); return }
 ~~~
 
-完整实现见 [HealthHandler](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http.go)，对应测试见 [TestG018HealthHandler](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/go/http_test.go)。容易出错的是返回 200 却继续接入无法服务的流量。下一步可以把探针响应体和状态码定义成运维可监控的契约。
+完整实现见 [HealthHandler](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http.go)，对应测试见 [TestG018HealthHandler](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/go/http_test.go)。容易出错的是返回 200 却继续接入无法服务的流量。下一步可以把探针响应体和状态码定义成运维可监控的契约。
 
 ## 面试回答、真实验收与案例
 

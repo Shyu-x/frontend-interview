@@ -11,12 +11,12 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # DOM 与无障碍手写题解 委托、焦点和异步表单 W025–W032
 
-可在浏览器直接打开 [`demo.html`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/demo.html) 看真实 DOM 操作。源码模块在 [`dom.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/dom.mjs)，Node 单测在 [`dom.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/dom.test.mjs)，运行 `node --test scripts/teaching-labs/web/dom.test.mjs`。Node 测试用轻量对象检查调用合同；它没有浏览器布局树、读屏软件或真实焦点系统，所以不等同于浏览器验收。
+可在浏览器直接打开 [`demo.html`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/demo.html) 看真实 DOM 操作。源码模块在 [`dom.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/dom.mjs)，Node 单测在 [`dom.test.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/dom.test.mjs)，运行 `node --test scripts/teaching-labs/web/dom.test.mjs`。Node 测试用轻量对象检查调用合同；它没有浏览器布局树、读屏软件或真实焦点系统，所以不等同于浏览器验收。
 
 ## W025 动态订单列表只绑定一次 {#w025}
 

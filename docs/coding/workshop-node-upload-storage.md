@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Node 上传与本地存储
@@ -55,7 +55,7 @@ await pipeline(request, limiter, createWriteStream(tempPath, { flags: 'wx', mode
 await rename(tempPath, destination);
 ```
 
-测试真实创建文件，4 字节输入成功；5 字节输入触发 413，且 uploads 目录不存在残留 `.part`。已有同名目标时再发生上传失败，旧版字节必须保留。唯一临时名使用随机 UUID，避免同进程同毫秒的并发上传互删 staging。超过 15 行的实现按入口校验、限速 Transform、成功发布、失败清理四段读 [atomicUpload](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/labs.mjs)。
+测试真实创建文件，4 字节输入成功；5 字节输入触发 413，且 uploads 目录不存在残留 `.part`。已有同名目标时再发生上传失败，旧版字节必须保留。唯一临时名使用随机 UUID，避免同进程同毫秒的并发上传互删 staging。超过 15 行的实现按入口校验、限速 Transform、成功发布、失败清理四段读 [atomicUpload](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/labs.mjs)。
 
 ## N012 · 对分片重试建立内容合同 {#n012}
 
@@ -105,4 +105,4 @@ if (actual !== expectedSha256) throw new Error('assembled checksum mismatch');
 
 在仓库根目录运行 `node --test scripts/teaching-labs/node/labs.test.mjs`，通过阈值为 `pass 30 / fail 0`。失败证据包含 413、错误 chunk digest、路径越界、最终哈希不符和 staging 残留断言。所有文件都写入测试生成的临时目录，`t.after` 负责递归删除。
 
-函数映射、业务场景与测试名在 [catalog.json](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/catalog.json)；官方文件系统 API 及原子 rename 的适用边界列在[参考资料](workshop-node-sources.md#nodejs-官方文档)。
+函数映射、业务场景与测试名在 [catalog.json](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/catalog.json)；官方文件系统 API 及原子 rename 的适用边界列在[参考资料](workshop-node-sources.md#nodejs-官方文档)。

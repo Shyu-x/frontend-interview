@@ -11,7 +11,7 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # Node 服务韧性实验
@@ -128,4 +128,4 @@ Promise.resolve().then(item.work).then(item.resolve, item.reject)
 
 运行 `node --test scripts/teaching-labs/node/labs.test.mjs`，预期 30 项全通过。核心边界包含租户隔离、时钟过期、同进程并发请求合并、Webhook 篡改拒绝、游标篡改拒绝以及队列溢出。
 
-实现入口和每题业务场景见 [catalog.json](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/node/catalog.json)；HMAC、HTTP 和项目关机实践依据集中在[参考资料](workshop-node-sources.md)。
+实现入口和每题业务场景见 [catalog.json](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/node/catalog.json)；HMAC、HTTP 和项目关机实践依据集中在[参考资料](workshop-node-sources.md)。

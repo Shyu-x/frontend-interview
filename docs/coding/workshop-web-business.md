@@ -11,12 +11,12 @@ runnable: true
 tested_with:
   - node@24.16.0
 verified_at: 2026-10-13
-source_commit: 27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb
+source_commit: f682da9816e3f5454a3f1d8d8cb074d0de53236b
 ---
 
 # 前端业务状态手写题解 购物车、保存与结算 W017–W024
 
-这组题把小算法放进可辨认的产品行为里：价格以分存储、收藏失败撤回、同一用户只刷新一次令牌、旧分页不污染新筛选、草稿冲突可见、付款状态不跳步。完整函数在 [`business.mjs`](https://github.com/Shyu-x/frontend-interview/blob/27ac651e0a1ac3d53eee663fe2d6e5b0d45f00eb/scripts/teaching-labs/web/business.mjs)，每题有成功与失败测试，运行 `node --test scripts/teaching-labs/web/business.test.mjs`。
+这组题把小算法放进可辨认的产品行为里：价格以分存储、收藏失败撤回、同一用户只刷新一次令牌、旧分页不污染新筛选、草稿冲突可见、付款状态不跳步。完整函数在 [`business.mjs`](https://github.com/Shyu-x/frontend-interview/blob/f682da9816e3f5454a3f1d8d8cb074d0de53236b/scripts/teaching-labs/web/business.mjs)，每题有成功与失败测试，运行 `node --test scripts/teaching-labs/web/business.test.mjs`。
 
 ## W017 购物车总价 先确定单位再相加 {#w017}
 
